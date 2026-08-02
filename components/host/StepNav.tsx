@@ -3,18 +3,18 @@
 import Link from "next/link";
 
 /**
- * Linear progression: home → pricing → contract → invoice. The Nav above
+ * Linear progression: home → pricing → contract → documents. The Nav above
  * lets users jump anywhere; these components add the natural forward/back
  * arrows + a step indicator that mirrors the workflow.
  */
 
-export type StepKey = "home" | "pricing" | "contract" | "invoice";
+export type StepKey = "home" | "pricing" | "contract" | "documents";
 
 const STEPS: { key: StepKey; href: string; label: string; short: string }[] = [
-  { key: "home",     href: "/host",          label: "Event Details", short: "Details" },
-  { key: "pricing",  href: "/host/pricing",  label: "Pricing",       short: "Pricing"  },
-  { key: "contract", href: "/host/contract", label: "Contract",      short: "Contract" },
-  { key: "invoice",  href: "/host/invoice",  label: "Invoices",      short: "Invoices" },
+  { key: "home",      href: "/host",           label: "Event Details", short: "Details"   },
+  { key: "pricing",   href: "/host/pricing",   label: "Pricing",       short: "Pricing"   },
+  { key: "contract",  href: "/host/contract",  label: "Contract",      short: "Contract"  },
+  { key: "documents", href: "/host/documents", label: "Documents",     short: "Documents" },
 ];
 
 function indexOfStep(current: StepKey): number {

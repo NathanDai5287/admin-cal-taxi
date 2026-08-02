@@ -1,0 +1,66 @@
+"use client";
+
+import Field from "./Field";
+import LineItemList from "@/components/host/LineItemList";
+import type { RentalFields } from "@/lib/host-documents";
+
+export default function RentalPanel({
+  fields,
+  onChange,
+  onReset,
+  totalDescription,
+}: {
+  fields: RentalFields;
+  onChange: (patch: Partial<RentalFields>) => void;
+  onReset: () => void;
+  totalDescription: string;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Issue Date">
+          <input
+            type="date" className="field-input" required
+            value={fields.issueDate}
+            onChange={e => onChange({ issueDate: e.target.value })}
+          />
+        </Field>
+        <Field label="Due Date">
+          <input
+            type="date" className="field-input" required
+            value={fields.dueDate}
+            onChange={e => onChange({ dueDate: e.target.value })}
+          />
+        </Field>
+        <Field label="Invoice Number" hint="Optional. Leave blank to auto-generate.">
+          <input
+            className="field-input" placeholder="auto: RNT-YYYY-MMDD-XXXXXX"
+            value={fields.invoiceNumber}
+            onChange={e => onChange({ invoiceNumber: e.target.value })}
+          />
+        </Field>
+      </div>
+
+      <hr className="border-rule" />
+
+      <div>
+        <div className="flex items-baseline justify-between mb-3 gap-4 flex-wrap">
+          <div>
+            <div className="card-title">Line Items</div>
+            <p className="text-[12px] text-muted mt-1.5 max-w-md">{totalDescription}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onReset}
+            className="btn-link"
+            title="Re-derive from current pricing selections and negotiated total"
+          >
+            Reset from Pricing
+          </button>
+        </div>
+
+        <LineItemList items={fields.items} onChange={items => onChange({ items })} />
+      </div>
+    </div>
+  );
+}
