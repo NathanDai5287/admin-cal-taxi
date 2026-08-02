@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { ApiCallError, generatePdf } from "@/lib/host-api";
 import { AreaKey, OverrideKey, useSharedData } from "@/lib/host-shared-state";
 import { autoValue, effective, hasDiverged } from "@/lib/host-derive";
 import { formatDateISO } from "@/lib/host-format";
@@ -15,18 +13,12 @@ const AREAS: { key: AreaKey; label: string; clearedDesc: string }[] = [
 
 export default function ContractPage() {
   const { hydrated, data, update } = useSharedData();
-  // Sign is intentionally local + reset on each page visit.
-  const [sign, setSign] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  // Fee, deposit, and max guests are derived from the pricing step on every
-  // render (see lib/host-derive.ts) rather than copied in once — so they can't
-  // hold a stale number from an earlier pass through the flow.
-  const rentalPrice   = hydrated ? effective(data, "rentalPrice")   : "";
-  const depositAmount = hydrated ? effective(data, "depositAmount") : "";
-  const maxGuests     = hydrated ? effective(data, "maxGuests")     : "";
+  // Max guests is derived from the pricing step on every render (see
+  // lib/host-derive.ts) rather than copied in once — so it can't hold a
+  // stale number from an earlier pass through the flow. (Rental fee and
+  // deposit are derived the same way, inside <DerivedField> itself.)
+  const maxGuests = hydrated ? effective(data, "maxGuests") : "";
 
   function setArea(key: AreaKey, on: boolean) {
     update("areas", { ...data.areas, [key]: on });
@@ -36,46 +28,6 @@ export default function ContractPage() {
     update("cleared", { ...data.cleared, [key]: on });
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null); setSuccess(null); setBusy(true);
-    try {
-      const selectedAreas = AREAS.filter(a => data.areas[a.key]).map(a => a.key);
-      const clearedMap: Record<string, boolean> = {};
-      selectedAreas.forEach(k => { clearedMap[k] = data.cleared[k]; });
-
-      const cleanupIdx = Math.min(Math.max(data.pricingSelections.cleanup, 0), 1);
-      const cleanupTier = cleanupIdx === 1 ? "full" : "basic";
-
-      const { filename } = await generatePdf("/api/host/generate/contract", {
-        club_name:  data.clubName,
-        date:       formatDateISO(data.eventDate),  // "May 5, 2026"
-        start_time: data.startTime,
-        end_time:   data.endTime,
-        price:      rentalPrice,
-        deposit:    depositAmount,
-        max_guests: maxGuests,
-        monitors:   data.monitors,
-        cleanup_tier: cleanupTier,
-        areas:      selectedAreas,
-        cleared:    clearedMap,
-        guest_list:      data.guestList,
-        sound_system:    data.soundSystem,
-        lighting_system: data.lightingSystem,
-        sign,
-      });
-      setSuccess(`Downloaded ${filename}`);
-    } catch (err) {
-      setError(
-        err instanceof ApiCallError ? err.message
-        : err instanceof Error      ? err.message
-        : "request failed",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const txt = <K extends keyof typeof data>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       update(k, e.target.value as never);
@@ -83,7 +35,7 @@ export default function ContractPage() {
   const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
 
   return (
-    <form onSubmit={submit} className="space-y-8">
+    <div className="space-y-8">
       <div>
         <StepIndicator current="contract" />
         <h1 className="page-title mt-6">Hosting Contract</h1>
@@ -262,41 +214,8 @@ export default function ContractPage() {
         </div>
       </section>
 
-      {/* ── Auto-sign ── */}
-      <section className="card">
-        <div className="card-header">
-          <span className="card-title">Execution</span>
-          <span className="card-subtitle">Optionally pre-sign the Theta Xi side.</span>
-        </div>
-        <div className="card-body">
-          <p className="text-[12.5px] text-muted mb-3 max-w-2xl leading-relaxed">
-            When enabled, the contract is generated with the Theta Xi Executive Board signature
-            and today&rsquo;s date already filled in. The renter&rsquo;s side is left blank.
-          </p>
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={sign}
-              onChange={e => setSign(e.target.checked)}
-            />
-            <span className="text-[14px]">Auto-sign Theta Xi side with today&rsquo;s date</span>
-          </label>
-        </div>
-      </section>
-
-      {/* ── Submit + step nav ── */}
-      <div className="flex items-center justify-between gap-6 flex-wrap pt-2 border-t border-rule">
-        <div className="flex-1 min-w-[200px] pt-4">
-          {error && <p className="text-warn text-[13px]">{error}</p>}
-          {success && <p className="text-ok text-[13px]">{success}</p>}
-        </div>
-        <button type="submit" disabled={busy || !hydrated} className="btn-primary mt-4">
-          {busy ? "Generating…" : "Generate Contract"}
-        </button>
-      </div>
-
       <StepNav current="contract" />
-    </form>
+    </div>
   );
 }
 
