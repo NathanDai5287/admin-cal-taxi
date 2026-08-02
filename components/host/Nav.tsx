@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/host/pricing",  label: "Pricing"  },
-  { href: "/host/contract", label: "Contract" },
-  { href: "/host/invoice",  label: "Invoice"  },
+  { href: "/host/pricing",   label: "Pricing"   },
+  { href: "/host/contract",  label: "Contract"  },
+  { href: "/host/documents", label: "Documents" },
+  { href: "/host/orders",    label: "Orders"    },
 ];
 
 export default function Nav() {
