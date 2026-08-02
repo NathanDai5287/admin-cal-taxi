@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* =====================================================================
+   Host section (/host) — ported from the standalone host.cal.taxi app.
+   Mirrors the generated Typst PDFs: brand blue, hairline rules, sharp
+   corners, uppercase tracked labels. Everything below is scoped under
+   [data-host] (set on app/host/layout.tsx's root wrapper) so it can't
+   bleed into /rush or the admin home page.
+   ===================================================================== */
+
+@theme {
+  --color-brand: #0a5482;
+  --color-brand-light: #e8f2f9;
+  --color-ink: #101014;
+  --color-muted: #6e6e72;
+  --color-rule: #d8d8db;
+  --color-canvas: #f5f5f7;
+  --color-ok: #1a7f4b;
+  --color-ok-light: #e6f4ec;
+  --color-warn: #c0392b;
+  --color-warn-light: #fdf0ef;
+}
+
+[data-host] {
+  color-scheme: light;
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss01", "cv01", "cv11";
+}
+
+[data-host] input,
+[data-host] textarea,
+[data-host] select,
+[data-host] button {
+  border-radius: 0;
+}
+
+@layer components {
+  /* ── Card ── */
+  [data-host] .card {
+    @apply bg-white border border-rule;
+    border-top: 3px solid var(--color-brand);
+  }
+  [data-host] .card-header {
+    @apply px-6 pt-4 pb-3 flex items-baseline gap-3;
+  }
+  [data-host] .card-title {
+    @apply text-[11px] font-bold tracking-[0.16em] uppercase text-brand;
+  }
+  [data-host] .card-subtitle {
+    @apply text-[12px] text-muted;
+  }
+  [data-host] .card-body {
+    @apply px-6 pb-6;
+  }
+  [data-host] .card-divider {
+    @apply border-t border-rule my-5;
+  }
+
+  [data-host] .card-plain {
+    @apply bg-white border border-rule;
+  }
+
+  /* ── Field labels & inputs ── */
+  [data-host] .field-label {
+    @apply block text-[11px] font-semibold uppercase tracking-[0.10em] text-muted mb-2;
+  }
+  [data-host] .field-input,
+  [data-host] .field-textarea {
+    @apply w-full px-3 py-2 bg-white border border-rule text-[14px] text-ink
+           outline-none transition-colors;
+    border-radius: 0;
+  }
+  [data-host] .field-input:focus,
+  [data-host] .field-textarea:focus {
+    @apply border-brand;
+    box-shadow: inset 0 -1px 0 0 var(--color-brand);
+  }
+  [data-host] .field-textarea {
+    @apply resize-y min-h-[80px];
+  }
+  [data-host] .field-hint {
+    @apply text-[11.5px] text-muted leading-snug mt-1.5;
+  }
+
+  /* ── Buttons ── */
+  [data-host] .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           bg-brand text-white border border-brand
+           hover:bg-[#08456a] hover:border-[#08456a]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    border-radius: 0;
+  }
+  [data-host] .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           bg-white text-brand border border-brand
+           hover:bg-brand-light disabled:opacity-50;
+    border-radius: 0;
+  }
+  [data-host] .btn-link {
+    @apply text-[12px] font-semibold tracking-[0.06em] text-muted
+           hover:text-warn underline-offset-4 hover:underline transition-colors
+           cursor-pointer;
+  }
+
+  /* ── Radio rows (used by pricing tiers) ── */
+  [data-host] .radio-option {
+    @apply flex items-center gap-2.5 px-3 py-2 bg-white border border-rule
+           cursor-pointer transition-colors hover:border-brand select-none;
+    border-left-width: 3px;
+    border-left-color: transparent;
+    border-radius: 0;
+  }
+  [data-host] .radio-option input[type="radio"] {
+    @apply accent-brand shrink-0;
+  }
+  [data-host] .radio-option.selected {
+    @apply border-brand bg-brand-light;
+    border-left-color: var(--color-brand);
+  }
+  [data-host] .radio-option.selected-warn {
+    @apply bg-white;
+    border-color: var(--color-warn);
+    border-left-color: var(--color-warn);
+  }
+
+  /* ── Plain checkbox row ── */
+  [data-host] .check-row {
+    @apply flex items-start gap-2.5 py-1.5 cursor-pointer text-[13.5px] select-none;
+  }
+  [data-host] .check-row input[type="checkbox"] {
+    @apply accent-brand mt-0.5 shrink-0;
+  }
+  [data-host] .check-row.disabled {
+    @apply text-muted/60 cursor-not-allowed;
+  }
+
+  /* ── Tabs (used by /host/invoice) ── */
+  [data-host] .tab-bar {
+    @apply flex border-b border-rule;
+  }
+  [data-host] .tab {
+    @apply px-5 py-3 -mb-px text-left transition-colors border-b-2 border-transparent
+           text-muted hover:text-ink cursor-pointer;
+    min-width: 160px;
+  }
+  [data-host] .tab .tab-label {
+    @apply block text-[13px] font-bold;
+  }
+  [data-host] .tab .tab-sub {
+    @apply block text-[11px] mt-0.5 opacity-80;
+  }
+  [data-host] .tab.active {
+    @apply text-brand border-brand;
+  }
+
+  /* ── Page heading ── */
+  [data-host] .page-eyebrow {
+    @apply text-[11px] font-bold tracking-[0.18em] uppercase text-brand;
+  }
+  [data-host] .page-title {
+    @apply text-[26px] font-bold text-ink tracking-[-0.01em] mt-1;
+  }
+  [data-host] .page-lede {
+    @apply text-[13.5px] text-muted mt-2 max-w-[580px] leading-relaxed;
+  }
+}
