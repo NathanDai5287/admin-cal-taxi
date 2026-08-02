@@ -116,6 +116,13 @@ export type SharedState = {
   // Cross-references between invoice tabs
   lastDepositInvoiceNumber: string;
 
+  /**
+   * The archived order this workspace is currently attached to, or "" when the
+   * workspace is a new unsaved rental. Set by "Save to Orders" and by loading
+   * an order back in; documents generated afterwards attach to it.
+   */
+  currentOrderId: string;
+
   // Officers — rendered on invoices and the credit memo. Optional;
   // empty values fall back to the generic "Theta Xi treasurer" wording.
   treasurerName: string;
@@ -152,6 +159,7 @@ export const EMPTY_STATE: SharedState = {
   },
 
   lastDepositInvoiceNumber: "",
+  currentOrderId: "",
 
   treasurerName: "",
   treasurerContact: "",
