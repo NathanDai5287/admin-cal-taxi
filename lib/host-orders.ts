@@ -16,7 +16,24 @@ import type { Order, OrderDocument, OrderStatus, OrderSummary } from "./host-ord
 const ORIGIN = process.env.HOST_BACKEND_ORIGIN;
 const KEY = process.env.HOST_BACKEND_KEY;
 
+/** The archive could not be reached, or isn't configured at all. */
 export class OrdersUnavailableError extends Error {}
+
+/**
+ * The archive answered with an error status.
+ *
+ * Carries `status` so callers can branch on it. Do not branch by matching the
+ * message: the backend's error bodies are its own vocabulary (a missing order
+ * is `{"error":"not_found"}`), so prose-matching silently stops working the
+ * moment either side rewords anything.
+ */
+export class OrdersRequestError extends Error {
+  status: number;
+  constructor(status: number, detail: string) {
+    super(`Order archive request failed: ${detail}`);
+    this.status = status;
+  }
+}
 
 /** True when the archive is wired up. Pages use this to explain themselves. */
 export function ordersConfigured(): boolean {
@@ -58,7 +75,7 @@ async function call<T>(
       const body = (await res.json()) as { error?: string; detail?: string };
       detail = body.detail || body.error || detail;
     } catch { /* non-JSON error body */ }
-    throw new Error(`Order archive request failed: ${detail}`);
+    throw new OrdersRequestError(res.status, detail);
   }
 
   return (await res.json()) as T;
@@ -69,12 +86,13 @@ export async function listOrders(): Promise<OrderSummary[]> {
   return orders;
 }
 
+/** The order, or null when it doesn't exist — so pages can call `notFound()`. */
 export async function getOrder(id: string): Promise<Order | null> {
   try {
     const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`);
     return order;
   } catch (err) {
-    if (err instanceof Error && /404|not found/i.test(err.message)) return null;
+    if (err instanceof OrdersRequestError && err.status === 404) return null;
     throw err;
   }
 }

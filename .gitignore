@@ -18,3 +18,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Agent worktrees (local scratch, never part of the project)
+.claude/worktrees/
