@@ -158,7 +158,9 @@ export default function WorkspaceActions({ order }: { order: Order }) {
       eventDate: "",
       lastDepositInvoiceNumber: "",
     });
-    router.push("/host/documents");
+    // Back to step 1, not the documents step: the event date was deliberately
+    // cleared, and every document is blocked until a new one is entered.
+    router.push("/host");
   }
 
   return (

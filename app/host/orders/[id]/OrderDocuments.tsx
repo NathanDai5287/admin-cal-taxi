@@ -11,6 +11,7 @@ import { useState } from "react";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import { ApiCallError, generatePdf } from "@/lib/host-api";
 import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
+import { formatDateISO } from "@/lib/host-format";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
 import { fmtUSDOrDash } from "../order-format";
 
@@ -79,8 +80,12 @@ function DocumentSlot({
     }
   }
 
+  // formatDateISO on the UTC date part, not toLocaleDateString: this is a
+  // client component, so it also renders during SSR — a timezone-dependent
+  // format produces different text on the server than in the browser and
+  // trips a hydration mismatch.
   const summary = doc
-    ? `${fmtUSDOrDash(doc.amount)} · Generated ${new Date(doc.generatedAt).toLocaleDateString("en-US")}`
+    ? `${fmtUSDOrDash(doc.amount)} · Generated ${formatDateISO(doc.generatedAt.slice(0, 10))}`
     : undefined;
 
   return (

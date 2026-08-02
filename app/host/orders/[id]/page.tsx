@@ -95,9 +95,12 @@ export default async function OrderDetailPage({
             <p className="text-[13.5px] text-muted mt-2">
               {formatDateISO(order.eventDate) || "No event date"}
             </p>
+            {/* Date only, from the UTC timestamp. Rendering the clock time
+                would show the server's timezone (UTC on Vercel) as though it
+                were the reader's, so an evening save reads as the next day. */}
             <p className="text-[11.5px] text-muted mt-3">
-              Created {new Date(order.createdAt).toLocaleString("en-US")} · Updated{" "}
-              {new Date(order.updatedAt).toLocaleString("en-US")}
+              Created {formatDateISO(order.createdAt.slice(0, 10))} · Updated{" "}
+              {formatDateISO(order.updatedAt.slice(0, 10))}
             </p>
           </div>
           <StatusPill status={status} large />

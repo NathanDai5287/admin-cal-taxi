@@ -33,7 +33,7 @@ import {
   type RentalFields,
 } from "@/lib/host-documents";
 import type { DocumentKind, OrderDocument } from "@/lib/host-orders-types";
-import { addDocumentAction, saveOrderAction } from "@/app/host/orders/actions";
+import { addDocumentAction, saveOrderAction, updateOrderAction } from "@/app/host/orders/actions";
 import { buildLineItems } from "./build-line-items";
 import ContractPanel from "./ContractPanel";
 import DepositPanel from "./DepositPanel";
@@ -177,8 +177,17 @@ export default function DocumentsPage() {
 
   const generated = generatedRef.current;
 
-  const [sessionDocuments, setSessionDocuments] = useState<Omit<OrderDocument, "id">[]>([]);
-  const [savedCount, setSavedCount] = useState(0);
+  /**
+   * Everything generated this session, at most one per kind — regenerating a
+   * document supersedes the earlier one rather than adding a second. The
+   * archive enforces the same rule (unique index on order_id + kind), because
+   * two documents of one kind would double-count in the order's ledger.
+   */
+  function generatedDocuments(): Omit<OrderDocument, "id">[] {
+    return DOCUMENT_ORDER.map(k => generatedRef.current[k]).filter(
+      (d): d is Omit<OrderDocument, "id"> => Boolean(d),
+    );
+  }
 
   const [busy, setBusy] = useState<Partial<Record<DocumentKind, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<DocumentKind, string | null>>>({});
@@ -270,7 +279,6 @@ export default function DocumentsPage() {
       };
 
       recordGenerated(kind, doc);
-      setSessionDocuments(prev => [...prev, doc]);
       setSuccesses(s => ({ ...s, [kind]: `Downloaded ${filename}` }));
 
       // Preserve the cross-reference: the credit memo tab used to read this
@@ -327,11 +335,22 @@ export default function DocumentsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
+  // The archive keys a rental on these two, and rejects a save without them.
+  const canSave = data.clubName.trim() !== "" && data.eventDate.trim() !== "";
+
+  /**
+   * Persist the workspace. Saving is idempotent: it always sends the current
+   * document set, and the archive replaces any same-kind document it already
+   * holds — so pressing this twice, or after regenerating a PDF, converges
+   * rather than piling up duplicates.
+   */
   async function saveToOrders() {
     setSaveBusy(true);
     setSaveError(null);
     setSaveNotice(null);
     try {
+      const documents = generatedDocuments();
+
       if (!data.currentOrderId) {
         const res = await saveOrderAction({
           clubName: data.clubName,
@@ -339,30 +358,38 @@ export default function DocumentsPage() {
           rentalPrice: toNum(effective(data, "rentalPrice")),
           depositAmount: toNum(effective(data, "depositAmount")),
           snapshot: data,
-          documents: sessionDocuments,
+          documents,
         });
         if (!res.ok) { setSaveError(res.error); return; }
         update("currentOrderId", res.data.id);
-        setSavedCount(sessionDocuments.length);
-        setSaveNotice(`Saved as a new order.`);
-      } else {
-        const pending = sessionDocuments.slice(savedCount);
-        if (pending.length === 0) {
-          setSaveNotice("Nothing new to save — already up to date.");
-          return;
-        }
-        const startCount = savedCount;
-        let count = startCount;
-        for (const doc of pending) {
-          const res = await addDocumentAction(data.currentOrderId, doc);
-          if (!res.ok) { setSaveError(res.error); break; }
-          count += 1;
-        }
-        setSavedCount(count);
-        if (count > startCount) {
-          setSaveNotice(`Saved ${count - startCount} document(s) to the order.`);
-        }
+        setSaveNotice(
+          documents.length
+            ? `Saved as a new order with ${documents.length} document(s).`
+            : "Saved as a new order. Generate documents and save again to attach them.",
+        );
+        return;
       }
+
+      // Existing order: re-send every document, plus refresh the stored
+      // snapshot so pricing/contract edits made since the first save persist.
+      const patch = await updateOrderAction(data.currentOrderId, {
+        clubName: data.clubName,
+        eventDate: data.eventDate,
+        rentalPrice: toNum(effective(data, "rentalPrice")),
+        depositAmount: toNum(effective(data, "depositAmount")),
+        snapshot: data,
+      });
+      if (!patch.ok) { setSaveError(patch.error); return; }
+
+      for (const doc of documents) {
+        const res = await addDocumentAction(data.currentOrderId, doc);
+        if (!res.ok) { setSaveError(res.error); return; }
+      }
+      setSaveNotice(
+        documents.length
+          ? `Order updated — ${documents.length} document(s) archived.`
+          : "Order updated.",
+      );
     } finally {
       setSaveBusy(false);
     }
@@ -535,16 +562,21 @@ export default function DocumentsPage() {
                   nothing is archived until you click this.
                 </p>
               )}
+              {!canSave && hydrated && (
+                <p className="text-[12px] text-muted mt-1.5">
+                  An organization and event date are required before a rental can be archived.
+                </p>
+              )}
               {saveError && <p className="text-warn text-[13px] mt-1.5">{saveError}</p>}
               {saveNotice && !saveError && <p className="text-ok text-[13px] mt-1.5">{saveNotice}</p>}
             </div>
             <button
               type="button"
               onClick={saveToOrders}
-              disabled={saveBusy || !hydrated}
+              disabled={saveBusy || !hydrated || !canSave}
               className="btn-primary"
             >
-              {saveBusy ? "Saving…" : "Save to Orders"}
+              {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
             </button>
           </div>
         </div>

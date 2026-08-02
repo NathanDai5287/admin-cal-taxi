@@ -53,7 +53,7 @@ export default function DocumentRow({
   state,
   summary,
   onDownload,
-  downloadLabel = "Download PDF",
+  downloadLabel,
   busy = false,
   error,
   success,
@@ -69,6 +69,7 @@ export default function DocumentRow({
   /** Key values at a glance while collapsed (e.g. "$2,000 · May 5, 2026"). */
   summary?: React.ReactNode;
   onDownload: () => void;
+  /** Overrides the button text in every state. Defaults by state when omitted. */
   downloadLabel?: string;
   busy?: boolean;
   error?: string | null;
@@ -131,7 +132,9 @@ export default function DocumentRow({
             disabled={!canDownload}
             className={isDone ? "btn-ghost" : "btn-primary"}
           >
-            {busy ? "Generating…" : isDone ? "Download again" : downloadLabel}
+            {busy
+              ? "Generating…"
+              : downloadLabel ?? (isDone ? "Download again" : "Download PDF")}
           </button>
         </div>
       </div>
