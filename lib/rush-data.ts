@@ -79,6 +79,130 @@ export async function getRushVotes(): Promise<ToppingVote[]> {
     .sort((a, b) => b.votes - a.votes);
 }
 
+// ---------------------------------------------------------------------------
+// QR scan tracking
+//
+// Printed QR codes point at rush.cal.taxi/r/<source>, which records the hit and
+// redirects to the homepage. Counters are written by rush-taxi's lib/scans.ts;
+// the source list is duplicated here for the same reason TOPPING_NAMES is —
+// two separately deployed projects with no shared package.
+// ---------------------------------------------------------------------------
+
+const SCAN_SOURCES = ["card", "flyer", "poster", "ig", "table"] as const;
+
+const SCAN_SOURCE_LABELS: Record<string, string> = {
+  card: "Business cards",
+  flyer: "Flyers",
+  poster: "Posters",
+  ig: "Instagram",
+  table: "Tabling",
+  unknown: "Unrecognized code",
+};
+
+export interface ScanRecord {
+  source: string;
+  ip: string;
+  userAgent: string;
+  scanId: string;
+  unique: boolean;
+  ts: number;
+}
+
+export interface ScanSourceStat {
+  source: string;
+  label: string;
+  total: number;
+  unique: number;
+  today: number;
+}
+
+export interface ScanStats {
+  sources: ScanSourceStat[];
+  totalScans: number;
+  totalUnique: number;
+  botHits: number;
+  daily: { date: string; total: number }[];
+  recent: ScanRecord[];
+}
+
+function todayInBerkeley(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export async function getScanStats(): Promise<ScanStats> {
+  if (!redis) {
+    return {
+      sources: [],
+      totalScans: 0,
+      totalUnique: 0,
+      botHits: 0,
+      daily: [],
+      recent: [],
+    };
+  }
+
+  const [totals, daily, bots, recentRaw] = await Promise.all([
+    redis.hgetall<Record<string, string>>("rush-taxi:scan-totals"),
+    redis.hgetall<Record<string, string>>("rush-taxi:scan-daily"),
+    redis.hgetall<Record<string, string>>("rush-taxi:scan-bots"),
+    redis.lrange("rush-taxi:scans", -50, -1),
+  ]);
+
+  // "unknown" only exists once something has actually hit an unrecognized
+  // slug, so it's appended conditionally rather than always shown as a zero.
+  const sourceKeys = [
+    ...SCAN_SOURCES,
+    ...Object.keys(totals ?? {}).filter(
+      (key) => !(SCAN_SOURCES as readonly string[]).includes(key),
+    ),
+  ];
+
+  const uniqueCounts = await Promise.all(
+    sourceKeys.map((source) => redis.scard(`rush-taxi:scan-uniques:${source}`)),
+  );
+
+  const today = todayInBerkeley();
+
+  const sources: ScanSourceStat[] = sourceKeys.map((source, i) => ({
+    source,
+    label: SCAN_SOURCE_LABELS[source] ?? source,
+    total: Number(totals?.[source] ?? 0),
+    unique: Number(uniqueCounts[i] ?? 0),
+    today: Number(daily?.[`${source}|${today}`] ?? 0),
+  }));
+
+  // Roll the per-source daily fields up into one figure per day.
+  const byDay = new Map<string, number>();
+  for (const [field, value] of Object.entries(daily ?? {})) {
+    const date = field.split("|")[1];
+    if (!date) continue;
+    byDay.set(date, (byDay.get(date) ?? 0) + Number(value));
+  }
+
+  return {
+    sources: sources.sort((a, b) => b.total - a.total),
+    totalScans: sources.reduce((sum, s) => sum + s.total, 0),
+    totalUnique: sources.reduce((sum, s) => sum + s.unique, 0),
+    botHits: Object.values(bots ?? {}).reduce(
+      (sum, value) => sum + Number(value),
+      0,
+    ),
+    daily: Array.from(byDay.entries())
+      .map(([date, total]) => ({ date, total }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    recent: recentRaw
+      .map((raw) =>
+        typeof raw === "string" ? JSON.parse(raw) : (raw as ScanRecord),
+      )
+      .reverse(),
+  };
+}
+
 // A "pair" is one (IP, device) combination — the unit that leads, votes,
 // and bans are all tracked and enforced by. Never IP alone (would block an
 // entire shared WiFi) or device alone (would follow someone onto a
