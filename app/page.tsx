@@ -3,6 +3,11 @@ import Link from "next/link";
 const APPS = [
   { href: "/rush", label: "Rush Week", description: "RSVP leads and pizza vote standings" },
   { href: "/host", label: "Host", description: "Rental contracts, pricing, and invoices" },
+  {
+    href: "/reimbursements",
+    label: "Reimbursements",
+    description: "Submit receipts and review chapter expense reimbursements",
+  },
 ];
 
 export default function Home() {

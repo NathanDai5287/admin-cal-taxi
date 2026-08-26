@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { updateReimbursementSession } from "@/lib/reimbursements/supabase/proxy";
+
 function unauthorized() {
   return new NextResponse("Authentication required", {
     status: 401,
@@ -8,7 +10,7 @@ function unauthorized() {
   });
 }
 
-export default function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const expectedUser = process.env.ADMIN_USERNAME ?? "admin";
   const expectedPass = process.env.ADMIN_PASSWORD;
 
@@ -26,7 +28,7 @@ export default function proxy(request: NextRequest) {
 
   if (user !== expectedUser || pass !== expectedPass) return unauthorized();
 
-  return NextResponse.next();
+  return updateReimbursementSession(request);
 }
 
 export const config = {
