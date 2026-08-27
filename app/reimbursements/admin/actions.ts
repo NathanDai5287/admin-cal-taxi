@@ -48,5 +48,6 @@ export async function updateStatus(formData: FormData) {
 
   await supabase.from("reimbursements").update({ status: parsed.data.status }).eq("id", parsed.data.id);
   revalidatePath("/reimbursements/admin");
+  revalidatePath(`/reimbursements/admin/${parsed.data.id}`);
   revalidatePath("/reimbursements/dashboard");
 }

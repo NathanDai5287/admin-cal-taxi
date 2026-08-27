@@ -15,9 +15,23 @@ type ResultResponse = {
     establishment?: string | null;
     dateISO?: string | null;
     date?: string | null;
-    total?: number | null;
+    total?: number | string | null;
   };
 };
+
+function parseReceiptTotal(value: number | string | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  const normalized = value.replaceAll(",", "").replace(/[^0-9.-]/g, "");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function amountsMatch(requestedAmount: number, receiptTotal: number) {
+  return Math.round(requestedAmount * 100) === Math.round(receiptTotal * 100);
+}
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -84,8 +98,9 @@ export async function processReimbursementReceipt(reimbursementId: string) {
     if (downloadError || !receipt) throw downloadError ?? new Error("Receipt not found.");
 
     const result = await scanReceipt(receipt, reimbursement.receipt_path.split("/").at(-1) ?? "receipt.jpg");
-    const receiptTotal = typeof result.total === "number" ? result.total : null;
-    const matches = receiptTotal !== null && Math.abs(Number(reimbursement.amount) - receiptTotal) < 0.005;
+    const receiptTotal = parseReceiptTotal(result.total);
+    const matches = receiptTotal !== null
+      && amountsMatch(Number(reimbursement.amount), receiptTotal);
     const receiptDate = (result.dateISO || result.date)?.slice(0, 10) || null;
 
     await admin.from("reimbursements").update({
