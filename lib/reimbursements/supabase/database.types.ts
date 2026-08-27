@@ -24,6 +24,7 @@ export type Database = {
         };
         Update: {
           full_name?: string;
+          role?: Database["public"]["Enums"]["app_role"];
         };
         Relationships: [];
       };
