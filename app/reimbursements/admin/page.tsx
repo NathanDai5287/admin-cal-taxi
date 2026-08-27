@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { updateStatus } from "@/app/reimbursements/admin/actions";
 import { AppHeader } from "@/components/reimbursements/app-header";
 import { InviteForm } from "@/components/reimbursements/invite-form";
 import { requireAdmin } from "@/lib/reimbursements/auth";
@@ -14,13 +13,10 @@ export default async function AdminPage() {
   const { supabase } = await requireAdmin();
   const { data: reimbursements } = await supabase
     .from("reimbursements")
-    .select("id, full_name, amount, category, status, merchant, receipt_path, submitted_at")
+    .select("id, full_name, amount, category, status, merchant, receipt_total, submitted_at")
     .order("submitted_at", { ascending: false });
 
-  const rows = await Promise.all((reimbursements ?? []).map(async (item) => {
-    const { data } = await supabase.storage.from("receipts").createSignedUrl(item.receipt_path, 300);
-    return { ...item, receiptUrl: data?.signedUrl ?? null };
-  }));
+  const rows = reimbursements ?? [];
 
   return (
     <main className="app-shell">
@@ -44,26 +40,25 @@ export default async function AdminPage() {
           <div className="panel-header"><h2>All submissions</h2></div>
           {rows.length ? (
             <table className="admin-table">
-              <thead><tr><th>Member</th><th>Expense</th><th>Amount</th><th>Status</th><th>Receipt</th><th>Review</th></tr></thead>
+              <thead><tr><th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Review</th></tr></thead>
               <tbody>
                 {rows.map((item) => (
-                  <tr key={item.id}>
-                    <td><strong>{item.full_name}</strong><div className="receipt-meta">{new Date(item.submitted_at).toLocaleDateString()}</div></td>
+                  <tr className="submission-row" key={item.id}>
+                    <td>
+                      <Link
+                        aria-label={`Review submission from ${item.full_name}`}
+                        className="submission-link"
+                        href={`/reimbursements/admin/${item.id}`}
+                      >
+                        {item.full_name}
+                      </Link>
+                      <div className="receipt-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
+                    </td>
                     <td>{item.merchant || formatStatus(item.category)}</td>
                     <td className="amount">{formatMoney(item.amount)}</td>
+                    <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
                     <td><span className={`badge badge-${item.status}`}>{formatStatus(item.status)}</span></td>
-                    <td>{item.receiptUrl ? <a className="back-link" href={item.receiptUrl} rel="noreferrer" target="_blank">View</a> : "—"}</td>
-                    <td>
-                      <div className="status-actions">
-                        {(["pending", "approved", "denied"] as const).map((status) => (
-                          <form action={updateStatus} key={status}>
-                            <input name="id" type="hidden" value={item.id} />
-                            <input name="status" type="hidden" value={status} />
-                            <button disabled={item.status === status} type="submit">{formatStatus(status)}</button>
-                          </form>
-                        ))}
-                      </div>
-                    </td>
+                    <td><span className="submission-row-action">Review submission <span aria-hidden="true">→</span></span></td>
                   </tr>
                 ))}
               </tbody>

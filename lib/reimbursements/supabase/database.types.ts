@@ -42,6 +42,11 @@ export type Database = {
           receipt_date: string | null;
           receipt_total: number | null;
           failure_reason: string | null;
+          discord_message_id: string | null;
+          discord_channel_id: string | null;
+          discord_notified_at: string | null;
+          discord_decided_at: string | null;
+          discord_reviewer_id: string | null;
           submitted_at: string;
           updated_at: string;
         };
@@ -59,6 +64,11 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          discord_message_id?: string | null;
+          discord_channel_id?: string | null;
+          discord_notified_at?: string | null;
+          discord_decided_at?: string | null;
+          discord_reviewer_id?: string | null;
           submitted_at?: string;
           updated_at?: string;
         };
@@ -68,6 +78,11 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          discord_message_id?: string | null;
+          discord_channel_id?: string | null;
+          discord_notified_at?: string | null;
+          discord_decided_at?: string | null;
+          discord_reviewer_id?: string | null;
           updated_at?: string;
         };
         Relationships: [];

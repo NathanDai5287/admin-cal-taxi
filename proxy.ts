@@ -11,6 +11,12 @@ function unauthorized() {
 }
 
 export default async function proxy(request: NextRequest) {
+  // Supabase cannot answer the site's interactive Basic Auth challenge. This
+  // machine-to-machine endpoint performs its own constant-time secret check.
+  if (request.nextUrl.pathname === "/api/webhooks/reimbursements") {
+    return NextResponse.next();
+  }
+
   const expectedUser = process.env.ADMIN_USERNAME ?? "admin";
   const expectedPass = process.env.ADMIN_PASSWORD;
 
