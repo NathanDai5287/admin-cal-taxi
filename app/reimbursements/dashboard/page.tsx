@@ -9,15 +9,16 @@ export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { supabase, profile } = await requireUser();
+  const { supabase, userId, profile, email } = await requireUser();
   const { data: reimbursements } = await supabase
     .from("reimbursements")
     .select("id, category, amount, status, merchant, submitted_at")
+    .eq("user_id", userId)
     .order("submitted_at", { ascending: false });
 
   return (
     <main className="app-shell">
-      <AppHeader isAdmin={profile.role === "admin"} />
+      <AppHeader email={email} isAdmin={profile.role === "admin"} name={profile.full_name} />
       <div className="app-content">
         <div className="page-heading">
           <div>

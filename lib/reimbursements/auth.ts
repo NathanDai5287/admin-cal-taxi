@@ -23,7 +23,9 @@ export async function requireUser() {
     redirect("/reimbursements/login");
   }
 
-  return { supabase, userId, profile };
+  const email = typeof data?.claims?.email === "string" ? data.claims.email : "";
+
+  return { supabase, userId, profile, email };
 }
 
 export async function requireAdmin() {

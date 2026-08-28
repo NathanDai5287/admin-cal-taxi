@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await notifyDiscordOfReimbursement(payload.data.record.id);
-    return Response.json(result, { status: result.status === "processing" ? 202 : 200 });
+    return Response.json(result, { status: result.status === "pending" ? 202 : 200 });
   } catch (error) {
     console.error("Discord reimbursement notification failed", error);
     return Response.json({ error: "Discord notification failed" }, { status: 502 });

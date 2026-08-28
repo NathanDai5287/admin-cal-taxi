@@ -98,7 +98,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       .maybeSingle();
     if (lookupError) throw lookupError;
     if (!reimbursement) return;
-    if (reimbursement.status === "processing") {
+    if (reimbursement.status === "pending") {
       await removeReaction(reaction, user.id);
       console.warn(`Submission ${reimbursement.id} is still processing; decision ignored.`);
       return;
@@ -112,7 +112,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         discord_reviewer_id: user.id,
       })
       .eq("id", reimbursement.id)
-      .neq("status", "processing")
+      .neq("status", "pending")
       .select("id")
       .maybeSingle();
     if (updateError) throw updateError;

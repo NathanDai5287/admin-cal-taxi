@@ -91,7 +91,7 @@ export async function updateStatus(formData: FormData) {
   const { supabase } = await requireAdmin();
   const parsed = z.object({
     id: z.uuid(),
-    status: z.enum(["pending", "verified", "approved", "denied"]),
+    status: z.enum(["approved", "denied"]),
   }).safeParse({ id: formData.get("id"), status: formData.get("status") });
   if (!parsed.success) return;
 

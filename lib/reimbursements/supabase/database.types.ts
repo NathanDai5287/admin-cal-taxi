@@ -103,9 +103,9 @@ export type Database = {
         | "utilities"
         | "other";
       reimbursement_status:
-        | "processing"
         | "pending"
         | "verified"
+        | "mismatch"
         | "approved"
         | "denied"
         | "processing_failed";

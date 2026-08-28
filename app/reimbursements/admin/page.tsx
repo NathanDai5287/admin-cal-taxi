@@ -32,7 +32,7 @@ async function getEmailByUserId() {
 }
 
 export default async function AdminPage() {
-  const { supabase } = await requireAdmin();
+  const { supabase, profile, email } = await requireAdmin();
   const [{ data: reimbursements }, { data: profiles }, emailByUserId] = await Promise.all([
     supabase
       .from("reimbursements")
@@ -50,7 +50,7 @@ export default async function AdminPage() {
 
   return (
     <main className="app-shell">
-      <AppHeader isAdmin />
+      <AppHeader email={email} isAdmin name={profile.full_name} />
       <div className="app-content">
         <div className="page-heading">
           <div>
