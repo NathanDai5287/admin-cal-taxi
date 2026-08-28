@@ -12,9 +12,21 @@ total extraction in the background.
 1. Copy `.env.example` to `.env.local` and fill in the values.
 2. Apply `supabase/migrations/20260826000000_receipt_reimbursements.sql` to the Supabase project.
 3. In Supabase Auth, disable public signups and allow these redirect URLs:
-   - `http://localhost:3000/reimbursements/auth/callback`
-   - `https://admin.cal.taxi/reimbursements/auth/callback`
-4. Create the first user in Supabase Auth, then promote that account in SQL:
+   - `http://localhost:3000/reimbursements/auth/accept-invite`
+   - `https://admin.cal.taxi/reimbursements/auth/accept-invite`
+4. Optional: after configuring custom SMTP, use a token-hash link in Supabase
+   Auth → Email Templates → Invite user to prevent email security scanners from
+   consuming an invitation just by opening the URL:
+
+   ```html
+   <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=invite">
+     Accept the invite
+   </a>
+   ```
+
+   Keep the rest of the template as desired. The application waits for the user
+   to press **Continue** before it verifies the one-time token.
+5. Create the first user in Supabase Auth, then promote that account in SQL:
 
    ```sql
    update public.profiles
