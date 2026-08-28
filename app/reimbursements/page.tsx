@@ -1,9 +1,21 @@
 import Link from "next/link";
 
 import { hasSupabaseConfig } from "@/lib/reimbursements/supabase/config";
+import { createClient } from "@/lib/reimbursements/supabase/server";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
   const configured = hasSupabaseConfig();
+  let signedIn = false;
+
+  if (configured) {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getClaims();
+    signedIn = Boolean(data?.claims?.sub);
+  }
+
+  const accountHref = signedIn ? "/reimbursements/dashboard" : "/reimbursements/login";
 
   return (
     <main className="landing-shell">
@@ -12,8 +24,8 @@ export default function Home() {
           <span className="brand-mark">R</span>
           <span>Chapter Reimbursements</span>
         </Link>
-        <Link className="button button-secondary" href="/reimbursements/login">
-          Sign in
+        <Link className="button button-secondary" href={accountHref}>
+          {signedIn ? "Dashboard" : "Sign in"}
         </Link>
       </nav>
 
@@ -25,8 +37,8 @@ export default function Home() {
           reimbursement from review to approval.
         </p>
         <div className="hero-actions">
-          <Link className="button button-primary" href="/reimbursements/login">
-            Submit an expense
+          <Link className="button button-primary" href={accountHref}>
+            {signedIn ? "Open dashboard" : "Submit an expense"}
           </Link>
           <span className="helper-text">Access is limited to invited members.</span>
         </div>

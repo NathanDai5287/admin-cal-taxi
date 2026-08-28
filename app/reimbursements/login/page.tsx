@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/reimbursements/login-form";
+import { createClient } from "@/lib/reimbursements/supabase/server";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -17,6 +19,12 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+
+  if (data?.claims?.sub) {
+    redirect("/reimbursements/dashboard");
+  }
 
   return (
     <main className="auth-page">
