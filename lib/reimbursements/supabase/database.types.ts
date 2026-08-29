@@ -9,21 +9,44 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      reimbursement_budgets: {
+        Row: {
+          budget_key: string;
+          amount: number | null;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          budget_key: string;
+          amount?: number | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number | null;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
           full_name: string;
+          email: string;
           role: Database["public"]["Enums"]["app_role"];
           created_at: string;
         };
         Insert: {
           id: string;
           full_name?: string;
+          email?: string;
           role?: Database["public"]["Enums"]["app_role"];
           created_at?: string;
         };
         Update: {
           full_name?: string;
+          email?: string;
           role?: Database["public"]["Enums"]["app_role"];
         };
         Relationships: [];
@@ -103,9 +126,9 @@ export type Database = {
         | "utilities"
         | "other";
       reimbursement_status:
-        | "processing"
         | "pending"
         | "verified"
+        | "mismatch"
         | "approved"
         | "denied"
         | "processing_failed";

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ReimbursementBrand } from "@/components/reimbursements/reimbursement-brand";
+import { ThemeToggle } from "@/components/reimbursements/theme-toggle";
 import { hasSupabaseConfig } from "@/lib/reimbursements/supabase/config";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
@@ -20,13 +22,13 @@ export default async function Home() {
   return (
     <main className="landing-shell">
       <nav className="site-nav">
-        <Link className="brand" href="/reimbursements">
-          <span className="brand-mark">R</span>
-          <span>Chapter Reimbursements</span>
-        </Link>
-        <Link className="button button-secondary" href={accountHref}>
-          {signedIn ? "Dashboard" : "Sign in"}
-        </Link>
+        <ReimbursementBrand href="/reimbursements" />
+        <div className="site-nav-actions">
+          <ThemeToggle />
+          <Link className="button button-secondary" href={accountHref}>
+            {signedIn ? "Dashboard" : "Sign in"}
+          </Link>
+        </div>
       </nav>
 
       <section className="hero">

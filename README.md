@@ -7,10 +7,11 @@ and receipt reimbursements.
 
 The reimbursement app is mounted at `/reimbursements` and uses Supabase for invited-user
 authentication, PostgreSQL data, and private receipt storage. Tabscanner performs receipt
-total extraction in the background.
+total extraction in the background. Submissions move from `pending` to `verified`,
+`mismatch`, or `processing_failed`; a reviewer can then mark them `approved` or `denied`.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
-2. Apply `supabase/migrations/20260826000000_receipt_reimbursements.sql` to the Supabase project.
+2. Apply the SQL files in `supabase/migrations` to the Supabase project in filename order.
 3. In Supabase Auth, disable public signups and allow these redirect URLs:
    - `http://localhost:3000/reimbursements/auth/accept-invite`
    - `https://admin.cal.taxi/reimbursements/auth/accept-invite`

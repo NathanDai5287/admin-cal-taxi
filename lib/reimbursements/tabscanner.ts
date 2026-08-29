@@ -89,7 +89,7 @@ export async function processReimbursementReceipt(reimbursementId: string) {
     .eq("id", reimbursementId)
     .single();
 
-  if (reimbursementError || !reimbursement || reimbursement.status !== "processing") return;
+  if (reimbursementError || !reimbursement || reimbursement.status !== "pending") return;
 
   try {
     const { data: receipt, error: downloadError } = await admin.storage
@@ -108,7 +108,7 @@ export async function processReimbursementReceipt(reimbursementId: string) {
       receipt_date: receiptDate,
       receipt_total: receiptTotal,
       failure_reason: null,
-      status: matches ? "verified" : "pending",
+      status: matches ? "verified" : "mismatch",
     }).eq("id", reimbursementId);
   } catch (error) {
     await admin.from("reimbursements").update({

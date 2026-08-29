@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/reimbursements/login-form";
+import { ReimbursementBrand } from "@/components/reimbursements/reimbursement-brand";
+import { ThemeToggle } from "@/components/reimbursements/theme-toggle";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -28,11 +29,9 @@ export default async function LoginPage({
 
   return (
     <main className="auth-page">
+      <ThemeToggle className="auth-theme-toggle" />
       <section className="auth-card">
-        <Link className="brand" href="/reimbursements">
-          <span className="brand-mark">R</span>
-          <span>Chapter Reimbursements</span>
-        </Link>
+        <ReimbursementBrand href="/reimbursements" />
         <h1>Welcome back</h1>
         <p>Sign in with the email address your chapter administrator invited.</p>
         {error && errorMessages[error] && <p className="notice auth-error">{errorMessages[error]}</p>}

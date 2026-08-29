@@ -17,12 +17,12 @@ export async function POST(_request: Request, context: RouteContext<"/api/reimbu
     .from("reimbursements")
     .select("id")
     .eq("id", id)
-    .eq("status", "processing")
+    .eq("status", "pending")
     .maybeSingle();
   if (!reimbursement) {
     return Response.json({ error: "Reimbursement not found" }, { status: 404 });
   }
 
   after(() => processReimbursementReceipt(id));
-  return Response.json({ status: "processing" }, { status: 202 });
+  return Response.json({ status: "pending" }, { status: 202 });
 }

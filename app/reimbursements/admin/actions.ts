@@ -91,12 +91,13 @@ export async function updateStatus(formData: FormData) {
   const { supabase } = await requireAdmin();
   const parsed = z.object({
     id: z.uuid(),
-    status: z.enum(["pending", "verified", "approved", "denied"]),
+    status: z.enum(["approved", "denied"]),
   }).safeParse({ id: formData.get("id"), status: formData.get("status") });
   if (!parsed.success) return;
 
   await supabase.from("reimbursements").update({ status: parsed.data.status }).eq("id", parsed.data.id);
   revalidatePath("/reimbursements/admin");
+  revalidatePath("/reimbursements/admin/reports");
   revalidatePath(`/reimbursements/admin/${parsed.data.id}`);
   revalidatePath("/reimbursements/dashboard");
 }

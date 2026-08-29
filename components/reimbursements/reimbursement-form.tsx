@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
@@ -8,13 +8,28 @@ import { createClient } from "@/lib/reimbursements/supabase/client";
 
 const maxReceiptSize = 10 * 1024 * 1024;
 const receiptTypes = new Set(["image/jpeg", "image/png"]);
+const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 
 export function ReimbursementForm({ defaultName }: { defaultName: string }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const paymentMethodRef = useRef<HTMLInputElement>(null);
+  const rememberPaymentMethodRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedPaymentMethod = window.localStorage.getItem(paymentMethodStorageKey);
+      if (!savedPaymentMethod || savedPaymentMethod.length > 200) return;
+
+      if (paymentMethodRef.current) paymentMethodRef.current.value = savedPaymentMethod;
+      if (rememberPaymentMethodRef.current) rememberPaymentMethodRef.current.checked = true;
+    } catch {
+      // Submission still works when browser storage is disabled.
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,7 +98,25 @@ export function ReimbursementForm({ defaultName }: { defaultName: string }) {
       if (!processResponse.ok) {
         throw new Error("The reimbursement was saved, but receipt processing could not start.");
       }
+
+      const rememberPaymentMethod = form.get("rememberPaymentMethod") === "on";
+      try {
+        if (rememberPaymentMethod) {
+          window.localStorage.setItem(paymentMethodStorageKey, parsed.data.paymentMethod);
+        } else {
+          window.localStorage.removeItem(paymentMethodStorageKey);
+        }
+      } catch {
+        // Saving the preference is optional and must not invalidate a submission.
+      }
+
       formRef.current?.reset();
+      if (rememberPaymentMethod && paymentMethodRef.current) {
+        paymentMethodRef.current.value = parsed.data.paymentMethod;
+      }
+      if (rememberPaymentMethod && rememberPaymentMethodRef.current) {
+        rememberPaymentMethodRef.current.checked = true;
+      }
       setMessage("Submitted. We’re checking the receipt now.");
       setSuccess(true);
       router.refresh();
@@ -119,11 +152,34 @@ export function ReimbursementForm({ defaultName }: { defaultName: string }) {
       </div>
       <div className="field">
         <label htmlFor="paymentMethod">Preferred payment method</label>
-        <input id="paymentMethod" maxLength={200} name="paymentMethod" placeholder="Zelle, Venmo, check…" required />
+        <input
+          id="paymentMethod"
+          maxLength={200}
+          name="paymentMethod"
+          placeholder="Zelle, Venmo, check…"
+          ref={paymentMethodRef}
+          required
+        />
+        <label className="remember-preference" htmlFor="rememberPaymentMethod">
+          <input
+            id="rememberPaymentMethod"
+            name="rememberPaymentMethod"
+            ref={rememberPaymentMethodRef}
+            type="checkbox"
+          />
+          <span>Remember on this device for future submissions</span>
+        </label>
       </div>
       <div className="field">
         <label htmlFor="receipt">Receipt image</label>
-        <input accept="image/jpeg,image/png" id="receipt" name="receipt" type="file" required />
+        <input
+          accept="image/jpeg,image/png"
+          className="receipt-file-input"
+          id="receipt"
+          name="receipt"
+          type="file"
+          required
+        />
         <span className="helper-text">JPG or PNG, up to 10 MB.</span>
       </div>
       {message && <p className={`form-message${success ? " success" : ""}`}>{message}</p>}

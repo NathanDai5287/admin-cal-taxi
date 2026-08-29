@@ -1,56 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { promoteMember } from "@/app/reimbursements/admin/actions";
+import { promoteMember, updateStatus } from "@/app/reimbursements/admin/actions";
 import { AppHeader } from "@/components/reimbursements/app-header";
 import { InviteForm } from "@/components/reimbursements/invite-form";
+import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { PromoteMemberButton } from "@/components/reimbursements/promote-member-button";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireIdentity } from "@/lib/reimbursements/auth";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
-import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export const metadata: Metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
 
-async function getEmailByUserId() {
-  const admin = createAdminClient();
-  const emailByUserId = new Map<string, string>();
-  const perPage = 1000;
-
-  for (let page = 1; ; page += 1) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
-    if (error) break;
-
-    for (const user of data.users) {
-      if (user.email) emailByUserId.set(user.id, user.email);
-    }
-
-    if (data.users.length < perPage) break;
-  }
-
-  return emailByUserId;
-}
-
 export default async function AdminPage() {
-  const { supabase } = await requireAdmin();
-  const [{ data: reimbursements }, { data: profiles }, emailByUserId] = await Promise.all([
+  const { supabase, userId, email } = await requireIdentity();
+
+  // Both requests remain protected by RLS while the current user's role is
+  // resolved from the profiles result.
+  const [reimbursementsResult, profilesResult] = await Promise.all([
     supabase
       .from("reimbursements")
       .select("id, full_name, amount, category, status, merchant, receipt_total, submitted_at")
       .order("submitted_at", { ascending: false }),
     supabase
       .from("profiles")
-      .select("id, full_name, role, created_at")
+      .select("id, full_name, email, role, created_at")
       .order("full_name"),
-    getEmailByUserId(),
   ]);
 
-  const rows = reimbursements ?? [];
-  const members = profiles ?? [];
+  if (reimbursementsResult.error) {
+    throw new Error(`Unable to load reimbursements: ${reimbursementsResult.error.message}`);
+  }
+  if (profilesResult.error) {
+    throw new Error(`Unable to load member profiles: ${profilesResult.error.message}`);
+  }
+
+  const rows = reimbursementsResult.data ?? [];
+  const members = profilesResult.data ?? [];
+  const profile = members.find((member) => member.id === userId);
+
+  if (!profile) redirect("/reimbursements/login");
+  if (profile.role !== "admin") redirect("/reimbursements/dashboard");
 
   return (
     <main className="app-shell">
-      <AppHeader isAdmin />
+      <AppHeader email={email} isAdmin name={profile.full_name} />
       <div className="app-content">
         <div className="page-heading">
           <div>
@@ -58,7 +53,6 @@ export default async function AdminPage() {
             <h1>Review reimbursements</h1>
             <p>Invite people, manage access, and move submitted expenses through review.</p>
           </div>
-          <Link className="back-link" href="/reimbursements/dashboard">← Member dashboard</Link>
         </div>
 
         <div className="admin-invite-grid">
@@ -82,7 +76,7 @@ export default async function AdminPage() {
                 {members.map((member) => (
                   <tr key={member.id}>
                     <td>{member.full_name || "Unnamed member"}</td>
-                    <td>{emailByUserId.get(member.id) ?? "—"}</td>
+                    <td>{member.email || "—"}</td>
                     <td>{new Date(member.created_at).toLocaleDateString()}</td>
                     <td><span className={`badge badge-${member.role}`}>{formatStatus(member.role)}</span></td>
                     <td>
@@ -121,7 +115,12 @@ export default async function AdminPage() {
                     <td>{item.merchant || formatStatus(item.category)}</td>
                     <td className="amount">{formatMoney(item.amount)}</td>
                     <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
-                    <td><span className={`badge badge-${item.status}`}>{formatStatus(item.status)}</span></td>
+                    <td>
+                      <form action={updateStatus} className="inline-status-form">
+                        <input name="id" type="hidden" value={item.id} />
+                        <InlineStatusSelect status={item.status} />
+                      </form>
+                    </td>
                     <td><span className="submission-row-action">Review submission <span aria-hidden="true">→</span></span></td>
                   </tr>
                 ))}

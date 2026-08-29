@@ -26,7 +26,7 @@ export default async function AdminSubmissionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { supabase } = await requireAdmin();
+  const { supabase, profile, email } = await requireAdmin();
   const { data: reimbursement } = await supabase
     .from("reimbursements")
     .select("id, full_name, category, amount, description, payment_method, receipt_path, status, merchant, receipt_date, receipt_total, failure_reason, submitted_at")
@@ -43,14 +43,14 @@ export default async function AdminSubmissionPage({
     ? null
     : Math.round(Number(reimbursement.receipt_total) * 100);
   const totalsMatch = receiptCents !== null && requestedCents === receiptCents;
-  const processingComplete = reimbursement.status !== "processing";
+  const processingComplete = reimbursement.status !== "pending";
   const submittedTotal = formatMoney(reimbursement.amount);
   const tabscannerTotal = reimbursement.receipt_total === null
     ? "—"
     : formatMoney(reimbursement.receipt_total);
   const comparisonMessage = totalsMatch
     ? "The submitted and scanned totals match."
-    : reimbursement.status === "processing"
+    : reimbursement.status === "pending"
       ? "Tabscanner is still processing this receipt."
       : reimbursement.status === "processing_failed"
         ? `Automatic verification failed${reimbursement.failure_reason ? `: ${reimbursement.failure_reason}` : "."}`
@@ -58,7 +58,7 @@ export default async function AdminSubmissionPage({
 
   return (
     <main className="app-shell">
-      <AppHeader isAdmin />
+      <AppHeader email={email} isAdmin name={profile.full_name} />
       <div className="app-content">
         <div className="page-heading">
           <div>
@@ -106,7 +106,7 @@ export default async function AdminSubmissionPage({
                     </button>
                   </form>
                 </div>
-                {!processingComplete && reimbursement.status === "processing" && <p className="helper-text">Approval is available when automatic processing finishes.</p>}
+                {!processingComplete && <p className="helper-text">Approval is available when automatic processing finishes.</p>}
               </div>
             </section>
           </div>

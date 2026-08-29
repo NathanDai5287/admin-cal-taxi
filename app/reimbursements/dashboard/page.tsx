@@ -1,23 +1,45 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/reimbursements/app-header";
 import { ReimbursementForm } from "@/components/reimbursements/reimbursement-form";
-import { requireUser } from "@/lib/reimbursements/auth";
+import { requireIdentity } from "@/lib/reimbursements/auth";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 
 export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { supabase, profile } = await requireUser();
-  const { data: reimbursements } = await supabase
-    .from("reimbursements")
-    .select("id, category, amount, status, merchant, submitted_at")
-    .order("submitted_at", { ascending: false });
+  const { supabase, userId, email } = await requireIdentity();
+  const [profileResult, reimbursementsResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, role")
+      .eq("id", userId)
+      .single(),
+    supabase
+      .from("reimbursements")
+      .select("id, category, amount, status, merchant, submitted_at")
+      .eq("user_id", userId)
+      .order("submitted_at", { ascending: false }),
+  ]);
+
+  if (profileResult.error && profileResult.error.code !== "PGRST116") {
+    throw new Error(`Unable to load the signed-in profile: ${profileResult.error.message}`);
+  }
+  if (reimbursementsResult.error) {
+    throw new Error(`Unable to load reimbursements: ${reimbursementsResult.error.message}`);
+  }
+  if (!profileResult.data) {
+    redirect("/reimbursements/login");
+  }
+
+  const profile = profileResult.data;
+  const reimbursements = reimbursementsResult.data;
 
   return (
     <main className="app-shell">
-      <AppHeader isAdmin={profile.role === "admin"} />
+      <AppHeader email={email} isAdmin={profile.role === "admin"} name={profile.full_name} />
       <div className="app-content">
         <div className="page-heading">
           <div>

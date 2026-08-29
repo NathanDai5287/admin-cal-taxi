@@ -21,22 +21,39 @@ function truncate(value: string, maximum: number) {
   return value.length <= maximum ? value : `${value.slice(0, maximum - 1)}…`;
 }
 
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function discordRequest(path: string, init: RequestInit = {}) {
   const token = requiredEnvironmentVariable("DISCORD_BOT_TOKEN");
-  const response = await fetch(`${discordApi}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bot ${token}`,
-      ...init.headers,
-    },
-  });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const response = await fetch(`${discordApi}${path}`, {
+      ...init,
+      headers: {
+        Authorization: `Bot ${token}`,
+        ...init.headers,
+      },
+    });
 
-  if (!response.ok) {
-    const detail = truncate(await response.text(), 500);
-    throw new Error(`Discord API ${response.status}: ${detail || response.statusText}`);
+    if (response.status === 429 && attempt < 3) {
+      const rateLimit = await response.json().catch(() => null) as { retry_after?: number } | null;
+      const retryAfter = typeof rateLimit?.retry_after === "number"
+        ? rateLimit.retry_after * 1000
+        : Number(response.headers.get("retry-after") ?? 1) * 1000;
+      await wait(Math.max(250, Math.ceil(retryAfter)));
+      continue;
+    }
+
+    if (!response.ok) {
+      const detail = truncate(await response.text(), 500);
+      throw new Error(`Discord API ${response.status}: ${detail || response.statusText}`);
+    }
+
+    return response;
   }
 
-  return response;
+  throw new Error("Discord API request exceeded its retry limit.");
 }
 
 async function addDecisionReactions(channelId: string, messageId: string) {
@@ -66,8 +83,8 @@ export async function notifyDiscordOfReimbursement(reimbursementId: string) {
     throw error ?? new Error("Reimbursement not found.");
   }
 
-  if (reimbursement.status === "processing") {
-    return { status: "processing" as const };
+  if (reimbursement.status === "pending") {
+    return { status: "pending" as const };
   }
 
   if (reimbursement.discord_message_id) {
