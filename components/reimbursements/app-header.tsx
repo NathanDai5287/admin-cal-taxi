@@ -1,4 +1,6 @@
-import Link from "next/link";
+import { ReimbursementBrand } from "@/components/reimbursements/reimbursement-brand";
+import { ReimbursementTabs } from "@/components/reimbursements/reimbursement-tabs";
+import { ThemeToggle } from "@/components/reimbursements/theme-toggle";
 
 type AppHeaderProps = {
   email: string;
@@ -9,16 +11,10 @@ type AppHeaderProps = {
 export function AppHeader({ email, isAdmin = false, name }: AppHeaderProps) {
   return (
     <header className="app-header">
-      <Link className="brand" href="/reimbursements/dashboard">
-        <span className="brand-mark">R</span>
-        <span>Chapter Reimbursements</span>
-      </Link>
+      <ReimbursementBrand href="/reimbursements/dashboard" />
+      <ReimbursementTabs isAdmin={isAdmin} />
       <div className="app-header-actions">
-        {isAdmin && (
-          <Link className="button button-secondary" href="/reimbursements/admin">
-            Admin
-          </Link>
-        )}
+        <ThemeToggle />
         <details className="account-menu">
           <summary className="account-menu-trigger">
             <span>{name || "Account"}</span>

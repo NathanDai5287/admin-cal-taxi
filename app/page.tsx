@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { InviteHashRedirect } from "@/components/reimbursements/invite-hash-redirect";
+import { SiteHomeIcon } from "@/components/site-home-icon";
 
 const APPS = [
   { href: "/rush", label: "Rush Week", description: "RSVP leads and pizza vote standings" },
@@ -17,7 +18,10 @@ export default function Home() {
     <>
       <InviteHashRedirect />
       <main className="mx-auto max-w-2xl px-6 py-16">
-        <h1 className="text-2xl font-bold text-slate-900">cal.taxi admin</h1>
+        <div className="flex items-center gap-3">
+          <SiteHomeIcon />
+          <h1 className="text-2xl font-bold text-slate-900">cal.taxi admin</h1>
+        </div>
         <p className="mt-1 text-sm text-slate-500">Internal tools</p>
 
         <ul className="mt-8 flex flex-col gap-2">

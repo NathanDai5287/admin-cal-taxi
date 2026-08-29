@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-
 import { AcceptInvite } from "@/components/reimbursements/accept-invite";
+import { ReimbursementBrand } from "@/components/reimbursements/reimbursement-brand";
+import { ThemeToggle } from "@/components/reimbursements/theme-toggle";
 
 export const metadata: Metadata = { title: "Accept invitation" };
 
@@ -15,11 +15,9 @@ export default async function AcceptInvitePage({
 
   return (
     <main className="auth-page">
+      <ThemeToggle className="auth-theme-toggle" />
       <section className="auth-card">
-        <Link className="brand" href="/reimbursements">
-          <span className="brand-mark">R</span>
-          <span>Chapter Reimbursements</span>
-        </Link>
+        <ReimbursementBrand href="/reimbursements" />
         <h1>Accept your invitation</h1>
         <AcceptInvite tokenHash={verifiedTokenHash} />
       </section>

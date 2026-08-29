@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { SiteHomeIcon } from "@/components/site-home-icon";
+
 const tabs = [
   { href: "/host/pricing",   label: "Pricing"   },
   { href: "/host/contract",  label: "Contract"  },
@@ -18,12 +20,7 @@ export default function Nav() {
           under the PDF letterhead. */}
       <div className="h-[3px] bg-brand" />
       <div className="max-w-[1080px] mx-auto px-6 h-[64px] flex items-center gap-5">
-        <Link
-          href="/"
-          className="flex-none text-[12px] font-semibold text-muted hover:text-brand transition-colors"
-        >
-          ← Admin
-        </Link>
+        <SiteHomeIcon />
         <span className="h-6 w-px bg-rule flex-none" aria-hidden="true" />
         <Link
           href="/host"
