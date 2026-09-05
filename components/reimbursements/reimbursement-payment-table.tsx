@@ -301,13 +301,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                 <strong>{formatMoney(group.cents / 100)}</strong>
               </div>
               <div className="payment-group-methods">
-                <span>Payment instructions</span>
+                <span>Zelle phone number or email</span>
                 {group.paymentMethods.length
                   ? group.paymentMethods.map((method) => <strong key={method}>{method}</strong>)
                   : <strong>Not provided</strong>}
               </div>
               {group.paymentMethods.length > 1 && (
-                <p className="payment-method-warning">Multiple payment instructions were submitted. Verify the destination before sending payment.</p>
+                <p className="payment-method-warning">Multiple Zelle destinations were submitted. Verify the destination before sending payment.</p>
               )}
             </section>
           ))}
@@ -317,7 +317,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
           <span>Grand total</span>
           <strong>{formatMoney(selectedTotalCents / 100)}</strong>
         </div>
-        <p className="payment-review-note">This records the selected items as reimbursed. It does not send money through Zelle, Venmo, or another provider.</p>
+        <p className="payment-review-note">This records the selected items as reimbursed. It does not send money through Zelle.</p>
         {dialogError && <p className="payment-dialog-error" role="alert">{dialogError}</p>}
         <div className="payment-review-actions">
           <button className="btn-ghost" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</button>

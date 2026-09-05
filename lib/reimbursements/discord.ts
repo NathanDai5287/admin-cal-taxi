@@ -116,7 +116,7 @@ export async function notifyDiscordOfReimbursement(reimbursementId: string) {
     { name: "Amount", value: amount, inline: true },
     { name: "Category", value: reimbursement.category.replaceAll("_", " "), inline: true },
     { name: "Description", value: truncate(reimbursement.description, 1024) },
-    { name: "Payment", value: truncate(reimbursement.payment_method, 1024), inline: true },
+    { name: "Zelle", value: truncate(reimbursement.payment_method, 1024), inline: true },
     { name: "Auto-check", value: reimbursement.status.replaceAll("_", " "), inline: true },
   ];
 

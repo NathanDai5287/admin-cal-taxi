@@ -79,7 +79,7 @@ export default async function SubmissionReviewPage({
               <div><dt>Merchant</dt><dd>{reimbursement.merchant || "Not detected"}</dd></div>
               <div><dt>Receipt date</dt><dd>{formatDate(reimbursement.receipt_date)}</dd></div>
               <div className="detail-wide"><dt>Description</dt><dd>{reimbursement.description}</dd></div>
-              <div className="detail-wide"><dt>Preferred payment method</dt><dd>{reimbursement.payment_method}</dd></div>
+              <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{reimbursement.payment_method}</dd></div>
             </dl>
           </section>
 

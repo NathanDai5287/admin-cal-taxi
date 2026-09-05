@@ -181,7 +181,7 @@ export function reportRowsToCsv(rows: ReportExportRow[]) {
     "Status",
     "Merchant",
     "Description",
-    "Payment method",
+    "Zelle",
     "Receipt date",
     "Submission ID",
   ];

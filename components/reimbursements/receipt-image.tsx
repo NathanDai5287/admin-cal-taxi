@@ -232,7 +232,7 @@ export function ReceiptImage({
               {comparisonMessage}
             </p>
             <div className="receipt-dialog-payment">
-              <span>Preferred payment method</span>
+              <span>Zelle phone number or email</span>
               <strong>{paymentMethod}</strong>
             </div>
             <div className="receipt-dialog-actions">

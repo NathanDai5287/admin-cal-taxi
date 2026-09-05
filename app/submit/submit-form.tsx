@@ -157,13 +157,13 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
         <textarea className="field-textarea" id="description" maxLength={2000} name="description" required />
       </div>
       <div className="field">
-        <label className="field-label" htmlFor="paymentMethod">Preferred payment method</label>
+        <label className="field-label" htmlFor="paymentMethod">Zelle phone number or email</label>
         <input
           className="field-input"
           id="paymentMethod"
           maxLength={200}
           name="paymentMethod"
-          placeholder="Zelle, Venmo, check…"
+          placeholder="Phone number or email"
           ref={paymentMethodRef}
           required
         />
