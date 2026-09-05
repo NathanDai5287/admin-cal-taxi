@@ -182,19 +182,24 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     <section className="card">
       <div className="card-header justify-between gap-4 flex-wrap">
         <span className="card-title">All submissions</span>
-        {selectedRows.length > 0 && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <span aria-live="polite" className="text-[12px] text-muted" role="status">
-              <strong className="tabular-nums text-ink">{formatMoney(selectedTotalCents / 100)}</strong>
-              {" · "}
-              {selectedRows.length} {selectedRows.length === 1 ? "reimbursement" : "reimbursements"}
-              {" · "}
-              {paymentGroups.length} {paymentGroups.length === 1 ? "member" : "members"}
-            </span>
-            <button className="btn-ghost btn-compact" onClick={() => setSelectedKeys(new Set())} type="button">Clear</button>
-            <button className="btn-primary btn-compact" onClick={openReviewDialog} type="button">Review payments</button>
-          </div>
-        )}
+        {/* Always rendered (hidden when nothing is selected) so the header height never changes. */}
+        <div
+          aria-hidden={selectedRows.length === 0}
+          className={
+            "flex items-center gap-3 flex-wrap transition-opacity duration-150 " +
+            (selectedRows.length > 0 ? "opacity-100" : "opacity-0 invisible pointer-events-none")
+          }
+        >
+          <span aria-live="polite" className="text-[12px] text-muted" role="status">
+            <strong className="tabular-nums text-ink">{formatMoney(selectedTotalCents / 100)}</strong>
+            {" · "}
+            {selectedRows.length} {selectedRows.length === 1 ? "reimbursement" : "reimbursements"}
+            {" · "}
+            {paymentGroups.length} {paymentGroups.length === 1 ? "member" : "members"}
+          </span>
+          <button className="btn-ghost btn-compact" disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</button>
+          <button className="btn-primary btn-compact" disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Review payments</button>
+        </div>
       </div>
       <div className="table-scroll border-t border-rule">
         <table className="data-table">
