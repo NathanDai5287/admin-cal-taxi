@@ -80,6 +80,7 @@ function Avatar({
 // waiting a few seconds disarms it.
 function SignOutPill({ session }: { session: AuthPillSession }) {
   const rootRef = useRef<HTMLSpanElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
@@ -113,24 +114,34 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
     <span ref={rootRef}>
       {/* /auth/signout exists on the admin host and is rewritten to the
           submit app's sign-out route on the submit host. */}
-      <form method="post" action="/auth/signout" className="m-0">
+      <form ref={formRef} method="post" action="/auth/signout" className="m-0">
+        {/* Always type="button": flipping to type="submit" inside the first
+            click's handler lets that same click submit the form (activation
+            behavior is evaluated after handlers run). Submit explicitly on
+            the second click instead. */}
         <button
-          type={confirming ? "submit" : "button"}
-          onClick={confirming ? undefined : () => setConfirming(true)}
+          type="button"
+          onClick={() => {
+            if (confirming) {
+              formRef.current?.requestSubmit();
+            } else {
+              setConfirming(true);
+            }
+          }}
           title={confirming ? "Click again to sign out" : session.email}
           className={
-            "inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 !rounded-full " +
+            "inline-flex items-center gap-2 py-1.5 !rounded-full " +
             "cursor-pointer border transition-colors duration-150 " +
             (confirming
-              ? "bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
-              : "bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+              ? "justify-center px-4 bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
+              : "pl-1.5 pr-3.5 bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
                 "transition-[border-color,box-shadow,transform] " +
                 "hover:border-[#a8a8ac] hover:-translate-y-px " +
                 "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
           }
         >
           {confirming ? (
-            <span className="px-1.5 text-[11px] font-bold tracking-[0.14em] uppercase">
+            <span className="text-[11px] font-bold tracking-[0.14em] uppercase">
               Sign out?
             </span>
           ) : (
