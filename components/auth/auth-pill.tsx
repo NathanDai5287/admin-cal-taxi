@@ -131,13 +131,12 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
           title={confirming ? "Click again to sign out" : session.email}
           className={
             "relative inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3.5 !rounded-full " +
-            "cursor-pointer border transition-colors duration-150 " +
+            "cursor-pointer border duration-150 hover:-translate-y-px " +
+            "transition-[background-color,border-color,color,box-shadow,transform] " +
             (confirming
               ? "bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
               : "bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
-                "transition-[border-color,box-shadow,transform] " +
-                "hover:border-[#a8a8ac] hover:-translate-y-px " +
-                "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
+                "hover:border-[#a8a8ac] hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
           }
         >
           {/* Both states render at all times with visibility toggled, so the
