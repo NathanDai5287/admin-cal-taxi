@@ -1,11 +1,5 @@
 @import "tailwindcss";
 
-:root {
-  /* Sub-app page titles. "Old English Text MT" ships with Windows/Office;
-     falls back to serif on machines without it. */
-  --font-old-english: "Old English Text MT", "Old English Text", "Engravers Old English BT", serif;
-}
-
 body {
   background: #f8fafc;
   color: #0f172a;
@@ -202,9 +196,6 @@ body {
   }
   [data-host] .page-title {
     @apply text-[26px] font-bold text-ink tracking-[-0.01em] mt-1;
-    font-family: var(--font-old-english);
-    font-weight: 400;
-    letter-spacing: 0;
   }
   [data-host] .page-lede {
     @apply text-[13.5px] text-muted mt-2 max-w-[580px] leading-relaxed;

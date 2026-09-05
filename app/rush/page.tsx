@@ -28,12 +28,7 @@ export default async function RushAdminPage() {
     <main className="mx-auto max-w-4xl px-6 py-10">
       <SiteHomeIcon />
 
-      <h1
-        className="mt-2 text-2xl font-normal text-slate-900"
-        style={{ fontFamily: "var(--font-old-english)" }}
-      >
-        Rush Week
-      </h1>
+      <h1 className="mt-2 text-2xl font-bold text-slate-900">Rush Week</h1>
       <p className="mt-1 text-sm text-slate-500">
         {leads.length} RSVP{leads.length === 1 ? "" : "s"} — {autoCount} from
         the popup, {manualCount} from the RSVP button
