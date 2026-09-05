@@ -42,7 +42,7 @@ export type SubmitResult =
   | { ok: false; message: string };
 
 export async function submitReimbursement(formData: FormData): Promise<SubmitResult> {
-  const { userId } = await requireMember();
+  const { userId, profile } = await requireMember();
 
   // Honeypot: the hidden "website" field is invisible to people. Bots that
   // fill it get a fake success and nothing is recorded.
@@ -97,6 +97,21 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
 
   if (insertError || !reimbursement) {
     return { ok: false, message: "Unable to submit the reimbursement. Try again." };
+  }
+
+  // Members type their full name on every submission; use it to upgrade
+  // profiles whose Google sign-in only gave us a first name.
+  const submittedName = parsed.data.fullName.trim();
+  const currentName = profile.full_name.trim();
+  if (
+    submittedName.includes(" ")
+    && (!currentName || !currentName.includes(" "))
+    && submittedName !== currentName
+  ) {
+    await supabase
+      .from("profiles")
+      .update({ full_name: submittedName })
+      .eq("id", userId);
   }
 
   after(() => processReimbursementReceipt(reimbursement.id));

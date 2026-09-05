@@ -66,11 +66,10 @@ end;
 $$;
 
 -- Backfill existing profiles whose stored name is empty or a single word
--- (first name only) when Google has a fuller name on file. Names the user
--- edited themselves that already contain a space are left untouched.
-update public.profiles as profile
-set full_name = candidate.full_name
-from (
+-- (first name only). Prefer a full (two-word) name from Google metadata, then
+-- the name on their most recent reimbursement submission. Stored names that
+-- already contain a space — including ones users edited — are left untouched.
+with google_names as (
   select
     id,
     coalesce(
@@ -82,8 +81,31 @@ from (
       ''
     ) as full_name
   from auth.users
+),
+submission_names as (
+  select distinct on (user_id)
+    user_id,
+    trim(full_name) as full_name
+  from public.reimbursements
+  order by user_id, submitted_at desc
+)
+update public.profiles as profile
+set full_name = candidate.full_name
+from (
+  select
+    profile.id,
+    coalesce(
+      case when position(' ' in google_names.full_name) > 0 then google_names.full_name end,
+      case when position(' ' in submission_names.full_name) > 0 then submission_names.full_name end,
+      nullif(google_names.full_name, ''),
+      nullif(submission_names.full_name, '')
+    ) as full_name
+  from public.profiles as profile
+  left join google_names on google_names.id = profile.id
+  left join submission_names on submission_names.user_id = profile.id
 ) as candidate
 where candidate.id = profile.id
+  and candidate.full_name is not null
   and candidate.full_name <> ''
   and candidate.full_name <> profile.full_name
   and (
