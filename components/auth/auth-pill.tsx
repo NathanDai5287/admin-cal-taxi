@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { siteOrigins } from "@/components/auth/site-origins";
 
@@ -130,6 +131,9 @@ function SignedInMenu({ session }: { session: AuthPillSession }) {
 export function AuthPill({ session }: AuthPillProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // Assume One Tap will show until it reports otherwise, so the fallback
+  // button doesn't flash before Google's island appears.
+  const [oneTapVisible, setOneTapVisible] = useState(true);
 
   useEffect(() => {
     if (!open) {
@@ -165,7 +169,10 @@ export function AuthPill({ session }: AuthPillProps) {
       }}
     >
       {session === null ? (
-        <GoogleSignInButton />
+        <>
+          <GoogleOneTap onVisibilityChange={setOneTapVisible} />
+          {oneTapVisible ? null : <GoogleSignInButton />}
+        </>
       ) : (
         <div className="relative">
           <button

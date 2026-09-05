@@ -18,9 +18,11 @@ To run the member site locally, visit `http://reimbursements.localhost:3000`.
 ### Accounts and roles
 
 Both sites share one Supabase Auth user base and the `profiles` table. Sign-in
-is Google-only (Supabase Auth's Google provider); the floating pill in the
-top-right corner of every page handles sign-in and sign-out. Sessions use a
-shared `.cal.taxi` cookie in production, so one sign-in covers both sites.
+is Google-only (Supabase Auth's Google provider): signed-out visitors get
+Google's One Tap account chooser automatically, with a button in the
+top-right corner as fallback; the same corner shows the account menu (with
+sign-out) once signed in. Sessions use a shared `.cal.taxi` cookie in
+production, so one sign-in covers both sites.
 
 Every profile has one of three roles:
 
@@ -36,7 +38,12 @@ user's role directly.
 One-time setup: enable the Google provider in Supabase Authentication with an
 OAuth client from Google Cloud Console (redirect URI
 `https://<project-ref>.supabase.co/auth/v1/callback`), then disable the email
-provider. To bootstrap the first admin, promote an existing user with:
+provider. In the same Google OAuth client, add these **Authorized JavaScript
+origins** so the One Tap prompt may appear: `https://admin.cal.taxi`,
+`https://reimbursements.cal.taxi`, and for local development
+`http://localhost:3000` and `http://reimbursements.localhost:3000`. Set
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID` to that client's ID in the website environment.
+To bootstrap the first admin, promote an existing user with:
 
 ```sql
 update public.profiles set role = 'admin' where id = '<user-id>';
