@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
-import { reimbursementCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
+import { getCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
 import { hasSupabaseConfig, getSupabaseConfig } from "@/lib/reimbursements/supabase/config";
 
 // Refreshes the Supabase session cookie on every request to an auth-gated
@@ -10,7 +10,7 @@ import { hasSupabaseConfig, getSupabaseConfig } from "@/lib/reimbursements/supab
 // (plain pass-through vs. a rewrite for the submit host); when the session is
 // refreshed the response is recreated through the same factory so refreshed
 // cookies reach both the browser and the downstream server components.
-export async function updateReimbursementSession(
+export async function updateSession(
   request: NextRequest,
   createResponse: (req: NextRequest) => NextResponse = (req) =>
     NextResponse.next({ request: req }),
@@ -23,7 +23,7 @@ export async function updateReimbursementSession(
   let response = createResponse(request);
 
   const supabase = createServerClient<Database>(url, publishableKey, {
-    cookieOptions: reimbursementCookieOptions,
+    cookieOptions: getCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -43,3 +43,5 @@ export async function updateReimbursementSession(
   await supabase.auth.getClaims();
   return response;
 }
+
+export { updateSession as updateReimbursementSession };

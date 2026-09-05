@@ -1,11 +1,24 @@
+import { redirect } from "next/navigation";
+
 import { SubmitForm } from "@/app/submit/submit-form";
+import { AccessDenied } from "@/components/auth/access-denied";
 import { SignOutButton } from "@/components/reimbursements/sign-out-button";
-import { requireMember } from "@/lib/reimbursements/auth";
+import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function SubmitPage() {
-  const { profile } = await requireMember();
+  const session = await getSessionProfile();
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (session.profile.role === "none") {
+    return <AccessDenied />;
+  }
+
+  const { profile } = session;
 
   return (
     <>

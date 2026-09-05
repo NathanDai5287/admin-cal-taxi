@@ -3,7 +3,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
-import { reimbursementCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
+import { getCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
 import { getSupabaseConfig } from "@/lib/reimbursements/supabase/config";
 
 export function createClient() {
@@ -13,6 +13,6 @@ export function createClient() {
       autoRefreshToken: true,
       persistSession: true,
     },
-    cookieOptions: reimbursementCookieOptions,
+    cookieOptions: getCookieOptions(),
   });
 }

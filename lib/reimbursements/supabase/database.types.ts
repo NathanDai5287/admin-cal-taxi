@@ -51,6 +51,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      invites: {
+        Row: {
+          email: string;
+          role: Database["public"]["Enums"]["app_role"];
+          invited_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          email: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          invited_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          email?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          invited_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       reimbursements: {
         Row: {
           id: string;
@@ -120,7 +141,7 @@ export type Database = {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
     };
     Enums: {
-      app_role: "member" | "admin";
+      app_role: "none" | "member" | "admin";
       reimbursement_category:
         | "food"
         | "supplies"

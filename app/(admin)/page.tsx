@@ -1,44 +1,113 @@
 import Link from "next/link";
 
+import { AccessDenied } from "@/components/auth/access-denied";
 import { SiteHomeIcon } from "@/components/site-home-icon";
+import { getSessionProfile } from "@/lib/reimbursements/auth";
 
-const APPS = [
-  { href: "/rush", label: "Rush Week", description: "RSVP leads and pizza vote standings" },
-  { href: "/host", label: "Host", description: "Rental contracts, pricing, and invoices" },
+export const dynamic = "force-dynamic";
+
+const ADMIN_APPS = [
+  {
+    href: "/host",
+    label: "Host",
+    description: "Rental contracts, pricing, and invoices",
+  },
+  {
+    href: "/rush",
+    label: "Rush",
+    description: "RSVP leads, QR scans, and pizza votes",
+  },
   {
     href: "/reimbursements",
     label: "Reimbursements",
-    description: "Review chapter expense reimbursements",
+    description: "Review and pay chapter expenses",
   },
   {
-    href: "https://reimbursements.cal.taxi",
-    label: "Submit a reimbursement",
-    description: "Public submission page for chapter expenses",
+    href: "/users",
+    label: "Members & invites",
+    description: "Invite members and manage who has access",
   },
 ];
 
-export default function Home() {
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <div className="flex items-center gap-3">
-        <SiteHomeIcon />
-        <h1 className="text-2xl font-bold text-slate-900">cal.taxi admin</h1>
-      </div>
-      <p className="mt-1 text-sm text-slate-500">Internal tools</p>
+export default async function Home() {
+  const session = await getSessionProfile();
 
-      <ul className="mt-8 flex flex-col gap-2">
-        {APPS.map((app) => (
-          <li key={app.href}>
-            <Link
-              href={app.href}
-              className="block rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300 hover:bg-slate-50"
-            >
-              <span className="font-medium text-slate-900">{app.label}</span>
-              <span className="block text-sm text-slate-500">{app.description}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </main>
+  if (!session) {
+    return (
+      <div data-brand className="min-h-screen">
+        <main className="mx-auto max-w-[560px] px-6 py-20">
+          <SiteHomeIcon />
+          <p className="page-eyebrow mt-6">Theta Xi</p>
+          <h1 className="page-title">cal.taxi admin</h1>
+          <p className="page-lede">
+            Sign in with the button in the top-right corner to continue.
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (session.profile.role === "none") {
+    return (
+      <div data-brand className="min-h-screen">
+        <AccessDenied />
+      </div>
+    );
+  }
+
+  if (session.profile.role === "member") {
+    return (
+      <div data-brand className="min-h-screen">
+        <main className="mx-auto max-w-[520px] px-6 py-16">
+          <section className="card">
+            <div className="card-header">
+              <span className="card-title">Member</span>
+            </div>
+            <div className="card-body border-t border-rule pt-5">
+              <h1 className="m-0 text-[18px] font-bold text-ink">
+                You&apos;re signed in as a member
+              </h1>
+              <p className="mt-2 mb-5 text-[13.5px] text-muted leading-relaxed">
+                You can submit chapter expenses from the reimbursement form.
+              </p>
+              <a className="back-link" href="https://reimbursements.cal.taxi">
+                Go to the reimbursement form →
+              </a>
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div data-brand className="min-h-screen">
+      <main className="mx-auto max-w-[1080px] px-6 py-16">
+        <SiteHomeIcon />
+        <p className="page-eyebrow mt-6">Theta Xi</p>
+        <h1 className="page-title">Admin</h1>
+        <p className="page-lede">Internal tools for chapter operations.</p>
+
+        <ul className="mt-10 m-0 p-0 grid gap-4 sm:grid-cols-2 list-none">
+          {ADMIN_APPS.map((app) => (
+            <li key={app.href}>
+              <Link
+                href={app.href}
+                className="card block no-underline h-full transition-colors hover:bg-brand-light"
+              >
+                <div className="card-header">
+                  <span className="card-title">{app.label}</span>
+                </div>
+                <div className="card-body border-t border-rule pt-4 pb-5">
+                  <p className="m-0 text-[13.5px] text-muted leading-relaxed">
+                    {app.description}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </main>
+    </div>
   );
 }

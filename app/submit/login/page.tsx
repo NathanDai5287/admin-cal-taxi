@@ -1,36 +1,36 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { LoginForm } from "@/components/reimbursements/login-form";
-import { createClient } from "@/lib/reimbursements/supabase/server";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const metadata: Metadata = { title: "Sign in" };
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-  if (data?.claims?.sub) {
+export default async function LoginPage({ searchParams }: { searchParams: PageSearchParams }) {
+  const session = await getSessionProfile();
+  if (session) {
     redirect("/");
   }
+
+  const params = await searchParams;
+  const authFailed = params.error === "auth";
 
   return (
     <div className="max-w-[440px] mx-auto py-8">
       <section className="card">
         <div className="card-header">
           <span className="card-title">Sign in</span>
+          <span className="card-subtitle">Submit a reimbursement</span>
         </div>
         <div className="card-body border-t border-rule pt-5">
-          <p className="text-[13.5px] text-muted mb-5">
-            Sign in with the email and password your treasurer gave you to
-            submit a reimbursement.
-          </p>
-          <LoginForm redirectTo="/" />
-          <p className="field-hint mt-5">
-            Need access? Ask your treasurer for an account.
-          </p>
+          {authFailed ? (
+            <p className="form-message mb-5">Sign-in failed. Please try again.</p>
+          ) : null}
+          <GoogleSignInButton next="/" />
         </div>
       </section>
     </div>

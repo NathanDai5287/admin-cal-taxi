@@ -5,24 +5,38 @@ and receipt reimbursements.
 
 ## Sites
 
-- `admin.cal.taxi` — the internal tools. `/rush` and `/host` are protected by
-  site-wide HTTP Basic Auth. `/reimbursements` (the review app) uses its own
-  Supabase sign-in and requires a profile with the `admin` role; this auth is
-  separate from Basic Auth and will be unified with it in the future.
-- `reimbursements.cal.taxi` — the member reimbursement submission page. Members
-  sign in with their Supabase account (any profile role). Served by the same
-  deployment: `proxy.ts` detects the host and rewrites `/` to the internal
-  `/submit` route.
+- `admin.cal.taxi` — the internal tools. `/host`, `/rush`, `/reimbursements`
+  (the review app), and `/users` all require sign-in with a profile whose role
+  is `admin`.
+- `reimbursements.cal.taxi` — the member reimbursement submission page.
+  Requires sign-in with a profile whose role is `member` or `admin`. Served by
+  the same deployment: `proxy.ts` detects the host and rewrites `/` to the
+  internal `/submit` route.
 
 To run the member site locally, visit `http://reimbursements.localhost:3000`.
 
-### Reimbursements accounts
+### Accounts and roles
 
-The two reimbursements sites share one Supabase Auth user base and the
-`profiles` table (`role` is `member` or `admin`). Sessions are host-only
-cookies, so each site remembers its own sign-in. Create users in Supabase
-Authentication (email + password); the `handle_new_user` trigger creates their
-profile with the default `member` role. Promote a reviewer with:
+Both sites share one Supabase Auth user base and the `profiles` table. Sign-in
+is Google-only (Supabase Auth's Google provider); the floating pill in the
+top-right corner of every page handles sign-in and sign-out. Sessions use a
+shared `.cal.taxi` cookie in production, so one sign-in covers both sites.
+
+Every profile has one of three roles:
+
+- `none` — the default for new sign-ins. No access to anything.
+- `member` — may submit reimbursements at `reimbursements.cal.taxi`.
+- `admin` — full access to every tool, including user management.
+
+Admins manage access at `admin.cal.taxi/users`: invite an email address with a
+role (applied automatically on that person's first Google sign-in via the
+`handle_new_user` trigger and the `invites` table), or change an existing
+user's role directly.
+
+One-time setup: enable the Google provider in Supabase Authentication with an
+OAuth client from Google Cloud Console (redirect URI
+`https://<project-ref>.supabase.co/auth/v1/callback`), then disable the email
+provider. To bootstrap the first admin, promote an existing user with:
 
 ```sql
 update public.profiles set role = 'admin' where id = '<user-id>';

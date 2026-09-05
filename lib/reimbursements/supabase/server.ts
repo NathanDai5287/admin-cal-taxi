@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
-import { reimbursementCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
+import { getCookieOptions } from "@/lib/reimbursements/supabase/cookie-options";
 import { getSupabaseConfig } from "@/lib/reimbursements/supabase/config";
 
 export async function createClient() {
@@ -12,7 +12,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(url, publishableKey, {
-    cookieOptions: reimbursementCookieOptions,
+    cookieOptions: getCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll();
