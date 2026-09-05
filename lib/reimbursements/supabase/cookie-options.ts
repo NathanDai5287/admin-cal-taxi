@@ -2,11 +2,16 @@ import type { NextRequest, NextResponse } from "next/server";
 
 const FOUR_HUNDRED_DAYS_IN_SECONDS = 400 * 24 * 60 * 60;
 
-// Only the production deployment shares a cookie domain. Keying this off
-// NEXT_PUBLIC_SITE_URL would also match local .env files copied from
-// .env.example (which points at admin.cal.taxi for Discord links) and break
-// localhost sign-in with Secure cookies scoped to the wrong domain.
+// Only the production deployment shares a cookie domain. Server code checks
+// Vercel's system env; in the browser VERCEL_ENV is not exposed to client
+// bundles, so detect by the host the page is actually served from. (Keying
+// off NEXT_PUBLIC_SITE_URL would also match local .env files copied from
+// .env.example and break localhost sign-in with Secure cookies scoped to
+// the wrong domain.)
 function isSharedProductionDomain() {
+  if (typeof window !== "undefined") {
+    return window.location.hostname.endsWith("cal.taxi");
+  }
   return process.env.VERCEL_ENV === "production";
 }
 

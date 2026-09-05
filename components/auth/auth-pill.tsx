@@ -134,6 +134,7 @@ export function AuthPill({ session }: AuthPillProps) {
   // Assume One Tap will show until it reports otherwise, so the fallback
   // button doesn't flash before Google's island appears.
   const [oneTapVisible, setOneTapVisible] = useState(true);
+  const [oneTapError, setOneTapError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -170,8 +171,17 @@ export function AuthPill({ session }: AuthPillProps) {
     >
       {session === null ? (
         <>
-          <GoogleOneTap onVisibilityChange={setOneTapVisible} />
-          {oneTapVisible ? null : <GoogleSignInButton />}
+          <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />
+          {oneTapVisible ? null : (
+            <div className="flex flex-col items-end gap-1.5">
+              <GoogleSignInButton />
+              {oneTapError ? (
+                <p className="m-0 max-w-[240px] text-right text-[11px] leading-snug text-red-700">
+                  Sign-in failed: {oneTapError}
+                </p>
+              ) : null}
+            </div>
+          )}
         </>
       ) : (
         <div className="relative">

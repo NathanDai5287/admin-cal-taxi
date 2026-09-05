@@ -51,15 +51,20 @@ export type GoogleOneTapProps = {
   // dismissed, skipped, or unavailable — the parent shows a fallback
   // sign-in button in the false case.
   onVisibilityChange?: (displayed: boolean) => void;
+  // Called when the ID-token exchange with Supabase fails, so the parent
+  // can surface the reason instead of failing silently.
+  onError?: (message: string) => void;
 };
 
-export function GoogleOneTap({ onVisibilityChange }: GoogleOneTapProps) {
+export function GoogleOneTap({ onVisibilityChange, onError }: GoogleOneTapProps) {
   const startedRef = useRef(false);
   const visibilityRef = useRef(onVisibilityChange);
+  const errorRef = useRef(onError);
 
   useEffect(() => {
     visibilityRef.current = onVisibilityChange;
-  }, [onVisibilityChange]);
+    errorRef.current = onError;
+  }, [onVisibilityChange, onError]);
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -88,6 +93,8 @@ export function GoogleOneTap({ onVisibilityChange }: GoogleOneTapProps) {
               nonce,
             });
             if (error) {
+              console.error("One Tap sign-in failed:", error);
+              errorRef.current?.(error.message);
               visibilityRef.current?.(false);
               return;
             }
