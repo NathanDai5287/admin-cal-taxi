@@ -2,7 +2,7 @@
 
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
-import { updateStatus } from "@/app/reimbursements/admin/actions";
+import { updateStatus } from "@/app/(admin)/reimbursements/actions";
 
 const ZOOM_SCALE = 2.5;
 
@@ -240,7 +240,7 @@ export function ReceiptImage({
                 <input name="id" type="hidden" value={reimbursementId} />
                 <input name="status" type="hidden" value="approved" />
                 <button
-                  className="button button-primary"
+                  className="btn-primary"
                   disabled={reimbursementStatus === "approved" || !processingComplete}
                   type="submit"
                 >
@@ -251,7 +251,7 @@ export function ReceiptImage({
                 <input name="id" type="hidden" value={reimbursementId} />
                 <input name="status" type="hidden" value="denied" />
                 <button
-                  className="button button-danger"
+                  className="btn-danger"
                   disabled={reimbursementStatus === "denied" || !processingComplete}
                   type="submit"
                 >

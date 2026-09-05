@@ -3,37 +3,27 @@
 Internal Next.js tools for cal.taxi, including rush administration, hosting documents,
 and receipt reimbursements.
 
+## Sites
+
+- `admin.cal.taxi` — the internal tools (`/rush`, `/host`, `/reimbursements`), protected
+  by site-wide HTTP Basic Auth.
+- `reimbursements.cal.taxi` — the public reimbursement submission page. No sign-in;
+  anyone can submit an expense. Served by the same deployment: `proxy.ts` detects the
+  host and rewrites `/` to the internal `/submit` route.
+
+To run the public site locally, visit `http://reimbursements.localhost:3000`.
+
 ## Receipt reimbursements
 
-The reimbursement app is mounted at `/reimbursements` and uses Supabase for invited-user
-authentication, PostgreSQL data, and private receipt storage. Tabscanner performs receipt
-total extraction in the background. Submissions move from `pending` to `verified`,
-`mismatch`, or `processing_failed`; a reviewer can then mark them `approved` or `denied`.
+Submissions are public. The browser uploads the receipt image straight to private
+Supabase Storage through a short-lived signed upload URL, then a server action records
+the row with the Supabase secret key. Tabscanner performs receipt total extraction in
+the background. Submissions move from `pending` to `verified`, `mismatch`, or
+`processing_failed`; a reviewer at `admin.cal.taxi/reimbursements` can then mark them
+`approved` or `denied` and record them as reimbursed.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
 2. Apply the SQL files in `supabase/migrations` to the Supabase project in filename order.
-3. In Supabase Auth, disable public signups and allow these redirect URLs:
-   - `http://localhost:3000/reimbursements/auth/accept-invite`
-   - `https://admin.cal.taxi/reimbursements/auth/accept-invite`
-4. Optional: after configuring custom SMTP, use a token-hash link in Supabase
-   Auth → Email Templates → Invite user to prevent email security scanners from
-   consuming an invitation just by opening the URL:
-
-   ```html
-   <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&amp;type=invite">
-     Accept the invite
-   </a>
-   ```
-
-   Keep the rest of the template as desired. The application waits for the user
-   to press **Continue** before it verifies the one-time token.
-5. Create the first user in Supabase Auth, then promote that account in SQL:
-
-   ```sql
-   update public.profiles
-   set role = 'admin'
-   where id = (select id from auth.users where email = 'treasurer@example.org');
-   ```
 
 Use Node.js 22 or newer. Run locally with `npm install` and `npm run dev`. Verify
 changes with `npm run lint` and `npm run build`.

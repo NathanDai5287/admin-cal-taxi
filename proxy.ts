@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { updateReimbursementSession } from "@/lib/reimbursements/supabase/proxy";
+// The public submission site serves the submit page at its root and nothing
+// else. It intentionally skips the site-wide Basic Auth below.
+const SUBMIT_HOSTS = new Set([
+  "reimbursements.cal.taxi",
+  "reimbursements.localhost:3000",
+]);
 
 function unauthorized() {
   return new NextResponse("Authentication required", {
@@ -10,10 +15,23 @@ function unauthorized() {
   });
 }
 
-export default async function proxy(request: NextRequest) {
+export default function proxy(request: NextRequest) {
+  const host = (request.headers.get("host") ?? "").toLowerCase();
+  const { pathname } = request.nextUrl;
+
+  if (SUBMIT_HOSTS.has(host)) {
+    if (pathname === "/") {
+      return NextResponse.rewrite(new URL("/submit", request.url));
+    }
+    if (pathname.startsWith("/_next") || pathname === "/icon.png" || pathname === "/favicon.ico") {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   // Supabase cannot answer the site's interactive Basic Auth challenge. This
   // machine-to-machine endpoint performs its own constant-time secret check.
-  if (request.nextUrl.pathname === "/api/webhooks/reimbursements") {
+  if (pathname === "/api/webhooks/reimbursements") {
     return NextResponse.next();
   }
 
@@ -34,7 +52,7 @@ export default async function proxy(request: NextRequest) {
 
   if (user !== expectedUser || pass !== expectedPass) return unauthorized();
 
-  return updateReimbursementSession(request);
+  return NextResponse.next();
 }
 
 export const config = {
