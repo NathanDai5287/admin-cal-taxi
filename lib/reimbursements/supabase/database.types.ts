@@ -142,6 +142,10 @@ export type Database = {
         Args: { invite_email: string; invite_role: "none" | "member" | "admin" };
         Returns: undefined;
       };
+      admin_remove_profile: {
+        Args: { target_user_id: string };
+        Returns: undefined;
+      };
       admin_set_profile_role: {
         Args: { new_role: "none" | "member" | "admin"; target_user_id: string };
         Returns: undefined;

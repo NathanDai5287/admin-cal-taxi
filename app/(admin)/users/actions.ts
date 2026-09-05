@@ -6,7 +6,9 @@ import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const inviteRoles = ["member", "admin"] as const;
-const profileRoles = ["none", "member", "admin"] as const;
+// 'none' is deliberately excluded: removing access is done by removing the
+// user entirely (removeUser), not by assigning a role.
+const profileRoles = ["member", "admin"] as const;
 
 type InviteRole = (typeof inviteRoles)[number];
 type ProfileRole = (typeof profileRoles)[number];
@@ -69,16 +71,14 @@ export async function revokeInvite(formData: FormData) {
   revalidatePath("/users");
 }
 
-export async function setUserRole(formData: FormData) {
+export async function setUserRole(userId: string, role: string) {
   const session = await requireAdmin("/");
-  const userId = formData.get("userId");
-  const role = formData.get("role");
 
-  if (typeof userId !== "string" || !userId) {
+  if (!userId) {
     throw new Error("Missing user.");
   }
   if (!isProfileRole(role)) {
-    throw new Error("Role must be none, member, or admin.");
+    throw new Error("Role must be member or admin.");
   }
   if (userId === session.userId && role !== "admin") {
     throw new Error("You can't remove your own admin access.");
@@ -95,6 +95,31 @@ export async function setUserRole(formData: FormData) {
 
   if (error) {
     throw new Error("Unable to update role. Please try again.");
+  }
+
+  revalidatePath("/users");
+}
+
+export async function removeUser(userId: string) {
+  const session = await requireAdmin("/");
+
+  if (!userId) {
+    throw new Error("Missing user.");
+  }
+  if (userId === session.userId) {
+    throw new Error("You can't remove yourself.");
+  }
+
+  const supabase = await createClient();
+  // Security definer function. Deleting the profile revokes all access (a
+  // future sign-in gets the synthesized 'none' role); their reimbursements
+  // are detached (user_id set null) rather than deleted.
+  const { error } = await supabase.rpc("admin_remove_profile", {
+    target_user_id: userId,
+  });
+
+  if (error) {
+    throw new Error("Unable to remove user. Please try again.");
   }
 
   revalidatePath("/users");

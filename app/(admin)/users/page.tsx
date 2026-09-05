@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { inviteUser, revokeInvite, setUserRole } from "@/app/(admin)/users/actions";
+import { inviteUser, revokeInvite } from "@/app/(admin)/users/actions";
+import { MembersTable } from "@/app/(admin)/users/members-table";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
@@ -105,52 +106,19 @@ export default async function UsersPage() {
         <div className="card-header">
           <span className="card-title" id="members-title">Members</span>
         </div>
-        {profiles.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profiles.map((profile) => {
-                const isYou = profile.id === session?.userId;
-                return (
-                  <tr key={profile.id}>
-                    <td>
-                      {profile.full_name.trim() ? profile.full_name : <span className="text-muted">—</span>}
-                      {isYou ? <span className="text-muted"> (you)</span> : null}
-                    </td>
-                    <td>{profile.email}</td>
-                    <td>
-                      <form action={setUserRole} className="flex items-center gap-2">
-                        <input name="userId" type="hidden" value={profile.id} />
-                        <select
-                          className="field-input"
-                          defaultValue={profile.role}
-                          disabled={isYou}
-                          name="role"
-                          title={isYou ? "You can't change your own role" : undefined}
-                        >
-                          <option value="none">None</option>
-                          <option value="member">Member</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                        <button className="btn-ghost btn-compact" disabled={isYou} type="submit">Save</button>
-                      </form>
-                    </td>
-                    <td className="whitespace-nowrap">{formatDate(profile.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state border-t border-rule">No members yet.</div>
-        )}
+        <MembersTable
+          currentUserId={session?.userId ?? ""}
+          members={profiles.map((profile) => ({
+            id: profile.id,
+            fullName: profile.full_name,
+            email: profile.email,
+            role: profile.role,
+            joinedLabel: formatDate(profile.created_at),
+          }))}
+        />
+        <p className="helper-text px-6 pb-5">
+          Removing someone revokes their access but keeps their reimbursement history.
+        </p>
       </section>
     </div>
   );
