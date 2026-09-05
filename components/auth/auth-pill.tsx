@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { siteOrigins } from "@/components/auth/site-origins";
 
 export type AuthPillSession = {
   fullName: string;
@@ -39,10 +38,6 @@ function initials(fullName: string, email: string) {
   }
   const local = email.split("@")[0] ?? "";
   return (local.slice(0, 2) || "?").toUpperCase();
-}
-
-function hostOrigins() {
-  return siteOrigins();
 }
 
 function Avatar({
@@ -80,90 +75,90 @@ function Avatar({
   );
 }
 
-const menuItemClass =
-  "block w-full px-4 py-2.5 text-left text-[13px] text-ink no-underline " +
-  "hover:bg-brand-light transition-colors cursor-pointer";
-
-function SignedInMenu({ session }: { session: AuthPillSession }) {
-  const origins = session.role === "admin" ? hostOrigins() : null;
-
-  return (
-    <div
-      role="menu"
-      className="absolute right-0 mt-2 w-72 bg-white border border-rule shadow-[0_12px_32px_rgba(16,16,20,0.14)]"
-    >
-      <div className="px-4 py-3 border-b border-rule">
-        <p className="m-0 text-[13.5px] font-semibold text-ink truncate">
-          {session.fullName.trim() || firstName(session.fullName, session.email)}
-        </p>
-        <p className="m-0 mt-0.5 text-[12px] text-muted truncate">
-          {session.email}
-        </p>
-      </div>
-      {origins ? (
-        <div className="py-1">
-          <a role="menuitem" href={origins.adminOrigin} className={menuItemClass}>
-            Admin dashboard
-          </a>
-          <a role="menuitem" href={origins.submitOrigin} className={menuItemClass}>
-            Submit a reimbursement
-          </a>
-        </div>
-      ) : null}
-      {session.role === "none" ? (
-        <p className="m-0 px-4 py-3 text-[12px] text-muted leading-snug">
-          No access yet — ask an admin to invite you.
-        </p>
-      ) : null}
-      <form method="post" action="/auth/signout" className="border-t border-rule">
-        <button
-          type="submit"
-          role="menuitem"
-          className={menuItemClass + " bg-transparent border-0 font-inherit"}
-        >
-          Sign out
-        </button>
-      </form>
-    </div>
-  );
-}
-
-export function AuthPill({ session }: AuthPillProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  // Assume One Tap will show until it reports otherwise, so the fallback
-  // button doesn't flash before Google's island appears.
-  const [oneTapVisible, setOneTapVisible] = useState(true);
-  const [oneTapError, setOneTapError] = useState<string | null>(null);
+// Two-click sign-out: the first click arms the pill (turns red, asks
+// "Sign out?"), the second submits. Clicking away, pressing Escape, or
+// waiting a few seconds disarms it.
+function SignOutPill({ session }: { session: AuthPillSession }) {
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    if (!open) {
+    if (!confirming) {
       return;
     }
 
     function onPointerDown(event: PointerEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setOpen(false);
+        setConfirming(false);
       }
     }
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpen(false);
+        setConfirming(false);
       }
     }
 
+    const timer = window.setTimeout(() => setConfirming(false), 4000);
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
+      window.clearTimeout(timer);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [confirming]);
+
+  return (
+    <span ref={rootRef}>
+      {/* /auth/signout exists on the admin host and is rewritten to the
+          submit app's sign-out route on the submit host. */}
+      <form method="post" action="/auth/signout" className="m-0">
+        <button
+          type={confirming ? "submit" : "button"}
+          onClick={confirming ? undefined : () => setConfirming(true)}
+          title={confirming ? "Click again to sign out" : session.email}
+          className={
+            "inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 !rounded-full " +
+            "cursor-pointer border transition-colors duration-150 " +
+            (confirming
+              ? "bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
+              : "bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+                "transition-[border-color,box-shadow,transform] " +
+                "hover:border-[#a8a8ac] hover:-translate-y-px " +
+                "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
+          }
+        >
+          {confirming ? (
+            <span className="px-1.5 text-[11px] font-bold tracking-[0.14em] uppercase">
+              Sign out?
+            </span>
+          ) : (
+            <>
+              <Avatar
+                fullName={session.fullName}
+                email={session.email}
+                avatarUrl={session.avatarUrl}
+              />
+              <span className="text-[11px] font-bold tracking-[0.14em] uppercase">
+                {firstName(session.fullName, session.email)}
+              </span>
+            </>
+          )}
+        </button>
+      </form>
+    </span>
+  );
+}
+
+export function AuthPill({ session }: AuthPillProps) {
+  // Assume One Tap will show until it reports otherwise, so the fallback
+  // button doesn't flash before Google's island appears.
+  const [oneTapVisible, setOneTapVisible] = useState(true);
+  const [oneTapError, setOneTapError] = useState<string | null>(null);
 
   return (
     <div
-      ref={rootRef}
       className="fixed top-3 right-4 z-50"
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -184,32 +179,7 @@ export function AuthPill({ session }: AuthPillProps) {
           )}
         </>
       ) : (
-        <div className="relative">
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-haspopup="menu"
-            onClick={() => setOpen((value) => !value)}
-            className={
-              "inline-flex items-center gap-2 pl-1.5 pr-3.5 py-1.5 !rounded-full " +
-              "bg-white border border-rule text-ink cursor-pointer " +
-              "shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
-              "transition-[border-color,box-shadow,transform] duration-150 " +
-              "hover:border-[#a8a8ac] hover:-translate-y-px " +
-              "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]"
-            }
-          >
-            <Avatar
-              fullName={session.fullName}
-              email={session.email}
-              avatarUrl={session.avatarUrl}
-            />
-            <span className="text-[11px] font-bold tracking-[0.14em] uppercase">
-              {firstName(session.fullName, session.email)}
-            </span>
-          </button>
-          {open ? <SignedInMenu session={session} /> : null}
-        </div>
+        <SignOutPill session={session} />
       )}
     </div>
   );

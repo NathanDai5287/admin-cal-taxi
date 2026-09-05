@@ -26,6 +26,7 @@ declare global {
             client_id: string;
             callback: (response: CredentialResponse) => void;
             nonce?: string;
+            use_fedcm_for_prompt?: boolean;
           }) => void;
           prompt: (listener?: (notification: PromptMomentNotification) => void) => void;
           cancel: () => void;
@@ -38,11 +39,14 @@ declare global {
 const GIS_SCRIPT_ID = "google-identity-services";
 const GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 
-// Supabase verifies the raw nonce; Google receives its SHA-256 hash.
+// Supabase verifies the raw nonce; Google receives its SHA-256 hash as a
+// lowercase hex string (Supabase hashes the raw nonce and compares hex).
 async function generateNonce() {
   const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(nonce));
-  const hashedNonce = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const hashedNonce = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
   return { nonce, hashedNonce };
 }
 
@@ -85,6 +89,8 @@ export function GoogleOneTap({ onVisibilityChange, onError }: GoogleOneTapProps)
         window.google.accounts.id.initialize({
           client_id: clientId!,
           nonce: hashedNonce,
+          // Chrome is phasing out third-party cookies; FedCM keeps One Tap working.
+          use_fedcm_for_prompt: true,
           callback: async (response) => {
             const supabase = createClient();
             const { error } = await supabase.auth.signInWithIdToken({

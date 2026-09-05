@@ -37,17 +37,18 @@ export function getCookieOptions() {
   };
 }
 
-// Sign-out must also expire pre-unification host-only session cookies:
-// cookie deletion matches name + domain + path, and the old cookies were set
-// without a domain, so clearing only the `.cal.taxi` variant would leave a
-// stale session behind on whichever host it was created.
-export function clearLegacyHostOnlyAuthCookies(
-  request: NextRequest,
-  response: NextResponse,
-) {
+// Sign-out must expire every variant of the session cookie: deletion matches
+// on name + domain + path, and both host-only cookies (pre-unification and
+// local dev) and the shared `.cal.taxi` cookie may be present. Clearing only
+// one variant leaves a stale session behind.
+export function clearAuthCookies(request: NextRequest, response: NextResponse) {
+  const shared = isSharedProductionDomain();
   for (const { name } of request.cookies.getAll()) {
     if (/^sb-.*-auth-token/.test(name)) {
       response.cookies.set(name, "", { path: "/", maxAge: 0 });
+      if (shared) {
+        response.cookies.set(name, "", { path: "/", maxAge: 0, domain: ".cal.taxi" });
+      }
     }
   }
 }
