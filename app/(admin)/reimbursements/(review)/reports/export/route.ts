@@ -1,4 +1,5 @@
 import {
+  loadReportManualExpenses,
   loadReportExportRows,
   parseReportFilters,
   reportRowsToCsv,
@@ -18,10 +19,13 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const url = new URL(request.url);
   const filters = parseReportFilters(Object.fromEntries(url.searchParams.entries()));
-  const rows = await loadReportExportRows(supabase, filters);
+  const [rows, manualExpenses] = await Promise.all([
+    loadReportExportRows(supabase, filters),
+    loadReportManualExpenses(supabase, filters),
+  ]);
   const filename = `reimbursements-${new Date().toISOString().slice(0, 10)}.csv`;
 
-  return new Response(reportRowsToCsv(rows), {
+  return new Response(reportRowsToCsv(rows, manualExpenses), {
     headers: {
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Content-Type": "text/csv; charset=utf-8",

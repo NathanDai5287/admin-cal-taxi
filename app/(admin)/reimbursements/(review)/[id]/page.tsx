@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { updateStatus } from "@/app/(admin)/reimbursements/(review)/actions";
 import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
-import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export const metadata: Metadata = { title: "Review submission" };
@@ -76,7 +76,7 @@ export default async function SubmissionReviewPage({
             </div>
             <dl className="detail-list border-t border-rule">
               <div><dt>Requested amount</dt><dd className="amount">{formatMoney(reimbursement.amount)}</dd></div>
-              <div><dt>Category</dt><dd>{formatStatus(reimbursement.category)}</dd></div>
+              <div><dt>Category</dt><dd>{formatCategory(reimbursement.category)}</dd></div>
               <div><dt>Expense</dt><dd><EditableMerchant id={reimbursement.id} merchant={reimbursement.merchant} /></dd></div>
               <div><dt>Receipt date</dt><dd>{formatDate(reimbursement.receipt_date)}</dd></div>
               <div className="detail-wide"><dt>Description</dt><dd>{reimbursement.description}</dd></div>

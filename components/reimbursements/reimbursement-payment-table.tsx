@@ -9,7 +9,7 @@ import {
   updateReimbursed,
   updateStatus,
 } from "@/app/(admin)/reimbursements/(review)/actions";
-import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 
@@ -164,7 +164,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     </Link>
                     <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
                   </td>
-                  <td>{item.merchant || formatStatus(item.category)}</td>
+                  <td>{item.merchant || formatCategory(item.category)}</td>
                   <td className="amount">{formatMoney(item.amount)}</td>
                   <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
                   <td>

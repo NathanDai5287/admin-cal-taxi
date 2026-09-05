@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { categories } from "@/lib/reimbursements/format";
+import { categories, formatCategory } from "@/lib/reimbursements/format";
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
 
 export const reimbursementStatuses = [
@@ -20,15 +20,25 @@ export type ReportPageRow = Pick<
   | "amount"
   | "status"
   | "merchant"
+  | "description"
+  | "receipt_date"
   | "submitted_at"
 >;
 
 export type ReportExportRow = ReportPageRow & Pick<
   Database["public"]["Tables"]["reimbursements"]["Row"],
-  | "description"
-  | "payment_method"
-  | "receipt_date"
+  "payment_method"
 >;
+
+export type ManualExpenseRow = Database["public"]["Tables"]["reimbursement_manual_expenses"]["Row"];
+
+export type ReportBreakdownItem = {
+  id: string;
+  source: "receipt" | "manual";
+  description: string;
+  amount: number;
+  date: string;
+};
 
 export type ReportFilters = {
   from: string;
@@ -97,7 +107,7 @@ export async function loadReportPageRows(
 ) {
   let query = supabase
     .from("reimbursements")
-    .select("id, full_name, category, amount, status, merchant, submitted_at")
+    .select("id, full_name, category, amount, status, merchant, description, receipt_date, submitted_at")
     .order("submitted_at", { ascending: false });
 
   if (filters.from) query = query.gte("submitted_at", `${filters.from}T00:00:00.000Z`);
@@ -110,6 +120,33 @@ export async function loadReportPageRows(
 
   const { data, error } = await query;
   if (error) throw new Error(`Unable to load the reimbursement report: ${error.message}`);
+  return data ?? [];
+}
+
+export async function loadReportManualExpenses(
+  supabase: SupabaseClient<Database>,
+  filters: ReportFilters,
+) {
+  // Manual expenses are approved chapter spending without an associated
+  // member. Member filters and non-approved status filters exclude them.
+  if (filters.member || (filters.status && filters.status !== "approved")) {
+    return [] as ManualExpenseRow[];
+  }
+
+  let query = supabase
+    .from("reimbursement_manual_expenses")
+    .select("id, category, amount, description, expense_date, created_by, created_at, updated_at")
+    .order("expense_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (filters.from) query = query.gte("expense_date", filters.from);
+  if (filters.to) query = query.lte("expense_date", filters.to);
+  if (filters.category) query = query.eq("category", filters.category as ManualExpenseRow["category"]);
+  if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
+  if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Unable to load manual expenses: ${error.message}`);
   return data ?? [];
 }
 
@@ -144,22 +181,57 @@ export async function loadReportExportRows(
   return rows;
 }
 
-export function summarizeApproved(rows: ReportPageRow[]) {
+export function summarizeApproved(rows: ReportPageRow[], manualExpenses: ManualExpenseRow[] = []) {
   const approved = rows.filter((row) => row.status === "approved");
   const categoryCents = Object.fromEntries(categories.map(([category]) => [category, 0])) as Record<string, number>;
+  const categoryItems = Object.fromEntries(categories.map(([category]) => [category, []])) as Record<string, ReportBreakdownItem[]>;
   const monthCents = new Map<string, number>();
+  let receiptCents = 0;
+  let manualCents = 0;
 
   for (const row of approved) {
     const cents = Math.round(Number(row.amount) * 100);
     categoryCents[row.category] += cents;
-    const month = row.submitted_at.slice(0, 7);
+    receiptCents += cents;
+    const date = row.receipt_date ?? row.submitted_at.slice(0, 10);
+    categoryItems[row.category].push({
+      id: row.id,
+      source: "receipt",
+      description: row.merchant || row.description,
+      amount: cents / 100,
+      date,
+    });
+    const month = date.slice(0, 7);
     monthCents.set(month, (monthCents.get(month) ?? 0) + cents);
+  }
+
+  for (const expense of manualExpenses) {
+    const cents = Math.round(Number(expense.amount) * 100);
+    categoryCents[expense.category] += cents;
+    manualCents += cents;
+    categoryItems[expense.category].push({
+      id: expense.id,
+      source: "manual",
+      description: expense.description,
+      amount: cents / 100,
+      date: expense.expense_date,
+    });
+    const month = expense.expense_date.slice(0, 7);
+    monthCents.set(month, (monthCents.get(month) ?? 0) + cents);
+  }
+
+  for (const items of Object.values(categoryItems)) {
+    items.sort((left, right) => right.date.localeCompare(left.date));
   }
 
   return {
     approvedCount: approved.length,
+    manualCount: manualExpenses.length,
+    receiptTotal: receiptCents / 100,
+    manualTotal: manualCents / 100,
     approvedTotal: Object.values(categoryCents).reduce((total, cents) => total + cents, 0) / 100,
     byCategory: Object.fromEntries(Object.entries(categoryCents).map(([category, cents]) => [category, cents / 100])),
+    byCategoryItems: categoryItems,
     byMonth: [...monthCents.entries()]
       .map(([month, cents]) => [month, cents / 100] as const)
       .sort(([left], [right]) => right.localeCompare(left)),
@@ -172,9 +244,10 @@ function csvCell(value: string | number | null) {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function reportRowsToCsv(rows: ReportExportRow[]) {
+export function reportRowsToCsv(rows: ReportExportRow[], manualExpenses: ManualExpenseRow[] = []) {
   const headings = [
-    "Submitted date",
+    "Date",
+    "Source",
     "Member",
     "Category",
     "Amount",
@@ -185,18 +258,41 @@ export function reportRowsToCsv(rows: ReportExportRow[]) {
     "Receipt date",
     "Submission ID",
   ];
-  const body = rows.map((row) => [
-    row.submitted_at,
-    row.full_name,
-    row.category,
-    Number(row.amount).toFixed(2),
-    row.status,
-    row.merchant,
-    row.description,
-    row.payment_method,
-    row.receipt_date,
-    row.id,
-  ].map(csvCell).join(","));
+  const entries = [
+    ...rows.map((row) => ({
+      date: row.receipt_date ?? row.submitted_at,
+      cells: [
+        row.receipt_date ?? row.submitted_at,
+        "receipt",
+        row.full_name,
+        formatCategory(row.category),
+        Number(row.amount).toFixed(2),
+        row.status,
+        row.merchant,
+        row.description,
+        row.payment_method,
+        row.receipt_date,
+        row.id,
+      ],
+    })),
+    ...manualExpenses.map((expense) => ({
+      date: expense.expense_date,
+      cells: [
+        expense.expense_date,
+        "manual",
+        "",
+        formatCategory(expense.category),
+        Number(expense.amount).toFixed(2),
+        "approved",
+        "",
+        expense.description,
+        "",
+        "",
+        expense.id,
+      ],
+    })),
+  ].sort((left, right) => right.date.localeCompare(left.date));
+  const body = entries.map(({ cells }) => cells.map(csvCell).join(","));
 
   return `\uFEFF${[headings.join(","), ...body].join("\r\n")}\r\n`;
 }

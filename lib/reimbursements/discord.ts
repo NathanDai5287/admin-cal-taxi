@@ -1,5 +1,6 @@
 import "server-only";
 
+import { formatCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 const discordApi = "https://discord.com/api/v10";
@@ -114,7 +115,7 @@ export async function notifyDiscordOfReimbursement(reimbursementId: string) {
   const fields = [
     { name: "Submitted by", value: truncate(reimbursement.full_name, 1024), inline: true },
     { name: "Amount", value: amount, inline: true },
-    { name: "Category", value: reimbursement.category.replaceAll("_", " "), inline: true },
+    { name: "Category", value: formatCategory(reimbursement.category), inline: true },
     { name: "Description", value: truncate(reimbursement.description, 1024) },
     { name: "Zelle", value: truncate(reimbursement.payment_method, 1024), inline: true },
     { name: "Auto-check", value: reimbursement.status.replaceAll("_", " "), inline: true },

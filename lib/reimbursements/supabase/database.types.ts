@@ -29,6 +29,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      reimbursement_manual_expenses: {
+        Row: {
+          id: string;
+          category: Database["public"]["Enums"]["reimbursement_category"];
+          amount: number;
+          description: string;
+          expense_date: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: Database["public"]["Enums"]["reimbursement_category"];
+          amount: number;
+          description: string;
+          expense_date: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          category?: Database["public"]["Enums"]["reimbursement_category"];
+          amount?: number;
+          description?: string;
+          expense_date?: string;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;
@@ -158,12 +189,13 @@ export type Database = {
     Enums: {
       app_role: "none" | "member" | "admin";
       reimbursement_category:
-        | "food"
-        | "supplies"
-        | "travel"
-        | "events"
-        | "utilities"
-        | "other";
+        | "administration"
+        | "rush"
+        | "socials"
+        | "education"
+        | "philanthropy"
+        | "brother_bonding"
+        | "retreat";
       reimbursement_status:
         | "pending"
         | "verified"

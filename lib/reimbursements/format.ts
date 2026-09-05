@@ -1,21 +1,36 @@
 import { z } from "zod";
 
+export const categoryValues = [
+  "administration",
+  "rush",
+  "socials",
+  "education",
+  "philanthropy",
+  "brother_bonding",
+  "retreat",
+] as const;
+
 export const reimbursementSchema = z.object({
   fullName: z.string().trim().min(1).max(120),
-  category: z.enum(["food", "supplies", "travel", "events", "utilities", "other"]),
+  category: z.enum(categoryValues),
   amount: z.coerce.number().positive().max(99_999_999.99),
   description: z.string().trim().min(1).max(2000),
   paymentMethod: z.string().trim().min(1).max(200),
 });
 
 export const categories = [
-  ["food", "Food"],
-  ["supplies", "Supplies"],
-  ["travel", "Travel"],
-  ["events", "Events"],
-  ["utilities", "Utilities"],
-  ["other", "Other"],
+  ["administration", "ADMINISTRATION"],
+  ["rush", "RUSH"],
+  ["socials", "SOCIALS"],
+  ["education", "EDUCATION"],
+  ["philanthropy", "PHILANTHROPY"],
+  ["brother_bonding", "BROTHER BONDING"],
+  ["retreat", "RETREAT"],
 ] as const;
+
+export type ReimbursementCategory = (typeof categoryValues)[number];
+
+const categoryLabels = new Map<string, string>(categories);
 
 export function formatMoney(value: number | string) {
   return new Intl.NumberFormat("en-US", {
@@ -26,4 +41,8 @@ export function formatMoney(value: number | string) {
 
 export function formatStatus(value: string) {
   return value.replaceAll("_", " ");
+}
+
+export function formatCategory(value: string) {
+  return categoryLabels.get(value) ?? formatStatus(value).toUpperCase();
 }

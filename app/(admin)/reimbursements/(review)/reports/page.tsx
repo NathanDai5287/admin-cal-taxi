@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { saveReimbursementBudgets } from "@/app/(admin)/reimbursements/(review)/reports/actions";
-import { categories, formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import {
+  addManualExpense,
+  deleteManualExpense,
+  saveReimbursementBudgets,
+} from "@/app/(admin)/reimbursements/(review)/reports/actions";
+import { categories, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
   filtersToSearchParams,
+  loadReportManualExpenses,
   loadReportPageRows,
   parseReportFilters,
   reimbursementStatuses,
@@ -28,14 +33,35 @@ function remainingText(limit: number | null, spent: number) {
   return remaining >= 0 ? `${formatMoney(remaining)} remaining` : `${formatMoney(Math.abs(remaining))} over`;
 }
 
+function formatExpenseDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
+}
+
+function currentPacificDate() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "America/Los_Angeles",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export default async function ReimbursementReportsPage({ searchParams }: { searchParams: PageSearchParams }) {
   const rawSearchParams = await searchParams;
   const filters = parseReportFilters(rawSearchParams);
   const supabase = createAdminClient();
-  const [namesResult, budgetQueryResult, rows] = await Promise.all([
+  const [namesResult, budgetQueryResult, rows, manualExpenses] = await Promise.all([
     supabase.from("reimbursements").select("full_name").order("full_name"),
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
     loadReportPageRows(supabase, filters),
+    loadReportManualExpenses(supabase, filters),
   ]);
 
   if (namesResult.error) {
@@ -46,7 +72,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   }
 
   const memberNames = [...new Set((namesResult.data ?? []).map((row) => row.full_name))];
-  const summary = summarizeApproved(rows);
+  const summary = summarizeApproved(rows, manualExpenses);
   const budgets = new Map((budgetQueryResult.data ?? []).map((row) => [row.budget_key, row.amount === null ? null : Number(row.amount)]));
   const overallBudget = budgets.get("overall") ?? null;
   const maximumCategorySpend = Math.max(...Object.values(summary.byCategory), 1);
@@ -54,6 +80,8 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   const exportHref = `/reimbursements/reports/export${filterParams.size ? `?${filterParams}` : ""}`;
   const returnTo = `/reimbursements/reports${filterParams.size ? `?${filterParams}` : ""}`;
   const budgetResult = typeof rawSearchParams.budget === "string" ? rawSearchParams.budget : "";
+  const manualResult = typeof rawSearchParams.manual === "string" ? rawSearchParams.manual : "";
+  const today = currentPacificDate();
 
   return (
     <div className="grid gap-6">
@@ -87,16 +115,16 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
       </section>
 
       <section className="stat-grid" aria-label="Report totals">
-        <article className="stat stat-primary"><span>Approved spending</span><strong>{formatMoney(summary.approvedTotal)}</strong><small>{summary.approvedCount} approved {summary.approvedCount === 1 ? "request" : "requests"}</small></article>
+        <article className="stat stat-primary"><span>Recorded spending</span><strong>{formatMoney(summary.approvedTotal)}</strong><small>{formatMoney(summary.receiptTotal)} receipts + {formatMoney(summary.manualTotal)} manual</small></article>
         <article className="stat"><span>Overall budget</span><strong>{overallBudget === null ? "Not set" : formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
-        <article className="stat"><span>Requests shown</span><strong>{rows.length}</strong><small>Every matching status</small></article>
+        <article className="stat"><span>Spending entries</span><strong>{summary.approvedCount + summary.manualCount}</strong><small>{summary.approvedCount} approved receipts, {summary.manualCount} manual</small></article>
       </section>
 
       <div className="grid gap-6 items-start lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
         <section className="card">
           <div className="card-header">
             <span className="card-title">Spending by category</span>
-            <span className="card-subtitle">Only approved reimbursements count.</span>
+            <span className="card-subtitle">Approved receipts and manual entries are included.</span>
           </div>
           <div className="spend-list border-t border-rule">
             {categories.map(([category, label]) => {
@@ -105,11 +133,30 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
               const barMaximum = limit !== null ? Math.max(limit, spent, 1) : maximumCategorySpend;
               const width = spent === 0 ? 0 : Math.max(2, Math.min(100, (spent / barMaximum) * 100));
               const overBudget = limit !== null && spent > limit;
+              const items = summary.byCategoryItems[category];
               return (
                 <article className="spend-row" key={category}>
                   <div className="spend-row-heading"><strong className="text-[13.5px]">{label}</strong><span>{formatMoney(spent)}</span></div>
                   <div className="spend-track" aria-hidden="true"><span className={overBudget ? "is-over" : ""} style={{ width: `${width}%` }} /></div>
                   <div className={`spend-row-meta${overBudget ? " is-over" : ""}`}><span>{limit === null ? "No category limit" : `${formatMoney(limit)} budget`}</span><span>{remainingText(limit, spent)}</span></div>
+                  {items.length > 0 && (
+                    <details className="spend-breakdown">
+                      <summary>{items.length} {items.length === 1 ? "item" : "items"} make up this total</summary>
+                      <div className="spend-breakdown-list">
+                        {items.map((item) => (
+                          <div className="spend-breakdown-item" key={`${item.source}-${item.id}`}>
+                            <div>
+                              {item.source === "receipt"
+                                ? <Link href={`/reimbursements/${item.id}`}>{item.description}</Link>
+                                : <span>{item.description}</span>}
+                              <small>{formatExpenseDate(item.date)} · {item.source === "receipt" ? "Receipt" : "Manual"}</small>
+                            </div>
+                            <strong>{formatMoney(item.amount)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </article>
               );
             })}
@@ -134,6 +181,69 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
         </section>
       </div>
 
+      <section className="card" aria-labelledby="manual-expense-title">
+        <div className="card-header">
+          <span className="card-title" id="manual-expense-title">Manual spending</span>
+          <span className="card-subtitle">Add chapter expenses that do not have a reimbursement receipt.</span>
+        </div>
+        <form action={addManualExpense} className="card-body border-t border-rule pt-5">
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1fr] items-end">
+            <div className="field">
+              <label className="field-label" htmlFor="manual-category">Category</label>
+              <select className="field-input" id="manual-category" name="category" required>
+                {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="manual-date">Expense date</label>
+              <input className="field-input" defaultValue={today} id="manual-date" name="expenseDate" type="date" required />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="manual-description">Description</label>
+              <input className="field-input" id="manual-description" maxLength={500} name="description" placeholder="What makes up this amount?" required />
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="manual-amount">Amount</label>
+              <div className="money-input"><span>$</span><input className="field-input" id="manual-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
+            <div aria-live="polite">
+              {manualResult === "added" && <p className="form-message success">Manual expense added.</p>}
+              {manualResult === "deleted" && <p className="form-message success">Manual expense removed.</p>}
+              {manualResult === "invalid" && <p className="form-message">Enter a category, date, description, and positive amount.</p>}
+              {manualResult === "error" && <p className="form-message">The manual expense could not be saved. Apply the latest database migration and try again.</p>}
+            </div>
+            <button className="btn-primary" type="submit">Add manual expense</button>
+          </div>
+        </form>
+        {manualExpenses.length ? (
+          <div className="table-scroll border-t border-rule">
+            <table className="data-table">
+              <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th><span className="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                {manualExpenses.map((expense) => (
+                  <tr key={expense.id}>
+                    <td className="whitespace-nowrap">{formatExpenseDate(expense.expense_date)}</td>
+                    <td>{formatCategory(expense.category)}</td>
+                    <td>{expense.description}</td>
+                    <td className="amount">{formatMoney(expense.amount)}</td>
+                    <td className="text-right">
+                      <form action={deleteManualExpense}>
+                        <input name="id" type="hidden" value={expense.id} />
+                        <input name="returnTo" type="hidden" value={returnTo} />
+                        <button className="btn-ghost btn-compact" type="submit">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <div className="empty-state border-t border-rule">No manual expenses match these filters.</div>}
+      </section>
+
       <section className="card">
         <div className="card-header">
           <span className="card-title">Budget limits</span>
@@ -144,7 +254,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           <div className="flex items-center justify-between gap-6 flex-wrap border-b border-rule pb-5">
             <div>
               <label className="field-label mb-1" htmlFor="overall">Overall chapter budget</label>
-              <p className="helper-text m-0">Compared with all approved spending in the current report.</p>
+              <p className="helper-text m-0">Compared with approved receipts and manual spending in the current report.</p>
             </div>
             <div className="money-input w-full sm:w-[220px]"><span>$</span><input className="field-input" defaultValue={overallBudget ?? ""} id="overall" min="0" name="overall" placeholder="No limit" step="0.01" type="number" /></div>
           </div>
@@ -183,7 +293,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
                 <tr key={row.id}>
                   <td className="whitespace-nowrap">{new Date(row.submitted_at).toLocaleDateString()}</td>
                   <td><Link className="submission-link relative" href={`/reimbursements/${row.id}`}>{row.full_name}</Link></td>
-                  <td>{formatStatus(row.category)}</td>
+                  <td>{formatCategory(row.category)}</td>
                   <td className="amount">{formatMoney(row.amount)}</td>
                   <td><span className={`badge badge-${row.status}`}>{formatStatus(row.status)}</span></td>
                   <td>{row.merchant || "—"}</td>
