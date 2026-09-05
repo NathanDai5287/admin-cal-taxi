@@ -111,9 +111,10 @@ export async function removeUser(userId: string) {
   }
 
   const supabase = await createClient();
-  // Security definer function. Deleting the profile revokes all access (a
-  // future sign-in gets the synthesized 'none' role); their reimbursements
-  // are detached (user_id set null) rather than deleted.
+  // Security definer function. Soft delete: the profile is archived
+  // (removed_at), which revokes all access and hides them from this page
+  // while preserving their reimbursement history. Re-inviting their email
+  // restores them.
   const { error } = await supabase.rpc("admin_remove_profile", {
     target_user_id: userId,
   });

@@ -35,6 +35,7 @@ export type Database = {
           full_name: string;
           email: string;
           role: Database["public"]["Enums"]["app_role"];
+          removed_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -42,12 +43,14 @@ export type Database = {
           full_name?: string;
           email?: string;
           role?: Database["public"]["Enums"]["app_role"];
+          removed_at?: string | null;
           created_at?: string;
         };
         Update: {
           full_name?: string;
           email?: string;
           role?: Database["public"]["Enums"]["app_role"];
+          removed_at?: string | null;
         };
         Relationships: [];
       };

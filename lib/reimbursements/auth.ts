@@ -49,7 +49,7 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, role")
+    .select("id, full_name, role, removed_at")
     .eq("id", userId)
     .single();
 
@@ -62,7 +62,17 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
     };
   }
 
-  return { userId, email, avatarUrl, profile };
+  return {
+    userId,
+    email,
+    avatarUrl,
+    // Soft-deleted members keep their row but are treated as having no access.
+    profile: {
+      id: profile.id,
+      full_name: profile.full_name,
+      role: profile.removed_at ? "none" : profile.role,
+    },
+  };
 }
 
 // Submit site (reimbursements.cal.taxi): members and admins may submit.

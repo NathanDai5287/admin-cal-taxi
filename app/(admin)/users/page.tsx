@@ -18,6 +18,7 @@ export default async function UsersPage() {
     supabase
       .from("profiles")
       .select("id, full_name, email, role, created_at")
+      .is("removed_at", null)
       .order("created_at", { ascending: true }),
     supabase
       .from("invites")
@@ -117,7 +118,8 @@ export default async function UsersPage() {
           }))}
         />
         <p className="helper-text px-6 pb-5">
-          Removing someone revokes their access but keeps their reimbursement history.
+          Removing someone revokes their access and hides them from this list. Their
+          reimbursement history is kept, and re-inviting their email restores them.
         </p>
       </section>
     </div>
