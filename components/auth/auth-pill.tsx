@@ -130,32 +130,39 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
           }}
           title={confirming ? "Click again to sign out" : session.email}
           className={
-            "inline-flex items-center gap-2 py-1.5 !rounded-full " +
+            "relative inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3.5 !rounded-full " +
             "cursor-pointer border transition-colors duration-150 " +
             (confirming
-              ? "justify-center px-4 bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
-              : "pl-1.5 pr-3.5 bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+              ? "bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
+              : "bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
                 "transition-[border-color,box-shadow,transform] " +
                 "hover:border-[#a8a8ac] hover:-translate-y-px " +
                 "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
           }
         >
-          {confirming ? (
+          {/* Both states render at all times with visibility toggled, so the
+              pill's size is always driven by the avatar + name and never
+              changes when the confirmation label appears. */}
+          <span
+            className="inline-flex items-center gap-2"
+            style={{ visibility: confirming ? "hidden" : "visible" }}
+          >
+            <Avatar
+              fullName={session.fullName}
+              email={session.email}
+              avatarUrl={session.avatarUrl}
+            />
             <span className="text-[11px] font-bold tracking-[0.14em] uppercase">
-              Sign out?
+              {firstName(session.fullName, session.email)}
             </span>
-          ) : (
-            <>
-              <Avatar
-                fullName={session.fullName}
-                email={session.email}
-                avatarUrl={session.avatarUrl}
-              />
-              <span className="text-[11px] font-bold tracking-[0.14em] uppercase">
-                {firstName(session.fullName, session.email)}
-              </span>
-            </>
-          )}
+          </span>
+          <span
+            aria-hidden={!confirming}
+            className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tracking-[0.14em] uppercase"
+            style={{ visibility: confirming ? "visible" : "hidden" }}
+          >
+            Sign out?
+          </span>
         </button>
       </form>
     </span>
