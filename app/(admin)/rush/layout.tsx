@@ -17,7 +17,7 @@ export default async function RushLayout({
   if (session.profile.role !== "admin") {
     return (
       <div data-brand className="min-h-screen">
-        <AccessDenied />
+        <AccessDenied showSubmitLink={session.profile.role === "member"} />
       </div>
     );
   }

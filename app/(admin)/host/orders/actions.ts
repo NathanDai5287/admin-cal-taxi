@@ -22,6 +22,7 @@ import {
   type OrderPatch,
 } from "@/lib/host-orders";
 import type { Order, OrderDocument, OrderStatus } from "@/lib/host-orders-types";
+import { requireAdmin } from "@/lib/reimbursements/auth";
 
 export type ActionResult<T> =
   | { ok: true; data: T }
@@ -33,6 +34,8 @@ function failed(err: unknown): { ok: false; error: string } {
 
 /** Save the current workspace as a new order. */
 export async function saveOrderAction(input: NewOrder): Promise<ActionResult<Order>> {
+  // Layouts don't wrap server-action POSTs — every action must check the role.
+  await requireAdmin("/");
   try {
     const order = await createOrder(input);
     revalidatePath("/host/orders");
@@ -47,6 +50,7 @@ export async function addDocumentAction(
   orderId: string,
   doc: Omit<OrderDocument, "id">,
 ): Promise<ActionResult<Order>> {
+  await requireAdmin("/");
   try {
     const order = await addDocument(orderId, doc);
     revalidatePath("/host/orders");
@@ -61,6 +65,7 @@ export async function updateOrderAction(
   orderId: string,
   patch: OrderPatch,
 ): Promise<ActionResult<Order>> {
+  await requireAdmin("/");
   try {
     const order = await updateOrder(orderId, patch);
     revalidatePath("/host/orders");
@@ -86,6 +91,7 @@ export async function setOrderNotesAction(
 }
 
 export async function deleteOrderAction(orderId: string): Promise<ActionResult<null>> {
+  await requireAdmin("/");
   try {
     await deleteOrder(orderId);
     revalidatePath("/host/orders");

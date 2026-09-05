@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
@@ -11,7 +12,11 @@ export default async function UsersLayout({ children }: { children: React.ReactN
   }
 
   if (session.profile.role !== "admin") {
-    throw new Error("This area is restricted to administrators.");
+    return (
+      <div data-brand className="min-h-screen">
+        <AccessDenied showSubmitLink={session.profile.role === "member"} />
+      </div>
+    );
   }
 
   return (

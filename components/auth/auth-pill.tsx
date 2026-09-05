@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { siteOrigins } from "@/components/auth/site-origins";
 
 export type AuthPillSession = {
   fullName: string;
@@ -40,17 +41,7 @@ function initials(fullName: string, email: string) {
 }
 
 function hostOrigins() {
-  const { protocol, hostname, host, port } = window.location;
-  if (hostname.endsWith("localhost")) {
-    return {
-      adminOrigin: `${protocol}//${host}`,
-      submitOrigin: `${protocol}//reimbursements.localhost:${port}`,
-    };
-  }
-  return {
-    adminOrigin: "https://admin.cal.taxi",
-    submitOrigin: "https://reimbursements.cal.taxi",
-  };
+  return siteOrigins();
 }
 
 function Avatar({

@@ -138,6 +138,14 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      admin_invite_email: {
+        Args: { invite_email: string; invite_role: "none" | "member" | "admin" };
+        Returns: undefined;
+      };
+      admin_set_profile_role: {
+        Args: { new_role: "none" | "member" | "admin"; target_user_id: string };
+        Returns: undefined;
+      };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
     };
     Enums: {

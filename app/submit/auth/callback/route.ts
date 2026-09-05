@@ -1,16 +1,18 @@
-import { redirect } from "next/navigation";
+import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
+// Only same-origin absolute paths: "//evil.com" is protocol-relative and
+// "/\evil.com" is treated as protocol-relative by some browsers.
 function safeNext(value: string | null) {
-  if (value && value.startsWith("/") && !value.startsWith("//")) {
+  if (value && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")) {
     return value;
   }
   return "/";
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
@@ -18,9 +20,9 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      redirect(next);
+      return NextResponse.redirect(`${origin}${next}`);
     }
   }
 
-  redirect("/login?error=auth");
+  return NextResponse.redirect(`${origin}/login?error=auth`);
 }

@@ -5,7 +5,7 @@ alter table public.profiles alter column role set default 'none';
 
 create table public.invites (
   email text primary key check (email = lower(email)),
-  role public.app_role not null default 'member',
+  role public.app_role not null default 'member' check (role in ('member', 'admin')),
   invited_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
@@ -20,12 +20,74 @@ create policy "admins can manage invites"
   using (public.is_admin())
   with check (public.is_admin());
 
-grant update on public.profiles to authenticated;
+-- Role changes go through security definer functions instead of a broad
+-- update grant. The pre-existing "members can update their own name" policy
+-- passes for ANY update to one's own row, so granting table-level update on
+-- profiles would let any signed-in user promote themselves to admin.
 
-create policy "admins can update profiles"
-  on public.profiles for update to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+create or replace function public.admin_set_profile_role(target_user_id uuid, new_role public.app_role)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'only admins can change roles';
+  end if;
+  update public.profiles set role = new_role where id = target_user_id;
+end;
+$$;
+
+revoke all on function public.admin_set_profile_role(uuid, public.app_role) from anon, authenticated;
+grant execute on function public.admin_set_profile_role(uuid, public.app_role) to authenticated;
+
+-- Inviting an email that already has a profile updates that profile's role
+-- immediately; otherwise the invite waits for their first Google sign-in.
+create or replace function public.admin_invite_email(invite_email text, invite_role public.app_role)
+returns void
+language plpgsql
+security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'only admins can invite users';
+  end if;
+  if invite_role not in ('member', 'admin') then
+    raise exception 'invites must be for member or admin';
+  end if;
+  if exists (select 1 from public.profiles where email = lower(invite_email)) then
+    update public.profiles set role = invite_role where email = lower(invite_email);
+    delete from public.invites where email = lower(invite_email);
+  else
+    insert into public.invites (email, role, invited_by)
+    values (lower(invite_email), invite_role, auth.uid())
+    on conflict (email) do update
+    set role = excluded.role, invited_by = excluded.invited_by;
+  end if;
+end;
+$$;
+
+revoke all on function public.admin_invite_email(text, public.app_role) from anon, authenticated;
+grant execute on function public.admin_invite_email(text, public.app_role) to authenticated;
+
+-- 'none' is authenticated but must not be able to submit reimbursements.
+drop policy "members can submit reimbursements for themselves"
+  on public.reimbursements;
+
+create policy "members can submit reimbursements for themselves"
+  on public.reimbursements for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and status = 'pending'
+    and merchant is null
+    and receipt_date is null
+    and receipt_total is null
+    and failure_reason is null
+    and exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role in ('member', 'admin')
+    )
+  );
 
 create or replace function public.handle_new_user()
 returns trigger

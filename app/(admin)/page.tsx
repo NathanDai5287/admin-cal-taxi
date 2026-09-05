@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { AccessDenied } from "@/components/auth/access-denied";
+import { AccessDenied, SubmitSiteLink } from "@/components/auth/access-denied";
 import { SiteHomeIcon } from "@/components/site-home-icon";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
@@ -29,8 +29,12 @@ const ADMIN_APPS = [
   },
 ];
 
-export default async function Home() {
-  const session = await getSessionProfile();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const [{ error }, session] = await Promise.all([searchParams, getSessionProfile()]);
 
   if (!session) {
     return (
@@ -42,6 +46,11 @@ export default async function Home() {
           <p className="page-lede">
             Sign in with the button in the top-right corner to continue.
           </p>
+          {error === "auth" ? (
+            <p className="mt-4 text-[13px] text-red-700">
+              Sign-in failed. Please try again.
+            </p>
+          ) : null}
         </main>
       </div>
     );
@@ -70,9 +79,7 @@ export default async function Home() {
               <p className="mt-2 mb-5 text-[13.5px] text-muted leading-relaxed">
                 You can submit chapter expenses from the reimbursement form.
               </p>
-              <a className="back-link" href="https://reimbursements.cal.taxi">
-                Go to the reimbursement form →
-              </a>
+              <SubmitSiteLink />
             </div>
           </section>
         </main>

@@ -17,7 +17,12 @@ export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (SUBMIT_HOSTNAMES.has(hostname)) {
-    if (pathname.startsWith("/_next") || pathname === "/icon.png" || pathname === "/favicon.ico") {
+    if (
+      pathname.startsWith("/_next") ||
+      pathname === "/icon.png" ||
+      pathname === "/favicon.ico" ||
+      pathname === "/taxi-icon.png"
+    ) {
       return NextResponse.next();
     }
     // Mount the submit app at the host root: / → /submit, /login →

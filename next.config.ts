@@ -3,14 +3,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(__dirname) },
-  async rewrites() {
-    return [
-      {
-        source: "/api/host/generate/:path*",
-        destination: `${process.env.HOST_BACKEND_ORIGIN}/api/generate/:path*`,
-      },
-    ];
-  },
+  // /api/host/generate/* is proxied by app/api/host/generate/[...path]/route.ts
+  // (a route handler, not a rewrite) so it can enforce the admin role first.
 };
 
 export default nextConfig;

@@ -1,8 +1,22 @@
+"use client";
+
+import { siteOrigins } from "@/components/auth/site-origins";
+
 type AccessDeniedProps = {
   title?: string;
   message?: string;
   showSubmitLink?: boolean;
 };
+
+// Client component so the submit-site link points at the right origin in
+// local development (reimbursements.localhost) as well as production.
+export function SubmitSiteLink({ className }: { className?: string }) {
+  return (
+    <a className={className ?? "back-link"} href={siteOrigins().submitOrigin}>
+      Go to the reimbursement form →
+    </a>
+  );
+}
 
 export function AccessDenied({
   title = "No access",
@@ -18,12 +32,7 @@ export function AccessDenied({
         <div className="card-body border-t border-rule pt-5">
           <p className="text-[13.5px] text-muted m-0 leading-relaxed">{message}</p>
           {showSubmitLink ? (
-            <a
-              className="back-link mt-5 inline-block"
-              href="https://reimbursements.cal.taxi"
-            >
-              Go to the reimbursement form →
-            </a>
+            <SubmitSiteLink className="back-link mt-5 inline-block" />
           ) : null}
         </div>
       </section>

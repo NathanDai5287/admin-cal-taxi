@@ -27,7 +27,11 @@ export default async function HostLayout({
       <SharedDataProvider>
         <Nav />
         <main className="max-w-[1080px] mx-auto px-6 py-8">
-          {session.profile.role === "admin" ? children : <AccessDenied />}
+          {session.profile.role === "admin" ? (
+            children
+          ) : (
+            <AccessDenied showSubmitLink={session.profile.role === "member"} />
+          )}
         </main>
       </SharedDataProvider>
     </div>

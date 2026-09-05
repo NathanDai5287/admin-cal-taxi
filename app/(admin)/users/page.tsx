@@ -60,7 +60,10 @@ export default async function UsersPage() {
           </div>
           <button className="btn-primary" type="submit">Invite</button>
         </form>
-        <p className="helper-text px-6 pb-5">They&apos;ll get this role the first time they sign in with Google.</p>
+        <p className="helper-text px-6 pb-5">
+          If they&apos;ve already signed in, their role updates right away. Otherwise it
+          applies automatically on their first Google sign-in.
+        </p>
       </section>
 
       <section className="card table-scroll" aria-labelledby="pending-invites-title">
@@ -125,12 +128,18 @@ export default async function UsersPage() {
                     <td>
                       <form action={setUserRole} className="flex items-center gap-2">
                         <input name="userId" type="hidden" value={profile.id} />
-                        <select className="field-input" defaultValue={profile.role} name="role">
+                        <select
+                          className="field-input"
+                          defaultValue={profile.role}
+                          disabled={isYou}
+                          name="role"
+                          title={isYou ? "You can't change your own role" : undefined}
+                        >
                           <option value="none">None</option>
                           <option value="member">Member</option>
                           <option value="admin">Admin</option>
                         </select>
-                        <button className="btn-ghost btn-compact" type="submit">Save</button>
+                        <button className="btn-ghost btn-compact" disabled={isYou} type="submit">Save</button>
                       </form>
                     </td>
                     <td className="whitespace-nowrap">{formatDate(profile.created_at)}</td>

@@ -32,7 +32,7 @@ function readEmail(formData: FormData) {
 }
 
 export async function inviteUser(formData: FormData) {
-  const session = await requireAdmin("/");
+  await requireAdmin("/");
   const email = readEmail(formData);
   const role = formData.get("role");
 
@@ -41,13 +41,15 @@ export async function inviteUser(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("invites").upsert(
-    { email, role, invited_by: session.userId },
-    { onConflict: "email" },
-  );
+  // Security definer function: updates an existing profile's role right away,
+  // otherwise stores the invite for their first Google sign-in.
+  const { error } = await supabase.rpc("admin_invite_email", {
+    invite_email: email,
+    invite_role: role,
+  });
 
   if (error) {
-    throw new Error(`Unable to invite user: ${error.message}`);
+    throw new Error("Unable to invite user. Please try again.");
   }
 
   revalidatePath("/users");
@@ -61,7 +63,7 @@ export async function revokeInvite(formData: FormData) {
   const { error } = await supabase.from("invites").delete().eq("email", email);
 
   if (error) {
-    throw new Error(`Unable to revoke invite: ${error.message}`);
+    throw new Error("Unable to revoke invite. Please try again.");
   }
 
   revalidatePath("/users");
@@ -83,10 +85,16 @@ export async function setUserRole(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("profiles").update({ role }).eq("id", userId);
+  // Security definer function: a direct table update would require a broad
+  // update grant that the "update your own name" policy would turn into a
+  // self-promotion hole.
+  const { error } = await supabase.rpc("admin_set_profile_role", {
+    target_user_id: userId,
+    new_role: role,
+  });
 
   if (error) {
-    throw new Error(`Unable to update role: ${error.message}`);
+    throw new Error("Unable to update role. Please try again.");
   }
 
   revalidatePath("/users");
