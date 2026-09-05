@@ -22,6 +22,30 @@ export async function updateStatus(formData: FormData) {
   revalidatePath(`/reimbursements/${parsed.data.id}`);
 }
 
+export async function updateMerchant(formData: FormData) {
+  await requireAdmin();
+
+  const parsed = z.object({
+    id: z.uuid(),
+    merchant: z.string().trim().min(1).max(200),
+  }).safeParse({ id: formData.get("id"), merchant: formData.get("merchant") });
+  if (!parsed.success) {
+    throw new Error("Enter a valid expense name.");
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("reimbursements")
+    .update({ merchant: parsed.data.merchant })
+    .eq("id", parsed.data.id);
+  if (error) {
+    throw new Error("Unable to rename the expense. Please try again.");
+  }
+
+  revalidatePath("/reimbursements");
+  revalidatePath(`/reimbursements/${parsed.data.id}`);
+}
+
 export async function updateReimbursed(formData: FormData) {
   await requireAdmin();
 

@@ -226,9 +226,11 @@
            px-2 py-0.5 text-[10.5px] tracking-[0.10em]
            bg-canvas text-muted border-rule;
   }
-  [data-brand] .badge-approved,
-  [data-brand] .badge-verified {
+  [data-brand] .badge-approved {
     @apply bg-ok-light text-ok border-ok/30;
+  }
+  [data-brand] .badge-verified {
+    @apply bg-brand-light text-brand border-brand/30;
   }
   [data-brand] .badge-denied,
   [data-brand] .badge-processing_failed {
@@ -306,9 +308,11 @@
   [data-brand] .inline-status-select:disabled {
     @apply cursor-not-allowed opacity-60;
   }
-  [data-brand] .inline-status-select.badge-approved,
-  [data-brand] .inline-status-select.badge-verified {
+  [data-brand] .inline-status-select.badge-approved {
     @apply bg-ok-light text-ok border-ok/30;
+  }
+  [data-brand] .inline-status-select.badge-verified {
+    @apply bg-brand-light text-brand border-brand/30;
   }
   [data-brand] .inline-status-select.badge-denied,
   [data-brand] .inline-status-select.badge-processing_failed {
@@ -593,20 +597,7 @@
     @apply text-warn font-semibold;
   }
 
-  /* ── Payment selection bar & review dialog ── */
-  [data-brand] .payment-selection-bar {
-    @apply flex flex-wrap items-center justify-between gap-4
-           border-t border-rule bg-canvas px-5 py-3;
-  }
-  [data-brand] .payment-selection-bar strong {
-    @apply tabular-nums;
-  }
-  [data-brand] .payment-selection-bar span {
-    @apply ml-2 text-[12px] text-muted;
-  }
-  [data-brand] .payment-selection-actions {
-    @apply flex items-center gap-2;
-  }
+  /* ── Payment review dialog ── */
   [data-brand] .payment-feedback {
     @apply m-0 border-t border-rule px-5 py-3 text-[13px] text-ok font-semibold;
   }

@@ -220,7 +220,7 @@ export function ReceiptImage({
                 <span>Amount check</span>
                 <h2 id="dialog-total-comparison">Total comparison</h2>
               </div>
-              <span className={`badge ${totalsMatch ? "badge-verified" : "badge-pending"}`}>
+              <span className={`badge ${totalsMatch ? "badge-approved" : "badge-pending"}`}>
                 {totalsMatch ? "Match" : "Review"}
               </span>
             </div>

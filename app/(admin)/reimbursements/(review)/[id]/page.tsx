@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { updateStatus } from "@/app/(admin)/reimbursements/(review)/actions";
+import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -76,7 +77,7 @@ export default async function SubmissionReviewPage({
             <dl className="detail-list border-t border-rule">
               <div><dt>Requested amount</dt><dd className="amount">{formatMoney(reimbursement.amount)}</dd></div>
               <div><dt>Category</dt><dd>{formatStatus(reimbursement.category)}</dd></div>
-              <div><dt>Merchant</dt><dd>{reimbursement.merchant || "Not detected"}</dd></div>
+              <div><dt>Expense</dt><dd><EditableMerchant id={reimbursement.id} merchant={reimbursement.merchant} /></dd></div>
               <div><dt>Receipt date</dt><dd>{formatDate(reimbursement.receipt_date)}</dd></div>
               <div className="detail-wide"><dt>Description</dt><dd>{reimbursement.description}</dd></div>
               <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{reimbursement.payment_method}</dd></div>
@@ -134,7 +135,7 @@ export default async function SubmissionReviewPage({
           <section aria-labelledby="amount-comparison-heading" className="card">
             <div className="totals-card-heading">
               <span className="card-title" id="amount-comparison-heading">Total comparison</span>
-              <span className={`badge ${totalsMatch ? "badge-verified" : "badge-pending"}`}>
+              <span className={`badge ${totalsMatch ? "badge-approved" : "badge-pending"}`}>
                 {totalsMatch ? "Match" : "Review"}
               </span>
             </div>
