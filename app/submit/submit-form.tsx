@@ -12,7 +12,7 @@ const receiptTypes = new Map([
 ] as const);
 const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 
-export function SubmitForm() {
+export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const paymentMethodRef = useRef<HTMLInputElement>(null);
   const rememberPaymentMethodRef = useRef<HTMLInputElement>(null);
@@ -128,7 +128,13 @@ export function SubmitForm() {
     <form className="form-stack" onSubmit={handleSubmit} ref={formRef}>
       <div className="field">
         <label className="field-label" htmlFor="fullName">Full name</label>
-        <input className="field-input" id="fullName" name="fullName" required />
+        <input
+          className="field-input"
+          defaultValue={defaultFullName}
+          id="fullName"
+          name="fullName"
+          required
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="field">

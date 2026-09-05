@@ -3,11 +3,18 @@ import {
   parseReportFilters,
   reportRowsToCsv,
 } from "@/lib/reimbursements/reports";
+import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Route handlers are not covered by the review layout's guard.
+  const session = await getSessionProfile();
+  if (!session || session.profile.role !== "admin") {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   const supabase = createAdminClient();
   const url = new URL(request.url);
   const filters = parseReportFilters(Object.fromEntries(url.searchParams.entries()));

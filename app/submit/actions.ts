@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { z } from "zod";
 
+import { requireMember } from "@/lib/reimbursements/auth";
 import { reimbursementSchema } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { processReimbursementReceipt } from "@/lib/reimbursements/tabscanner";
@@ -16,6 +17,8 @@ export type PrepareUploadResult =
 export async function prepareReceiptUpload(
   extension: string,
 ): Promise<PrepareUploadResult> {
+  await requireMember();
+
   const parsed = z.enum(RECEIPT_EXTENSIONS).safeParse(extension);
   if (!parsed.success) {
     return { ok: false, message: "Receipt must be a JPG or PNG image." };
@@ -39,6 +42,8 @@ export type SubmitResult =
   | { ok: false; message: string };
 
 export async function submitReimbursement(formData: FormData): Promise<SubmitResult> {
+  const { userId } = await requireMember();
+
   // Honeypot: the hidden "website" field is invisible to people. Bots that
   // fill it get a fake success and nothing is recorded.
   const honeypot = formData.get("website");
@@ -79,7 +84,7 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
   const { data: reimbursement, error: insertError } = await supabase
     .from("reimbursements")
     .insert({
-      user_id: null,
+      user_id: userId,
       full_name: parsed.data.fullName,
       category: parsed.data.category,
       amount: parsed.data.amount,

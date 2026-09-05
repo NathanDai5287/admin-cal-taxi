@@ -3,9 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export async function updateStatus(formData: FormData) {
+  await requireAdmin();
+
   const parsed = z.object({
     id: z.uuid(),
     status: z.enum(["approved", "denied"]),
@@ -20,6 +23,8 @@ export async function updateStatus(formData: FormData) {
 }
 
 export async function updateReimbursed(formData: FormData) {
+  await requireAdmin();
+
   const parsed = z.object({ id: z.uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) return;
 
@@ -37,6 +42,8 @@ export type BulkReimbursementResult =
 export async function markReimbursementsPaid(
   reimbursementIds: string[],
 ): Promise<BulkReimbursementResult> {
+  await requireAdmin();
+
   const parsed = z.array(z.uuid()).min(1).safeParse(reimbursementIds);
 
   if (!parsed.success) {

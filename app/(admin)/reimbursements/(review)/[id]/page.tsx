@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { updateStatus } from "@/app/(admin)/reimbursements/actions";
+import { updateStatus } from "@/app/(admin)/reimbursements/(review)/actions";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";

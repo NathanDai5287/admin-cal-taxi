@@ -5,22 +5,38 @@ and receipt reimbursements.
 
 ## Sites
 
-- `admin.cal.taxi` — the internal tools (`/rush`, `/host`, `/reimbursements`), protected
-  by site-wide HTTP Basic Auth.
-- `reimbursements.cal.taxi` — the public reimbursement submission page. No sign-in;
-  anyone can submit an expense. Served by the same deployment: `proxy.ts` detects the
-  host and rewrites `/` to the internal `/submit` route.
+- `admin.cal.taxi` — the internal tools. `/rush` and `/host` are protected by
+  site-wide HTTP Basic Auth. `/reimbursements` (the review app) uses its own
+  Supabase sign-in and requires a profile with the `admin` role; this auth is
+  separate from Basic Auth and will be unified with it in the future.
+- `reimbursements.cal.taxi` — the member reimbursement submission page. Members
+  sign in with their Supabase account (any profile role). Served by the same
+  deployment: `proxy.ts` detects the host and rewrites `/` to the internal
+  `/submit` route.
 
-To run the public site locally, visit `http://reimbursements.localhost:3000`.
+To run the member site locally, visit `http://reimbursements.localhost:3000`.
+
+### Reimbursements accounts
+
+The two reimbursements sites share one Supabase Auth user base and the
+`profiles` table (`role` is `member` or `admin`). Sessions are host-only
+cookies, so each site remembers its own sign-in. Create users in Supabase
+Authentication (email + password); the `handle_new_user` trigger creates their
+profile with the default `member` role. Promote a reviewer with:
+
+```sql
+update public.profiles set role = 'admin' where id = '<user-id>';
+```
 
 ## Receipt reimbursements
 
-Submissions are public. The browser uploads the receipt image straight to private
-Supabase Storage through a short-lived signed upload URL, then a server action records
-the row with the Supabase secret key. Tabscanner performs receipt total extraction in
-the background. Submissions move from `pending` to `verified`, `mismatch`, or
-`processing_failed`; a reviewer at `admin.cal.taxi/reimbursements` can then mark them
-`approved` or `denied` and record them as reimbursed.
+A signed-in member submits an expense. The browser uploads the receipt image
+straight to private Supabase Storage through a short-lived signed upload URL,
+then a server action records the row with the Supabase secret key. Tabscanner
+performs receipt total extraction in the background. Submissions move from
+`pending` to `verified`, `mismatch`, or `processing_failed`; a reviewer at
+`admin.cal.taxi/reimbursements` can then mark them `approved` or `denied` and
+record them as reimbursed.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
 2. Apply the SQL files in `supabase/migrations` to the Supabase project in filename order.

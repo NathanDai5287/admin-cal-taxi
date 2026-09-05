@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// The public submission site serves the submit page at its root and nothing
-// else. It intentionally skips the site-wide Basic Auth below.
-const SUBMIT_HOSTS = new Set([
+import { updateReimbursementSession } from "@/lib/reimbursements/supabase/proxy";
+
+// The member submission site serves the submit app at its root and nothing
+// else. It uses Supabase sign-in (member role) instead of the site-wide
+// Basic Auth below. Compared by hostname only, so any local dev port works.
+const SUBMIT_HOSTNAMES = new Set([
   "reimbursements.cal.taxi",
-  "reimbursements.localhost:3000",
+  "reimbursements.localhost",
 ]);
 
 function unauthorized() {
@@ -15,24 +18,35 @@ function unauthorized() {
   });
 }
 
-export default function proxy(request: NextRequest) {
-  const host = (request.headers.get("host") ?? "").toLowerCase();
+export default async function proxy(request: NextRequest) {
+  const hostname = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const { pathname } = request.nextUrl;
 
-  if (SUBMIT_HOSTS.has(host)) {
-    if (pathname === "/") {
-      return NextResponse.rewrite(new URL("/submit", request.url));
-    }
+  if (SUBMIT_HOSTNAMES.has(hostname)) {
     if (pathname.startsWith("/_next") || pathname === "/icon.png" || pathname === "/favicon.ico") {
       return NextResponse.next();
     }
-    return NextResponse.redirect(new URL("/", request.url));
+    // Mount the submit app at the host root: / → /submit, /login →
+    // /submit/login, and so on. Unknown paths land on the app's catch-all,
+    // which bounces back to /.
+    const url = request.nextUrl.clone();
+    url.pathname = `/submit${pathname === "/" ? "" : pathname}`;
+    return updateReimbursementSession(request, (req) =>
+      NextResponse.rewrite(url, { request: req }),
+    );
   }
 
   // Supabase cannot answer the site's interactive Basic Auth challenge. This
   // machine-to-machine endpoint performs its own constant-time secret check.
   if (pathname === "/api/webhooks/reimbursements") {
     return NextResponse.next();
+  }
+
+  // The reimbursements review app uses Supabase sign-in (admin role) rather
+  // than Basic Auth. Layouts and server actions enforce the role; the proxy
+  // just keeps the session cookie fresh.
+  if (pathname.startsWith("/reimbursements")) {
+    return updateReimbursementSession(request);
   }
 
   const expectedUser = process.env.ADMIN_USERNAME ?? "admin";

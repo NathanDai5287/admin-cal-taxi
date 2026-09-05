@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categories } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -25,6 +26,8 @@ function reportRedirectTarget(formData: FormData, result: "saved" | "invalid" | 
 }
 
 export async function saveReimbursementBudgets(formData: FormData) {
+  await requireAdmin();
+
   const parsed = z.object(Object.fromEntries(
     budgetKeys.map((key) => [key, amountSchema]),
   ) as Record<(typeof budgetKeys)[number], typeof amountSchema>).safeParse(

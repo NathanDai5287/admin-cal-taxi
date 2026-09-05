@@ -15,9 +15,11 @@ type AppNavProps = {
   title: string;
   subtitle?: string;
   tabs?: AppNavTab[];
+  // Optional right-side slot, e.g. a sign-out button.
+  action?: React.ReactNode;
 };
 
-export function AppNav({ homeHref, title, subtitle, tabs = [] }: AppNavProps) {
+export function AppNav({ homeHref, title, subtitle, tabs = [], action }: AppNavProps) {
   const pathname = usePathname();
 
   // The longest matching tab wins, so /reimbursements/reports lights up
@@ -64,6 +66,11 @@ export function AppNav({ homeHref, title, subtitle, tabs = [] }: AppNavProps) {
             ))}
           </nav>
         )}
+        {action ? (
+          <div className={`flex items-center ${tabs.length > 0 ? "ml-5" : "ml-auto"}`}>
+            {action}
+          </div>
+        ) : null}
       </div>
     </header>
   );

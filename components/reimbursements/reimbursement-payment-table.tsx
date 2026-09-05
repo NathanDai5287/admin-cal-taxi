@@ -8,7 +8,7 @@ import {
   markReimbursementsPaid,
   updateReimbursed,
   updateStatus,
-} from "@/app/(admin)/reimbursements/actions";
+} from "@/app/(admin)/reimbursements/(review)/actions";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
