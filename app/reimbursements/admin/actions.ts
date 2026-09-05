@@ -112,3 +112,38 @@ export async function updateReimbursed(formData: FormData) {
   revalidatePath("/reimbursements/admin");
   revalidatePath(`/reimbursements/admin/${parsed.data.id}`);
 }
+
+export type BulkReimbursementResult =
+  | { ok: true; skippedIds: string[]; updatedIds: string[] }
+  | { ok: false; message: string };
+
+export async function markReimbursementsPaid(
+  reimbursementIds: string[],
+): Promise<BulkReimbursementResult> {
+  const { supabase } = await requireAdmin();
+  const parsed = z.array(z.uuid()).min(1).safeParse(reimbursementIds);
+
+  if (!parsed.success) {
+    return { ok: false, message: "Choose at least one valid reimbursement." };
+  }
+
+  const ids = [...new Set(parsed.data)];
+  const { data, error } = await supabase
+    .from("reimbursements")
+    .update({ reimbursed: true })
+    .in("id", ids)
+    .eq("status", "approved")
+    .eq("reimbursed", false)
+    .select("id");
+
+  if (error) {
+    return { ok: false, message: `Unable to mark reimbursements as paid: ${error.message}` };
+  }
+
+  const updatedIds = (data ?? []).map((row) => row.id);
+  const updatedIdSet = new Set(updatedIds);
+  const skippedIds = ids.filter((id) => !updatedIdSet.has(id));
+
+  revalidatePath("/reimbursements/admin");
+  return { ok: true, skippedIds, updatedIds };
+}

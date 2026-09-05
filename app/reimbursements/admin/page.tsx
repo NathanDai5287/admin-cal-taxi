@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { promoteMember, updateReimbursed, updateStatus } from "@/app/reimbursements/admin/actions";
+import { promoteMember } from "@/app/reimbursements/admin/actions";
 import { AppHeader } from "@/components/reimbursements/app-header";
 import { InviteForm } from "@/components/reimbursements/invite-form";
-import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { PromoteMemberButton } from "@/components/reimbursements/promote-member-button";
-import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
+import { ReimbursementPaymentTable } from "@/components/reimbursements/reimbursement-payment-table";
 import { requireIdentity } from "@/lib/reimbursements/auth";
-import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { formatStatus } from "@/lib/reimbursements/format";
 
 export const metadata: Metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
@@ -22,7 +20,7 @@ export default async function AdminPage() {
   const [reimbursementsResult, profilesResult] = await Promise.all([
     supabase
       .from("reimbursements")
-      .select("id, full_name, amount, category, status, merchant, receipt_total, reimbursed, submitted_at")
+      .select("id, user_id, full_name, amount, category, status, merchant, receipt_total, payment_method, reimbursed, submitted_at, updated_at")
       .order("submitted_at", { ascending: false }),
     supabase
       .from("profiles")
@@ -95,46 +93,9 @@ export default async function AdminPage() {
           ) : <div className="empty-state">No members found.</div>}
         </section>
 
-        <section className="panel table-scroll">
-          <div className="panel-header"><h2>All submissions</h2></div>
-          {rows.length ? (
-            <table className="admin-table">
-              <thead><tr><th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Reimbursed</th><th>Review</th></tr></thead>
-              <tbody>
-                {rows.map((item) => (
-                  <tr className="submission-row" key={item.id}>
-                    <td>
-                      <Link
-                        aria-label={`Review submission from ${item.full_name}`}
-                        className="submission-link"
-                        href={`/reimbursements/admin/${item.id}`}
-                      >
-                        {item.full_name}
-                      </Link>
-                      <div className="receipt-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
-                    </td>
-                    <td>{item.merchant || formatStatus(item.category)}</td>
-                    <td className="amount">{formatMoney(item.amount)}</td>
-                    <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
-                    <td>
-                      <form action={updateStatus} className="inline-status-form">
-                        <input name="id" type="hidden" value={item.id} />
-                        <InlineStatusSelect status={item.status} />
-                      </form>
-                    </td>
-                    <td>
-                      <form action={updateReimbursed} className="inline-status-form">
-                        <input name="id" type="hidden" value={item.id} />
-                        <ReimbursedCheckbox reimbursed={item.reimbursed} />
-                      </form>
-                    </td>
-                    <td><span className="submission-row-action">Review submission <span aria-hidden="true">→</span></span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <div className="empty-state">No reimbursements to review.</div>}
-        </section>
+        {rows.length
+          ? <ReimbursementPaymentTable rows={rows} />
+          : <section className="panel"><div className="panel-header"><h2>All submissions</h2></div><div className="empty-state">No reimbursements to review.</div></section>}
       </div>
     </main>
   );
