@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/reimbursements/supabase/client";
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -28,7 +28,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/reimbursements/dashboard");
+      router.push(redirectTo);
       router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to sign in.");
@@ -40,15 +40,29 @@ export function LoginForm() {
   return (
     <form className="form-stack" onSubmit={handleSubmit}>
       <div className="field">
-        <label htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="email" required />
+        <label className="field-label" htmlFor="email">Email</label>
+        <input
+          className="field-input"
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+        />
       </div>
       <div className="field">
-        <label htmlFor="password">Password</label>
-        <input id="password" name="password" type="password" autoComplete="current-password" required />
+        <label className="field-label" htmlFor="password">Password</label>
+        <input
+          className="field-input"
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+        />
       </div>
       {message && <p className="form-message">{message}</p>}
-      <button className="button button-primary" disabled={pending} type="submit">
+      <button className="btn-primary" disabled={pending} type="submit">
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>

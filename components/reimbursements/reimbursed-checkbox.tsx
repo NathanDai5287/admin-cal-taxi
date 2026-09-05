@@ -8,7 +8,7 @@ export function ReimbursedCheckbox({ reimbursed }: { reimbursed: boolean }) {
   return (
     <input
       aria-label={reimbursed ? "Reimbursement paid" : "Mark reimbursement as paid"}
-      className="reimbursed-checkbox"
+      className="checkbox-brand"
       defaultChecked={reimbursed}
       disabled={pending}
       name="reimbursed"

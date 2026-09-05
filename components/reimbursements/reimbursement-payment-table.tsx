@@ -8,7 +8,7 @@ import {
   markReimbursementsPaid,
   updateReimbursed,
   updateStatus,
-} from "@/app/reimbursements/admin/actions";
+} from "@/app/(admin)/reimbursements/(review)/actions";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
@@ -33,15 +33,14 @@ export type PaymentTableRow = {
   status: ReimbursementStatus;
   submitted_at: string;
   updated_at: string;
-  user_id: string;
 };
 
 type PaymentGroup = {
   cents: number;
   count: number;
   fullName: string;
+  nameKey: string;
   paymentMethods: string[];
-  userId: string;
 };
 
 function amountInCents(amount: number) {
@@ -50,6 +49,11 @@ function amountInCents(amount: number) {
 
 function selectionKey(row: PaymentTableRow) {
   return `${row.id}:${row.updated_at}`;
+}
+
+// Submissions are anonymous, so payments are grouped by normalized name.
+function nameKeyOf(fullName: string) {
+  return fullName.trim().replaceAll(/\s+/g, " ").toLowerCase();
 }
 
 export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] }) {
@@ -82,7 +86,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
     for (const row of selectedRows) {
       const paymentMethod = row.payment_method.trim();
-      const existing = groups.get(row.user_id);
+      const nameKey = nameKeyOf(row.full_name);
+      const existing = groups.get(nameKey);
       if (existing) {
         existing.cents += amountInCents(row.amount);
         existing.count += 1;
@@ -92,13 +97,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
       const methodSet = new Set<string>();
       if (paymentMethod) methodSet.add(paymentMethod);
-      groups.set(row.user_id, {
+      groups.set(nameKey, {
         cents: amountInCents(row.amount),
         count: 1,
         fullName: row.full_name,
         methodSet,
+        nameKey,
         paymentMethods: [],
-        userId: row.user_id,
       });
     }
 
@@ -174,19 +179,19 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   }
 
   return (
-    <section className="panel submission-payment-panel">
-      <div className="panel-header"><h2>All submissions</h2></div>
-      <div className="submission-table-scroll">
-        <table className="admin-table reimbursement-payment-table">
+    <section className="card">
+      <div className="card-header"><span className="card-title">All submissions</span></div>
+      <div className="table-scroll border-t border-rule">
+        <table className="data-table">
           <thead>
             <tr>
-              <th className="payment-select-cell">
-                <label className="payment-select-heading">
+              <th>
+                <label className="flex items-center gap-2 cursor-pointer">
                   <span>Pay</span>
                   <input
                     aria-label="Select all approved unpaid reimbursements"
                     checked={allEligibleSelected}
-                    className="payment-select-checkbox"
+                    className="checkbox-brand"
                     disabled={!eligibleRows.length}
                     onChange={toggleAll}
                     ref={selectAllRef}
@@ -202,13 +207,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
               const eligible = item.status === "approved" && !item.reimbursed;
               return (
                 <tr className="submission-row" key={item.id}>
-                  <td className="payment-select-cell">
+                  <td>
                     <input
                       aria-label={eligible
                         ? `Select reimbursement from ${item.full_name} for ${formatMoney(item.amount)}`
                         : `Reimbursement from ${item.full_name} is not eligible for payment`}
                       checked={selectedKeys.has(selectionKey(item))}
-                      className="payment-select-checkbox"
+                      className="checkbox-brand inline-action"
                       disabled={!eligible}
                       onChange={(event) => toggleRow(item, event.currentTarget.checked)}
                       type="checkbox"
@@ -218,28 +223,28 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     <Link
                       aria-label={`Review submission from ${item.full_name}`}
                       className="submission-link"
-                      href={`/reimbursements/admin/${item.id}`}
+                      href={`/reimbursements/${item.id}`}
                     >
                       {item.full_name}
                     </Link>
-                    <div className="receipt-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
+                    <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
                   </td>
                   <td>{item.merchant || formatStatus(item.category)}</td>
                   <td className="amount">{formatMoney(item.amount)}</td>
                   <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
                   <td>
-                    <form action={updateStatus} className="inline-status-form">
+                    <form action={updateStatus} className="inline-action">
                       <input name="id" type="hidden" value={item.id} />
                       <InlineStatusSelect status={item.status} />
                     </form>
                   </td>
                   <td>
-                    <form action={updateReimbursed} className="inline-status-form">
+                    <form action={updateReimbursed} className="inline-action">
                       <input name="id" type="hidden" value={item.id} />
                       <ReimbursedCheckbox key={`${item.id}:${item.reimbursed}`} reimbursed={item.reimbursed} />
                     </form>
                   </td>
-                  <td><span className="submission-row-action">Review submission <span aria-hidden="true">→</span></span></td>
+                  <td><span className="submission-row-action">Review <span aria-hidden="true">→</span></span></td>
                 </tr>
               );
             })}
@@ -258,8 +263,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
             </span>
           </div>
           <div className="payment-selection-actions">
-            <button className="button button-secondary button-compact" onClick={() => setSelectedKeys(new Set())} type="button">Clear</button>
-            <button className="button button-primary button-compact" onClick={openReviewDialog} type="button">Review payments</button>
+            <button className="btn-ghost btn-compact" onClick={() => setSelectedKeys(new Set())} type="button">Clear</button>
+            <button className="btn-primary btn-compact" onClick={openReviewDialog} type="button">Review payments</button>
           </div>
         </div>
       )}
@@ -279,7 +284,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       >
         <div className="payment-review-heading">
           <div>
-            <p className="eyebrow">Payment review</p>
+            <p className="page-eyebrow m-0">Payment review</p>
             <h2 id="payment-review-heading">Confirm reimbursements</h2>
           </div>
           <button aria-label="Close payment review" className="payment-review-close" disabled={submitting} onClick={closeReviewDialog} type="button">×</button>
@@ -287,7 +292,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
         <div className="payment-group-list">
           {paymentGroups.map((group) => (
-            <section className="payment-group" key={group.userId}>
+            <section className="payment-group" key={group.nameKey}>
               <div className="payment-group-summary">
                 <div>
                   <h3>{group.fullName}</h3>
@@ -315,8 +320,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         <p className="payment-review-note">This records the selected items as reimbursed. It does not send money through Zelle, Venmo, or another provider.</p>
         {dialogError && <p className="payment-dialog-error" role="alert">{dialogError}</p>}
         <div className="payment-review-actions">
-          <button className="button button-secondary" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</button>
-          <button className="button button-primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
+          <button className="btn-ghost" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</button>
+          <button className="btn-primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
             {submitting ? "Marking reimbursed…" : "Mark selected as reimbursed"}
           </button>
         </div>

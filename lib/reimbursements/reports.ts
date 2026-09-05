@@ -15,7 +15,6 @@ export const reimbursementStatuses = [
 export type ReportPageRow = Pick<
   Database["public"]["Tables"]["reimbursements"]["Row"],
   | "id"
-  | "user_id"
   | "full_name"
   | "category"
   | "amount"
@@ -71,7 +70,7 @@ export function parseReportFilters(params: SearchParams): ReportFilters {
     from: validDate(first(params.from)),
     to: validDate(first(params.to)),
     category: categoryValues.has(category) ? category : "",
-    member: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(first(params.member)) ? first(params.member) : "",
+    member: first(params.member).trim().slice(0, 120),
     minAmount: validAmount(first(params.minAmount)),
     maxAmount: validAmount(first(params.maxAmount)),
     status: statusValues.has(status) ? status : "",
@@ -98,13 +97,13 @@ export async function loadReportPageRows(
 ) {
   let query = supabase
     .from("reimbursements")
-    .select("id, user_id, full_name, category, amount, status, merchant, submitted_at")
+    .select("id, full_name, category, amount, status, merchant, submitted_at")
     .order("submitted_at", { ascending: false });
 
   if (filters.from) query = query.gte("submitted_at", `${filters.from}T00:00:00.000Z`);
   if (filters.to) query = query.lt("submitted_at", endExclusiveDate(filters.to));
   if (filters.category) query = query.eq("category", filters.category as ReportPageRow["category"]);
-  if (filters.member) query = query.eq("user_id", filters.member);
+  if (filters.member) query = query.eq("full_name", filters.member);
   if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
   if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
   if (filters.status) query = query.eq("status", filters.status as ReportPageRow["status"]);
@@ -124,14 +123,14 @@ export async function loadReportExportRows(
   for (let from = 0; ; from += pageSize) {
     let query = supabase
       .from("reimbursements")
-      .select("id, user_id, full_name, category, amount, status, merchant, description, payment_method, receipt_date, submitted_at")
+      .select("id, full_name, category, amount, status, merchant, description, payment_method, receipt_date, submitted_at")
       .order("submitted_at", { ascending: false })
       .range(from, from + pageSize - 1);
 
     if (filters.from) query = query.gte("submitted_at", `${filters.from}T00:00:00.000Z`);
     if (filters.to) query = query.lt("submitted_at", endExclusiveDate(filters.to));
     if (filters.category) query = query.eq("category", filters.category as ReportExportRow["category"]);
-    if (filters.member) query = query.eq("user_id", filters.member);
+    if (filters.member) query = query.eq("full_name", filters.member);
     if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
     if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
     if (filters.status) query = query.eq("status", filters.status as ReportExportRow["status"]);

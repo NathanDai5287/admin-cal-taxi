@@ -54,7 +54,7 @@ export type Database = {
       reimbursements: {
         Row: {
           id: string;
-          user_id: string;
+          user_id: string | null;
           full_name: string;
           category: Database["public"]["Enums"]["reimbursement_category"];
           amount: number;
@@ -77,7 +77,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          user_id: string;
+          user_id?: string | null;
           full_name: string;
           category: Database["public"]["Enums"]["reimbursement_category"];
           amount: number;

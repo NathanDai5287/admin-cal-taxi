@@ -1,0 +1,734 @@
+/* =====================================================================
+   Shared brand design system — originally ported from the standalone
+   host.cal.taxi app. Mirrors the generated Typst PDFs: brand blue,
+   hairline rules, sharp corners, uppercase tracked labels. Everything is
+   scoped under [data-brand] (set on each sub-app's layout wrapper) so it
+   can't bleed between sub-apps.
+   ===================================================================== */
+
+@theme {
+  --color-brand: #0a5482;
+  --color-brand-light: #e8f2f9;
+  --color-ink: #101014;
+  --color-muted: #6e6e72;
+  --color-rule: #d8d8db;
+  --color-canvas: #f5f5f7;
+  --color-ok: #1a7f4b;
+  --color-ok-light: #e6f4ec;
+  --color-warn: #c0392b;
+  --color-warn-light: #fdf0ef;
+  --color-caution: #93651e;
+  --color-caution-light: #fbf3e2;
+}
+
+[data-brand] {
+  color-scheme: light;
+  background: #ffffff;
+  color: var(--color-ink);
+  font-family: Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-feature-settings: "ss01", "cv01", "cv11";
+}
+
+[data-brand] input,
+[data-brand] textarea,
+[data-brand] select,
+[data-brand] button {
+  border-radius: 0;
+}
+
+@layer components {
+  /* ── Card ── */
+  [data-brand] .card {
+    @apply bg-white border border-rule;
+    border-top: 3px solid var(--color-brand);
+  }
+  [data-brand] .card-header {
+    @apply px-6 pt-4 pb-3 flex items-baseline gap-3;
+  }
+  [data-brand] .card-title {
+    @apply text-[11px] font-bold tracking-[0.16em] uppercase text-brand;
+  }
+  [data-brand] .card-subtitle {
+    @apply text-[12px] text-muted;
+  }
+  [data-brand] .card-body {
+    @apply px-6 pb-6;
+  }
+  [data-brand] .card-divider {
+    @apply border-t border-rule my-5;
+  }
+
+  [data-brand] .card-plain {
+    @apply bg-white border border-rule;
+  }
+
+  /* ── Field labels & inputs ── */
+  [data-brand] .field-label {
+    @apply block text-[11px] font-semibold uppercase tracking-[0.10em] text-muted mb-2;
+  }
+  [data-brand] .field-input,
+  [data-brand] .field-textarea {
+    @apply w-full px-3 py-2 bg-white border border-rule text-[14px] text-ink
+           outline-none transition-colors;
+    border-radius: 0;
+  }
+  [data-brand] .field-input:focus,
+  [data-brand] .field-textarea:focus {
+    @apply border-brand;
+    box-shadow: inset 0 -1px 0 0 var(--color-brand);
+  }
+  [data-brand] .field-textarea {
+    @apply resize-y min-h-[80px];
+  }
+  [data-brand] .field-hint {
+    @apply text-[11.5px] text-muted leading-snug mt-1.5;
+  }
+
+  /* ── Buttons ── */
+  [data-brand] .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           bg-brand text-white border border-brand
+           hover:bg-[#08456a] hover:border-[#08456a]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    border-radius: 0;
+  }
+  [data-brand] .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           bg-white text-brand border border-brand
+           hover:bg-brand-light disabled:opacity-50;
+    border-radius: 0;
+  }
+  [data-brand] .btn-link {
+    @apply text-[12px] font-semibold tracking-[0.06em] text-muted
+           hover:text-warn underline-offset-4 hover:underline transition-colors
+           cursor-pointer;
+  }
+
+  /* ── Radio rows (used by pricing tiers) ── */
+  [data-brand] .radio-option {
+    @apply flex items-center gap-2.5 px-3 py-2 bg-white border border-rule
+           cursor-pointer transition-colors hover:border-brand select-none;
+    border-left-width: 3px;
+    border-left-color: transparent;
+    border-radius: 0;
+  }
+  [data-brand] .radio-option input[type="radio"] {
+    @apply accent-brand shrink-0;
+  }
+  [data-brand] .radio-option.selected {
+    @apply border-brand bg-brand-light;
+    border-left-color: var(--color-brand);
+  }
+  [data-brand] .radio-option.selected-warn {
+    @apply bg-white;
+    border-color: var(--color-warn);
+    border-left-color: var(--color-warn);
+  }
+
+  /* ── Plain checkbox row ── */
+  [data-brand] .check-row {
+    @apply flex items-start gap-2.5 py-1.5 cursor-pointer text-[13.5px] select-none;
+  }
+  [data-brand] .check-row input[type="checkbox"] {
+    @apply accent-brand mt-0.5 shrink-0;
+  }
+  [data-brand] .check-row.disabled {
+    @apply text-muted/60 cursor-not-allowed;
+  }
+
+  /* ── Tabs (used by /host/invoice) ── */
+  [data-brand] .tab-bar {
+    @apply flex border-b border-rule;
+  }
+  [data-brand] .tab {
+    @apply px-5 py-3 -mb-px text-left transition-colors border-b-2 border-transparent
+           text-muted hover:text-ink cursor-pointer;
+    min-width: 160px;
+  }
+  [data-brand] .tab .tab-label {
+    @apply block text-[13px] font-bold;
+  }
+  [data-brand] .tab .tab-sub {
+    @apply block text-[11px] mt-0.5 opacity-80;
+  }
+  [data-brand] .tab.active {
+    @apply text-brand border-brand;
+  }
+
+  /* ── Page heading ── */
+  [data-brand] .page-eyebrow {
+    @apply text-[11px] font-bold tracking-[0.18em] uppercase text-brand;
+  }
+  [data-brand] .page-title {
+    @apply text-[26px] font-bold text-ink tracking-[-0.01em] mt-1;
+  }
+  [data-brand] .page-lede {
+    @apply text-[13.5px] text-muted mt-2 max-w-[580px] leading-relaxed;
+  }
+
+  /* ── Forms ── */
+  [data-brand] .form-stack {
+    @apply grid gap-5;
+  }
+  [data-brand] .field {
+    @apply grid gap-1.5;
+  }
+  [data-brand] .form-message {
+    @apply m-0 text-[13px] leading-relaxed text-warn;
+  }
+  [data-brand] .form-message.success {
+    @apply text-ok;
+  }
+  [data-brand] .money-input {
+    @apply relative;
+  }
+  [data-brand] .money-input > span {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 text-muted text-[13px] pointer-events-none;
+  }
+  [data-brand] .money-input > input {
+    @apply pl-7;
+  }
+  [data-brand] .file-input {
+    @apply w-full px-2 py-1.5 bg-white border border-rule text-[13px] text-ink
+           outline-none transition-colors cursor-pointer;
+    border-radius: 0;
+  }
+  [data-brand] .file-input:focus {
+    @apply border-brand;
+    box-shadow: inset 0 -1px 0 0 var(--color-brand);
+  }
+  [data-brand] .file-input::file-selector-button {
+    @apply mr-3 px-3.5 py-1.5 bg-brand text-white text-[11px] font-bold
+           tracking-[0.10em] uppercase border-0 cursor-pointer transition-colors;
+    border-radius: 0;
+  }
+  [data-brand] .file-input:hover::file-selector-button {
+    @apply bg-[#08456a];
+  }
+
+  /* ── Danger / compact buttons ── */
+  [data-brand] .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           bg-white text-warn border border-warn
+           hover:bg-warn-light disabled:opacity-50 disabled:cursor-not-allowed;
+    border-radius: 0;
+  }
+  [data-brand] .btn-compact {
+    @apply px-3 py-1.5 text-[11px];
+  }
+
+  /* ── Status badges ── */
+  [data-brand] .badge {
+    @apply inline-block border font-bold uppercase whitespace-nowrap
+           px-2 py-0.5 text-[10.5px] tracking-[0.10em]
+           bg-canvas text-muted border-rule;
+  }
+  [data-brand] .badge-approved,
+  [data-brand] .badge-verified {
+    @apply bg-ok-light text-ok border-ok/30;
+  }
+  [data-brand] .badge-denied,
+  [data-brand] .badge-processing_failed {
+    @apply bg-warn-light text-warn border-warn/30;
+  }
+  [data-brand] .badge-pending,
+  [data-brand] .badge-mismatch {
+    @apply bg-caution-light text-caution border-caution/30;
+  }
+
+  /* ── Data tables ── */
+  [data-brand] .table-scroll {
+    @apply overflow-x-auto;
+  }
+  [data-brand] .data-table {
+    @apply w-full border-collapse;
+  }
+  [data-brand] .data-table th {
+    @apply border-b border-rule px-4 py-3 text-left align-middle
+           text-[11px] font-bold tracking-[0.12em] uppercase text-muted;
+  }
+  [data-brand] .data-table td {
+    @apply border-b border-rule px-4 py-3 text-left align-middle text-[13.5px];
+  }
+  [data-brand] .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  [data-brand] .amount {
+    @apply tabular-nums font-bold;
+  }
+
+  /* Clickable submission rows (stretched-link pattern) */
+  [data-brand] .submission-row {
+    @apply relative transition-colors;
+  }
+  [data-brand] .submission-row:hover {
+    background: color-mix(in srgb, var(--color-brand-light) 45%, transparent);
+  }
+  [data-brand] .submission-link {
+    @apply text-brand font-bold;
+  }
+  [data-brand] .submission-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  [data-brand] .submission-link:focus-visible {
+    outline: none;
+  }
+  [data-brand] .submission-row:has(.submission-link:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--color-brand) 30%, transparent);
+    outline-offset: -3px;
+  }
+  [data-brand] .submission-row-action {
+    @apply text-brand text-[11px] font-bold uppercase tracking-[0.10em] whitespace-nowrap;
+  }
+  [data-brand] .row-meta {
+    @apply text-[12px] text-muted mt-0.5;
+  }
+  [data-brand] .inline-action {
+    @apply relative z-[2] w-fit;
+  }
+
+  /* ── Inline status select / checkboxes ── */
+  [data-brand] .inline-status-select {
+    @apply w-auto border font-bold uppercase cursor-pointer outline-none
+           px-2 py-1 pr-7 text-[10.5px] tracking-[0.10em]
+           bg-canvas text-muted border-rule;
+    border-radius: 0;
+  }
+  [data-brand] .inline-status-select:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 25%, transparent);
+  }
+  [data-brand] .inline-status-select:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  [data-brand] .inline-status-select.badge-approved,
+  [data-brand] .inline-status-select.badge-verified {
+    @apply bg-ok-light text-ok border-ok/30;
+  }
+  [data-brand] .inline-status-select.badge-denied,
+  [data-brand] .inline-status-select.badge-processing_failed {
+    @apply bg-warn-light text-warn border-warn/30;
+  }
+  [data-brand] .inline-status-select.badge-pending,
+  [data-brand] .inline-status-select.badge-mismatch {
+    @apply bg-caution-light text-caution border-caution/30;
+  }
+  [data-brand] .checkbox-brand {
+    @apply w-4 h-4 m-0 accent-brand cursor-pointer;
+  }
+  [data-brand] .checkbox-brand:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--color-brand) 25%, transparent);
+    outline-offset: 2px;
+  }
+  [data-brand] .checkbox-brand:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  /* ── Empty state / helper text / back link ── */
+  [data-brand] .empty-state {
+    @apply px-6 py-10 text-center text-muted text-[13px];
+  }
+  [data-brand] .helper-text {
+    @apply text-[12px] text-muted leading-relaxed;
+  }
+  [data-brand] .back-link {
+    @apply text-[12px] font-bold uppercase tracking-[0.10em] text-brand
+           hover:text-[#08456a] transition-colors;
+  }
+
+  /* ── Review layout & detail list ── */
+  [data-brand] .review-grid {
+    @apply grid gap-6 items-start;
+    grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  }
+  [data-brand] .review-details {
+    @apply grid gap-6;
+  }
+  [data-brand] .detail-list {
+    @apply grid grid-cols-2 m-0;
+  }
+  [data-brand] .detail-list > div {
+    @apply min-w-0 border-b border-rule px-6 py-4;
+  }
+  [data-brand] .detail-list > div:nth-child(odd) {
+    @apply border-r border-rule;
+  }
+  [data-brand] .detail-list > div:last-child {
+    @apply border-b-0;
+  }
+  [data-brand] .detail-list .detail-wide {
+    @apply border-r-0;
+    grid-column: 1 / -1;
+  }
+  [data-brand] .detail-list dt {
+    @apply mb-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted;
+  }
+  [data-brand] .detail-list dd {
+    @apply m-0 break-words leading-relaxed text-[13.5px];
+  }
+  [data-brand] .review-actions {
+    @apply px-6 py-5;
+  }
+  [data-brand] .review-actions > p:first-child {
+    @apply mt-0 mb-4 text-[13px] text-muted;
+  }
+  [data-brand] .status-actions {
+    @apply flex flex-wrap gap-2.5;
+  }
+
+  /* ── Receipt sidebar / totals ── */
+  [data-brand] .receipt-sidebar {
+    @apply sticky top-5 grid gap-4;
+  }
+  [data-brand] .receipt-image-wrap {
+    @apply p-4;
+  }
+  [data-brand] .receipt-preview-button {
+    @apply grid w-full gap-2 border-0 p-0 bg-transparent text-brand
+           text-[11px] font-bold uppercase tracking-[0.10em] cursor-zoom-in;
+  }
+  [data-brand] .receipt-preview {
+    @apply block w-full border border-rule object-contain bg-canvas;
+    max-height: 680px;
+    border-radius: 0;
+  }
+  [data-brand] .totals-card-heading {
+    @apply flex items-center justify-between gap-3 px-5 pt-4 pb-3;
+  }
+  [data-brand] .totals-card-values {
+    @apply grid items-center gap-2.5 px-5 pb-4 text-center;
+    grid-template-columns: 1fr auto 1fr;
+  }
+  [data-brand] .totals-card-values div {
+    @apply grid gap-1 min-w-0;
+  }
+  [data-brand] .totals-card-values span {
+    @apply text-[10px] font-bold uppercase tracking-[0.10em] text-muted;
+  }
+  [data-brand] .totals-card-values strong {
+    @apply break-words text-[16px] tabular-nums;
+  }
+  [data-brand] .totals-card-note {
+    @apply m-0 border-t border-rule px-5 py-2.5 text-[12px] font-semibold leading-snug;
+  }
+  [data-brand] .verification-symbol {
+    @apply text-[20px] text-muted;
+  }
+  [data-brand] .verification-match {
+    @apply text-ok;
+  }
+  [data-brand] .verification-review {
+    @apply text-caution;
+  }
+
+  /* ── Receipt zoom dialog ── */
+  [data-brand] .receipt-dialog {
+    @apply border-0 p-0;
+    width: min(1100px, calc(100vw - 40px));
+    max-width: none;
+    height: min(900px, calc(100vh - 40px));
+    max-height: none;
+    background: #1c1c1f;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .35);
+    border-radius: 0;
+  }
+  [data-brand] .receipt-dialog::backdrop {
+    background: rgba(16, 16, 20, .8);
+  }
+  [data-brand] .receipt-dialog-hint {
+    @apply absolute top-4 left-5 text-white/70 text-[11px] font-bold
+           uppercase tracking-[0.10em];
+  }
+  [data-brand] .receipt-dialog-close {
+    @apply absolute top-2.5 right-3 grid w-8 h-8 place-items-center border-0
+           bg-white/15 text-white text-[22px] cursor-pointer;
+    border-radius: 0;
+  }
+  [data-brand] .receipt-dialog-layout {
+    @apply grid gap-3.5 w-full h-full;
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 270px);
+    padding: 48px 16px 16px;
+  }
+  [data-brand] .receipt-dialog-viewport {
+    @apply w-full h-full overflow-hidden bg-[#101014];
+    overscroll-behavior: contain;
+  }
+  [data-brand] .receipt-dialog-zoom {
+    @apply flex w-full h-full items-center justify-center overflow-hidden
+           border-0 p-0 bg-transparent cursor-zoom-in;
+  }
+  [data-brand] .receipt-dialog-zoom.is-zoomed {
+    @apply cursor-grab;
+    touch-action: none;
+  }
+  [data-brand] .receipt-dialog-zoom.is-dragging {
+    @apply cursor-grabbing;
+  }
+  [data-brand] .receipt-dialog-image {
+    @apply block w-auto h-auto max-w-full max-h-full;
+    transform-origin: center;
+    transition: transform 180ms ease-out;
+  }
+  [data-brand] .receipt-dialog-zoom.is-dragging .receipt-dialog-image {
+    transition: none;
+  }
+  [data-brand] .receipt-dialog-totals {
+    @apply self-end overflow-hidden bg-white text-ink border border-rule;
+    border-top: 3px solid var(--color-brand);
+    border-radius: 0;
+  }
+  [data-brand] .receipt-dialog-totals-heading {
+    @apply flex items-center justify-between gap-3 px-4 pt-4 pb-3;
+  }
+  [data-brand] .receipt-dialog-totals-heading > div {
+    @apply grid gap-1;
+  }
+  [data-brand] .receipt-dialog-totals-heading > div > span {
+    @apply text-[10px] font-bold uppercase tracking-[0.12em] text-brand;
+  }
+  [data-brand] .receipt-dialog-totals-heading h2 {
+    @apply m-0 text-[15px] font-bold text-ink;
+  }
+  [data-brand] .receipt-dialog-total-values {
+    @apply grid m-0 border-t border-rule;
+  }
+  [data-brand] .receipt-dialog-total-values div {
+    @apply flex items-center justify-between gap-3 px-4 py-3;
+  }
+  [data-brand] .receipt-dialog-total-values div + div {
+    @apply border-t border-rule;
+  }
+  [data-brand] .receipt-dialog-total-values dt {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+  [data-brand] .receipt-dialog-total-values dd {
+    @apply m-0 text-[15px] font-bold tabular-nums;
+  }
+  [data-brand] .receipt-dialog-totals > p {
+    @apply m-0 border-t border-rule px-4 py-2.5 text-[12px] font-semibold leading-snug;
+  }
+  [data-brand] .receipt-dialog-payment {
+    @apply grid gap-1 border-t border-rule px-4 py-3;
+  }
+  [data-brand] .receipt-dialog-payment span {
+    @apply text-[10px] font-bold uppercase tracking-[0.10em] text-muted;
+  }
+  [data-brand] .receipt-dialog-payment strong {
+    @apply break-words text-[13px] leading-snug;
+  }
+  [data-brand] .receipt-dialog-actions {
+    @apply grid grid-cols-2 gap-2 border-t border-rule px-4 py-3.5;
+  }
+  [data-brand] .receipt-dialog-actions form,
+  [data-brand] .receipt-dialog-actions button {
+    @apply w-full;
+  }
+  [data-brand] .receipt-dialog-actions > p {
+    @apply m-0 text-[11px] text-muted leading-snug;
+    grid-column: 1 / -1;
+  }
+
+  /* ── Report stats & spend bars ── */
+  [data-brand] .stat-grid {
+    @apply grid grid-cols-3 gap-4;
+  }
+  [data-brand] .stat {
+    @apply grid content-between gap-2 bg-white border border-rule px-5 py-4 min-h-[120px];
+    border-top: 3px solid var(--color-brand);
+  }
+  [data-brand] .stat > span {
+    @apply text-[10.5px] font-bold uppercase tracking-[0.12em] text-muted;
+  }
+  [data-brand] .stat strong {
+    @apply text-[26px] font-bold text-ink tracking-[-0.01em] tabular-nums;
+  }
+  [data-brand] .stat small {
+    @apply text-[12px] text-muted;
+  }
+  [data-brand] .stat-primary {
+    @apply bg-brand border-brand;
+  }
+  [data-brand] .stat-primary > span,
+  [data-brand] .stat-primary small {
+    @apply text-white/75;
+  }
+  [data-brand] .stat-primary strong {
+    @apply text-white;
+  }
+  [data-brand] .spend-list {
+    @apply grid;
+  }
+  [data-brand] .spend-row {
+    @apply px-6 py-4 border-b border-rule;
+  }
+  [data-brand] .spend-row:last-child {
+    @apply border-b-0;
+  }
+  [data-brand] .spend-row-heading,
+  [data-brand] .spend-row-meta {
+    @apply flex items-center justify-between gap-4;
+  }
+  [data-brand] .spend-row-heading span {
+    @apply font-bold tabular-nums text-[13.5px];
+  }
+  [data-brand] .spend-track {
+    @apply h-[6px] my-2.5 mb-2 overflow-hidden bg-canvas;
+    border-radius: 0;
+  }
+  [data-brand] .spend-track span {
+    @apply block h-full bg-brand;
+  }
+  [data-brand] .spend-track span.is-over {
+    @apply bg-warn;
+  }
+  [data-brand] .spend-row-meta {
+    @apply text-[11.5px] text-muted;
+  }
+  [data-brand] .spend-row-meta.is-over span:last-child {
+    @apply text-warn font-semibold;
+  }
+
+  /* ── Payment selection bar & review dialog ── */
+  [data-brand] .payment-selection-bar {
+    @apply flex flex-wrap items-center justify-between gap-4
+           border-t border-rule bg-canvas px-5 py-3;
+  }
+  [data-brand] .payment-selection-bar strong {
+    @apply tabular-nums;
+  }
+  [data-brand] .payment-selection-bar span {
+    @apply ml-2 text-[12px] text-muted;
+  }
+  [data-brand] .payment-selection-actions {
+    @apply flex items-center gap-2;
+  }
+  [data-brand] .payment-feedback {
+    @apply m-0 border-t border-rule px-5 py-3 text-[13px] text-ok font-semibold;
+  }
+  [data-brand] .payment-review-dialog {
+    @apply border border-rule bg-white p-0 w-full;
+    max-width: 560px;
+    border-top: 3px solid var(--color-brand);
+    border-radius: 0;
+  }
+  [data-brand] .payment-review-dialog::backdrop {
+    background: rgba(16, 16, 20, .55);
+  }
+  [data-brand] .payment-review-heading {
+    @apply flex items-start justify-between gap-4 px-6 pt-5 pb-4 border-b border-rule;
+  }
+  [data-brand] .payment-review-heading h2 {
+    @apply m-0 mt-1 text-[18px] font-bold text-ink;
+  }
+  [data-brand] .payment-review-close {
+    @apply grid w-8 h-8 place-items-center border border-rule bg-white
+           text-muted text-[18px] cursor-pointer hover:text-ink transition-colors;
+    border-radius: 0;
+  }
+  [data-brand] .payment-group-list {
+    @apply grid max-h-[320px] overflow-y-auto;
+  }
+  [data-brand] .payment-group {
+    @apply px-6 py-4 border-b border-rule;
+  }
+  [data-brand] .payment-group-summary {
+    @apply flex items-center justify-between gap-4;
+  }
+  [data-brand] .payment-group-summary h3 {
+    @apply m-0 text-[14px] font-bold text-ink;
+  }
+  [data-brand] .payment-group-summary span {
+    @apply text-[12px] text-muted;
+  }
+  [data-brand] .payment-group-summary strong {
+    @apply text-[15px] tabular-nums;
+  }
+  [data-brand] .payment-group-methods {
+    @apply mt-2 grid gap-0.5;
+  }
+  [data-brand] .payment-group-methods span {
+    @apply text-[10px] font-bold uppercase tracking-[0.10em] text-muted;
+  }
+  [data-brand] .payment-group-methods strong {
+    @apply text-[13px] break-words;
+  }
+  [data-brand] .payment-method-warning {
+    @apply m-0 mt-2 text-[12px] font-semibold text-caution;
+  }
+  [data-brand] .payment-review-total {
+    @apply flex items-center justify-between gap-4 px-6 py-3.5 border-b border-rule
+           text-[12px] font-bold uppercase tracking-[0.10em] text-muted;
+  }
+  [data-brand] .payment-review-total strong {
+    @apply text-[16px] text-ink tabular-nums tracking-normal;
+  }
+  [data-brand] .payment-review-note {
+    @apply m-0 px-6 pt-3 text-[12px] text-muted leading-relaxed;
+  }
+  [data-brand] .payment-dialog-error {
+    @apply m-0 px-6 pt-2 text-[13px] text-warn font-semibold;
+  }
+  [data-brand] .payment-review-actions {
+    @apply flex justify-end gap-2 px-6 py-4;
+  }
+
+  /* ── Loading skeleton ── */
+  [data-brand] .loading-block {
+    @apply block overflow-hidden;
+    border-radius: 0;
+    background: linear-gradient(100deg, var(--color-canvas) 25%, #ffffff 45%, var(--color-canvas) 65%);
+    background-size: 220% 100%;
+    animation: brand-loading 1.35s ease-in-out infinite;
+  }
+  @keyframes brand-loading {
+    from { background-position: 100% 0; }
+    to { background-position: -120% 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-brand] .loading-block { animation: none; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 820px) {
+    [data-brand] .review-grid {
+      grid-template-columns: 1fr;
+    }
+    [data-brand] .receipt-sidebar {
+      @apply static;
+      grid-row: 1;
+    }
+    [data-brand] .receipt-dialog-layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+    [data-brand] .receipt-dialog-totals {
+      @apply self-stretch;
+    }
+    [data-brand] .stat-grid {
+      grid-template-columns: 1fr;
+    }
+    [data-brand] .data-table {
+      min-width: 720px;
+    }
+  }
+  @media (max-width: 560px) {
+    [data-brand] .detail-list {
+      grid-template-columns: 1fr;
+    }
+    [data-brand] .detail-list > div,
+    [data-brand] .detail-list > div:nth-child(odd) {
+      @apply border-r-0 border-b border-rule;
+    }
+    [data-brand] .detail-list > div:last-child {
+      @apply border-b-0;
+    }
+    [data-brand] .detail-list .detail-wide {
+      grid-column: auto;
+    }
+  }
+}
