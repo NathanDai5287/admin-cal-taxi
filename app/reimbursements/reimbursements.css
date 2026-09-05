@@ -304,6 +304,11 @@ html[data-reimbursement-theme="dark"] [data-reimbursements] {
 .submission-row:has(.submission-link:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: -3px; }
 .submission-row-action { color: var(--accent); font-size: .78rem; font-weight: 800; white-space: nowrap; }
 .inline-status-form { position: relative; z-index: 2; width: fit-content; }
+.reimbursed-checkbox {
+  width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer;
+}
+.reimbursed-checkbox:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.reimbursed-checkbox:disabled { cursor: not-allowed; opacity: .7; }
 .inline-status-select {
   width: auto; min-height: 30px; border: 0; border-radius: 999px; padding: 5px 28px 5px 10px;
   color: var(--neutral-text); font-size: .69rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;

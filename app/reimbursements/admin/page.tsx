@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { promoteMember, updateStatus } from "@/app/reimbursements/admin/actions";
+import { promoteMember, updateReimbursed, updateStatus } from "@/app/reimbursements/admin/actions";
 import { AppHeader } from "@/components/reimbursements/app-header";
 import { InviteForm } from "@/components/reimbursements/invite-form";
 import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
 import { PromoteMemberButton } from "@/components/reimbursements/promote-member-button";
+import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 import { requireIdentity } from "@/lib/reimbursements/auth";
 import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
 
@@ -21,7 +22,7 @@ export default async function AdminPage() {
   const [reimbursementsResult, profilesResult] = await Promise.all([
     supabase
       .from("reimbursements")
-      .select("id, full_name, amount, category, status, merchant, receipt_total, submitted_at")
+      .select("id, full_name, amount, category, status, merchant, receipt_total, reimbursed, submitted_at")
       .order("submitted_at", { ascending: false }),
     supabase
       .from("profiles")
@@ -98,7 +99,7 @@ export default async function AdminPage() {
           <div className="panel-header"><h2>All submissions</h2></div>
           {rows.length ? (
             <table className="admin-table">
-              <thead><tr><th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Review</th></tr></thead>
+              <thead><tr><th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Reimbursed</th><th>Review</th></tr></thead>
               <tbody>
                 {rows.map((item) => (
                   <tr className="submission-row" key={item.id}>
@@ -119,6 +120,12 @@ export default async function AdminPage() {
                       <form action={updateStatus} className="inline-status-form">
                         <input name="id" type="hidden" value={item.id} />
                         <InlineStatusSelect status={item.status} />
+                      </form>
+                    </td>
+                    <td>
+                      <form action={updateReimbursed} className="inline-status-form">
+                        <input name="id" type="hidden" value={item.id} />
+                        <ReimbursedCheckbox reimbursed={item.reimbursed} />
                       </form>
                     </td>
                     <td><span className="submission-row-action">Review submission <span aria-hidden="true">→</span></span></td>

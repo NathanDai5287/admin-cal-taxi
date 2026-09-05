@@ -66,6 +66,7 @@ export type Database = {
           receipt_date: string | null;
           receipt_total: number | null;
           failure_reason: string | null;
+          reimbursed: boolean;
           discord_message_id: string | null;
           discord_channel_id: string | null;
           discord_notified_at: string | null;
@@ -88,6 +89,7 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          reimbursed?: boolean;
           discord_message_id?: string | null;
           discord_channel_id?: string | null;
           discord_notified_at?: string | null;
@@ -102,6 +104,7 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          reimbursed?: boolean;
           discord_message_id?: string | null;
           discord_channel_id?: string | null;
           discord_notified_at?: string | null;

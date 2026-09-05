@@ -101,3 +101,14 @@ export async function updateStatus(formData: FormData) {
   revalidatePath(`/reimbursements/admin/${parsed.data.id}`);
   revalidatePath("/reimbursements/dashboard");
 }
+
+export async function updateReimbursed(formData: FormData) {
+  const { supabase } = await requireAdmin();
+  const parsed = z.object({ id: z.uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) return;
+
+  const reimbursed = formData.get("reimbursed") === "true";
+  await supabase.from("reimbursements").update({ reimbursed }).eq("id", parsed.data.id);
+  revalidatePath("/reimbursements/admin");
+  revalidatePath(`/reimbursements/admin/${parsed.data.id}`);
+}
