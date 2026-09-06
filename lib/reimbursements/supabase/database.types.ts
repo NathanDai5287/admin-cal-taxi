@@ -34,6 +34,7 @@ export type Database = {
           id: string;
           amount: number;
           description: string;
+          source: Database["public"]["Enums"]["chapter_income_source"];
           budget_date: string;
           created_by: string | null;
           created_at: string;
@@ -43,6 +44,7 @@ export type Database = {
           id?: string;
           amount: number;
           description: string;
+          source?: Database["public"]["Enums"]["chapter_income_source"];
           budget_date: string;
           created_by?: string | null;
           created_at?: string;
@@ -51,7 +53,74 @@ export type Database = {
         Update: {
           amount?: number;
           description?: string;
+          source?: Database["public"]["Enums"]["chapter_income_source"];
           budget_date?: string;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      chapter_financial_settings: {
+        Row: {
+          id: boolean;
+          chapter_name: string;
+          term_label: string;
+          term_start: string;
+          term_end: string;
+          opening_cash: number;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          chapter_name?: string;
+          term_label: string;
+          term_start: string;
+          term_end: string;
+          opening_cash?: number;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          chapter_name?: string;
+          term_label?: string;
+          term_start?: string;
+          term_end?: string;
+          opening_cash?: number;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      chapter_receivables: {
+        Row: {
+          id: string;
+          member_name: string;
+          amount_assessed: number;
+          amount_paid: number;
+          due_date: string;
+          notes: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_name: string;
+          amount_assessed: number;
+          amount_paid?: number;
+          due_date: string;
+          notes?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          member_name?: string;
+          amount_assessed?: number;
+          amount_paid?: number;
+          due_date?: string;
+          notes?: string;
           created_by?: string | null;
           updated_at?: string;
         };
@@ -216,6 +285,12 @@ export type Database = {
     };
     Enums: {
       app_role: "none" | "member" | "admin";
+      chapter_income_source:
+        | "active_member_dues"
+        | "new_member_fees"
+        | "fundraising"
+        | "alumni_donations"
+        | "other";
       reimbursement_category:
         | "administration"
         | "rush"
