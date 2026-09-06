@@ -26,6 +26,7 @@ export default async function ReviewLayout({ children }: { children: React.React
         tabs={[
           { href: "/reimbursements", label: "Review" },
           { href: "/reimbursements/reports", label: "Reports" },
+          { href: "/reimbursements/budgets", label: "Budgets" },
         ]}
       />
       <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>
