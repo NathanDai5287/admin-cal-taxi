@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   addManualExpense,
   deleteManualExpense,
-  saveReimbursementBudgets,
 } from "@/app/(admin)/reimbursements/(review)/reports/actions";
 import { categories, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
@@ -57,9 +56,10 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   const rawSearchParams = await searchParams;
   const filters = parseReportFilters(rawSearchParams);
   const supabase = createAdminClient();
-  const [namesResult, budgetQueryResult, rows, manualExpenses] = await Promise.all([
+  const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([
     supabase.from("reimbursements").select("full_name").order("full_name"),
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
+    supabase.from("reimbursement_budget_entries").select("amount"),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
   ]);
@@ -70,16 +70,19 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   if (budgetQueryResult.error) {
     throw new Error(`Unable to load reimbursement budgets: ${budgetQueryResult.error.message}`);
   }
+  if (budgetEntriesResult.error) {
+    throw new Error(`Unable to load the total budget: ${budgetEntriesResult.error.message}`);
+  }
 
   const memberNames = [...new Set((namesResult.data ?? []).map((row) => row.full_name))];
   const summary = summarizeApproved(rows, manualExpenses);
   const budgets = new Map((budgetQueryResult.data ?? []).map((row) => [row.budget_key, row.amount === null ? null : Number(row.amount)]));
-  const overallBudget = budgets.get("overall") ?? null;
+  const overallBudget = (budgetEntriesResult.data ?? [])
+    .reduce((total, entry) => total + Number(entry.amount), 0);
   const maximumCategorySpend = Math.max(...Object.values(summary.byCategory), 1);
   const filterParams = filtersToSearchParams(filters);
   const exportHref = `/reimbursements/reports/export${filterParams.size ? `?${filterParams}` : ""}`;
   const returnTo = `/reimbursements/reports${filterParams.size ? `?${filterParams}` : ""}`;
-  const budgetResult = typeof rawSearchParams.budget === "string" ? rawSearchParams.budget : "";
   const manualResult = typeof rawSearchParams.manual === "string" ? rawSearchParams.manual : "";
   const today = currentPacificDate();
 
@@ -116,7 +119,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
       <section className="stat-grid" aria-label="Report totals">
         <article className="stat stat-primary"><span>Recorded spending</span><strong>{formatMoney(summary.approvedTotal)}</strong><small>{formatMoney(summary.receiptTotal)} receipts + {formatMoney(summary.manualTotal)} manual</small></article>
-        <article className="stat"><span>Overall budget</span><strong>{overallBudget === null ? "Not set" : formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
+        <article className="stat"><span>Total budget</span><strong>{formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
         <article className="stat"><span>Spending entries</span><strong>{summary.approvedCount + summary.manualCount}</strong><small>{summary.approvedCount} approved receipts, {summary.manualCount} manual</small></article>
       </section>
 
@@ -242,39 +245,6 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
             </table>
           </div>
         ) : <div className="empty-state border-t border-rule">No manual expenses match these filters.</div>}
-      </section>
-
-      <section className="card">
-        <div className="card-header">
-          <span className="card-title">Budget limits</span>
-          <span className="card-subtitle">Leave a field blank to remove that limit.</span>
-        </div>
-        <form action={saveReimbursementBudgets} className="card-body border-t border-rule pt-5">
-          <input name="returnTo" type="hidden" value={returnTo} />
-          <div className="flex items-center justify-between gap-6 flex-wrap border-b border-rule pb-5">
-            <div>
-              <label className="field-label mb-1" htmlFor="overall">Overall chapter budget</label>
-              <p className="helper-text m-0">Compared with approved receipts and manual spending in the current report.</p>
-            </div>
-            <div className="money-input w-full sm:w-[220px]"><span>$</span><input className="field-input" defaultValue={overallBudget ?? ""} id="overall" min="0" name="overall" placeholder="No limit" step="0.01" type="number" /></div>
-          </div>
-          <div className="grid gap-4 py-5 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map(([category, label]) => (
-              <div className="field" key={category}>
-                <label className="field-label" htmlFor={`budget-${category}`}>{label}</label>
-                <div className="money-input"><span>$</span><input className="field-input" defaultValue={budgets.get(category) ?? ""} id={`budget-${category}`} min="0" name={category} placeholder="No limit" step="0.01" type="number" /></div>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {budgetResult === "saved" && <p className="form-message success">Budget limits saved.</p>}
-              {budgetResult === "invalid" && <p className="form-message">Enter a valid non-negative amount.</p>}
-              {budgetResult === "error" && <p className="form-message">Budget limits could not be saved. Apply the latest database migration and try again.</p>}
-            </div>
-            <button className="btn-primary" type="submit">Save budget limits</button>
-          </div>
-        </form>
       </section>
 
       <section className="card table-scroll">

@@ -29,6 +29,34 @@ export type Database = {
         };
         Relationships: [];
       };
+      reimbursement_budget_entries: {
+        Row: {
+          id: string;
+          amount: number;
+          description: string;
+          budget_date: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          amount: number;
+          description: string;
+          budget_date: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          description?: string;
+          budget_date?: string;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       reimbursement_manual_expenses: {
         Row: {
           id: string;
