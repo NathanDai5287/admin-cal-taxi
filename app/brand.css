@@ -36,6 +36,16 @@
   border-radius: 0;
 }
 
+/* Hide number-input spinners globally — they clutter the UI and the keyboard is faster */
+[data-brand] input[type="number"] {
+  -moz-appearance: textfield;
+}
+[data-brand] input[type="number"]::-webkit-inner-spin-button,
+[data-brand] input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 @layer components {
   /* ── Card ── */
   [data-brand] .card {
@@ -87,18 +97,26 @@
   /* ── Buttons ── */
   [data-brand] .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
-           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
-           bg-brand text-white border border-brand
+           text-[12px] font-bold tracking-[0.12em] uppercase
+           bg-brand text-white border border-brand cursor-pointer
            hover:bg-[#08456a] hover:border-[#08456a]
-           disabled:opacity-50 disabled:cursor-not-allowed;
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
     border-radius: 0;
+    transition: background-color 150ms, border-color 150ms, transform 100ms;
+  }
+  [data-brand] .btn-primary:not(:disabled):active {
+    transform: scale(0.97);
   }
   [data-brand] .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
-           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           text-[12px] font-bold tracking-[0.12em] uppercase cursor-pointer
            bg-white text-brand border border-brand
-           hover:bg-brand-light disabled:opacity-50;
+           hover:bg-brand-light disabled:opacity-50 disabled:cursor-not-allowed;
     border-radius: 0;
+    transition: background-color 150ms, transform 100ms;
+  }
+  [data-brand] .btn-ghost:not(:disabled):active {
+    transform: scale(0.97);
   }
   [data-brand] .btn-link {
     @apply text-[12px] font-semibold tracking-[0.06em] text-muted
@@ -211,10 +229,14 @@
   /* ── Danger / compact buttons ── */
   [data-brand] .btn-danger {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
-           text-[12px] font-bold tracking-[0.12em] uppercase transition-colors
+           text-[12px] font-bold tracking-[0.12em] uppercase cursor-pointer
            bg-white text-warn border border-warn
            hover:bg-warn-light disabled:opacity-50 disabled:cursor-not-allowed;
     border-radius: 0;
+    transition: background-color 150ms, transform 100ms;
+  }
+  [data-brand] .btn-danger:not(:disabled):active {
+    transform: scale(0.97);
   }
   [data-brand] .btn-compact {
     @apply px-3 py-1.5 text-[11px];
@@ -293,6 +315,19 @@
   }
   [data-brand] .inline-action {
     @apply relative z-[2] w-fit;
+  }
+  /* Remove td padding and absorb it into the inline-action element so the z-index
+     shield covers the full cell — no dead-zone gap that falls through to the row link. */
+  [data-brand] .data-table td:has(> .inline-action) {
+    padding: 0;
+  }
+  /* Forms that act as inline-action wrappers fill the cell as flex rows */
+  [data-brand] .data-table td > form.inline-action {
+    @apply flex items-center px-4 py-3 min-h-full;
+  }
+  /* Label wrappers (e.g. Pay checkbox column) fill the cell and center the control */
+  [data-brand] .data-table td > label.inline-action {
+    @apply flex items-center px-4 py-3 min-h-full cursor-pointer;
   }
 
   /* ── Inline status select / checkboxes ── */

@@ -228,17 +228,19 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
               return (
                 <tr className="submission-row" key={item.id}>
                   <td>
+                    <label className="inline-action checkbox-cell">
                     <input
                       aria-label={eligible
                         ? `Select reimbursement from ${item.full_name} for ${formatMoney(item.amount)}`
                         : `Reimbursement from ${item.full_name} is not eligible for payment`}
                       checked={selectedKeys.has(selectionKey(item))}
-                      className="checkbox-brand inline-action"
+                      className="checkbox-brand"
                       disabled={!eligible}
                       onChange={(event) => toggleRow(item, event.currentTarget.checked)}
                       title={eligible ? undefined : "Only approved, unpaid reimbursements can be selected"}
                       type="checkbox"
                     />
+                    </label>
                   </td>
                   <td>
                     <Link
