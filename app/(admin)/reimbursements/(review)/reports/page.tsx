@@ -94,7 +94,11 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           <h1 className="page-title">Spending summary</h1>
           <p className="page-lede">Review requests, approved spending, and the chapter’s remaining budget.</p>
         </div>
-        <Link className="btn-ghost" href={exportHref}>Export CSV</Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link className="btn-ghost" href="/reimbursements/reports/financial">Download financial PDF</Link>
+          <Link className="btn-ghost" href="/reimbursements/reports/financial?format=json">Chart data JSON</Link>
+          <Link className="btn-ghost" href={exportHref}>Export CSV</Link>
+        </div>
       </div>
 
       <section className="card" aria-labelledby="report-filter-title">
