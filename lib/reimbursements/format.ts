@@ -8,6 +8,7 @@ export const categoryValues = [
   "philanthropy",
   "brother_bonding",
   "retreat",
+  "house",
 ] as const;
 
 export const reimbursementSchema = z.object({
@@ -26,6 +27,7 @@ export const categories = [
   ["philanthropy", "PHILANTHROPY"],
   ["brother_bonding", "BROTHER BONDING"],
   ["retreat", "RETREAT"],
+  ["house", "HOUSE"],
 ] as const;
 
 export type ReimbursementCategory = (typeof categoryValues)[number];

@@ -298,7 +298,8 @@ export type Database = {
         | "education"
         | "philanthropy"
         | "brother_bonding"
-        | "retreat";
+        | "retreat"
+        | "house";
       reimbursement_status:
         | "pending"
         | "verified"
