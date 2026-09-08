@@ -122,9 +122,11 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
         throw new Error("The receipt upload failed. Try submitting again.");
       }
 
-      const payload = new FormData(event.currentTarget);
-      payload.set("receiptPath", prepared.path);
-      const result = await submitReimbursement(payload);
+      // Reuse the values captured before awaiting; currentTarget is cleared
+      // after the event handler yields. The image is already in Storage.
+      form.delete("receipt");
+      form.set("receiptPath", prepared.path);
+      const result = await submitReimbursement(form);
       if (!result.ok) throw new Error(result.message);
 
       const rememberPaymentMethod = form.get("rememberPaymentMethod") === "on";
