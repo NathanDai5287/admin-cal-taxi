@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 
 import { prepareReceiptUpload, submitReimbursement } from "@/app/submit/actions";
 import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
@@ -14,6 +14,10 @@ const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 
 export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
   const formRef = useRef<HTMLFormElement>(null);
+  const receiptRef = useRef<HTMLInputElement>(null);
+  const dragDepth = useRef(0);
+  const [draggingReceipt, setDraggingReceipt] = useState(false);
+  const [receiptError, setReceiptError] = useState("");
   const paymentMethodRef = useRef<HTMLInputElement>(null);
   const rememberPaymentMethodRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
@@ -32,10 +36,36 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
     }
   }, []);
 
+  function handleReceiptDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepth.current = 0;
+    setDraggingReceipt(false);
+    if (pending) return;
+
+    const files = event.dataTransfer.files;
+    const receipt = files[0];
+    if (files.length !== 1) {
+      setReceiptError("Drop one receipt image at a time.");
+      return;
+    }
+    if (!receiptTypes.has(receipt.type as "image/jpeg" | "image/png")) {
+      setReceiptError("Receipt must be a JPG or PNG image.");
+      return;
+    }
+    if (receipt.size === 0 || receipt.size > maxReceiptSize) {
+      setReceiptError("Choose a non-empty receipt image up to 10 MB.");
+      return;
+    }
+
+    if (receiptRef.current) receiptRef.current.files = files;
+    setReceiptError("");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
     setMessage("");
+    setReceiptError("");
     setSuccess(false);
 
     try {
@@ -179,15 +209,43 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       </div>
       <div className="field">
         <label className="field-label" htmlFor="receipt">Receipt image</label>
-        <input
-          accept="image/jpeg,image/png"
-          className="file-input"
-          id="receipt"
-          name="receipt"
-          type="file"
-          required
-        />
-        <span className="field-hint">JPG or PNG, up to 10 MB.</span>
+        <div
+          className={`border-2 border-dashed p-5 transition-colors ${draggingReceipt ? "border-brand bg-brand-light" : "border-rule bg-canvas"}`}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (pending || !event.dataTransfer.types.includes("Files")) return;
+            dragDepth.current += 1;
+            setDraggingReceipt(true);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = pending ? "none" : "copy";
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            if (dragDepth.current === 0) setDraggingReceipt(false);
+          }}
+          onDrop={handleReceiptDrop}
+        >
+          <p className="mb-3 text-sm text-muted">
+            {draggingReceipt ? "Drop your receipt here" : "Drag a receipt image here, or choose a file below."}
+          </p>
+          <input
+            accept="image/jpeg,image/png"
+            aria-describedby={`receipt-hint${receiptError ? " receipt-error" : ""}`}
+            className="file-input"
+            disabled={pending}
+            id="receipt"
+            name="receipt"
+            onChange={() => setReceiptError("")}
+            ref={receiptRef}
+            type="file"
+            required
+          />
+        </div>
+        <span className="field-hint" id="receipt-hint">JPG or PNG, up to 10 MB. One receipt per submission.</span>
+        {receiptError && <p className="text-sm text-warn" id="receipt-error" role="alert">{receiptError}</p>}
       </div>
       {/* Honeypot: hidden from people, attractive to bots. */}
       <div aria-hidden="true" className="absolute left-[-10000px] top-auto w-[1px] h-[1px] overflow-hidden">
