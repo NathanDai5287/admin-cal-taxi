@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import Link from "next/link";
 
 import { prepareReceiptUpload, submitReimbursement } from "@/app/submit/actions";
 import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
@@ -244,6 +245,7 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
         <input id="website" name="website" tabIndex={-1} autoComplete="off" />
       </div>
       {message && <p className={`form-message${success ? " success" : ""}`} role="status">{message}</p>}
+      {success && <Link href="/history" className="text-sm text-brand underline">View my reimbursements →</Link>}
       <button className="btn-primary" disabled={pending} type="submit">
         {pending ? "Submitting…" : "Submit reimbursement"}
       </button>
