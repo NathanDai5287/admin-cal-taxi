@@ -38,7 +38,7 @@ export async function prepareReceiptUpload(
 }
 
 export type SubmitResult =
-  | { ok: true; message: string }
+  | { ok: true; message: string; reimbursementId?: string }
   | { ok: false; message: string };
 
 export async function submitReimbursement(formData: FormData): Promise<SubmitResult> {
@@ -115,5 +115,5 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
   }
 
   after(() => processReimbursementReceipt(reimbursement.id));
-  return { ok: true, message: "Submitted. We’re checking the receipt now." };
+  return { ok: true, reimbursementId: reimbursement.id, message: "Submitted. We’re checking the receipt now." };
 }

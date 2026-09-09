@@ -1,8 +1,9 @@
 "use client";
 import { Button } from "@/components/brand/button";
 
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { prepareReceiptUpload, submitReimbursement } from "@/app/submit/actions";
 import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
@@ -11,6 +12,7 @@ import { prepareReceiptImage, receiptAccept, receiptFormat, receiptValidationErr
 const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 
 export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const receiptRef = useRef<HTMLInputElement>(null);
   const dragDepth = useRef(0);
@@ -18,7 +20,9 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
   const [receiptError, setReceiptError] = useState("");
   const paymentMethodRef = useRef<HTMLInputElement>(null);
   const rememberPaymentMethodRef = useRef<HTMLInputElement>(null);
-  const [pending, setPending] = useState(false);
+  const [submitting, setPending] = useState(false);
+  const [navigating, startNavigation] = useTransition();
+  const pending = submitting || navigating;
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
 
@@ -129,6 +133,11 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
         }
       } catch {
         // Saving the preference is optional and must not invalidate a submission.
+      }
+
+      if (result.reimbursementId) {
+        startNavigation(() => router.push(`/history/${result.reimbursementId}`));
+        return;
       }
 
       formRef.current?.reset();
