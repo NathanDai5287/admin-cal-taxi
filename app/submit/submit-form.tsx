@@ -5,11 +5,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "rea
 import { prepareReceiptUpload, submitReimbursement } from "@/app/submit/actions";
 import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
 
-const maxReceiptSize = 10 * 1024 * 1024;
-const receiptTypes = new Map([
-  ["image/jpeg", "jpg"],
-  ["image/png", "png"],
-] as const);
+import { prepareReceiptImage, receiptAccept, receiptFormat, receiptValidationError } from "@/lib/reimbursements/receipt-upload";
 const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 
 export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
@@ -48,12 +44,9 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       setReceiptError("Drop one receipt image at a time.");
       return;
     }
-    if (!receiptTypes.has(receipt.type as "image/jpeg" | "image/png")) {
-      setReceiptError("Receipt must be a JPG or PNG image.");
-      return;
-    }
-    if (receipt.size === 0 || receipt.size > maxReceiptSize) {
-      setReceiptError("Choose a non-empty receipt image up to 10 MB.");
+    const error = receiptValidationError(receipt);
+    if (error) {
+      setReceiptError(error);
       return;
     }
 
@@ -95,13 +88,9 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       if (!(receipt instanceof File) || receipt.size === 0) {
         throw new Error("Choose a receipt image.");
       }
-      const extension = receiptTypes.get(receipt.type as "image/jpeg" | "image/png");
-      if (!extension) {
-        throw new Error("Receipt must be a JPG or PNG image.");
-      }
-      if (receipt.size > maxReceiptSize) {
-        throw new Error("Receipt must be smaller than 10 MB.");
-      }
+      if (receiptFormat(receipt) === "heic") setMessage("Converting HEIC receipt to JPG…");
+      const { blob, extension } = await prepareReceiptImage(receipt);
+      setMessage("Uploading receipt…");
 
       // The receipt goes straight to Supabase Storage through a signed upload
       // URL, so large images never pass through the web server.
@@ -115,8 +104,8 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       uploadUrl.searchParams.set("token", prepared.token);
       const uploadResponse = await fetch(uploadUrl, {
         method: "PUT",
-        body: receipt,
-        headers: { "content-type": receipt.type, "x-upsert": "false" },
+        body: blob,
+        headers: { "content-type": blob.type, "x-upsert": "false" },
       });
       if (!uploadResponse.ok) {
         throw new Error("The receipt upload failed. Try submitting again.");
@@ -234,7 +223,7 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
             {draggingReceipt ? "Drop your receipt here" : "Drag a receipt image here, or choose a file below."}
           </p>
           <input
-            accept="image/jpeg,image/png"
+            accept={receiptAccept}
             aria-describedby={`receipt-hint${receiptError ? " receipt-error" : ""}`}
             className="file-input"
             disabled={pending}
@@ -246,7 +235,7 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
             required
           />
         </div>
-        <span className="field-hint" id="receipt-hint">JPG or PNG, up to 10 MB. One receipt per submission.</span>
+        <span className="field-hint" id="receipt-hint">JPG, PNG, or HEIC, up to 10 MB. HEIC photos are converted to JPG for viewing. One receipt per submission.</span>
         {receiptError && <p className="text-sm text-warn" id="receipt-error" role="alert">{receiptError}</p>}
       </div>
       {/* Honeypot: hidden from people, attractive to bots. */}
