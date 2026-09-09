@@ -1,6 +1,7 @@
 "use client";
 
 import { resetVotesAction } from "./actions";
+import { Button } from "@/components/brand/button";
 
 export default function ResetVotesButton() {
   return (
@@ -16,12 +17,13 @@ export default function ResetVotesButton() {
         }
       }}
     >
-      <button
+      <Button
         type="submit"
-        className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+        variant="danger"
+        compact
       >
         Reset votes
-      </button>
+      </Button>
     </form>
   );
 }

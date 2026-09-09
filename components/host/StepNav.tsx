@@ -1,4 +1,5 @@
 "use client";
+import { ButtonLink, Button } from "@/components/brand/button";
 
 import Link from "next/link";
 
@@ -94,24 +95,23 @@ export function StepNav({
   return (
     <nav className="flex items-center justify-between gap-4 border-t border-rule pt-6 mt-2 flex-wrap">
       {prev ? (
-        <Link href={prev.href} className="btn-ghost">
+        <ButtonLink href={prev.href} variant="secondary">
           ← {prev.label}
-        </Link>
+        </ButtonLink>
       ) : <span />}
 
       {next ? (
         nextDisabled ? (
-          <span
-            className="btn-primary opacity-50 cursor-not-allowed"
-            aria-disabled="true"
+          <Button
+            disabled
             title="Fill in the required fields above to continue"
           >
             {nextLabel ?? `Continue to ${next.label}`} →
-          </span>
+          </Button>
         ) : (
-          <Link href={next.href} className="btn-primary">
+          <ButtonLink href={next.href} variant="primary">
             {nextLabel ?? `Continue to ${next.label}`} →
-          </Link>
+          </ButtonLink>
         )
       ) : <span />}
     </nav>

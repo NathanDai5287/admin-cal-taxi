@@ -1,3 +1,4 @@
+import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -92,16 +93,16 @@ export default async function SubmissionReviewPage({
                 <form action={updateStatus}>
                   <input name="id" type="hidden" value={reimbursement.id} />
                   <input name="status" type="hidden" value="approved" />
-                  <button className="btn-primary" disabled={reimbursement.status === "approved" || !processingComplete} type="submit">
+                  <Button variant="primary" disabled={reimbursement.status === "approved" || !processingComplete} type="submit">
                     {reimbursement.status === "approved" ? "Approved" : "Approve submission"}
-                  </button>
+                  </Button>
                 </form>
                 <form action={updateStatus}>
                   <input name="id" type="hidden" value={reimbursement.id} />
                   <input name="status" type="hidden" value="denied" />
-                  <button className="btn-danger" disabled={reimbursement.status === "denied" || !processingComplete} type="submit">
+                  <Button variant="danger" disabled={reimbursement.status === "denied" || !processingComplete} type="submit">
                     {reimbursement.status === "denied" ? "Denied" : "Deny submission"}
-                  </button>
+                  </Button>
                 </form>
               </div>
               {!processingComplete && <p className="helper-text mt-3">Approval is available when automatic processing finishes.</p>}

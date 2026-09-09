@@ -1,3 +1,4 @@
+import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 
 import { inviteUser, revokeInvite } from "@/app/(admin)/users/actions";
@@ -60,7 +61,7 @@ export default async function UsersPage() {
               <option value="admin">Admin</option>
             </select>
           </div>
-          <button className="btn-primary" type="submit">Invite</button>
+          <Button variant="primary" type="submit">Invite</Button>
         </form>
         <p className="helper-text px-6 pb-5">
           If they&apos;ve already signed in, their role updates right away. Otherwise it
@@ -91,7 +92,7 @@ export default async function UsersPage() {
                   <td>
                     <form action={revokeInvite}>
                       <input name="email" type="hidden" value={invite.email} />
-                      <button className="btn-link" type="submit">Revoke</button>
+                      <Button variant="text" type="submit">Revoke</Button>
                     </form>
                   </td>
                 </tr>

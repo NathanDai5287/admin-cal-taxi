@@ -47,6 +47,111 @@
 }
 
 @layer components {
+  /* Secondary navigation: the main navbar's underline interaction, quieter. */
+  [data-brand] .member-tabs {
+    display: flex;
+    gap: 1.75rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+  [data-brand] .member-tabs a {
+    padding: 0 0 0.85rem;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-muted);
+    transition: color 150ms, border-color 150ms;
+  }
+  [data-brand] .member-tabs a:hover { color: var(--color-ink); }
+  [data-brand] .member-tabs a[aria-current="page"] {
+    color: var(--color-brand);
+    border-bottom-color: var(--color-brand);
+  }
+  [data-brand] .brand-button:focus-visible,
+  [data-brand] .member-tabs a:focus-visible,
+  [data-brand] .history-filters a:focus-visible,
+  [data-brand] .history-row:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 4px;
+  }
+  [data-brand] .brand-button { border-radius: 0; }
+  [data-brand] .brand-button.btn-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+  }
+  [data-brand] .brand-button.btn-link:hover { color: var(--color-brand); }
+  [data-brand] .brand-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Member history is a ruled ledger, not a collection of elevated cards. */
+  [data-brand] .history-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    padding-bottom: 0.75rem;
+  }
+  [data-brand] .history-filters { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+  [data-brand] .history-filters a { padding: 0.5rem 0; font-size: 12px; color: var(--color-muted); }
+  [data-brand] .history-filters a:hover { color: var(--color-ink); }
+  [data-brand] .history-filters a[aria-current="page"] {
+    color: var(--color-brand);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 5px;
+  }
+  [data-brand] .history-ledger { border-top: 2px solid var(--color-brand); }
+  [data-brand] .history-columns,
+  [data-brand] .history-row { display: grid; grid-template-columns: minmax(0, 1fr) 145px 110px; gap: 1.25rem; }
+  [data-brand] .history-columns {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--color-rule);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-muted);
+  }
+  [data-brand] .history-columns span:last-child { text-align: right; }
+  [data-brand] .history-row {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-rule);
+    align-items: baseline;
+    transition: background-color 150ms;
+  }
+  [data-brand] .history-row:hover { background: var(--color-canvas); }
+  [data-brand] .history-expense { min-width: 0; }
+  [data-brand] .history-expense h2 {
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  [data-brand] .history-expense p { margin-top: 4px; font-size: 10px; letter-spacing: 0.025em; color: var(--color-muted); }
+  [data-brand] .history-expense p span { padding: 0 4px; }
+  [data-brand] .history-status { font-size: 12px; }
+  [data-brand] .history-status > span { font-weight: 600; }
+  [data-brand] .history-status small { display: block; margin-top: 4px; font-size: 11px; color: var(--color-muted); }
+  [data-brand] .history-status [data-status="denied"] { color: var(--color-warn); }
+  [data-brand] .history-status [data-status="mismatch"],
+  [data-brand] .history-status [data-status="processing_failed"] { color: var(--color-caution); }
+  [data-brand] .history-status [data-paid="true"] { color: var(--color-ok); }
+  [data-brand] .history-amount { text-align: right; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  [data-brand] .history-empty { border-block: 1px solid var(--color-rule); padding: 2rem 0; }
+  @media (max-width: 540px) {
+    [data-brand] .member-tabs { gap: 1.25rem; }
+    [data-brand] .member-tabs a { font-size: 11px; }
+    [data-brand] .history-columns { display: none; }
+    [data-brand] .history-row { grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem 0.75rem; }
+    [data-brand] .history-amount { grid-column: 2; grid-row: 1; }
+    [data-brand] .history-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; }
+    [data-brand] .history-status small { margin-top: 0; }
+  }
   /* ── Card ── */
   [data-brand] .card {
     @apply bg-white border border-rule;

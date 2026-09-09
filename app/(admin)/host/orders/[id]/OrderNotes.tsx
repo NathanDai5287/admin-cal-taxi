@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 /** Free-form notes on an order, saved via setOrderNotesAction. */
 
@@ -54,9 +55,9 @@ export default function OrderNotes({
           placeholder="Anything worth remembering about this rental…"
         />
         <div className="flex items-center gap-4">
-          <button type="button" className="btn-ghost" disabled={busy || !dirty} onClick={save}>
+          <Button type="button" variant="secondary" disabled={busy || !dirty} onClick={save}>
             {busy ? "Saving…" : "Save Notes"}
-          </button>
+          </Button>
           {!busy && justSaved && !dirty && <span className="text-[12px] text-ok">Saved</span>}
           {!busy && error && <span className="text-[12px] text-warn">{error}</span>}
         </div>

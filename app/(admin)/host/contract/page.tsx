@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import { AreaKey, OverrideKey, useSharedData } from "@/lib/host-shared-state";
 import { autoValue, effective, hasDiverged } from "@/lib/host-derive";
@@ -280,9 +281,9 @@ function DerivedField({
       <p className="field-hint">
         {provenance}
         {hydrated && isManual && auto && (
-          <button type="button" className="btn-link" onClick={() => resetDerived(okey)}>
+          <Button type="button" variant="text" onClick={() => resetDerived(okey)}>
             Reset to auto
-          </button>
+          </Button>
         )}
         {extraHint && <span className="block">{extraHint}</span>}
       </p>

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import Field from "./Field";
 import LineItemList from "@/components/host/LineItemList";
@@ -49,14 +50,14 @@ export default function RentalPanel({
             <div className="card-title">Line Items</div>
             <p className="text-[12px] text-muted mt-1.5 max-w-md">{totalDescription}</p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onReset}
-            className="btn-link"
+            variant="text"
             title="Re-derive from current pricing selections and negotiated total"
           >
             Reset from Pricing
-          </button>
+          </Button>
         </div>
 
         <LineItemList items={fields.items} onChange={items => onChange({ items })} />

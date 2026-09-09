@@ -1,3 +1,4 @@
+import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 
 import {
@@ -131,7 +132,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
               {settingsSaveResult === "invalid" && <p className="form-message">Enter a valid term, date range, and opening cash amount.</p>}
               {settingsSaveResult === "error" && <p className="form-message">Report settings could not be saved.</p>}
             </div>
-            <button className="btn-primary" type="submit">Save report settings</button>
+            <Button variant="primary" type="submit">Save report settings</Button>
           </div>
         </form>
       </section>
@@ -175,7 +176,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
               {entryResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}
               {entryResult === "error" && <p className="form-message">The budget entry could not be saved. Apply the latest database migration and try again.</p>}
             </div>
-            <button className="btn-primary" type="submit">Add to budget</button>
+            <Button variant="primary" type="submit">Add to budget</Button>
           </div>
         </form>
         {entries.length ? (
@@ -192,7 +193,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
                     <td className="text-right">
                       <form action={deleteBudgetEntry}>
                         <input name="id" type="hidden" value={entry.id} />
-                        <button className="btn-ghost btn-compact" type="submit">Remove</button>
+                        <Button variant="secondary" compact type="submit">Remove</Button>
                       </form>
                     </td>
                   </tr>
@@ -224,7 +225,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
               {receivableResult === "invalid" && <p className="form-message">Enter valid balance details; paid cannot exceed assessed.</p>}
               {receivableResult === "error" && <p className="form-message">The member balance could not be saved.</p>}
             </div>
-            <button className="btn-primary" type="submit">Add member balance</button>
+            <Button variant="primary" type="submit">Add member balance</Button>
           </div>
         </form>
         {receivables.length ? (
@@ -245,12 +246,12 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
                           <input name="id" type="hidden" value={row.id} />
                           <input name="amountAssessed" type="hidden" value={assessed} />
                           <div className="money-input"><span>$</span><input aria-label={`Amount paid by ${row.member_name}`} className="field-input py-1.5" defaultValue={paid} max={assessed} min="0" name="amountPaid" step="0.01" type="number" /></div>
-                          <button className="btn-ghost btn-compact" type="submit">Save</button>
+                          <Button variant="secondary" compact type="submit">Save</Button>
                         </form>
                       </td>
                       <td className="amount">{formatMoney(assessed - paid)}</td>
                       <td>{row.notes || "—"}</td>
-                      <td className="text-right"><form action={deleteReceivable}><input name="id" type="hidden" value={row.id} /><button className="btn-ghost btn-compact" type="submit">Remove</button></form></td>
+                      <td className="text-right"><form action={deleteReceivable}><input name="id" type="hidden" value={row.id} /><Button variant="secondary" compact type="submit">Remove</Button></form></td>
                     </tr>
                   );
                 })}
@@ -280,7 +281,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
               {limitsResult === "invalid" && <p className="form-message">Enter valid non-negative amounts.</p>}
               {limitsResult === "error" && <p className="form-message">Category limits could not be saved.</p>}
             </div>
-            <button className="btn-primary" type="submit">Save category limits</button>
+            <Button variant="primary" type="submit">Save category limits</Button>
           </div>
         </form>
       </section>

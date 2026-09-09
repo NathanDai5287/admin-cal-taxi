@@ -6,7 +6,6 @@ import { createClient } from "@/lib/reimbursements/supabase/server";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import { memberPaymentStatus, memberStatus, memberSubmissionDate } from "@/lib/reimbursements/member-status";
-import { MemberRefresh } from "@/components/reimbursements/member-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My reimbursement" };
@@ -29,7 +28,7 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
   const status = memberStatus(row.status);
   return <>
     <Link href="/history" className="text-sm text-brand underline">← My reimbursements</Link>
-    <div className="my-5 flex flex-wrap items-center justify-between gap-3"><h1 className="page-title">Reimbursement details</h1><MemberRefresh /></div>
+    <div className="my-5"><h1 className="page-title">Reimbursement details</h1></div>
     <section className="card mb-5 p-5">
       <div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">{status.label}</h2><span className="font-semibold text-brand">{memberPaymentStatus(row.status, row.reimbursed)}</span></div>
       <p className="mt-2 text-sm text-muted">{status.explanation}</p>
@@ -43,8 +42,8 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
       {receipt?.signedUrl ? <><a href={receipt.signedUrl} target="_blank" rel="noopener noreferrer" className="mb-3 inline-block text-sm text-brand underline">Open full-size receipt ↗</a>
         {/* Signed private Storage URLs are already optimized receipt images. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={receipt.signedUrl} alt={`Receipt for ${row.description.slice(0, 120)}`} className="h-auto w-full rounded border border-rule" />
-      </> : <p className="text-sm text-muted">The receipt couldn’t be loaded. Use Refresh status to try again.</p>}
+        <img src={receipt.signedUrl} alt={`Receipt for ${row.description.slice(0, 120)}`} className="h-auto w-full border border-rule" />
+      </> : <p className="text-sm text-muted">The receipt couldn’t be loaded. Reload the page to try again.</p>}
     </section>
   </>;
 }

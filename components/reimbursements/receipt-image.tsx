@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
@@ -239,24 +240,24 @@ export function ReceiptImage({
               <form action={updateStatus}>
                 <input name="id" type="hidden" value={reimbursementId} />
                 <input name="status" type="hidden" value="approved" />
-                <button
-                  className="btn-primary"
+                <Button
+                  variant="primary"
                   disabled={reimbursementStatus === "approved" || !processingComplete}
                   type="submit"
                 >
                   {reimbursementStatus === "approved" ? "Approved" : "Approve"}
-                </button>
+                </Button>
               </form>
               <form action={updateStatus}>
                 <input name="id" type="hidden" value={reimbursementId} />
                 <input name="status" type="hidden" value="denied" />
-                <button
-                  className="btn-danger"
+                <Button
+                  variant="danger"
                   disabled={reimbursementStatus === "denied" || !processingComplete}
                   type="submit"
                 >
                   {reimbursementStatus === "denied" ? "Denied" : "Deny"}
-                </button>
+                </Button>
               </form>
               {!processingComplete && reimbursementStatus === "pending" && (
                 <p>Actions are available when automatic processing finishes.</p>

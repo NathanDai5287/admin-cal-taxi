@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import { useMemo } from "react";
 
@@ -93,13 +94,13 @@ export default function LineItemList({
       </div>
 
       <div className="flex items-center justify-between pt-3 mt-2 border-t border-rule">
-        <button
+        <Button
           type="button"
           onClick={addItem}
-          className="text-[12px] font-bold tracking-[0.10em] uppercase text-brand hover:text-[#08456a] transition-colors"
+          variant="text"
         >
           + Add Line Item
-        </button>
+        </Button>
         <div className="flex items-baseline gap-3">
           <span className="text-[10.5px] font-bold tracking-[0.16em] uppercase text-muted">Total</span>
           <span className="text-[18px] font-bold text-brand tabular-nums tracking-[-0.01em]">

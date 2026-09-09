@@ -7,6 +7,7 @@ import {
 import { banPairAction, unbanPairAction } from "./actions";
 import ResetVotesButton from "./ResetVotesButton";
 import { SiteHomeIcon } from "@/components/site-home-icon";
+import { Button } from "@/components/brand/button";
 
 export const dynamic = "force-dynamic";
 
@@ -310,16 +311,13 @@ export default async function RushAdminPage() {
                           name="deviceId"
                           value={entry.deviceId}
                         />
-                        <button
+                        <Button
                           type="submit"
-                          className={`rounded px-3 py-1 text-xs font-semibold ${
-                            entry.banned
-                              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                              : "bg-red-600 text-white hover:bg-red-700"
-                          }`}
+                          variant={entry.banned ? "secondary" : "danger"}
+                          compact
                         >
                           {entry.banned ? "Unban" : "Ban"}
-                        </button>
+                        </Button>
                       </form>
                     </td>
                   </tr>

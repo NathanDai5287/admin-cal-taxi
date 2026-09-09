@@ -22,5 +22,5 @@ export default async function RushLayout({
     );
   }
 
-  return children;
+  return <div data-brand className="min-h-screen">{children}</div>;
 }

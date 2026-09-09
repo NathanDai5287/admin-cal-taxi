@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import ContactsForm from "@/components/host/ContactsForm";
 import SharedDataForm from "@/components/host/SharedDataForm";
@@ -49,14 +50,14 @@ export default function HostHome() {
           Saved fields persist across reloads in your browser&rsquo;s local storage. Clearing wipes
           contract drafts, pricing selections, and shared event details.
         </p>
-        <button
+        <Button
           type="button"
           onClick={handleClear}
           disabled={!hydrated}
-          className="btn-link mt-4 disabled:opacity-50"
+          variant="text" className="mt-4 disabled:opacity-50"
         >
           Clear Saved Data
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -15,7 +15,8 @@ type AppNavProps = {
   title: string;
   subtitle?: string;
   tabs?: AppNavTab[];
-  // Optional right-side slot, e.g. a sign-out button.
+  // Optional right-side slot for app-specific actions. Account actions live
+  // exclusively in the global top-right account control.
   action?: React.ReactNode;
 };
 

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 /**
  * "Load into workspace" and "Duplicate as new event" — the two ways an
@@ -165,22 +166,22 @@ export default function WorkspaceActions({ order }: { order: Order }) {
 
   return (
     <>
-      <button
+      <Button
         type="button"
-        className="btn-primary"
+        variant="primary"
         disabled={busy !== null}
         onClick={loadIntoWorkspace}
       >
         {busy === "load" ? "Loading…" : "Load into Workspace"}
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        className="btn-ghost"
+        variant="secondary"
         disabled={busy !== null}
         onClick={duplicateAsNewEvent}
       >
         {busy === "duplicate" ? "Duplicating…" : "Duplicate as New Event"}
-      </button>
+      </Button>
     </>
   );
 }

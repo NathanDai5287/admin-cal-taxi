@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/brand/button";
 /**
  * /host/orders/[id] — a single archived rental.
  *
@@ -12,7 +13,6 @@
  * 500s the same way the list page doesn't.
  */
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
@@ -30,7 +30,7 @@ import WorkspaceActions from "./WorkspaceActions";
 export const dynamic = "force-dynamic";
 
 function BackLink() {
-  return <Link href="/host/orders" className="btn-link">← Back to Orders</Link>;
+  return <ButtonLink href="/host/orders" variant="text">← Back to Orders</ButtonLink>;
 }
 
 export default async function OrderDetailPage({

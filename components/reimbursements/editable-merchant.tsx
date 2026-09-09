@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import { useState, useTransition } from "react";
 
@@ -14,9 +15,9 @@ export function EditableMerchant({ id, merchant }: { id: string; merchant: strin
     return (
       <span className="inline-flex items-center gap-2 flex-wrap">
         <span>{merchant?.trim() ? merchant : "Not detected"}</span>
-        <button className="btn-link" onClick={() => setEditing(true)} type="button">
+        <Button variant="text" onClick={() => setEditing(true)} type="button">
           Rename
-        </button>
+        </Button>
       </span>
     );
   }
@@ -47,17 +48,17 @@ export function EditableMerchant({ id, merchant }: { id: string; merchant: strin
         placeholder="Expense name"
         required
       />
-      <button className="btn-primary btn-compact" disabled={pending} type="submit">
+      <Button variant="primary" compact disabled={pending} type="submit">
         {pending ? "Saving…" : "Save"}
-      </button>
-      <button
-        className="btn-ghost btn-compact"
+      </Button>
+      <Button
+        variant="secondary" compact
         disabled={pending}
         onClick={() => setEditing(false)}
         type="button"
       >
         Cancel
-      </button>
+      </Button>
       {error ? <span className="form-message">{error}</span> : null}
     </form>
   );

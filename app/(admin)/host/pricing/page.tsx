@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import PricingCalculator from "@/components/host/PricingCalculator";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
@@ -52,14 +53,14 @@ export default function PricingPage() {
               onChange={e => setDerived("finalPrice", e.target.value)}
             />
             {calcTotal !== null && (
-              <button
+              <Button
                 type="button"
                 onClick={() => resetDerived("finalPrice")}
-                className="btn-link mt-2"
+                variant="text" className="mt-2"
                 disabled={!isManual}
               >
                 Reset to calculated ({fmtUSD(Math.round(calcTotal))})
-              </button>
+              </Button>
             )}
           </div>
 

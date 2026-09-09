@@ -1,3 +1,4 @@
+import { ButtonLink } from "@/components/brand/button";
 /**
  * /host/orders — the order archive list.
  *
@@ -13,7 +14,6 @@
  *   - the archive is reachable and simply has no orders  → point at /host/documents
  */
 
-import Link from "next/link";
 import { listOrders, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import OrdersList from "./OrdersList";
 
@@ -84,9 +84,9 @@ export default async function OrdersPage() {
           <p className="text-[13px] text-muted mt-2 leading-relaxed">
             Orders are saved from the documents step once a contract or invoice is generated.
           </p>
-          <Link href="/host/documents" className="btn-primary inline-flex mt-5">
+          <ButtonLink href="/host/documents" variant="primary" className="inline-flex mt-5">
             Go to Documents
-          </Link>
+          </ButtonLink>
         </section>
       ) : (
         <OrdersList orders={orders} />

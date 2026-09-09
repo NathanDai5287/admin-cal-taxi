@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 /**
  * One document in a list of four — the shared shell used by both the
@@ -116,26 +117,26 @@ export default function DocumentRow({
 
         <div className="flex items-center gap-3 shrink-0">
           {children && (
-            <button
+            <Button
               type="button"
               onClick={() => setOpen(o => !o)}
-              className="btn-link"
+              variant="text"
               aria-expanded={open}
               aria-controls={panelId}
             >
               {open ? "Hide fields" : "Edit fields"}
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
             onClick={onDownload}
             disabled={!canDownload}
-            className={isDone ? "btn-ghost" : "btn-primary"}
+            variant={isDone ? "secondary" : "primary"}
           >
             {busy
               ? "Generating…"
               : downloadLabel ?? (isDone ? "Download again" : "Download PDF")}
-          </button>
+          </Button>
         </div>
       </div>
 

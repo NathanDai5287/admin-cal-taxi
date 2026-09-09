@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
@@ -246,9 +247,9 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       </div>
       {message && <p className={`form-message${success ? " success" : ""}`} role="status">{message}</p>}
       {success && <Link href="/history" className="text-sm text-brand underline">View my reimbursements →</Link>}
-      <button className="btn-primary" disabled={pending} type="submit">
+      <Button variant="primary" disabled={pending} type="submit">
         {pending ? "Submitting…" : "Submit reimbursement"}
-      </button>
+      </Button>
     </form>
   );
 }

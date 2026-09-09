@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { SubmitForm } from "@/app/submit/submit-form";
 import { AccessDenied } from "@/components/auth/access-denied";
-import { SignOutButton } from "@/components/reimbursements/sign-out-button";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +29,6 @@ export default async function SubmitPage() {
             Add the expense details and attach a photo of the receipt. The receipt
             total is checked automatically before a treasurer reviews it.
           </p>
-        </div>
-        <div className="flex items-center gap-3 text-[12.5px] text-muted">
-          <span>
-            Signed in as <span className="font-semibold text-ink">{profile.full_name}</span>
-          </span>
-          <SignOutButton action="/auth/signout" />
         </div>
       </div>
 

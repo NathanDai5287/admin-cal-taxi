@@ -74,7 +74,7 @@ export default async function Home({
             </div>
             <div className="card-body border-t border-rule pt-5">
               <h1 className="m-0 text-[18px] font-bold text-ink">
-                You&apos;re signed in as a member
+                Chapter reimbursements
               </h1>
               <p className="mt-2 mb-5 text-[13.5px] text-muted leading-relaxed">
                 You can submit chapter expenses from the reimbursement form.

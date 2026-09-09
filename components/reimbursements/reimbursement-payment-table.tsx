@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -197,8 +198,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
             {" · "}
             {paymentGroups.length} {paymentGroups.length === 1 ? "member" : "members"}
           </span>
-          <button className="btn-ghost btn-compact" disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</button>
-          <button className="btn-primary btn-compact" disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Review payments</button>
+          <Button variant="secondary" compact disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</Button>
+          <Button variant="primary" compact disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Review payments</Button>
         </div>
       </div>
       <div className="table-scroll border-t border-rule">
@@ -325,10 +326,10 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         <p className="payment-review-note">This records the selected items as reimbursed. It does not send money through Zelle.</p>
         {dialogError && <p className="payment-dialog-error" role="alert">{dialogError}</p>}
         <div className="payment-review-actions">
-          <button className="btn-ghost" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</button>
-          <button className="btn-primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
+          <Button variant="secondary" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</Button>
+          <Button variant="primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
             {submitting ? "Marking reimbursed…" : "Mark selected as reimbursed"}
-          </button>
+          </Button>
         </div>
       </dialog>
     </section>

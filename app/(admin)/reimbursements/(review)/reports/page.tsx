@@ -1,3 +1,4 @@
+import { ButtonLink, Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -95,9 +96,9 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           <p className="page-lede">Review requests, approved spending, and the chapter’s remaining budget.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Link className="btn-ghost" href="/reimbursements/reports/financial">Download financial PDF</Link>
-          <Link className="btn-ghost" href="/reimbursements/reports/financial?format=json">Chart data JSON</Link>
-          <Link className="btn-ghost" href={exportHref}>Export CSV</Link>
+          <ButtonLink variant="secondary" href="/reimbursements/reports/financial">Download financial PDF</ButtonLink>
+          <ButtonLink variant="secondary" href="/reimbursements/reports/financial?format=json">Chart data JSON</ButtonLink>
+          <ButtonLink variant="secondary" href={exportHref}>Export CSV</ButtonLink>
         </div>
       </div>
 
@@ -117,7 +118,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           <div className="field"><label className="field-label" htmlFor="minAmount">Minimum amount</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={filters.minAmount} id="minAmount" min="0" name="minAmount" placeholder="0.00" step="0.01" type="number" /></div></div>
           <div className="field"><label className="field-label" htmlFor="maxAmount">Maximum amount</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={filters.maxAmount} id="maxAmount" min="0" name="maxAmount" placeholder="Any" step="0.01" type="number" /></div></div>
           <div className="field"><label className="field-label" htmlFor="status">Status</label><select className="field-input" defaultValue={filters.status} id="status" name="status"><option value="">All statuses</option>{reimbursementStatuses.map((status) => <option key={status} value={status}>{formatStatus(status)}</option>)}</select></div>
-          <button className="btn-primary w-full" type="submit">Apply filters</button>
+          <Button variant="primary" className="w-full" type="submit">Apply filters</Button>
         </form>
       </section>
 
@@ -222,7 +223,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
               {manualResult === "invalid" && <p className="form-message">Enter a category, date, description, and positive amount.</p>}
               {manualResult === "error" && <p className="form-message">The manual expense could not be saved. Apply the latest database migration and try again.</p>}
             </div>
-            <button className="btn-primary" type="submit">Add manual expense</button>
+            <Button variant="primary" type="submit">Add manual expense</Button>
           </div>
         </form>
         {manualExpenses.length ? (
@@ -240,7 +241,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
                       <form action={deleteManualExpense}>
                         <input name="id" type="hidden" value={expense.id} />
                         <input name="returnTo" type="hidden" value={returnTo} />
-                        <button className="btn-ghost btn-compact" type="submit">Remove</button>
+                        <Button variant="secondary" compact type="submit">Remove</Button>
                       </form>
                     </td>
                   </tr>
@@ -257,7 +258,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
             <span className="card-title">Matching reimbursements</span>
             <span className="card-subtitle">{rows.length} {rows.length === 1 ? "result" : "results"}; totals exclude non-approved requests.</span>
           </div>
-          <Link className="btn-ghost btn-compact" href={exportHref}>Download CSV</Link>
+          <ButtonLink variant="secondary" compact href={exportHref}>Download CSV</ButtonLink>
         </div>
         {rows.length ? (
           <table className="data-table">

@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "@/components/brand/button";
 
 /** Delete, with a confirmation — there is no undo once minmus drops the row. */
 
@@ -30,9 +31,9 @@ export default function DeleteOrderButton({ orderId }: { orderId: string }) {
   return (
     <div className="flex items-center gap-2.5 ml-auto">
       {error && <span className="text-[11px] text-warn">{error}</span>}
-      <button type="button" className="btn-link" disabled={busy} onClick={onDelete}>
+      <Button type="button" variant="text" disabled={busy} onClick={onDelete}>
         {busy ? "Deleting…" : "Delete Order"}
-      </button>
+      </Button>
     </div>
   );
 }

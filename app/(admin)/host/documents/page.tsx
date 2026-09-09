@@ -1,4 +1,5 @@
 "use client";
+import { Button, ButtonLink } from "@/components/brand/button";
 
 /**
  * Step 4: generate all four documents and (optionally) archive them.
@@ -11,7 +12,6 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
 import { ApiCallError, generatePdf } from "@/lib/host-api";
@@ -534,14 +534,14 @@ export default function DocumentsPage() {
         </div>
         <div className="card-body space-y-5">
           <div className="flex items-center gap-4 flex-wrap">
-            <button
+            <Button
               type="button"
               onClick={downloadAll}
               disabled={downloadAllBusy}
-              className="btn-ghost"
+              variant="secondary"
             >
               {downloadAllBusy ? "Downloading…" : "Download All"}
-            </button>
+            </Button>
             {downloadAllReport && (
               <p className="text-[12.5px] text-muted">{downloadAllReport}</p>
             )}
@@ -552,9 +552,9 @@ export default function DocumentsPage() {
               {data.currentOrderId ? (
                 <p className="text-[12.5px] text-ink">
                   Attached to order{" "}
-                  <Link href={`/host/orders/${data.currentOrderId}`} className="btn-link">
+                  <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text">
                     {data.currentOrderId}
-                  </Link>.
+                  </ButtonLink>.
                 </p>
               ) : (
                 <p className="text-[12.5px] text-muted">
@@ -570,14 +570,14 @@ export default function DocumentsPage() {
               {saveError && <p className="text-warn text-[13px] mt-1.5">{saveError}</p>}
               {saveNotice && !saveError && <p className="text-ok text-[13px] mt-1.5">{saveNotice}</p>}
             </div>
-            <button
+            <Button
               type="button"
               onClick={saveToOrders}
               disabled={saveBusy || !hydrated || !canSave}
-              className="btn-primary"
+              variant="primary"
             >
               {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
-            </button>
+            </Button>
           </div>
         </div>
       </section>
