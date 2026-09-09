@@ -19,11 +19,41 @@
   --color-warn-light: #fdf0ef;
   --color-caution: #93651e;
   --color-caution-light: #fbf3e2;
+  --color-page: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-action: #0a5482;
+  --color-action-hover: #08456a;
+  --color-danger: #b42332;
+}
+
+:root {
+  color-scheme: light;
+}
+
+/* Shared by every route, including controls outside a data-brand wrapper. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-page: #18181b;
+  --color-surface: #202023;
+  --color-canvas: #27272b;
+  --color-ink: #f1f1f3;
+  --color-muted: #a6a6af;
+  --color-rule: #38383f;
+  --color-brand: #7aaaff;
+  --color-brand-light: #24334c;
+  --color-action: #2864cf;
+  --color-action-hover: #2057bb;
+  --color-ok: #70d8a1;
+  --color-ok-light: #203c2e;
+  --color-warn: #ff939d;
+  --color-warn-light: #43282f;
+  --color-caution: #ebc477;
+  --color-caution-light: #403622;
 }
 
 [data-brand] {
-  color-scheme: light;
-  background: #ffffff;
+  color-scheme: inherit;
+  background: var(--color-page);
   color: var(--color-ink);
   font-family: Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-feature-settings: "ss01", "cv01", "cv11";
@@ -154,7 +184,7 @@
   }
   /* ── Card ── */
   [data-brand] .card {
-    @apply bg-white border border-rule;
+    @apply bg-surface border border-rule;
     border-top: 3px solid var(--color-brand);
   }
   [data-brand] .card-header {
@@ -174,7 +204,7 @@
   }
 
   [data-brand] .card-plain {
-    @apply bg-white border border-rule;
+    @apply bg-surface border border-rule;
   }
 
   /* ── Field labels & inputs ── */
@@ -183,7 +213,7 @@
   }
   [data-brand] .field-input,
   [data-brand] .field-textarea {
-    @apply w-full px-3 py-2 bg-white border border-rule text-[14px] text-ink
+    @apply w-full px-3 py-2 bg-surface border border-rule text-[14px] text-ink
            outline-none transition-colors;
     border-radius: 0;
   }
@@ -203,8 +233,8 @@
   [data-brand] .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
            text-[12px] font-bold tracking-[0.12em] uppercase
-           bg-brand text-white border border-brand cursor-pointer
-           hover:bg-[#08456a] hover:border-[#08456a]
+           bg-action text-white border border-action cursor-pointer
+           hover:bg-action-hover hover:border-action-hover
            disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
     border-radius: 0;
     transition: background-color 150ms, border-color 150ms, transform 100ms;
@@ -215,7 +245,7 @@
   [data-brand] .btn-ghost {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
            text-[12px] font-bold tracking-[0.12em] uppercase cursor-pointer
-           bg-white text-brand border border-brand
+           bg-surface text-brand border border-brand
            hover:bg-brand-light disabled:opacity-50 disabled:cursor-not-allowed;
     border-radius: 0;
     transition: background-color 150ms, transform 100ms;
@@ -231,7 +261,7 @@
 
   /* ── Radio rows (used by pricing tiers) ── */
   [data-brand] .radio-option {
-    @apply flex items-center gap-2.5 px-3 py-2 bg-white border border-rule
+    @apply flex items-center gap-2.5 px-3 py-2 bg-surface border border-rule
            cursor-pointer transition-colors hover:border-brand select-none;
     border-left-width: 3px;
     border-left-color: transparent;
@@ -245,7 +275,7 @@
     border-left-color: var(--color-brand);
   }
   [data-brand] .radio-option.selected-warn {
-    @apply bg-white;
+    @apply bg-surface;
     border-color: var(--color-warn);
     border-left-color: var(--color-warn);
   }
@@ -314,7 +344,7 @@
     @apply pl-7;
   }
   [data-brand] .file-input {
-    @apply w-full px-2 py-1.5 bg-white border border-rule text-[13px] text-ink
+    @apply w-full px-2 py-1.5 bg-surface border border-rule text-[13px] text-ink
            outline-none transition-colors cursor-pointer;
     border-radius: 0;
   }
@@ -323,19 +353,19 @@
     box-shadow: inset 0 -1px 0 0 var(--color-brand);
   }
   [data-brand] .file-input::file-selector-button {
-    @apply mr-3 px-3.5 py-1.5 bg-brand text-white text-[11px] font-bold
+    @apply mr-3 px-3.5 py-1.5 bg-action text-white text-[11px] font-bold
            tracking-[0.10em] uppercase border-0 cursor-pointer transition-colors;
     border-radius: 0;
   }
   [data-brand] .file-input:hover::file-selector-button {
-    @apply bg-[#08456a];
+    @apply bg-action-hover;
   }
 
   /* ── Danger / compact buttons ── */
   [data-brand] .btn-danger {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
            text-[12px] font-bold tracking-[0.12em] uppercase cursor-pointer
-           bg-white text-warn border border-warn
+           bg-surface text-warn border border-warn
            hover:bg-warn-light disabled:opacity-50 disabled:cursor-not-allowed;
     border-radius: 0;
     transition: background-color 150ms, transform 100ms;
@@ -482,7 +512,7 @@
   }
   [data-brand] .back-link {
     @apply text-[12px] font-bold uppercase tracking-[0.10em] text-brand
-           hover:text-[#08456a] transition-colors;
+           hover:text-brand transition-colors;
   }
 
   /* ── Review layout & detail list ── */
@@ -622,7 +652,7 @@
     transition: none;
   }
   [data-brand] .receipt-dialog-totals {
-    @apply self-end overflow-hidden bg-white text-ink border border-rule;
+    @apply self-end overflow-hidden bg-surface text-ink border border-rule;
     border-top: 3px solid var(--color-brand);
     border-radius: 0;
   }
@@ -682,7 +712,7 @@
     @apply grid grid-cols-3 gap-4;
   }
   [data-brand] .stat {
-    @apply grid content-between gap-2 bg-white border border-rule px-5 py-4 min-h-[120px];
+    @apply grid content-between gap-2 bg-surface border border-rule px-5 py-4 min-h-[120px];
     border-top: 3px solid var(--color-brand);
   }
   [data-brand] .stat > span {
@@ -695,7 +725,7 @@
     @apply text-[12px] text-muted;
   }
   [data-brand] .stat-primary {
-    @apply bg-brand border-brand;
+    @apply bg-action border-action;
   }
   [data-brand] .stat-primary > span,
   [data-brand] .stat-primary small {
@@ -770,7 +800,7 @@
     @apply m-0 border-t border-rule px-5 py-3 text-[13px] text-ok font-semibold;
   }
   [data-brand] .payment-review-dialog {
-    @apply border border-rule bg-white p-0 w-full;
+    @apply border border-rule bg-surface p-0 w-full;
     max-width: 560px;
     border-top: 3px solid var(--color-brand);
     border-radius: 0;
@@ -785,7 +815,7 @@
     @apply m-0 mt-1 text-[18px] font-bold text-ink;
   }
   [data-brand] .payment-review-close {
-    @apply grid w-8 h-8 place-items-center border border-rule bg-white
+    @apply grid w-8 h-8 place-items-center border border-rule bg-surface
            text-muted text-[18px] cursor-pointer hover:text-ink transition-colors;
     border-radius: 0;
   }
@@ -840,7 +870,7 @@
   [data-brand] .loading-block {
     @apply block overflow-hidden;
     border-radius: 0;
-    background: linear-gradient(100deg, var(--color-canvas) 25%, #ffffff 45%, var(--color-canvas) 65%);
+    background: linear-gradient(100deg, var(--color-canvas) 25%, var(--color-surface) 45%, var(--color-canvas) 65%);
     background-size: 220% 100%;
     animation: brand-loading 1.35s ease-in-out infinite;
   }

@@ -140,8 +140,8 @@ function OrderRow({ order }: { order: OrderSummary }) {
             className={
               "inline-flex items-center justify-center w-[20px] h-[20px] text-[10px] font-bold border shrink-0 " +
               (have.has(kind)
-                ? "bg-brand text-white border-brand"
-                : "bg-white text-muted border-rule")
+                ? "bg-action text-white border-action"
+                : "bg-surface text-muted border-rule")
             }
           >
             {DOC_ABBR[kind]}

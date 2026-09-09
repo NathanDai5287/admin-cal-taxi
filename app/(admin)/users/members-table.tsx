@@ -78,8 +78,8 @@ function RemoveButton({ disabled, onRemove }: { disabled?: boolean; onRemove: ()
       className={
         "inline-flex h-8 w-8 items-center justify-center border transition-colors duration-150 cursor-pointer " +
         (armed
-          ? "bg-warn border-warn text-white text-[13px] font-bold"
-          : "bg-white border-rule text-muted hover:text-warn hover:border-warn") +
+          ? "bg-danger border-danger text-white text-[13px] font-bold"
+          : "bg-surface border-rule text-muted hover:text-warn hover:border-warn") +
         (disabled ? " opacity-40 cursor-not-allowed" : "")
       }
       disabled={disabled}

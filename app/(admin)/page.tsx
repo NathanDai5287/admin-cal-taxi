@@ -47,7 +47,7 @@ export default async function Home({
             Sign in with the button in the top-right corner to continue.
           </p>
           {error === "auth" ? (
-            <p className="mt-4 text-[13px] text-red-700">
+            <p className="mt-4 text-[13px] text-warn">
               Sign-in failed. Please try again.
             </p>
           ) : null}

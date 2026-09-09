@@ -350,13 +350,13 @@ export default function PricingCalculator() {
           />
 
           {result.contingencyPrice > 0 && (
-            <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-              <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500 mb-1">
+            <div className="mt-4 p-3 bg-canvas border border-rule rounded-lg">
+              <div className="text-[11px] uppercase tracking-wider font-bold text-muted mb-1">
                 Permit Contingency
               </div>
-              <div className="text-[12px] text-slate-600 leading-snug">
+              <div className="text-[12px] text-muted leading-snug">
                 If the fire permit is denied, the reduced 50-person price is{" "}
-                <span className="font-bold text-slate-900">{fmt(result.contingencyPrice)}</span>.
+                <span className="font-bold text-ink">{fmt(result.contingencyPrice)}</span>.
               </div>
             </div>
           )}

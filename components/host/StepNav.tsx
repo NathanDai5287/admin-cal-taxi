@@ -41,10 +41,10 @@ export function StepIndicator({ current }: { current: StepKey }) {
                   "inline-flex items-center justify-center w-[22px] h-[22px] " +
                   "text-[11px] font-bold border " +
                   (isActive
-                    ? "bg-brand text-white border-brand"
+                    ? "bg-action text-white border-action"
                     : isDone
                     ? "bg-brand-light text-brand border-brand"
-                    : "bg-white text-muted border-rule")
+                    : "bg-surface text-muted border-rule")
                 }
               >
                 {i + 1}

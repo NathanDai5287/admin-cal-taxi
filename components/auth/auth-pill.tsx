@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export type AuthPillSession = {
   fullName: string;
@@ -68,7 +69,7 @@ function Avatar({
   return (
     <span
       aria-hidden="true"
-      className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[9px] font-bold tracking-wide text-white"
+      className="grid h-6 w-6 place-items-center rounded-full bg-action text-[9px] font-bold tracking-wide text-white"
     >
       {initials(fullName, email)}
     </span>
@@ -135,8 +136,8 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
             "transition-[background-color,border-color,color,box-shadow,transform] " +
             (confirming
               ? "bg-red-700 border-red-700 text-white shadow-[0_4px_12px_rgba(185,28,28,0.35)] hover:bg-red-800 hover:border-red-800"
-              : "bg-white border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
-                "hover:border-[#a8a8ac] hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
+              : "bg-surface border-rule text-ink shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+                "hover:border-brand hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)]")
           }
         >
           {/* Both states render at all times with visibility toggled, so the
@@ -176,11 +177,12 @@ export function AuthPill({ session }: AuthPillProps) {
 
   return (
     <div
-      className="fixed top-3 right-4 z-50"
+      className="account-controls sticky top-0 z-50 flex min-h-[62px] items-start justify-end gap-2 px-4 py-3"
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
       }}
     >
+      <ThemeToggle />
       {session === null ? (
         <>
           <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />
@@ -188,7 +190,7 @@ export function AuthPill({ session }: AuthPillProps) {
             <div className="flex flex-col items-end gap-1.5">
               <GoogleSignInButton />
               {oneTapError ? (
-                <p className="m-0 max-w-[240px] text-right text-[11px] leading-snug text-red-700">
+                <p className="m-0 max-w-[240px] text-right text-[11px] leading-snug text-warn">
                   Sign-in failed: {oneTapError}
                 </p>
               ) : null}

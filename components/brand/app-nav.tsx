@@ -30,7 +30,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action }: AppNavP
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
-    <header className="border-b border-rule bg-white">
+    <header className="border-b border-rule bg-surface">
       {/* Thin brand-blue band at the very top — echoes the 1.2pt brand rule
           under the PDF letterhead. */}
       <div className="h-[3px] bg-brand" />

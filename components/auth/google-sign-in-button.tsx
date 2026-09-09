@@ -71,12 +71,12 @@ export function GoogleSignInButton({
       disabled={pending}
       aria-busy={pending}
       className={
-        "inline-flex items-center gap-2.5 px-4 py-2 !rounded-full bg-white " +
+        "inline-flex items-center gap-2.5 px-4 py-2 !rounded-full bg-surface " +
         "border border-rule text-ink cursor-pointer " +
         "text-[11px] font-bold tracking-[0.14em] uppercase " +
         "shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
         "transition-[border-color,box-shadow,transform] duration-150 " +
-        "hover:border-[#a8a8ac] hover:-translate-y-px " +
+        "hover:border-brand hover:-translate-y-px " +
         "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)] " +
         "disabled:opacity-50 disabled:cursor-wait disabled:hover:translate-y-0 " +
         "disabled:hover:border-rule disabled:hover:shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +

@@ -2,8 +2,49 @@
 @import "./brand.css";
 
 body {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-page);
+  color: var(--color-ink);
+}
+
+body > [data-brand] {
+  min-height: calc(100dvh - 62px);
+}
+
+.account-controls {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-rule);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms, background-color 150ms;
+}
+
+.theme-toggle:hover,
+.theme-toggle[aria-pressed="true"] {
+  background: var(--color-brand-light);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--color-brand-light);
+  color: var(--color-ink);
 }
 
 .site-home-icon {
@@ -24,7 +65,7 @@ body {
 }
 
 .site-home-icon:focus-visible {
-  outline: 3px solid rgba(37, 107, 74, .28);
+  outline: 3px solid var(--color-brand);
   outline-offset: 3px;
 }
 

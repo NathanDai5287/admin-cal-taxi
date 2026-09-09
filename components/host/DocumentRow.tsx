@@ -93,8 +93,8 @@ export default function DocumentRow({
             "inline-flex items-center justify-center w-[22px] h-[22px] shrink-0 mt-0.5 " +
             "text-[11px] font-bold border " +
             (isDone
-              ? "bg-brand text-white border-brand"
-              : "bg-white text-muted border-rule")
+              ? "bg-action text-white border-action"
+              : "bg-surface text-muted border-rule")
           }
           aria-hidden="true"
         >
