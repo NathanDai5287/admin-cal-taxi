@@ -77,9 +77,10 @@ export default async function SubmissionReviewPage({
             </div>
             <dl className="detail-list border-t border-rule">
               <div><dt>Requested amount</dt><dd className="amount">{formatMoney(reimbursement.amount)}</dd></div>
+              <div><dt>Tabscanner total</dt><dd className="amount">{tabscannerTotal}</dd></div>
               <div><dt>Category</dt><dd>{formatCategory(reimbursement.category)}</dd></div>
-              <div><dt>Expense</dt><dd><EditableMerchant id={reimbursement.id} merchant={reimbursement.merchant} /></dd></div>
               <div><dt>Receipt date</dt><dd>{formatDate(reimbursement.receipt_date)}</dd></div>
+              <div className="detail-wide"><dt>Expense</dt><dd><EditableMerchant id={reimbursement.id} merchant={reimbursement.merchant} /></dd></div>
               <div className="detail-wide"><dt>Description</dt><dd>{reimbursement.description}</dd></div>
               <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{reimbursement.payment_method}</dd></div>
             </dl>
