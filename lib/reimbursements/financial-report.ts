@@ -43,13 +43,18 @@ export type FinancialReport = ReturnType<typeof buildFinancialReport>;
 
 const chartColors = [
   "#0A5482",
-  "#2C7DA0",
-  "#61A5C2",
-  "#89C2D9",
-  "#014F86",
-  "#468FAF",
-  "#A9D6E5",
+  "#D97706",
+  "#2F855A",
+  "#805AD5",
+  "#C53030",
+  "#0F766E",
+  "#B7791F",
+  "#4A5568",
 ] as const;
+
+function titleCase(value: string) {
+  return value.toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+}
 
 function cents(value: number) {
   return Number.isFinite(value) ? Math.round(value * 100) : 0;
@@ -96,7 +101,7 @@ export function buildFinancialReport(input: FinancialReportInput) {
     const share = totalIncomeCents > 0 ? Math.round((incomeCents[source] / totalIncomeCents) * 10000) / 10000 : 0;
     return {
       source,
-      label,
+      label: titleCase(label),
       amount: amountDollars,
       share,
       percentage: Math.round(share * 1000) / 10,
@@ -109,7 +114,7 @@ export function buildFinancialReport(input: FinancialReportInput) {
     const spentCents = actualCents[category];
     return {
       category,
-      label: formatCategory(category),
+      label: titleCase(formatCategory(category)),
       budgeted: budgetedCents === null ? null : dollars(budgetedCents),
       actual: dollars(spentCents),
       remaining: budgetedCents === null ? null : dollars(budgetedCents - spentCents),
@@ -123,6 +128,7 @@ export function buildFinancialReport(input: FinancialReportInput) {
     (total, row) => total + (row.budgeted === null ? 0 : cents(row.budgeted)),
     0,
   );
+  const incomeChartRows = incomeBreakdown.filter((row) => row.amount > 0);
   const expenseChartRows = expenseBreakdown.filter((row) => row.actual > 0);
 
   return {
@@ -157,6 +163,23 @@ export function buildFinancialReport(input: FinancialReportInput) {
       outstandingLiabilities: dollars(cents(input.outstandingLiabilities)),
     },
     charts: {
+      revenueDistribution: {
+        type: "pie" as const,
+        labels: incomeChartRows.map((row) => row.label),
+        datasets: [{
+          label: "Revenue",
+          data: incomeChartRows.map((row) => row.amount),
+          backgroundColor: incomeChartRows.map((_, index) => chartColors[index % chartColors.length]),
+        }],
+        proportions: incomeChartRows.map((row) => row.percentage),
+        items: incomeChartRows.map((row, index) => ({
+          source: row.source,
+          label: row.label,
+          amount: row.amount,
+          percentage: row.percentage,
+          color: chartColors[index % chartColors.length],
+        })),
+      },
       expenseDistribution: {
         type: "pie" as const,
         labels: expenseChartRows.map((row) => row.label),

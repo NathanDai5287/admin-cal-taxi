@@ -60,32 +60,85 @@ function expenseTableCells(report: FinancialReport) {
   ].join("\n")).join("\n");
 }
 
-function distributionRows(report: FinancialReport) {
-  const total = report.executiveSnapshot.totalExpenses;
-  const rows = report.expenseBreakdown.filter((row) => row.actual > 0);
-  if (!rows.length) return `#text(size: 8.5pt, fill: muted)[No spending recorded for this term.]`;
+type PieItem = {
+  label: string;
+  percentage: number;
+  color: string;
+};
 
-  const cells = rows.map((row) => {
-    const share = total > 0 ? (row.actual / total) * 100 : 0;
-    const barWidth = Math.max(1, Math.min(100, share));
-    return `[
-#grid(
-  columns: (1.08in, 1fr, 0.36in),
-  gutter: 5pt,
-  align: (left, horizon, right),
-  [#text(size: 7.5pt, weight: "semibold")[#${text(row.label)}]],
-  [#block(width: 100%, height: 5pt, fill: canvas)[#rect(width: ${barWidth.toFixed(2)}%, height: 5pt, fill: brand)]],
-  [#text(size: 7.5pt)[#${text(`${share.toFixed(1)}%`)}]],
-)
+function pieSvg(items: PieItem[]) {
+  const size = 160;
+  const center = size / 2;
+  const radius = 72;
+
+  if (!items.length) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}"><circle cx="${center}" cy="${center}" r="${radius}" fill="#E5E7EB"/></svg>`;
+  }
+
+  if (items.length === 1) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}"><circle cx="${center}" cy="${center}" r="${radius}" fill="${items[0].color}"/></svg>`;
+  }
+
+  const totalPercentage = items.reduce((total, item) => total + item.percentage, 0);
+  let angle = -Math.PI / 2;
+  const paths = items.map((item) => {
+    const sweep = (item.percentage / totalPercentage) * Math.PI * 2;
+    const end = angle + sweep;
+    const startX = center + radius * Math.cos(angle);
+    const startY = center + radius * Math.sin(angle);
+    const endX = center + radius * Math.cos(end);
+    const endY = center + radius * Math.sin(end);
+    const largeArc = sweep > Math.PI ? 1 : 0;
+    const path = `<path d="M ${center} ${center} L ${startX.toFixed(3)} ${startY.toFixed(3)} A ${radius} ${radius} 0 ${largeArc} 1 ${endX.toFixed(3)} ${endY.toFixed(3)} Z" fill="${item.color}" stroke="#FFFFFF" stroke-width="2"/>`;
+    angle = end;
+    return path;
+  }).join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">${paths}</svg>`;
+}
+
+function pieLegend(items: PieItem[], emptyMessage: string) {
+  if (!items.length) return `#text(size: 6.6pt, fill: muted)[#${text(emptyMessage)}]`;
+
+  const rows = items.map((item) => `
+rect(width: 6pt, height: 6pt, radius: 1pt, fill: rgb(${JSON.stringify(item.color)})),
+[#text(size: 6.5pt)[#${text(item.label)}]],
+[#align(right)[#text(size: 6.5pt, weight: "semibold")[#${text(`${item.percentage.toFixed(1)}%`)}]]],
+`).join("\n");
+
+  return `#grid(
+  columns: (7pt, 1fr, auto),
+  column-gutter: 4pt,
+  row-gutter: 2.5pt,
+  align: (center, left, right),
+  ${rows}
+)`;
+}
+
+function pieCard(title: string, total: number, items: PieItem[], emptyMessage: string) {
+  return `block(
+  width: 100%,
+  height: 1.45in,
+  stroke: 0.5pt + rule,
+  fill: white,
+  inset: 7pt,
+)[
+  #text(size: 7pt, weight: "bold", tracking: 0.06em, fill: brand)[#upper(${text(title)})]
+  #h(4pt)
+  #text(size: 7pt, fill: muted)[#${text(money(total))}]
+  #v(5pt)
+  #grid(
+    columns: (0.93in, 1fr),
+    gutter: 7pt,
+    align: (center, horizon),
+    [#image.decode(bytes(${JSON.stringify(pieSvg(items))}), format: "svg", width: 0.91in, height: 0.91in)],
+    [${pieLegend(items, emptyMessage)}],
+  )
 ]`;
-  }).join(",\n");
-
-  return `#grid(columns: (1fr, 1fr), column-gutter: 18pt, row-gutter: 7pt, ${cells})`;
 }
 
 export function buildFinancialReportTypst(report: FinancialReport) {
   const net = report.executiveSnapshot.netOperating;
-  const netStatus = report.executiveSnapshot.operatingStatus === "surplus" ? "SURPLUS" : "DEFICIT";
   const netColor = net >= 0 ? "ok" : "warn";
   const totalRemaining = report.budgetSummary.totalRemaining;
   const budgetStatus = totalRemaining >= 0 ? "Within category budgets" : "Over category budgets";
@@ -108,8 +161,10 @@ export function buildFinancialReportTypst(report: FinancialReport) {
   footer: context [
     #set text(size: 7pt, fill: muted)
     #grid(
-      columns: (1fr, auto),
+      columns: (1fr, auto, 0.2in),
+      column-gutter: 12pt,
       [THETA XI - INTERNAL FINANCIAL REPORT],
+      [#${text(`Generated ${date(report.meta.generatedAt)}`)}],
       [#counter(page).display("1")],
     )
   ],
@@ -119,15 +174,15 @@ export function buildFinancialReportTypst(report: FinancialReport) {
 #set table(stroke: 0.45pt + rule, inset: (x: 6pt, y: 3.5pt))
 
 #let section-title(value) = {
-  v(7pt)
+  v(3pt)
   block(width: 100%, stroke: (top: 2.2pt + brand), inset: (top: 4pt, bottom: 1pt))[
     #text(size: 7.5pt, weight: "bold", tracking: 0.12em, fill: brand)[#upper(value)]
   ]
 }
 
-#let metric(label, value, note, fill: white, accent: brand) = block(
+#let metric(label, value, note: none, fill: white, accent: brand) = block(
   width: 100%,
-  height: 0.76in,
+  height: if note == none { 0.62in } else { 0.76in },
   stroke: 0.5pt + rule,
   fill: fill,
   inset: 6pt,
@@ -135,8 +190,10 @@ export function buildFinancialReportTypst(report: FinancialReport) {
   #text(size: 6.3pt, weight: "bold", tracking: 0.09em, fill: accent)[#upper(label)]
   #v(2pt)
   #text(size: 13pt, weight: "bold", fill: ink)[#value]
-  #v(0pt)
-  #text(size: 6.3pt, fill: muted)[#note]
+  #if note != none {
+    v(1pt)
+    text(size: 6.3pt, fill: muted)[#note]
+  }
 ]
 
 #grid(
@@ -164,9 +221,9 @@ export function buildFinancialReportTypst(report: FinancialReport) {
 #grid(
   columns: (1fr, 1fr, 1fr),
   gutter: 8pt,
-  metric("Current cash position", ${text(money(report.executiveSnapshot.cashPosition))}, ${text(`Opening cash ${money(report.executiveSnapshot.openingCash)}`)}, fill: brand-light),
-  metric("Net operating status", ${text(money(net))}, ${text(netStatus)}, fill: ${netColor}-light, accent: ${netColor}),
-  metric("Total expenses", ${text(money(report.executiveSnapshot.totalExpenses))}, ${text(`${percent(report.budgetSummary.percentageUsed)} of category budgets`)})
+  metric("Current cash position", ${text(money(report.executiveSnapshot.cashPosition))}, fill: brand-light),
+  metric("Net operating status", ${text(money(net))}, fill: ${netColor}-light, accent: ${netColor}),
+  metric("Total expenses", ${text(money(report.executiveSnapshot.totalExpenses))})
 )
 #v(3pt)
 #text(size: 6.8pt, fill: muted)[Cash position includes term income and paid outflows. Approved reimbursements that have not been paid appear as outstanding liabilities below.]
@@ -207,25 +264,22 @@ export function buildFinancialReportTypst(report: FinancialReport) {
 #v(4pt)
 #text(size: 6.8pt, fill: muted)[#${text(budgetStatus)}]
 
-#section-title("Expense distribution")
-${distributionRows(report)}
+#section-title("Revenue and expense breakdown")
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 8pt,
+  ${pieCard("Revenue by category", report.executiveSnapshot.totalIncome, report.charts.revenueDistribution.items, "No revenue recorded for this term.")},
+  ${pieCard("Expenses by category", report.executiveSnapshot.totalExpenses, report.charts.expenseDistribution.items, "No expenses recorded for this term.")},
+)
 
 #section-title("Outstanding balances")
 #grid(
   columns: (1fr, 1fr),
   gutter: 8pt,
-  metric("Accounts receivable", ${text(money(report.outstandingBalances.accountsReceivable))}, ${text("Unpaid member dues")}),
-  metric("Outstanding liabilities", ${text(money(report.outstandingBalances.outstandingLiabilities))}, ${text("Approved reimbursements pending payment")}, fill: warn-light, accent: warn),
+  metric("Accounts receivable", ${text(money(report.outstandingBalances.accountsReceivable))}, note: ${text("Unpaid member dues")}),
+  metric("Outstanding liabilities", ${text(money(report.outstandingBalances.outstandingLiabilities))}, note: ${text("Approved reimbursements pending payment")}, fill: warn-light, accent: warn),
 )
 
-#v(6pt)
-#line(length: 100%, stroke: 0.5pt + rule)
-#v(5pt)
-#grid(
-  columns: (1fr, auto),
-  [#text(size: 6.5pt, fill: muted)[Prepared for internal chapter use. Amounts reflect records entered through the generated date.]],
-  [#text(size: 6.5pt, fill: muted)[#${text(`Generated ${date(report.meta.generatedAt)}`)}]],
-)
 `;
 }
 
