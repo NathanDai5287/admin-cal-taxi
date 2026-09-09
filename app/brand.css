@@ -100,7 +100,7 @@
   }
   [data-brand] .brand-button:focus-visible,
   [data-brand] .member-tabs a:focus-visible,
-  [data-brand] .history-filters a:focus-visible,
+  [data-brand] .history-filters button:focus-visible,
   [data-brand] .history-row:focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 4px;
@@ -124,9 +124,9 @@
     padding-bottom: 0.75rem;
   }
   [data-brand] .history-filters { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
-  [data-brand] .history-filters a { padding: 0.5rem 0; font-size: 12px; color: var(--color-muted); }
-  [data-brand] .history-filters a:hover { color: var(--color-ink); }
-  [data-brand] .history-filters a[aria-current="page"] {
+  [data-brand] .history-filters button { padding: 0.5rem 0; font-size: 12px; color: var(--color-muted); cursor: pointer; }
+  [data-brand] .history-filters button:hover { color: var(--color-ink); }
+  [data-brand] .history-filters button[aria-current="page"] {
     color: var(--color-brand);
     font-weight: 700;
     text-decoration: underline;
