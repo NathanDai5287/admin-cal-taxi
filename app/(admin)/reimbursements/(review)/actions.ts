@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { categoryValues } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export async function updateStatus(formData: FormData) {
@@ -43,6 +44,32 @@ export async function updateMerchant(formData: FormData) {
   }
 
   revalidatePath("/reimbursements");
+  revalidatePath(`/reimbursements/${parsed.data.id}`);
+}
+
+export async function updateCategory(formData: FormData) {
+  await requireAdmin();
+
+  const parsed = z.object({
+    id: z.uuid(),
+    category: z.enum(categoryValues),
+  }).safeParse({ id: formData.get("id"), category: formData.get("category") });
+  if (!parsed.success) {
+    throw new Error("Choose a valid reimbursement category.");
+  }
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from("reimbursements")
+    .update({ category: parsed.data.category })
+    .eq("id", parsed.data.id);
+  if (error) {
+    throw new Error("Unable to change the category. Please try again.");
+  }
+
+  revalidatePath("/reimbursements");
+  revalidatePath("/reimbursements/reports");
+  revalidatePath("/reimbursements/budgets");
   revalidatePath(`/reimbursements/${parsed.data.id}`);
 }
 

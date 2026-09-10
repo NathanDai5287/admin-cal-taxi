@@ -251,6 +251,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          category?: Database["public"]["Enums"]["reimbursement_category"];
           status?: Database["public"]["Enums"]["reimbursement_status"];
           merchant?: string | null;
           receipt_date?: string | null;
