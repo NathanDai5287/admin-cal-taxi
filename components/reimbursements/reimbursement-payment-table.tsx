@@ -7,20 +7,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   markReimbursementsPaid,
-  updateReimbursed,
-  updateStatus,
+  setReimbursementPaid,
+  setReimbursementStatus,
 } from "@/app/(admin)/reimbursements/(review)/actions";
 import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
-import { InlineStatusSelect } from "@/components/reimbursements/inline-status-select";
+import {
+  InlineStatusSelect,
+  type ReimbursementStatus,
+} from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
-
-type ReimbursementStatus =
-  | "pending"
-  | "verified"
-  | "mismatch"
-  | "approved"
-  | "denied"
-  | "processing_failed";
 
 export type PaymentTableRow = {
   amount: number;
@@ -49,7 +44,7 @@ function amountInCents(amount: number) {
 }
 
 function selectionKey(row: PaymentTableRow) {
-  return `${row.id}:${row.updated_at}`;
+  return row.id;
 }
 
 // Submissions are anonymous, so payments are grouped by normalized name.
@@ -65,18 +60,109 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const [feedback, setFeedback] = useState("");
   const [dialogError, setDialogError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [mutationError, setMutationError] = useState("");
+  const [rowOverrides, setRowOverrides] = useState<Map<string, Partial<PaymentTableRow>>>(() => new Map());
+  const [pendingFields, setPendingFields] = useState<Set<string>>(() => new Set());
+
+  const optimisticRows = useMemo(() => rows.map((serverRow) => {
+    const override = rowOverrides.get(serverRow.id);
+    if (!override) return serverRow;
+
+    const statusPending = pendingFields.has(`${serverRow.id}:status`);
+    const reimbursedPending = pendingFields.has(`${serverRow.id}:reimbursed`);
+    const serverIsCurrent = override.updated_at !== undefined
+      && Date.parse(serverRow.updated_at) >= Date.parse(override.updated_at);
+
+    return {
+      ...serverRow,
+      ...(!serverIsCurrent ? override : {}),
+      status: (statusPending || !serverIsCurrent) && override.status !== undefined
+        ? override.status
+        : serverRow.status,
+      reimbursed: (reimbursedPending || !serverIsCurrent) && override.reimbursed !== undefined
+        ? override.reimbursed
+        : serverRow.reimbursed,
+    };
+  }), [pendingFields, rowOverrides, rows]);
+
+  function patchRow(id: string, patch: Partial<PaymentTableRow>) {
+    setRowOverrides((current) => {
+      const next = new Map(current);
+      next.set(id, { ...next.get(id), ...patch });
+      return next;
+    });
+  }
+
+  function setFieldPending(key: string, pending: boolean) {
+    setPendingFields((current) => {
+      const next = new Set(current);
+      if (pending) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus) {
+    const key = `${row.id}:status`;
+    const previousStatus = row.status;
+    setMutationError("");
+    patchRow(row.id, { status });
+    setFieldPending(key, true);
+
+    try {
+      const result = await setReimbursementStatus(row.id, status);
+      if (!result.ok) {
+        patchRow(row.id, { status: previousStatus });
+        setMutationError(result.message);
+        return;
+      }
+
+      patchRow(row.id, result.row);
+      router.refresh();
+    } catch (error) {
+      patchRow(row.id, { status: previousStatus });
+      setMutationError(error instanceof Error ? error.message : "Unable to change the status.");
+    } finally {
+      setFieldPending(key, false);
+    }
+  }
+
+  async function changeReimbursed(row: PaymentTableRow, reimbursed: boolean) {
+    const key = `${row.id}:reimbursed`;
+    const previousReimbursed = row.reimbursed;
+    setMutationError("");
+    patchRow(row.id, { reimbursed });
+    setFieldPending(key, true);
+
+    try {
+      const result = await setReimbursementPaid(row.id, reimbursed);
+      if (!result.ok) {
+        patchRow(row.id, { reimbursed: previousReimbursed });
+        setMutationError(result.message);
+        return;
+      }
+
+      patchRow(row.id, result.row);
+      router.refresh();
+    } catch (error) {
+      patchRow(row.id, { reimbursed: previousReimbursed });
+      setMutationError(error instanceof Error ? error.message : "Unable to change the payment state.");
+    } finally {
+      setFieldPending(key, false);
+    }
+  }
 
   const eligibleRows = useMemo(
-    () => rows.filter((row) => row.status === "approved" && !row.reimbursed),
-    [rows],
+    () => optimisticRows.filter((row) => row.status === "approved" && !row.reimbursed),
+    [optimisticRows],
   );
   const eligibleKeySet = useMemo(
     () => new Set(eligibleRows.map(selectionKey)),
     [eligibleRows],
   );
   const selectedRows = useMemo(
-    () => rows.filter((row) => eligibleKeySet.has(selectionKey(row)) && selectedKeys.has(selectionKey(row))),
-    [eligibleKeySet, rows, selectedKeys],
+    () => optimisticRows.filter((row) => eligibleKeySet.has(selectionKey(row)) && selectedKeys.has(selectionKey(row))),
+    [eligibleKeySet, optimisticRows, selectedKeys],
   );
   const selectedTotalCents = useMemo(
     () => selectedRows.reduce((total, row) => total + amountInCents(row.amount), 0),
@@ -156,25 +242,65 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
   async function confirmPayments() {
     if (!selectedRows.length || submitting) return;
+    const paymentRows = selectedRows;
+    const paymentIds = paymentRows.map((row) => row.id);
     setSubmitting(true);
     setDialogError("");
+    setMutationError("");
+    dialogRef.current?.close();
+    setSelectedKeys(new Set());
+    setFeedback(`Marking ${paymentRows.length} ${paymentRows.length === 1 ? "reimbursement" : "reimbursements"} as reimbursed…`);
+    setRowOverrides((current) => {
+      const next = new Map(current);
+      for (const row of paymentRows) {
+        next.set(row.id, { ...next.get(row.id), reimbursed: true });
+      }
+      return next;
+    });
+    for (const id of paymentIds) setFieldPending(`${id}:reimbursed`, true);
 
     try {
-      const result = await markReimbursementsPaid(selectedRows.map((row) => row.id));
+      const result = await markReimbursementsPaid(paymentIds);
       if (!result.ok) {
-        setDialogError(result.message);
+        setRowOverrides((current) => {
+          const next = new Map(current);
+          for (const row of paymentRows) {
+            next.set(row.id, { ...next.get(row.id), reimbursed: row.reimbursed });
+          }
+          return next;
+        });
+        setFeedback("");
+        setMutationError(result.message);
         return;
       }
 
-      dialogRef.current?.close();
-      setSelectedKeys(new Set());
+      const updatedById = new Map(result.updatedRows.map((row) => [row.id, row]));
+      setRowOverrides((current) => {
+        const next = new Map(current);
+        for (const row of paymentRows) {
+          next.set(row.id, {
+            ...next.get(row.id),
+            ...(updatedById.get(row.id) ?? { reimbursed: row.reimbursed }),
+          });
+        }
+        return next;
+      });
       setFeedback(result.skippedIds.length
-        ? `${result.updatedIds.length} marked reimbursed; ${result.skippedIds.length} skipped because they were no longer eligible.`
-        : `${result.updatedIds.length} ${result.updatedIds.length === 1 ? "reimbursement" : "reimbursements"} marked reimbursed.`);
+        ? `${result.updatedRows.length} marked reimbursed; ${result.skippedIds.length} skipped because they were no longer eligible.`
+        : `${result.updatedRows.length} ${result.updatedRows.length === 1 ? "reimbursement" : "reimbursements"} marked reimbursed.`);
       router.refresh();
     } catch (error) {
-      setDialogError(error instanceof Error ? error.message : "Unable to mark the selected reimbursements as paid.");
+      setRowOverrides((current) => {
+        const next = new Map(current);
+        for (const row of paymentRows) {
+          next.set(row.id, { ...next.get(row.id), reimbursed: row.reimbursed });
+        }
+        return next;
+      });
+      setFeedback("");
+      setMutationError(error instanceof Error ? error.message : "Unable to mark the selected reimbursements as paid.");
     } finally {
+      for (const id of paymentIds) setFieldPending(`${id}:reimbursed`, false);
       setSubmitting(false);
     }
   }
@@ -224,7 +350,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
             </tr>
           </thead>
           <tbody>
-            {rows.map((item) => {
+            {optimisticRows.map((item) => {
               const eligible = item.status === "approved" && !item.reimbursed;
               return (
                 <tr className="submission-row" key={item.id}>
@@ -257,16 +383,22 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td className="amount">{formatMoney(item.amount)}</td>
                   <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
                   <td>
-                    <form action={updateStatus} className="inline-action">
-                      <input name="id" type="hidden" value={item.id} />
-                      <InlineStatusSelect status={item.status} />
-                    </form>
+                    <div className="inline-action">
+                      <InlineStatusSelect
+                        disabled={pendingFields.has(`${item.id}:status`)}
+                        onChange={(status) => void changeStatus(item, status)}
+                        status={item.status}
+                      />
+                    </div>
                   </td>
                   <td>
-                    <form action={updateReimbursed} className="inline-action">
-                      <input name="id" type="hidden" value={item.id} />
-                      <ReimbursedCheckbox key={`${item.id}:${item.reimbursed}`} reimbursed={item.reimbursed} />
-                    </form>
+                    <div className="inline-action">
+                      <ReimbursedCheckbox
+                        disabled={pendingFields.has(`${item.id}:reimbursed`)}
+                        onChange={(reimbursed) => void changeReimbursed(item, reimbursed)}
+                        reimbursed={item.reimbursed}
+                      />
+                    </div>
                   </td>
                 </tr>
               );
@@ -276,6 +408,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       </div>
 
       {feedback && <p className="payment-feedback" role="status">{feedback}</p>}
+      {mutationError && <p className="payment-dialog-error pb-3" role="alert">{mutationError}</p>}
 
       <dialog
         aria-labelledby="payment-review-heading"
