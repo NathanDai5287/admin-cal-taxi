@@ -47,12 +47,23 @@ export default async function UsersPage() {
 
       <section className="card" aria-labelledby="invite-user-title">
         <div className="card-header">
-          <span className="card-title" id="invite-user-title">Invite a user</span>
+          <span className="card-title" id="invite-user-title">Invite people</span>
         </div>
         <form action={inviteUser} className="card-body border-t border-rule pt-5 grid gap-4 sm:grid-cols-[1fr_auto_auto] items-end">
           <div className="field">
-            <label className="field-label" htmlFor="email">Email</label>
-            <input className="field-input" id="email" name="email" required type="email" />
+            <label className="field-label" htmlFor="email">Email addresses</label>
+            <input
+              autoCapitalize="none"
+              autoComplete="off"
+              className="field-input"
+              id="email"
+              multiple
+              name="email"
+              placeholder="alex@example.com, jordan@example.com"
+              required
+              spellCheck={false}
+              type="email"
+            />
           </div>
           <div className="field">
             <label className="field-label" htmlFor="role">Role</label>
@@ -64,8 +75,9 @@ export default async function UsersPage() {
           <Button variant="primary" type="submit">Invite</Button>
         </form>
         <p className="helper-text px-6 pb-5">
-          If they&apos;ve already signed in, their role updates right away. Otherwise it
-          applies automatically on their first Google sign-in.
+          Separate multiple email addresses with commas. If someone has already signed
+          in, their role updates right away. Otherwise it applies automatically on their
+          first Google sign-in.
         </p>
       </section>
 

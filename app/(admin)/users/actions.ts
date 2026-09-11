@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const inviteRoles = ["member", "admin"] as const;
@@ -35,7 +36,7 @@ function readEmail(formData: FormData) {
 
 export async function inviteUser(formData: FormData) {
   await requireAdmin("/");
-  const email = readEmail(formData);
+  const emails = parseInviteEmails(formData.get("email"));
   const role = formData.get("role");
 
   if (!isInviteRole(role)) {
@@ -45,13 +46,23 @@ export async function inviteUser(formData: FormData) {
   const supabase = await createClient();
   // Security definer function: updates an existing profile's role right away,
   // otherwise stores the invite for their first Google sign-in.
-  const { error } = await supabase.rpc("admin_invite_email", {
-    invite_email: email,
-    invite_role: role,
-  });
+  const results = await Promise.all(
+    emails.map((email) =>
+      supabase.rpc("admin_invite_email", {
+        invite_email: email,
+        invite_role: role,
+      }),
+    ),
+  );
+  const failedInvites = results.filter(({ error }) => error);
 
-  if (error) {
-    throw new Error("Unable to invite user. Please try again.");
+  if (failedInvites.length) {
+    revalidatePath("/users");
+    throw new Error(
+      failedInvites.length === emails.length
+        ? "Unable to invite these users. Please try again."
+        : `${emails.length - failedInvites.length} invites were saved, but ${failedInvites.length} could not be. Please try the list again.`,
+    );
   }
 
   revalidatePath("/users");
