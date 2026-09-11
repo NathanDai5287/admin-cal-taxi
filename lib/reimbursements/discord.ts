@@ -57,6 +57,37 @@ async function discordRequest(path: string, init: RequestInit = {}) {
   throw new Error("Discord API request exceeded its retry limit.");
 }
 
+export async function sendDiscordDuesAnnouncement(content: string, userIds: string[]) {
+  const channelId = requiredEnvironmentVariable("DISCORD_ANNOUNCEMENT_CHANNEL_ID");
+  if (!content.trim() || content.length > 2000) {
+    throw new Error("Discord announcements must be between 1 and 2,000 characters.");
+  }
+
+  const uniqueUserIds = [...new Set(userIds)];
+  if (!uniqueUserIds.length || uniqueUserIds.some((id) => !/^\d{15,22}$/.test(id))) {
+    throw new Error("The announcement does not contain valid Discord recipients.");
+  }
+
+  const response = await discordRequest(`/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      content,
+      allowed_mentions: {
+        parse: [],
+        users: uniqueUserIds,
+        replied_user: false,
+      },
+    }),
+  });
+  const message = await response.json() as DiscordMessage;
+  if (!message.id || !message.channel_id) {
+    throw new Error("Discord returned an invalid message response.");
+  }
+
+  return { messageId: message.id, channelId: message.channel_id };
+}
+
 async function addDecisionReactions(channelId: string, messageId: string) {
   for (const emoji of [approvedEmoji, deniedEmoji]) {
     await discordRequest(

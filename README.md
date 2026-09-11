@@ -97,3 +97,16 @@ status to `approved`, or ❌ to set it to `denied`.
 The web app may remain on serverless hosting, but the Discord worker must remain
 running so it can receive reaction events. Supabase's secret key and the Discord bot
 token must never be exposed to browser code.
+
+### Discord dues announcements
+
+Admins can compose a custom message from the Dues Tracker and send it to selected
+members with outstanding balances. The web app posts through the same bot token as
+the reimbursement workflow; the persistent reaction worker is not required for
+announcements.
+
+1. Apply `supabase/migrations/20260911010000_dues_discord_announcements.sql`.
+2. Set `DISCORD_ANNOUNCEMENT_CHANNEL_ID` in the website environment and give the bot
+   View Channel and Send Messages permissions in that channel.
+3. Add each member's Discord user ID to their dues balance. The announcement action
+   allows only those exact user mentions and blocks automatic role or everyone mentions.

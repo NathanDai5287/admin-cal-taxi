@@ -419,6 +419,161 @@
     @apply tabular-nums font-bold;
   }
 
+  /* ── Dues tracker ── */
+  [data-brand] .dues-notification-note {
+    @apply border-l-2 border-brand pl-4 py-1;
+  }
+  [data-brand] .dues-notification-note span {
+    @apply block text-[10px] font-bold uppercase tracking-[0.14em] text-muted;
+  }
+  [data-brand] .dues-notification-note strong {
+    @apply block mt-1 text-[13px] font-semibold text-ink;
+  }
+  [data-brand] .dues-summary {
+    @apply grid border-y border-rule bg-surface sm:grid-cols-3;
+  }
+  [data-brand] .dues-summary > div {
+    @apply min-w-0 px-6 py-5 border-b border-rule sm:border-b-0 sm:border-r;
+  }
+  [data-brand] .dues-summary > div:last-child { @apply border-b-0 sm:border-r-0; }
+  [data-brand] .dues-summary > .dues-summary-primary {
+    background: var(--color-brand);
+    color: white;
+    border-color: var(--color-brand);
+  }
+  [data-brand] .dues-summary span {
+    @apply block text-[11px] font-bold uppercase tracking-[0.12em] text-muted;
+  }
+  [data-brand] .dues-summary-primary span,
+  [data-brand] .dues-summary-primary p { color: rgba(255, 255, 255, .76); }
+  [data-brand] .dues-summary strong {
+    @apply block mt-2 text-[28px] leading-none font-bold tabular-nums tracking-[-0.02em];
+  }
+  [data-brand] .dues-summary p { @apply mt-2 text-[12px] text-muted; }
+  [data-brand] .dues-ledger-toolbar {
+    @apply flex flex-wrap items-center justify-between gap-4 px-6 py-5;
+  }
+  [data-brand] .dues-search {
+    @apply flex min-h-[40px] min-w-[230px] items-center gap-2 border border-rule bg-page px-3 text-muted;
+  }
+  [data-brand] .dues-search:focus-within {
+    @apply border-brand;
+    box-shadow: inset 0 -1px 0 0 var(--color-brand);
+  }
+  [data-brand] .dues-search input {
+    @apply w-full bg-transparent text-[14px] text-ink outline-none;
+  }
+  [data-brand] .dues-filter-bar {
+    @apply flex overflow-x-auto border-y border-rule bg-canvas px-6;
+  }
+  [data-brand] .dues-filter-bar button {
+    @apply flex min-h-[48px] items-center gap-2 border-b-2 border-transparent px-4 text-[12px] font-bold text-muted cursor-pointer;
+  }
+  [data-brand] .dues-filter-bar button:hover { @apply text-ink; }
+  [data-brand] .dues-filter-bar button.active { @apply border-brand text-brand; }
+  [data-brand] .dues-filter-count {
+    @apply min-w-5 bg-surface px-1.5 py-0.5 text-center text-[10px] tabular-nums border border-rule;
+  }
+  [data-brand] .dues-list { @apply divide-y divide-rule; }
+  [data-brand] .dues-row {
+    @apply grid items-center gap-4 px-6 py-4 transition-colors lg:grid-cols-[minmax(260px,1fr)_130px_auto];
+  }
+  [data-brand] .dues-row:hover { background: color-mix(in srgb, var(--color-brand-light) 34%, transparent); }
+  [data-brand] .dues-person { @apply flex min-w-0 items-center gap-3; }
+  [data-brand] .dues-avatar {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center bg-brand-light text-[13px] font-bold text-brand border border-brand/20;
+  }
+  [data-brand] .dues-person h3 { @apply truncate text-[14px] font-bold text-ink; }
+  [data-brand] .dues-person p { @apply mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-muted; }
+  [data-brand] .dues-overdue-label { @apply font-bold uppercase tracking-[0.08em] text-warn; }
+  [data-brand] .dues-paid-label { @apply font-bold uppercase tracking-[0.08em] text-ok; }
+  [data-brand] .dues-discord-linked { @apply font-bold uppercase tracking-[0.08em] text-brand; }
+  [data-brand] .dues-balance { @apply lg:text-right; }
+  [data-brand] .dues-balance span { @apply block text-[10px] font-bold uppercase tracking-[0.1em] text-muted; }
+  [data-brand] .dues-balance strong { @apply mt-1 block text-[18px] font-bold tabular-nums text-ink; }
+  [data-brand] .dues-actions { @apply flex items-center justify-end gap-2; }
+  [data-brand] .dues-edit { @apply relative; }
+  [data-brand] .dues-edit > summary {
+    @apply inline-flex min-h-[32px] items-center border border-brand bg-surface px-3 text-[11px] font-bold uppercase tracking-[0.1em] text-brand cursor-pointer list-none;
+  }
+  [data-brand] .dues-edit > summary::-webkit-details-marker { display: none; }
+  [data-brand] .dues-edit-panel {
+    @apply fixed inset-x-4 top-1/2 z-30 max-h-[85vh] -translate-y-1/2 overflow-y-auto border border-rule bg-surface p-5 shadow-2xl sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:w-[560px] sm:max-w-[calc(100vw-3rem)] sm:translate-y-0;
+  }
+  [data-brand] .dues-edit[open]::before {
+    content: "";
+    @apply fixed inset-0 z-20 bg-black/30 sm:hidden;
+  }
+  @media (max-width: 1023px) {
+    [data-brand] .dues-row { @apply grid-cols-[minmax(0,1fr)_130px_auto]; }
+    [data-brand] .dues-balance { @apply col-start-2 row-start-1 text-right; }
+    [data-brand] .dues-actions { @apply col-start-3 row-start-1; }
+  }
+  @media (max-width: 560px) {
+    [data-brand] .dues-ledger-toolbar { @apply items-stretch; }
+    [data-brand] .dues-search { @apply w-full; }
+    [data-brand] .dues-filter-bar { @apply px-2; }
+    [data-brand] .dues-filter-bar button { @apply px-3; }
+    [data-brand] .dues-row { @apply grid-cols-1; }
+    [data-brand] .dues-balance,
+    [data-brand] .dues-actions { @apply col-start-1 row-auto text-left justify-start; }
+  }
+
+  [data-brand] .dues-announcement-strip {
+    @apply relative flex flex-wrap items-center gap-4 border border-rule bg-surface px-5 py-4;
+    border-left: 3px solid var(--color-brand);
+  }
+  [data-brand] .dues-announcement-mark {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center bg-brand-light text-brand;
+  }
+  [data-brand] .dues-announcement-strip h2 { @apply text-[14px] font-bold text-ink; }
+  [data-brand] .dues-announcement-strip > div > p { @apply mt-1 text-[12.5px] text-muted; }
+  [data-brand] .dues-dialog-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4;
+  }
+  [data-brand] .dues-announcement-dialog {
+    @apply max-h-[92vh] w-full max-w-[720px] overflow-y-auto border border-rule bg-surface shadow-2xl;
+  }
+  [data-brand] .dues-dialog-header {
+    @apply flex items-start justify-between gap-5 border-b border-rule px-6 py-5;
+  }
+  [data-brand] .dues-dialog-header h2 { @apply mt-1 text-[20px] font-bold text-ink; }
+  [data-brand] .dues-dialog-header button {
+    @apply flex h-9 w-9 items-center justify-center border border-rule text-[24px] leading-none text-muted cursor-pointer hover:border-brand hover:text-brand;
+  }
+  [data-brand] .dues-announcement-form { @apply grid gap-5 p-6; }
+  [data-brand] .dues-recipient-fieldset {
+    @apply relative border border-rule p-0;
+  }
+  [data-brand] .dues-recipient-fieldset legend {
+    @apply ml-4 px-2 text-[11px] font-bold uppercase tracking-[0.11em] text-muted;
+  }
+  [data-brand] .dues-recipient-fieldset legend span { @apply ml-2 font-medium normal-case tracking-normal; }
+  [data-brand] .dues-recipient-actions { @apply flex justify-end gap-4 px-4 pb-2 text-[11px] font-bold text-brand; }
+  [data-brand] .dues-recipient-actions button { @apply cursor-pointer hover:underline; }
+  [data-brand] .dues-recipient-list { @apply max-h-[190px] overflow-y-auto border-t border-rule; }
+  [data-brand] .dues-recipient-list label {
+    @apply grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-rule px-4 py-3 text-[13px] last:border-b-0 hover:bg-brand-light;
+  }
+  [data-brand] .dues-recipient-list input { @apply accent-brand; }
+  [data-brand] .dues-recipient-list strong { @apply tabular-nums; }
+  [data-brand] .dues-message-preview {
+    @apply border-l-[3px] border-[#5865f2] bg-canvas px-5 py-4 text-[14px] leading-relaxed;
+  }
+  [data-brand] .dues-message-preview > span { @apply mb-3 block text-[10px] font-bold uppercase tracking-[0.13em] text-muted; }
+  [data-brand] .dues-message-preview p { @apply whitespace-pre-wrap text-ink; }
+  [data-brand] .dues-message-preview .dues-preview-recipient { @apply mt-1; }
+  [data-brand] .dues-message-preview .dues-preview-recipient:first-of-type { @apply mt-3; }
+  [data-brand] .dues-message-preview b { color: #5865f2; }
+  [data-brand] .dues-dialog-footer {
+    @apply flex min-h-[44px] flex-wrap items-center justify-between gap-4 border-t border-rule pt-5;
+  }
+  @media (max-width: 560px) {
+    [data-brand] .dues-announcement-strip .brand-button { @apply ml-0 w-full; }
+    [data-brand] .dues-dialog-footer { @apply items-stretch; }
+    [data-brand] .dues-dialog-footer > div { @apply ml-auto; }
+  }
+
   /* Clickable submission rows (stretched-link pattern) */
   [data-brand] .submission-row {
     @apply relative transition-colors;

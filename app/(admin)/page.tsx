@@ -23,6 +23,11 @@ const ADMIN_APPS = [
     description: "Review and pay chapter expenses",
   },
   {
+    href: "/dues",
+    label: "Dues Tracker",
+    description: "Track member balances and payment status",
+  },
+  {
     href: "/users",
     label: "Members & invites",
     description: "Invite members and manage who has access",

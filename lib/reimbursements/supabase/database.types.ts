@@ -99,6 +99,7 @@ export type Database = {
           amount_assessed: number;
           amount_paid: number;
           due_date: string;
+          discord_user_id: string;
           notes: string;
           created_by: string | null;
           created_at: string;
@@ -110,6 +111,7 @@ export type Database = {
           amount_assessed: number;
           amount_paid?: number;
           due_date: string;
+          discord_user_id?: string;
           notes?: string;
           created_by?: string | null;
           created_at?: string;
@@ -120,6 +122,7 @@ export type Database = {
           amount_assessed?: number;
           amount_paid?: number;
           due_date?: string;
+          discord_user_id?: string;
           notes?: string;
           created_by?: string | null;
           updated_at?: string;
