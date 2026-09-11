@@ -800,8 +800,9 @@
     @apply m-0 border-t border-rule px-5 py-3 text-[13px] text-ok font-semibold;
   }
   [data-brand] .payment-review-dialog {
-    @apply border border-rule bg-surface p-0 w-full;
+    @apply fixed inset-0 m-auto border border-rule bg-surface p-0 w-full;
     max-width: 560px;
+    max-height: calc(100vh - 32px);
     border-top: 3px solid var(--color-brand);
     border-radius: 0;
   }

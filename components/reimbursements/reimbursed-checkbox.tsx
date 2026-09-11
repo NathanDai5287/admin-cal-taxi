@@ -1,22 +1,22 @@
 "use client";
 
-import { useFormStatus } from "react-dom";
-
-export function ReimbursedCheckbox({ reimbursed }: { reimbursed: boolean }) {
-  const { pending } = useFormStatus();
-
+export function ReimbursedCheckbox({
+  disabled = false,
+  onChange,
+  reimbursed,
+}: {
+  disabled?: boolean;
+  onChange: (reimbursed: boolean) => void;
+  reimbursed: boolean;
+}) {
   return (
     <input
       aria-label={reimbursed ? "Reimbursement paid" : "Mark reimbursement as paid"}
+      checked={reimbursed}
       className="checkbox-brand"
-      defaultChecked={reimbursed}
-      disabled={pending}
-      name="reimbursed"
-      onChange={(event) => {
-        event.currentTarget.form?.requestSubmit();
-      }}
+      disabled={disabled}
+      onChange={(event) => onChange(event.currentTarget.checked)}
       type="checkbox"
-      value="true"
     />
   );
 }
