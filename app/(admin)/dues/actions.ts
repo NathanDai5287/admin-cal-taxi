@@ -18,15 +18,44 @@ function normalizeDiscordUserId(value: unknown) {
 }
 
 const entrySchema = z.object({
-  memberName: z.string().trim().min(1).max(120),
-  amountOwed: z.coerce.number().positive().max(999_999_999.99),
+  memberName: z.string().trim().min(1, "member").max(120, "member"),
+  amountOwed: z.coerce.number().positive("amount").max(999_999_999.99, "amount"),
   dueDate: dateSchema,
-  notes: z.string().trim().max(500),
-  discordUserId: z.string().refine((value) => !value || /^\d{15,22}$/.test(value)),
+  notes: z.string().trim().max(500, "notes"),
+  discordUserId: z.string().refine(
+    (value) => !value || /^\d{15,22}$/.test(value),
+    "discord",
+  ),
 });
 
-function resultUrl(result: "added" | "saved" | "paid" | "reopened" | "deleted" | "invalid" | "error") {
+type DuesResult =
+  | "added"
+  | "bulk-added"
+  | "saved"
+  | "payment"
+  | "paid"
+  | "reopened"
+  | "deleted"
+  | "invalid"
+  | "invalid-member"
+  | "invalid-amount"
+  | "invalid-date"
+  | "invalid-notes"
+  | "invalid-discord"
+  | "error";
+
+function resultUrl(result: DuesResult) {
   return `/dues?result=${result}`;
+}
+
+function entryErrorUrl(error: z.ZodError) {
+  const field = error.issues[0]?.path[0];
+  if (field === "memberName") return resultUrl("invalid-member");
+  if (field === "amountOwed") return resultUrl("invalid-amount");
+  if (field === "dueDate") return resultUrl("invalid-date");
+  if (field === "notes") return resultUrl("invalid-notes");
+  if (field === "discordUserId") return resultUrl("invalid-discord");
+  return resultUrl("invalid");
 }
 
 function revalidateDues() {
@@ -44,7 +73,7 @@ export async function addDuesBalance(formData: FormData) {
     discordUserId: normalizeDiscordUserId(formData.get("discordUserId")),
   });
 
-  if (!parsed.success) redirect(resultUrl("invalid"));
+  if (!parsed.success) redirect(entryErrorUrl(parsed.error));
 
   const supabase = createAdminClient();
   const { error } = await supabase.from("chapter_receivables").insert({
@@ -60,6 +89,77 @@ export async function addDuesBalance(formData: FormData) {
   if (error) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl("added"));
+}
+
+const bulkFeeSchema = z.object({
+  amountOwed: z.coerce.number().positive().max(999_999_999.99),
+  dueDate: dateSchema,
+  memberIds: z.array(z.string().uuid()).min(1).max(500),
+});
+
+const bulkMemberSchema = z.object({
+  discordUserId: z.string().refine((value) => !value || /^\d{15,22}$/.test(value)),
+  notes: z.string().trim().max(500),
+});
+
+export async function addBulkDuesFees(formData: FormData) {
+  const { userId } = await requireAdmin("/");
+  const memberIds = [...new Set(formData.getAll("memberId").filter(
+    (value): value is string => typeof value === "string",
+  ))];
+  const parsed = bulkFeeSchema.safeParse({
+    amountOwed: formData.get("amountOwed"),
+    dueDate: formData.get("dueDate"),
+    memberIds,
+  });
+
+  if (!parsed.success) redirect(entryErrorUrl(parsed.error));
+
+  const memberDetails = new Map<string, z.infer<typeof bulkMemberSchema>>();
+  for (const memberId of parsed.data.memberIds) {
+    const detail = bulkMemberSchema.safeParse({
+      discordUserId: normalizeDiscordUserId(formData.get(`discordUserId:${memberId}`)),
+      notes: formData.get(`notes:${memberId}`) ?? "",
+    });
+    if (!detail.success) redirect(resultUrl("invalid"));
+    memberDetails.set(memberId, detail.data);
+  }
+
+  const supabase = createAdminClient();
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", parsed.data.memberIds)
+    .is("removed_at", null);
+
+  if (profilesError || profiles?.length !== parsed.data.memberIds.length) {
+    redirect(resultUrl("error"));
+  }
+
+  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const rows = parsed.data.memberIds.map((memberId) => {
+    const profile = profilesById.get(memberId);
+    const detail = memberDetails.get(memberId);
+    if (!profile?.full_name.trim() || !detail) return null;
+    return {
+      member_name: profile.full_name.trim(),
+      amount_assessed: parsed.data.amountOwed,
+      amount_paid: 0,
+      due_date: parsed.data.dueDate,
+      notes: detail.notes,
+      discord_user_id: detail.discordUserId,
+      created_by: userId,
+    };
+  });
+
+  if (rows.some((row) => row === null)) redirect(resultUrl("error"));
+  const { error } = await supabase.from("chapter_receivables").insert(
+    rows.filter((row): row is NonNullable<typeof row> => row !== null),
+  );
+
+  if (error) redirect(resultUrl("error"));
+  revalidateDues();
+  redirect(resultUrl("bulk-added"));
 }
 
 export async function updateDuesBalance(formData: FormData) {
@@ -131,6 +231,42 @@ export async function setDuesPaid(formData: FormData) {
   if (error) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl(paid ? "paid" : "reopened"));
+}
+
+export async function addDuesPayment(formData: FormData) {
+  await requireAdmin("/");
+  const parsed = z.object({
+    id: z.string().uuid(),
+    paymentAmount: z.coerce.number().positive().max(999_999_999.99),
+  }).safeParse({
+    id: formData.get("id"),
+    paymentAmount: formData.get("paymentAmount"),
+  });
+
+  if (!parsed.success) redirect(resultUrl("invalid"));
+
+  const supabase = createAdminClient();
+  const { data: current, error: readError } = await supabase
+    .from("chapter_receivables")
+    .select("amount_assessed, amount_paid")
+    .eq("id", parsed.data.id)
+    .single();
+
+  if (readError || !current) redirect(resultUrl("error"));
+
+  const assessed = Number(current.amount_assessed);
+  const paid = Number(current.amount_paid);
+  const outstanding = Math.max(assessed - paid, 0);
+  if (parsed.data.paymentAmount > outstanding) redirect(resultUrl("invalid"));
+
+  const { error } = await supabase
+    .from("chapter_receivables")
+    .update({ amount_paid: paid + parsed.data.paymentAmount })
+    .eq("id", parsed.data.id);
+
+  if (error) redirect(resultUrl("error"));
+  revalidateDues();
+  redirect(resultUrl("payment"));
 }
 
 export async function deleteDuesBalance(formData: FormData) {

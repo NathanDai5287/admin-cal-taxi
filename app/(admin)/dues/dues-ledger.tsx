@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
+  addDuesPayment,
   deleteDuesBalance,
   setDuesPaid,
   updateDuesBalance,
@@ -15,6 +16,7 @@ export type DuesRow = {
   memberName: string;
   amountOwed: number;
   assessedAmount: number;
+  paidAmount: number;
   dueDate: string;
   notes: string;
   discordUserId: string;
@@ -41,9 +43,50 @@ function SearchIcon() {
   );
 }
 
+function DeleteBalanceButton({ id, memberName }: { id: string; memberName: string }) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const timeout = setTimeout(() => setArmed(false), 5000);
+    return () => clearTimeout(timeout);
+  }, [armed]);
+
+  return (
+    <Button
+      aria-label={armed ? `Confirm permanent deletion of ${memberName}'s balance` : `Delete ${memberName}'s balance`}
+      compact
+      formAction={deleteDuesBalance}
+      name="id"
+      onClick={(event) => {
+        if (!armed) {
+          event.preventDefault();
+          setArmed(true);
+        }
+      }}
+      type="submit"
+      value={id}
+      variant="danger"
+    >
+      {armed ? "Confirm delete" : "Delete balance"}
+    </Button>
+  );
+}
+
 export function DuesLedger({ rows }: { rows: DuesRow[] }) {
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingRow = rows.find((row) => row.id === editingId) ?? null;
+
+  useEffect(() => {
+    if (!editingRow) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setEditingId(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [editingRow]);
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -65,7 +108,8 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
   };
 
   return (
-    <section className="card overflow-hidden" aria-labelledby="dues-ledger-title">
+    <>
+    <section className="card" aria-labelledby="dues-ledger-title">
       <div className="dues-ledger-toolbar">
         <div>
           <h2 className="card-title" id="dues-ledger-title">Member balances</h2>
@@ -114,6 +158,9 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
                     {row.isPaid ? <span className="dues-paid-label">Paid</span> : null}
                     {row.discordUserId ? <span className="dues-discord-linked">Discord linked</span> : null}
                   </p>
+                  {row.paidAmount > 0 && !row.isPaid ? (
+                    <p>Paid {formatMoney(row.paidAmount)} of {formatMoney(row.assessedAmount)}</p>
+                  ) : null}
                 </div>
               </div>
 
@@ -130,40 +177,7 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
                     {row.isPaid ? "Reopen" : "Mark paid"}
                   </Button>
                 </form>
-                <details className="dues-edit">
-                  <summary>Edit</summary>
-                  <div className="dues-edit-panel">
-                    <form action={updateDuesBalance} className="grid gap-4">
-                      <input name="id" type="hidden" value={row.id} />
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="field">
-                          <label className="field-label" htmlFor={`member-${row.id}`}>Member</label>
-                          <input className="field-input" defaultValue={row.memberName} id={`member-${row.id}`} maxLength={120} name="memberName" required />
-                        </div>
-                        <div className="field">
-                          <label className="field-label" htmlFor={`amount-${row.id}`}>Amount owed</label>
-                          <div className="money-input"><span>$</span><input className="field-input" defaultValue={row.isPaid ? row.assessedAmount : row.amountOwed} id={`amount-${row.id}`} min="0.01" name="amountOwed" step="0.01" type="number" required /></div>
-                        </div>
-                        <div className="field">
-                          <label className="field-label" htmlFor={`due-${row.id}`}>Due date</label>
-                          <input className="field-input" defaultValue={row.dueDate} id={`due-${row.id}`} name="dueDate" type="date" required />
-                        </div>
-                        <div className="field">
-                          <label className="field-label" htmlFor={`discord-${row.id}`}>Discord member ID</label>
-                          <input className="field-input" defaultValue={row.discordUserId} id={`discord-${row.id}`} inputMode="numeric" maxLength={25} name="discordUserId" placeholder="Paste ID or mention" />
-                        </div>
-                        <div className="field">
-                          <label className="field-label" htmlFor={`notes-${row.id}`}>Note</label>
-                          <input className="field-input" defaultValue={row.notes} id={`notes-${row.id}`} maxLength={500} name="notes" />
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-4 border-t border-rule pt-4">
-                        <Button compact type="submit" variant="primary">Save changes</Button>
-                        <Button compact formAction={deleteDuesBalance} name="id" type="submit" value={row.id} variant="danger">Remove</Button>
-                      </div>
-                    </form>
-                  </div>
-                </details>
+                <Button compact onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>
               </div>
             </article>
           ))}
@@ -174,5 +188,87 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
         </div>
       )}
     </section>
+    {editingRow ? (
+      <div
+        className="dues-dialog-backdrop"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setEditingId(null);
+        }}
+        role="presentation"
+      >
+        <section aria-labelledby="edit-balance-title" aria-modal="true" className="dues-balance-dialog" role="dialog">
+          <div className="dues-dialog-header">
+            <div>
+              <p className="page-eyebrow">Member balance</p>
+              <h2 id="edit-balance-title">Edit {editingRow.memberName}</h2>
+            </div>
+            <button aria-label="Close balance editor" onClick={() => setEditingId(null)} type="button">×</button>
+          </div>
+
+          <div className="dues-balance-snapshot" aria-label="Balance summary">
+            <div><span>Assessed</span><strong>{formatMoney(editingRow.assessedAmount)}</strong></div>
+            <div><span>Paid</span><strong>{formatMoney(editingRow.paidAmount)}</strong></div>
+            <div><span>Still owed</span><strong>{formatMoney(editingRow.amountOwed)}</strong></div>
+          </div>
+
+          {!editingRow.isPaid ? (
+            <form action={addDuesPayment} className="dues-payment-form">
+              <input name="id" type="hidden" value={editingRow.id} />
+              <div className="field grow">
+                <label className="field-label" htmlFor={`payment-${editingRow.id}`}>Add a payment</label>
+                <div className="money-input"><span>$</span><input autoFocus className="field-input" id={`payment-${editingRow.id}`} max={editingRow.amountOwed} min="0.01" name="paymentAmount" placeholder="0.00" step="0.01" type="number" required /></div>
+              </div>
+              <Button type="submit" variant="primary">Apply payment</Button>
+            </form>
+          ) : (
+            <div className="dues-paid-notice">This balance is fully paid.</div>
+          )}
+
+          <form action={updateDuesBalance} className="dues-edit-form">
+            <input name="id" type="hidden" value={editingRow.id} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="field">
+                <label className="field-label" htmlFor={`member-${editingRow.id}`}>Member</label>
+                <input className="field-input" defaultValue={editingRow.memberName} id={`member-${editingRow.id}`} maxLength={120} name="memberName" required />
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor={`amount-${editingRow.id}`}>{editingRow.isPaid ? "Original amount" : "Amount still owed"}</label>
+                <div className="money-input"><span>$</span><input className="field-input" defaultValue={editingRow.isPaid ? editingRow.assessedAmount : editingRow.amountOwed} id={`amount-${editingRow.id}`} min="0.01" name="amountOwed" step="0.01" type="number" required /></div>
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor={`due-${editingRow.id}`}>Due date</label>
+                <input className="field-input" defaultValue={editingRow.dueDate} id={`due-${editingRow.id}`} name="dueDate" type="date" required />
+              </div>
+              <div className="field">
+                <label className="field-label" htmlFor={`discord-${editingRow.id}`}>Discord member ID</label>
+                <input
+                  className="field-input"
+                  defaultValue={editingRow.discordUserId}
+                  id={`discord-${editingRow.id}`}
+                  inputMode="numeric"
+                  maxLength={25}
+                  name="discordUserId"
+                  pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
+                  placeholder="Optional numeric ID"
+                  title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
+                />
+              </div>
+              <div className="field sm:col-span-2">
+                <label className="field-label" htmlFor={`notes-${editingRow.id}`}>Note</label>
+                <input className="field-input" defaultValue={editingRow.notes} id={`notes-${editingRow.id}`} maxLength={500} name="notes" />
+              </div>
+            </div>
+            <div className="dues-edit-footer">
+              <DeleteBalanceButton id={editingRow.id} memberName={editingRow.memberName} />
+              <div className="flex gap-2">
+                <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
+                <Button type="submit" variant="primary">Save changes</Button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </div>
+    ) : null}
+    </>
   );
 }

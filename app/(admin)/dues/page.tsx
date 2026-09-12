@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { addDuesBalance } from "@/app/(admin)/dues/actions";
+import { BulkFeeForm } from "@/app/(admin)/dues/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/dues/dues-announcement";
 import { DuesLedger } from "@/app/(admin)/dues/dues-ledger";
 import { Button } from "@/components/brand/button";
@@ -21,11 +22,18 @@ function currentPacificDate() {
 
 const feedback: Record<string, { text: string; success: boolean }> = {
   added: { text: "Member balance added.", success: true },
+  "bulk-added": { text: "The fee was applied to every selected member.", success: true },
   saved: { text: "Member balance updated.", success: true },
+  payment: { text: "Payment added to the balance.", success: true },
   paid: { text: "Balance marked paid.", success: true },
   reopened: { text: "Balance moved back to outstanding.", success: true },
   deleted: { text: "Member balance removed.", success: true },
-  invalid: { text: "Check the member, amount, and due date, then try again.", success: false },
+  invalid: { text: "Check the entered amount and balance details, then try again.", success: false },
+  "invalid-member": { text: "Enter a member name between 1 and 120 characters.", success: false },
+  "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
+  "invalid-date": { text: "Choose a valid due date.", success: false },
+  "invalid-notes": { text: "Keep the note under 500 characters.", success: false },
+  "invalid-discord": { text: "Discord needs a numeric user ID or a pasted <@mention>, not a username.", success: false },
   error: { text: "The balance could not be saved. Please try again.", success: false },
 };
 
@@ -43,7 +51,7 @@ export default async function DuesPage({
       .order("member_name", { ascending: true }),
     supabase
       .from("profiles")
-      .select("full_name")
+      .select("id, full_name")
       .is("removed_at", null)
       .order("full_name", { ascending: true }),
   ]);
@@ -63,6 +71,7 @@ export default async function DuesPage({
       memberName: row.member_name,
       amountOwed,
       assessedAmount: assessed,
+      paidAmount: paid,
       dueDate: row.due_date,
       notes: row.notes,
       discordUserId: row.discord_user_id,
@@ -74,10 +83,27 @@ export default async function DuesPage({
   const outstandingRows = rows.filter((row) => !row.isPaid);
   const totalOutstanding = outstandingRows.reduce((sum, row) => sum + row.amountOwed, 0);
   const overdueRows = rows.filter((row) => row.isOverdue);
+  const totalPaid = rows.reduce((sum, row) => sum + row.paidAmount, 0);
+  const settledRows = rows.filter((row) => row.isPaid);
   const selectedFeedback = result ? feedback[result] : undefined;
-  const members = (profilesResult.data ?? [])
-    .map((profile) => profile.full_name.trim())
-    .filter(Boolean);
+  if (profilesResult.error) {
+    throw new Error(`Unable to load members: ${profilesResult.error.message}`);
+  }
+
+  const discordIdsByName = new Map<string, string>();
+  for (const row of rows) {
+    if (/^\d{15,22}$/.test(row.discordUserId) && !discordIdsByName.has(row.memberName.toLowerCase())) {
+      discordIdsByName.set(row.memberName.toLowerCase(), row.discordUserId);
+    }
+  }
+  const members = (profilesResult.data ?? []).flatMap((profile) => {
+    const name = profile.full_name.trim();
+    return name ? [{
+      id: profile.id,
+      name,
+      discordUserId: discordIdsByName.get(name.toLowerCase()) ?? "",
+    }] : [];
+  });
 
   return (
     <div className="grid gap-7">
@@ -101,9 +127,9 @@ export default async function DuesPage({
           <p>{overdueRows.length ? formatMoney(overdueRows.reduce((sum, row) => sum + row.amountOwed, 0)) : "Nothing overdue"}</p>
         </div>
         <div>
-          <span>Settled</span>
-          <strong>{rows.filter((row) => row.isPaid).length}</strong>
-          <p>Paid balances</p>
+          <span>Settled total</span>
+          <strong>{formatMoney(totalPaid)}</strong>
+          <p>{settledRows.length} fully paid {settledRows.length === 1 ? "balance" : "balances"}</p>
         </div>
       </section>
 
@@ -120,6 +146,12 @@ export default async function DuesPage({
         unlinkedCount={outstandingRows.filter((row) => !/^\d{15,22}$/.test(row.discordUserId)).length}
       />
 
+      <BulkFeeForm
+        feedback={result === "bulk-added" ? selectedFeedback : undefined}
+        members={members}
+        today={today}
+      />
+
       <section className="card" aria-labelledby="add-dues-title">
         <div className="card-header">
           <span className="card-title" id="add-dues-title">Add a member balance</span>
@@ -130,7 +162,7 @@ export default async function DuesPage({
             <div className="field">
               <label className="field-label" htmlFor="dues-member">Member</label>
               <input className="field-input" id="dues-member" list="chapter-members" maxLength={120} name="memberName" placeholder="Member name" required />
-              <datalist id="chapter-members">{members.map((member) => <option key={member} value={member} />)}</datalist>
+              <datalist id="chapter-members">{members.map((member) => <option key={member.id} value={member.name} />)}</datalist>
             </div>
             <div className="field">
               <label className="field-label" htmlFor="dues-amount">Amount owed</label>
@@ -142,8 +174,17 @@ export default async function DuesPage({
             </div>
             <div className="field">
               <label className="field-label" htmlFor="dues-discord">Discord member ID</label>
-              <input className="field-input" id="dues-discord" inputMode="numeric" maxLength={25} name="discordUserId" placeholder="Paste ID or mention" />
-              <p className="field-hint">Used to mention this member in announcements.</p>
+              <input
+                className="field-input"
+                id="dues-discord"
+                inputMode="numeric"
+                maxLength={25}
+                name="discordUserId"
+                pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
+                placeholder="Optional numeric ID"
+                title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
+              />
+              <p className="field-hint">Optional. Use Copy User ID in Discord; usernames cannot create targeted mentions.</p>
             </div>
             <div className="field sm:col-span-2">
               <label className="field-label" htmlFor="dues-notes">Note</label>
@@ -152,7 +193,7 @@ export default async function DuesPage({
           </div>
           <div className="mt-5 flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4">
             <div aria-live="polite">
-              {selectedFeedback ? (
+              {selectedFeedback && result !== "bulk-added" ? (
                 <p className={`form-message${selectedFeedback.success ? " success" : ""}`}>{selectedFeedback.text}</p>
               ) : null}
             </div>
