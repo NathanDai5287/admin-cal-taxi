@@ -15,19 +15,33 @@ type AppNavProps = {
   title: string;
   subtitle?: string;
   tabs?: AppNavTab[];
+  variant?: "app" | "section";
   // Optional right-side slot for app-specific actions. Account actions live
   // exclusively in the global top-right account control.
   action?: React.ReactNode;
 };
 
-export function AppNav({ homeHref, title, subtitle, tabs = [], action }: AppNavProps) {
+export function AppNav({ homeHref, title, subtitle, tabs = [], action, variant = "app" }: AppNavProps) {
   const pathname = usePathname();
 
-  // The longest matching tab wins, so /reimbursements/reports lights up
+  // The longest matching tab wins, so /finance/reports lights up
   // "Reports" rather than both "Review" and "Reports".
   const activeHref = tabs
     .filter((tab) => pathname === tab.href || pathname.startsWith(tab.href + "/"))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
+  if (variant === "section") {
+    return (
+      <nav aria-label={title} className="flex gap-2 overflow-x-auto border-b border-rule pb-3">
+        {tabs.map((tab) => <Link
+          key={tab.href}
+          href={tab.href}
+          aria-current={tab.href === activeHref ? "page" : undefined}
+          className={`whitespace-nowrap rounded px-4 py-2 text-sm font-bold ${tab.href === activeHref ? "bg-brand text-white" : "text-muted hover:text-ink"}`}
+        >{tab.label}</Link>)}
+      </nav>
+    );
+  }
 
   return (
     <header className="border-b border-rule bg-surface">

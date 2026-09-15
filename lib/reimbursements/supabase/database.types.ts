@@ -31,6 +31,7 @@ export type Database = {
       };
       reimbursement_budget_entries: {
         Row: {
+          kind: "income" | "forecast";
           id: string;
           amount: number;
           description: string;
@@ -41,6 +42,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          kind?: "income" | "forecast";
           id?: string;
           amount: number;
           description: string;
@@ -51,6 +53,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          kind?: "income" | "forecast";
           amount?: number;
           description?: string;
           source?: Database["public"]["Enums"]["chapter_income_source"];
@@ -94,6 +97,7 @@ export type Database = {
       };
       chapter_receivables: {
         Row: {
+          member_id: string | null;
           id: string;
           member_name: string;
           amount_assessed: number;
@@ -106,6 +110,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          member_id?: string | null;
           id?: string;
           member_name: string;
           amount_assessed: number;
@@ -118,6 +123,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          member_id?: string | null;
           member_name?: string;
           amount_assessed?: number;
           amount_paid?: number;
@@ -131,6 +137,7 @@ export type Database = {
       };
       reimbursement_manual_expenses: {
         Row: {
+          receipt_path: string | null;
           id: string;
           category: Database["public"]["Enums"]["reimbursement_category"];
           amount: number;
@@ -141,6 +148,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          receipt_path?: string | null;
           id?: string;
           category: Database["public"]["Enums"]["reimbursement_category"];
           amount: number;
@@ -151,6 +159,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          receipt_path?: string | null;
           category?: Database["public"]["Enums"]["reimbursement_category"];
           amount?: number;
           description?: string;

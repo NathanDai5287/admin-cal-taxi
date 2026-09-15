@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    default: "Reimbursements",
-    template: "%s · Reimbursements",
+    default: "Finance",
+    template: "%s · Finance",
   },
-  description: "Review chapter expense reimbursements.",
+  description: "Sign in to chapter finances.",
 };
 
 export default function ReimbursementsLayout({ children }: LayoutProps<"/reimbursements">) {

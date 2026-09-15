@@ -137,7 +137,7 @@ export async function notifyDiscordOfReimbursement(reimbursementId: string) {
   const filename = receiptFilename(reimbursement.receipt_path);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const reviewUrl = siteUrl
-    ? new URL(`/reimbursements/${reimbursement.id}`, siteUrl).toString()
+    ? new URL(`/finance/review/${reimbursement.id}`, siteUrl).toString()
     : undefined;
   const amount = new Intl.NumberFormat("en-US", {
     style: "currency",

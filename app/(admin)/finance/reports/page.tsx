@@ -1,11 +1,8 @@
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { ButtonLink, Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import {
-  addManualExpense,
-  deleteManualExpense,
-} from "@/app/(admin)/reimbursements/(review)/reports/actions";
 import { categories, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
   filtersToSearchParams,
@@ -42,25 +39,15 @@ function formatExpenseDate(value: string) {
   }).format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
-function currentPacificDate() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "America/Los_Angeles",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
 export default async function ReimbursementReportsPage({ searchParams }: { searchParams: PageSearchParams }) {
+  await requireAdmin();
   const rawSearchParams = await searchParams;
   const filters = parseReportFilters(rawSearchParams);
   const supabase = createAdminClient();
   const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([
     supabase.from("reimbursements").select("full_name").order("full_name"),
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
-    supabase.from("reimbursement_budget_entries").select("amount"),
+    supabase.from("reimbursement_budget_entries").select("amount").eq("kind", "forecast"),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
   ]);
@@ -82,22 +69,19 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
     .reduce((total, entry) => total + Number(entry.amount), 0);
   const maximumCategorySpend = Math.max(...Object.values(summary.byCategory), 1);
   const filterParams = filtersToSearchParams(filters);
-  const exportHref = `/reimbursements/reports/export${filterParams.size ? `?${filterParams}` : ""}`;
-  const returnTo = `/reimbursements/reports${filterParams.size ? `?${filterParams}` : ""}`;
-  const manualResult = typeof rawSearchParams.manual === "string" ? rawSearchParams.manual : "";
-  const today = currentPacificDate();
+  const exportHref = `/finance/reports/export${filterParams.size ? `?${filterParams}` : ""}`;
 
   return (
     <div className="grid gap-6">
       <div className="flex items-end justify-between gap-6 flex-wrap">
         <div>
-          <p className="page-eyebrow">Chapter reimbursements</p>
+          <p className="page-eyebrow">Chapter finances</p>
           <h1 className="page-title">Spending summary</h1>
-          <p className="page-lede">Review requests, approved spending, and the chapter’s remaining budget.</p>
+          <p className="page-lede">Read spending summaries and export recorded activity. Approved unpaid reimbursements are included in spending commitments.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <ButtonLink variant="secondary" href="/reimbursements/reports/financial">Download financial PDF</ButtonLink>
-          <ButtonLink variant="secondary" href="/reimbursements/reports/financial?format=json">Chart data JSON</ButtonLink>
+          <ButtonLink variant="secondary" href="/finance/reports/financial">Download financial PDF</ButtonLink>
+          <ButtonLink variant="secondary" href="/finance/reports/financial?format=json">Chart data JSON</ButtonLink>
           <ButtonLink variant="secondary" href={exportHref}>Export CSV</ButtonLink>
         </div>
       </div>
@@ -106,9 +90,9 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
         <div className="card-header justify-between">
           <div className="flex items-baseline gap-3">
             <span className="card-title" id="report-filter-title">Filter report</span>
-            <span className="card-subtitle">Totals and exports use the same filters.</span>
+            <span className="card-subtitle">Page totals and CSV use these filters; PDF and JSON cover all current activity.</span>
           </div>
-          {filterParams.size > 0 && <Link className="back-link" href="/reimbursements/reports">Clear filters</Link>}
+          {filterParams.size > 0 && <Link className="back-link" href="/finance/reports">Clear filters</Link>}
         </div>
         <form className="card-body border-t border-rule pt-5 grid grid-cols-2 md:grid-cols-4 gap-4 items-end" method="get">
           <div className="field"><label className="field-label" htmlFor="from">From</label><input className="field-input" defaultValue={filters.from} id="from" name="from" type="date" /></div>
@@ -124,7 +108,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
       <section className="stat-grid" aria-label="Report totals">
         <article className="stat stat-primary"><span>Recorded spending</span><strong>{formatMoney(summary.approvedTotal)}</strong><small>{formatMoney(summary.receiptTotal)} receipts + {formatMoney(summary.manualTotal)} manual</small></article>
-        <article className="stat"><span>Total budget</span><strong>{formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
+        <article className="stat"><span>Planned income</span><strong>{formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
         <article className="stat"><span>Spending entries</span><strong>{summary.approvedCount + summary.manualCount}</strong><small>{summary.approvedCount} approved receipts, {summary.manualCount} manual</small></article>
       </section>
 
@@ -155,7 +139,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
                           <div className="spend-breakdown-item" key={`${item.source}-${item.id}`}>
                             <div>
                               {item.source === "receipt"
-                                ? <Link href={`/reimbursements/${item.id}`}>{item.description}</Link>
+                                ? <Link href={`/finance/review/${item.id}`}>{item.description}</Link>
                                 : <span>{item.description}</span>}
                               <small>{formatExpenseDate(item.date)} · {item.source === "receipt" ? "Receipt" : "Manual"}</small>
                             </div>
@@ -189,68 +173,6 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
         </section>
       </div>
 
-      <section className="card" aria-labelledby="manual-expense-title">
-        <div className="card-header">
-          <span className="card-title" id="manual-expense-title">Manual spending</span>
-          <span className="card-subtitle">Add chapter expenses that do not have a reimbursement receipt.</span>
-        </div>
-        <form action={addManualExpense} className="card-body border-t border-rule pt-5">
-          <input name="returnTo" type="hidden" value={returnTo} />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1fr] items-end">
-            <div className="field">
-              <label className="field-label" htmlFor="manual-category">Category</label>
-              <select className="field-input" id="manual-category" name="category" required>
-                {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-date">Expense date</label>
-              <input className="field-input" defaultValue={today} id="manual-date" name="expenseDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-description">Description</label>
-              <input className="field-input" id="manual-description" maxLength={500} name="description" placeholder="What makes up this amount?" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-amount">Amount</label>
-              <div className="money-input"><span>$</span><input className="field-input" id="manual-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {manualResult === "added" && <p className="form-message success">Manual expense added.</p>}
-              {manualResult === "deleted" && <p className="form-message success">Manual expense removed.</p>}
-              {manualResult === "invalid" && <p className="form-message">Enter a category, date, description, and positive amount.</p>}
-              {manualResult === "error" && <p className="form-message">The manual expense could not be saved. Apply the latest database migration and try again.</p>}
-            </div>
-            <Button variant="primary" type="submit">Add manual expense</Button>
-          </div>
-        </form>
-        {manualExpenses.length ? (
-          <div className="table-scroll border-t border-rule">
-            <table className="data-table">
-              <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                {manualExpenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className="whitespace-nowrap">{formatExpenseDate(expense.expense_date)}</td>
-                    <td>{formatCategory(expense.category)}</td>
-                    <td>{expense.description}</td>
-                    <td className="amount">{formatMoney(expense.amount)}</td>
-                    <td className="text-right">
-                      <form action={deleteManualExpense}>
-                        <input name="id" type="hidden" value={expense.id} />
-                        <input name="returnTo" type="hidden" value={returnTo} />
-                        <Button variant="secondary" compact type="submit">Remove</Button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state border-t border-rule">No manual expenses match these filters.</div>}
-      </section>
 
       <section className="card table-scroll">
         <div className="card-header justify-between">
@@ -267,7 +189,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td className="whitespace-nowrap">{new Date(row.submitted_at).toLocaleDateString()}</td>
-                  <td><Link className="submission-link relative" href={`/reimbursements/${row.id}`}>{row.full_name}</Link></td>
+                  <td><Link className="submission-link relative" href={`/finance/review/${row.id}`}>{row.full_name}</Link></td>
                   <td>{formatCategory(row.category)}</td>
                   <td className="amount">{formatMoney(row.amount)}</td>
                   <td><span className={`badge badge-${row.status}`}>{formatStatus(row.status)}</span></td>

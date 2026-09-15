@@ -3,7 +3,7 @@ import { Button } from "@/components/brand/button";
 
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
-import { updateStatus } from "@/app/(admin)/reimbursements/(review)/actions";
+import { updateStatus } from "@/app/(admin)/finance/review/actions";
 
 const ZOOM_SCALE = 2.5;
 

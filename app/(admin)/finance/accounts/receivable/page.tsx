@@ -1,14 +1,15 @@
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import type { Metadata } from "next";
 
-import { addDuesBalance } from "@/app/(admin)/dues/actions";
-import { BulkFeeForm } from "@/app/(admin)/dues/bulk-fee-form";
-import { DuesAnnouncement } from "@/app/(admin)/dues/dues-announcement";
-import { DuesLedger } from "@/app/(admin)/dues/dues-ledger";
+import { addDuesBalance } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { BulkFeeForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
+import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
+import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
-export const metadata: Metadata = { title: "Dues Tracker" };
+export const metadata: Metadata = { title: "Accounts receivable" };
 export const dynamic = "force-dynamic";
 
 function currentPacificDate() {
@@ -29,7 +30,7 @@ const feedback: Record<string, { text: string; success: boolean }> = {
   reopened: { text: "Balance moved back to outstanding.", success: true },
   deleted: { text: "Member balance removed.", success: true },
   invalid: { text: "Check the entered amount and balance details, then try again.", success: false },
-  "invalid-member": { text: "Enter a member name between 1 and 120 characters.", success: false },
+  "invalid-member": { text: "Choose an active registered member.", success: false },
   "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
   "invalid-date": { text: "Choose a valid due date.", success: false },
   "invalid-notes": { text: "Keep the note under 500 characters.", success: false },
@@ -42,16 +43,18 @@ export default async function DuesPage({
 }: {
   searchParams: Promise<{ result?: string }>;
 }) {
+  await requireAdmin();
   const [{ result }, supabase] = await Promise.all([searchParams, Promise.resolve(createAdminClient())]);
   const [receivablesResult, profilesResult] = await Promise.all([
     supabase
       .from("chapter_receivables")
-      .select("id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id")
+      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id")
       .order("due_date", { ascending: true })
       .order("member_name", { ascending: true }),
     supabase
       .from("profiles")
-      .select("id, full_name")
+      .select("id, full_name, email")
+      .in("role", ["member", "admin"])
       .is("removed_at", null)
       .order("full_name", { ascending: true }),
   ]);
@@ -68,6 +71,7 @@ export default async function DuesPage({
     const isPaid = amountOwed <= 0;
     return {
       id: row.id,
+      memberId: row.member_id,
       memberName: row.member_name,
       amountOwed,
       assessedAmount: assessed,
@@ -90,18 +94,17 @@ export default async function DuesPage({
     throw new Error(`Unable to load members: ${profilesResult.error.message}`);
   }
 
-  const discordIdsByName = new Map<string, string>();
+  const discordIdsByMember = new Map<string, string>();
   for (const row of rows) {
-    if (/^\d{15,22}$/.test(row.discordUserId) && !discordIdsByName.has(row.memberName.toLowerCase())) {
-      discordIdsByName.set(row.memberName.toLowerCase(), row.discordUserId);
-    }
+    if (row.memberId && /^\d{15,22}$/.test(row.discordUserId)) discordIdsByMember.set(row.memberId, row.discordUserId);
   }
   const members = (profilesResult.data ?? []).flatMap((profile) => {
     const name = profile.full_name.trim();
     return name ? [{
       id: profile.id,
       name,
-      discordUserId: discordIdsByName.get(name.toLowerCase()) ?? "",
+      email: profile.email,
+      discordUserId: discordIdsByMember.get(profile.id) ?? "",
     }] : [];
   });
 
@@ -110,7 +113,7 @@ export default async function DuesPage({
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <p className="page-eyebrow">Chapter finances</p>
-          <h1 className="page-title">Dues Tracker</h1>
+          <h1 className="page-title">Accounts receivable</h1>
           <p className="page-lede">Keep member balances current and see who still owes dues.</p>
         </div>
       </div>
@@ -161,8 +164,10 @@ export default async function DuesPage({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="field">
               <label className="field-label" htmlFor="dues-member">Member</label>
-              <input className="field-input" id="dues-member" list="chapter-members" maxLength={120} name="memberName" placeholder="Member name" required />
-              <datalist id="chapter-members">{members.map((member) => <option key={member.id} value={member.name} />)}</datalist>
+              <select className="field-input" id="dues-member" name="memberId" defaultValue="" required>
+                <option value="" disabled>Choose a registered member</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.email}</option>)}
+              </select>
             </div>
             <div className="field">
               <label className="field-label" htmlFor="dues-amount">Amount owed</label>
@@ -202,7 +207,7 @@ export default async function DuesPage({
         </form>
       </section>
 
-      <DuesLedger rows={rows} />
+      <DuesLedger rows={rows} members={members} />
     </div>
   );
 }

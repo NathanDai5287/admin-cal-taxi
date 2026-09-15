@@ -3,7 +3,7 @@ import { Button } from "@/components/brand/button";
 
 import { useState, useTransition } from "react";
 
-import { updateMerchant } from "@/app/(admin)/reimbursements/(review)/actions";
+import { updateMerchant } from "@/app/(admin)/finance/review/actions";
 
 // Inline rename for the expense (merchant) shown in the submissions table.
 export function EditableMerchant({ id, merchant }: { id: string; merchant: string | null }) {

@@ -17,7 +17,7 @@ export default async function ReimbursementsLoginPage({
 }) {
   const session = await getSessionProfile();
   if (session) {
-    redirect("/reimbursements");
+    redirect("/finance");
   }
 
   const params = await searchParams;
@@ -28,13 +28,13 @@ export default async function ReimbursementsLoginPage({
       <section className="card">
         <div className="card-header">
           <span className="card-title">Sign in</span>
-          <span className="card-subtitle">Reimbursements review</span>
+          <span className="card-subtitle">Chapter finances</span>
         </div>
         <div className="card-body border-t border-rule pt-5">
           {authFailed ? (
             <p className="form-message mb-5">Sign-in failed. Please try again.</p>
           ) : null}
-          <GoogleSignInButton next="/reimbursements" />
+          <GoogleSignInButton next="/finance" />
         </div>
       </section>
     </main>

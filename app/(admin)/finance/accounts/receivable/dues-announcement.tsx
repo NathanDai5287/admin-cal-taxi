@@ -5,7 +5,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   sendDuesAnnouncement,
   type DuesAnnouncementState,
-} from "@/app/(admin)/dues/actions";
+} from "@/app/(admin)/finance/accounts/receivable/actions";
 import { Button } from "@/components/brand/button";
 
 export type AnnouncementRecipient = {

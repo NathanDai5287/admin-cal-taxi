@@ -1,12 +1,11 @@
 # admin-cal-taxi
 
 Internal Next.js tools for cal.taxi, including rush administration, hosting documents,
-and receipt reimbursements.
+and chapter finances.
 
 ## Sites
 
-- `admin.cal.taxi` — the internal tools. `/host`, `/rush`, `/reimbursements`
-  (the review app), and `/users` all require sign-in with a profile whose role
+- `admin.cal.taxi` — the internal tools. `/host`, `/rush`, `/finance`, and `/users` all require sign-in with a profile whose role
   is `admin`.
 - `reimbursements.cal.taxi` — the member reimbursement submission page.
   Requires sign-in with a profile whose role is `member` or `admin`. Served by
@@ -56,8 +55,8 @@ straight to private Supabase Storage through a short-lived signed upload URL,
 then a server action records the row with the Supabase secret key. Tabscanner
 performs receipt total extraction in the background. Submissions move from
 `pending` to `verified`, `mismatch`, or `processing_failed`; a reviewer at
-`admin.cal.taxi/reimbursements` can then mark them `approved` or `denied` and
-record them as reimbursed.
+`admin.cal.taxi/finance/review` can then mark them `approved` or `denied`.
+Admins record payouts separately at `/finance/accounts/payable`.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
 2. Apply the SQL files in `supabase/migrations` to the Supabase project in filename order.
@@ -100,7 +99,7 @@ token must never be exposed to browser code.
 
 ### Discord dues announcements
 
-Admins can compose a custom message from the Dues Tracker and send it to selected
+Admins can compose a custom message from Finance → Accounts → Receivable and send it to selected
 members with outstanding balances. The web app posts through the same bot token as
 the reimbursement workflow; the persistent reaction worker is not required for
 announcements.
@@ -110,3 +109,14 @@ announcements.
    View Channel and Send Messages permissions in that channel.
 3. Add each member's Discord user ID to their dues balance. The announcement action
    allows only those exact user mentions and blocks automatic role or everyone mentions.
+
+## Finance organization
+
+Dues and reimbursements share `/finance`: Accounts (receivable, payable and
+activity), Planning, Review, and read-only Reports. Manual direct expenses are
+admin-only and support optional JPG/PNG receipt images. All activity is treated
+as the current term; no term selection is exposed.
+
+See [Finance organization](docs/finance-organization.md) for page ownership,
+required migration, verification, retained accounting behavior, and the future
+whole-site snapshot/restore plan.

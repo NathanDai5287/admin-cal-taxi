@@ -18,14 +18,9 @@ const ADMIN_APPS = [
     description: "RSVP leads, QR scans, and pizza votes",
   },
   {
-    href: "/reimbursements",
-    label: "Reimbursements",
-    description: "Review and pay chapter expenses",
-  },
-  {
-    href: "/dues",
-    label: "Dues Tracker",
-    description: "Track member balances and payment status",
+    href: "/finance",
+    label: "Finance",
+    description: "Accounts, planning, reimbursement review, and reports",
   },
   {
     href: "/users",

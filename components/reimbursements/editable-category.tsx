@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 
-import { updateCategory } from "@/app/(admin)/reimbursements/(review)/actions";
+import { updateCategory } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
 import {
   categories,

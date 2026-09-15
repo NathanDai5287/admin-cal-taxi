@@ -1,9 +1,10 @@
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { updateStatus } from "@/app/(admin)/reimbursements/(review)/actions";
+import { updateStatus } from "@/app/(admin)/finance/review/actions";
 import { EditableCategory } from "@/components/reimbursements/editable-category";
 import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
@@ -27,11 +28,12 @@ export default async function SubmissionReviewPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdmin();
   const { id } = await params;
   const supabase = createAdminClient();
   const { data: reimbursement } = await supabase
     .from("reimbursements")
-    .select("id, full_name, category, amount, description, payment_method, receipt_path, status, merchant, receipt_date, receipt_total, failure_reason, submitted_at")
+    .select("id, full_name, category, amount, description, payment_method, receipt_path, status, reimbursed, merchant, receipt_date, receipt_total, failure_reason, submitted_at")
     .eq("id", id)
     .single();
 
@@ -66,7 +68,7 @@ export default async function SubmissionReviewPage({
           <h1 className="page-title">{reimbursement.full_name}</h1>
           <p className="page-lede">Submitted {formatDate(reimbursement.submitted_at, true)}</p>
         </div>
-        <Link className="back-link" href="/reimbursements">← All submissions</Link>
+        <Link className="back-link" href="/finance/review">← All submissions</Link>
       </div>
 
       <div className="review-grid">
@@ -90,19 +92,19 @@ export default async function SubmissionReviewPage({
           <section className="card">
             <div className="card-header"><span className="card-title">Review decision</span></div>
             <div className="review-actions border-t border-rule">
-              <p>Review the details and receipt image before making a decision.</p>
+              <p>{reimbursement.reimbursed ? "This reimbursement has been paid. Correct the payment in Accounts before changing the decision." : "Review the details and receipt image before making a decision."}</p>
               <div className="status-actions">
                 <form action={updateStatus}>
                   <input name="id" type="hidden" value={reimbursement.id} />
                   <input name="status" type="hidden" value="approved" />
-                  <Button variant="primary" disabled={reimbursement.status === "approved" || !processingComplete} type="submit">
+                  <Button variant="primary" disabled={reimbursement.reimbursed || reimbursement.status === "approved" || !processingComplete} type="submit">
                     {reimbursement.status === "approved" ? "Approved" : "Approve submission"}
                   </Button>
                 </form>
                 <form action={updateStatus}>
                   <input name="id" type="hidden" value={reimbursement.id} />
                   <input name="status" type="hidden" value="denied" />
-                  <Button variant="danger" disabled={reimbursement.status === "denied" || !processingComplete} type="submit">
+                  <Button variant="danger" disabled={reimbursement.reimbursed || reimbursement.status === "denied" || !processingComplete} type="submit">
                     {reimbursement.status === "denied" ? "Denied" : "Deny submission"}
                   </Button>
                 </form>
@@ -122,7 +124,7 @@ export default async function SubmissionReviewPage({
                     alt={`Receipt submitted by ${reimbursement.full_name}`}
                     comparisonMessage={comparisonMessage}
                     paymentMethod={reimbursement.payment_method}
-                    processingComplete={processingComplete}
+                    processingComplete={processingComplete && !reimbursement.reimbursed}
                     reimbursementId={reimbursement.id}
                     reimbursementStatus={reimbursement.status}
                     src={receipt.signedUrl}

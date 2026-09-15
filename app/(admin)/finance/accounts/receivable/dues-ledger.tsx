@@ -7,12 +7,13 @@ import {
   deleteDuesBalance,
   setDuesPaid,
   updateDuesBalance,
-} from "@/app/(admin)/dues/actions";
+} from "@/app/(admin)/finance/accounts/receivable/actions";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
 
 export type DuesRow = {
   id: string;
+  memberId: string | null;
   memberName: string;
   amountOwed: number;
   assessedAmount: number;
@@ -73,7 +74,7 @@ function DeleteBalanceButton({ id, memberName }: { id: string; memberName: strin
   );
 }
 
-export function DuesLedger({ rows }: { rows: DuesRow[] }) {
+export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: string; name: string; email: string }[] }) {
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -152,6 +153,7 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
                 </div>
                 <div className="min-w-0">
                   <h3>{row.memberName}</h3>
+                  {!row.memberId && <p>Account link needed — use Edit to select the registered member.</p>}
                   <p>
                     Due {formatDate(row.dueDate)}
                     {row.isOverdue ? <span className="dues-overdue-label">Overdue</span> : null}
@@ -229,7 +231,11 @@ export function DuesLedger({ rows }: { rows: DuesRow[] }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
                 <label className="field-label" htmlFor={`member-${editingRow.id}`}>Member</label>
-                <input className="field-input" defaultValue={editingRow.memberName} id={`member-${editingRow.id}`} maxLength={120} name="memberName" required />
+                <select className="field-input" defaultValue={editingRow.memberId ?? ""} id={`member-${editingRow.id}`} name="memberId" required>
+                  {!editingRow.memberId && <option value="" disabled>Link {editingRow.memberName} to a registered member</option>}
+                  {editingRow.memberId && !members.some((member) => member.id === editingRow.memberId) && <option value={editingRow.memberId}>{editingRow.memberName} (archived)</option>}
+                  {members.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.email}</option>)}
+                </select>
               </div>
               <div className="field">
                 <label className="field-label" htmlFor={`amount-${editingRow.id}`}>{editingRow.isPaid ? "Original amount" : "Amount still owed"}</label>

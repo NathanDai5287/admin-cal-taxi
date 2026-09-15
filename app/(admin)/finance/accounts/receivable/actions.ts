@@ -18,7 +18,7 @@ function normalizeDiscordUserId(value: unknown) {
 }
 
 const entrySchema = z.object({
-  memberName: z.string().trim().min(1, "member").max(120, "member"),
+  memberId: z.string().uuid("member"),
   amountOwed: z.coerce.number().positive("amount").max(999_999_999.99, "amount"),
   dueDate: dateSchema,
   notes: z.string().trim().max(500, "notes"),
@@ -45,12 +45,12 @@ type DuesResult =
   | "error";
 
 function resultUrl(result: DuesResult) {
-  return `/dues?result=${result}`;
+  return `/finance/accounts/receivable?result=${result}`;
 }
 
 function entryErrorUrl(error: z.ZodError) {
   const field = error.issues[0]?.path[0];
-  if (field === "memberName") return resultUrl("invalid-member");
+  if (field === "memberId") return resultUrl("invalid-member");
   if (field === "amountOwed") return resultUrl("invalid-amount");
   if (field === "dueDate") return resultUrl("invalid-date");
   if (field === "notes") return resultUrl("invalid-notes");
@@ -59,14 +59,15 @@ function entryErrorUrl(error: z.ZodError) {
 }
 
 function revalidateDues() {
-  revalidatePath("/dues");
-  revalidatePath("/reimbursements/budgets");
+  revalidatePath("/finance/accounts/receivable");
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/reports");
 }
 
 export async function addDuesBalance(formData: FormData) {
   const { userId } = await requireAdmin("/");
   const parsed = entrySchema.safeParse({
-    memberName: formData.get("memberName"),
+    memberId: formData.get("memberId"),
     amountOwed: formData.get("amountOwed"),
     dueDate: formData.get("dueDate"),
     notes: formData.get("notes") ?? "",
@@ -76,8 +77,12 @@ export async function addDuesBalance(formData: FormData) {
   if (!parsed.success) redirect(entryErrorUrl(parsed.error));
 
   const supabase = createAdminClient();
+  const { data: member } = await supabase.from("profiles").select("id, full_name")
+    .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
+  if (!member) redirect(resultUrl("invalid-member"));
   const { error } = await supabase.from("chapter_receivables").insert({
-    member_name: parsed.data.memberName,
+    member_id: member.id,
+    member_name: member.full_name,
     amount_assessed: parsed.data.amountOwed,
     amount_paid: 0,
     due_date: parsed.data.dueDate,
@@ -130,6 +135,7 @@ export async function addBulkDuesFees(formData: FormData) {
     .from("profiles")
     .select("id, full_name")
     .in("id", parsed.data.memberIds)
+    .in("role", ["member", "admin"])
     .is("removed_at", null);
 
   if (profilesError || profiles?.length !== parsed.data.memberIds.length) {
@@ -142,6 +148,7 @@ export async function addBulkDuesFees(formData: FormData) {
     const detail = memberDetails.get(memberId);
     if (!profile?.full_name.trim() || !detail) return null;
     return {
+      member_id: profile.id,
       member_name: profile.full_name.trim(),
       amount_assessed: parsed.data.amountOwed,
       amount_paid: 0,
@@ -166,7 +173,7 @@ export async function updateDuesBalance(formData: FormData) {
   await requireAdmin("/");
   const parsed = entrySchema.extend({ id: z.string().uuid() }).safeParse({
     id: formData.get("id"),
-    memberName: formData.get("memberName"),
+    memberId: formData.get("memberId"),
     amountOwed: formData.get("amountOwed"),
     dueDate: formData.get("dueDate"),
     notes: formData.get("notes") ?? "",
@@ -178,19 +185,27 @@ export async function updateDuesBalance(formData: FormData) {
   const supabase = createAdminClient();
   const { data: current, error: readError } = await supabase
     .from("chapter_receivables")
-    .select("amount_assessed, amount_paid")
+    .select("member_id, member_name, amount_assessed, amount_paid")
     .eq("id", parsed.data.id)
     .single();
 
   if (readError || !current) redirect(resultUrl("error"));
 
+  let memberName = current.member_name;
+  if (parsed.data.memberId !== current.member_id) {
+    const { data: member } = await supabase.from("profiles").select("id, full_name")
+      .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
+    if (!member) redirect(resultUrl("invalid-member"));
+    memberName = member.full_name;
+  }
   const currentAssessed = Number(current.amount_assessed);
   const currentPaid = Number(current.amount_paid);
   const wasPaid = currentPaid >= currentAssessed;
   const { error } = await supabase
     .from("chapter_receivables")
     .update({
-      member_name: parsed.data.memberName,
+      member_id: parsed.data.memberId,
+      member_name: memberName,
       amount_assessed: wasPaid ? parsed.data.amountOwed : currentPaid + parsed.data.amountOwed,
       amount_paid: wasPaid ? parsed.data.amountOwed : currentPaid,
       due_date: parsed.data.dueDate,

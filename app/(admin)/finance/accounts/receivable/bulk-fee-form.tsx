@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { addBulkDuesFees } from "@/app/(admin)/dues/actions";
+import { addBulkDuesFees } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { Button } from "@/components/brand/button";
 
 export type BulkFeeMember = {

@@ -135,7 +135,7 @@ export async function loadReportManualExpenses(
 
   let query = supabase
     .from("reimbursement_manual_expenses")
-    .select("id, category, amount, description, expense_date, created_by, created_at, updated_at")
+    .select("id, category, amount, description, expense_date, receipt_path, created_by, created_at, updated_at")
     .order("expense_date", { ascending: false })
     .order("created_at", { ascending: false });
 
