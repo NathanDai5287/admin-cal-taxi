@@ -37,7 +37,13 @@ user's role directly.
 One-time setup: enable the Google provider in Supabase Authentication with an
 OAuth client from Google Cloud Console (redirect URI
 `https://<project-ref>.supabase.co/auth/v1/callback`), then disable the email
-provider. In the same Google OAuth client, add these **Authorized JavaScript
+provider. In Supabase Authentication → URL Configuration, add both
+`https://admin.cal.taxi/auth/callback` and
+`https://reimbursements.cal.taxi/auth/callback` to **Redirect URLs**. Without
+the member callback, Google can authenticate successfully but return the user
+somewhere that never exchanges the login code, leaving the app signed out.
+
+In the same Google OAuth client, add these **Authorized JavaScript
 origins** so the One Tap prompt may appear: `https://admin.cal.taxi`,
 `https://reimbursements.cal.taxi`, and for local development
 `http://localhost:3000` and `http://reimbursements.localhost:3000`. Set

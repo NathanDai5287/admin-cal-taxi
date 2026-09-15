@@ -20,13 +20,37 @@ type ResultResponse = {
 };
 
 function parseReceiptTotal(value: number | string | null | undefined) {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value >= 0 && value <= 99_999_999.99
+      ? value
+      : null;
+  }
   if (typeof value !== "string") return null;
 
   const normalized = value.replaceAll(",", "").replace(/[^0-9.-]/g, "");
   if (!normalized) return null;
   const parsed = Number(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 99_999_999.99
+    ? parsed
+    : null;
+}
+
+function parseReceiptDate(value: string | null | undefined) {
+  if (typeof value !== "string") return null;
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T00:00:00Z`);
+  if (
+    Number.isNaN(date.valueOf())
+    || date.getUTCFullYear() !== Number(year)
+    || date.getUTCMonth() + 1 !== Number(month)
+    || date.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+  return `${year}-${month}-${day}`;
 }
 
 function amountsMatch(requestedAmount: number, receiptTotal: number) {
@@ -43,6 +67,7 @@ async function tabscannerRequest(url: string, options: RequestInit) {
   const response = await fetch(url, {
     ...options,
     headers: { ...options.headers, apikey: apiKey },
+    signal: options.signal ?? AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
     throw new Error(`Tabscanner returned ${response.status}.`);
@@ -101,19 +126,32 @@ export async function processReimbursementReceipt(reimbursementId: string) {
     const receiptTotal = parseReceiptTotal(result.total);
     const matches = receiptTotal !== null
       && amountsMatch(Number(reimbursement.amount), receiptTotal);
-    const receiptDate = (result.dateISO || result.date)?.slice(0, 10) || null;
+    const receiptDate = parseReceiptDate(result.dateISO)
+      ?? parseReceiptDate(result.date);
 
-    await admin.from("reimbursements").update({
+    const { error: updateError } = await admin.from("reimbursements").update({
       merchant: result.establishment || null,
       receipt_date: receiptDate,
       receipt_total: receiptTotal,
       failure_reason: null,
       status: matches ? "verified" : "mismatch",
-    }).eq("id", reimbursementId);
+    }).eq("id", reimbursementId).eq("status", "pending");
+    if (updateError) throw updateError;
   } catch (error) {
-    await admin.from("reimbursements").update({
+    const failureReason = error instanceof Error
+      ? error.message.slice(0, 500)
+      : "Receipt processing failed.";
+    const { error: failureUpdateError } = await admin.from("reimbursements").update({
       status: "processing_failed",
-      failure_reason: error instanceof Error ? error.message.slice(0, 500) : "Receipt processing failed.",
-    }).eq("id", reimbursementId);
+      failure_reason: failureReason,
+    }).eq("id", reimbursementId).eq("status", "pending");
+    if (failureUpdateError) {
+      console.error("Could not record reimbursement processing failure", {
+        reimbursementId,
+        processingError: failureReason,
+        updateError: failureUpdateError.message,
+      });
+      throw failureUpdateError;
+    }
   }
 }

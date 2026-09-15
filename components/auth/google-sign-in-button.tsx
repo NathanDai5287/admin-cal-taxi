@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { createClient } from "@/lib/reimbursements/supabase/client";
+import { clearLegacyHostOnlyAuthCookies } from "@/lib/reimbursements/supabase/cookie-options";
 
 export type GoogleSignInButtonProps = {
   label?: string;
@@ -45,10 +46,13 @@ export function GoogleSignInButton({
   next,
 }: GoogleSignInButtonProps) {
   const [pending, setPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   async function handleClick() {
     setPending(true);
+    setErrorMessage("");
     try {
+      clearLegacyHostOnlyAuthCookies();
       const supabase = createClient();
       const nextPath = next ?? `${window.location.pathname}${window.location.search}`;
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
@@ -57,34 +61,49 @@ export function GoogleSignInButton({
         options: { redirectTo },
       });
       if (error) {
+        console.error("Google OAuth could not start", error);
+        setErrorMessage(error.message || "Google sign-in could not start. Please try again.");
         setPending(false);
       }
-    } catch {
+    } catch (error) {
+      console.error("Google OAuth could not start", error);
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Google sign-in could not start. Check your connection and try again.",
+      );
       setPending(false);
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={pending}
-      aria-busy={pending}
-      className={
-        "inline-flex items-center gap-2.5 px-4 py-2 !rounded-full bg-surface " +
-        "border border-rule text-ink cursor-pointer " +
-        "text-[11px] font-bold tracking-[0.14em] uppercase " +
-        "shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
-        "transition-[border-color,box-shadow,transform] duration-150 " +
-        "hover:border-brand hover:-translate-y-px " +
-        "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)] " +
-        "disabled:opacity-50 disabled:cursor-wait disabled:hover:translate-y-0 " +
-        "disabled:hover:border-rule disabled:hover:shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
-        className
-      }
-    >
-      <GoogleGMark />
-      <span>{pending ? "Signing in…" : label}</span>
-    </button>
+    <div className="flex flex-col items-start gap-2">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={pending}
+        aria-busy={pending}
+        className={
+          "inline-flex items-center gap-2.5 px-4 py-2 !rounded-full bg-surface " +
+          "border border-rule text-ink cursor-pointer " +
+          "text-[11px] font-bold tracking-[0.14em] uppercase " +
+          "shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+          "transition-[border-color,box-shadow,transform] duration-150 " +
+          "hover:border-brand hover:-translate-y-px " +
+          "hover:shadow-[0_4px_12px_rgba(16,16,20,0.12)] " +
+          "disabled:opacity-50 disabled:cursor-wait disabled:hover:translate-y-0 " +
+          "disabled:hover:border-rule disabled:hover:shadow-[0_1px_3px_rgba(16,16,20,0.08)] " +
+          className
+        }
+      >
+        <GoogleGMark />
+        <span>{pending ? "Signing in…" : label}</span>
+      </button>
+      {errorMessage ? (
+        <p className="m-0 max-w-[320px] text-[12px] leading-snug text-warn" role="alert">
+          Sign-in failed: {errorMessage}
+        </p>
+      ) : null}
+    </div>
   );
 }

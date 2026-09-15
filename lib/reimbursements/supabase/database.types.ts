@@ -294,6 +294,10 @@ export type Database = {
         Args: { new_role: "none" | "member" | "admin"; target_user_id: string };
         Returns: undefined;
       };
+      claim_pending_invite: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
     };
     Enums: {

@@ -37,6 +37,26 @@ export function getCookieOptions() {
   };
 }
 
+// Before starting a new browser sign-in, remove only host-scoped remnants
+// from older deployments. A stale cookie with the same name can otherwise
+// shadow the current shared `.cal.taxi` session. Omitting Domain deliberately
+// leaves the shared cookie untouched.
+export function clearLegacyHostOnlyAuthCookies() {
+  if (typeof document === "undefined") return;
+
+  const names = new Set(
+    document.cookie
+      .split(";")
+      .map((part) => part.trim().split("=", 1)[0])
+      .filter((name) => /^sb-.*-auth-token(?:\.\d+)?$/.test(name)),
+  );
+  for (const name of names) {
+    document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${
+      window.location.protocol === "https:" ? "; Secure" : ""
+    }`;
+  }
+}
+
 // Sign-out must expire every variant of the session cookie: deletion matches
 // on name + domain + path, and both host-only cookies (pre-unification and
 // local dev) and the shared `.cal.taxi` cookie may be present. Clearing only

@@ -70,15 +70,6 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
     try {
       const form = new FormData(event.currentTarget);
 
-      // Honeypot: pretend the submission worked and stop here.
-      const honeypot = form.get("website");
-      if (typeof honeypot === "string" && honeypot.trim() !== "") {
-        formRef.current?.reset();
-        setMessage("Submitted. We’re checking the receipt now.");
-        setSuccess(true);
-        return;
-      }
-
       const parsed = reimbursementSchema.safeParse({
         fullName: form.get("fullName"),
         category: form.get("category"),
@@ -248,11 +239,6 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
         </div>
         <span className="field-hint" id="receipt-hint">JPG, PNG, or HEIC, up to 10 MB. HEIC photos are converted to JPG for viewing. One receipt per submission.</span>
         {receiptError && <p className="text-sm text-warn" id="receipt-error" role="alert">{receiptError}</p>}
-      </div>
-      {/* Honeypot: hidden from people, attractive to bots. */}
-      <div aria-hidden="true" className="absolute left-[-10000px] top-auto w-[1px] h-[1px] overflow-hidden">
-        <label htmlFor="website">Website</label>
-        <input id="website" name="website" tabIndex={-1} autoComplete="off" />
       </div>
       {message && <p className={`form-message${success ? " success" : ""}`} role="status">{message}</p>}
       {success && <Link href="/history" className="text-sm text-brand underline">View my reimbursements →</Link>}

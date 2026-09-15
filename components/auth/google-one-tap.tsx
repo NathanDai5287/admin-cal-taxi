@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { createClient } from "@/lib/reimbursements/supabase/client";
+import { clearLegacyHostOnlyAuthCookies } from "@/lib/reimbursements/supabase/cookie-options";
 
 // Google Identity Services "One Tap": the native account-chooser island that
 // appears automatically (top-right on desktop). The ID token it returns is
@@ -92,6 +93,7 @@ export function GoogleOneTap({ onVisibilityChange, onError }: GoogleOneTapProps)
           // Chrome is phasing out third-party cookies; FedCM keeps One Tap working.
           use_fedcm_for_prompt: true,
           callback: async (response) => {
+            clearLegacyHostOnlyAuthCookies();
             const supabase = createClient();
             const { error } = await supabase.auth.signInWithIdToken({
               provider: "google",

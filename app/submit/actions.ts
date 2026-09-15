@@ -44,13 +44,6 @@ export type SubmitResult =
 export async function submitReimbursement(formData: FormData): Promise<SubmitResult> {
   const { userId, profile } = await requireMember();
 
-  // Honeypot: the hidden "website" field is invisible to people. Bots that
-  // fill it get a fake success and nothing is recorded.
-  const honeypot = formData.get("website");
-  if (typeof honeypot === "string" && honeypot.trim() !== "") {
-    return { ok: true, message: "Submitted. We’re checking the receipt now." };
-  }
-
   const parsed = reimbursementSchema.safeParse({
     fullName: formData.get("fullName"),
     category: formData.get("category"),
