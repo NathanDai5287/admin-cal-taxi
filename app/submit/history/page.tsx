@@ -1,6 +1,7 @@
 import { requireMember } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
-import { MemberHistory, memberHistoryFilters, type MemberHistoryFilter } from "@/components/reimbursements/member-history";
+import { MemberHistory } from "@/components/reimbursements/member-history";
+import { memberHistoryFilters, type MemberHistoryFilter } from "@/lib/reimbursements/member-history";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My reimbursements" };
