@@ -918,6 +918,45 @@
   [data-brand] .stat-primary strong {
     @apply text-white;
   }
+  [data-brand] .stat[href] {
+    @apply transition-all hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2;
+  }
+  [data-brand] .stat[href] small span {
+    @apply inline-block ml-1 transition-transform;
+  }
+  [data-brand] .stat[href]:hover small span {
+    @apply translate-x-1;
+  }
+  [data-brand] .account-workflow-card {
+    @apply grid min-h-[156px] grid-cols-[auto_1fr_auto] items-start gap-4 border border-rule bg-surface p-5
+           transition-all hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2;
+    border-top: 3px solid var(--color-brand);
+  }
+  [data-brand] .account-workflow-number {
+    @apply flex h-7 w-7 items-center justify-center bg-brand-light text-[12px] font-bold text-brand;
+  }
+  [data-brand] .account-workflow-card h3 {
+    @apply text-[15px] font-bold text-ink;
+  }
+  [data-brand] .account-workflow-card p {
+    @apply mt-2 text-[12.5px] leading-relaxed text-muted;
+  }
+  [data-brand] .account-workflow-card > svg {
+    @apply mt-1 text-brand transition-transform;
+  }
+  [data-brand] .account-workflow-card:hover > svg {
+    @apply translate-x-1;
+  }
+  [data-brand] .account-choice {
+    @apply grid gap-1.5 border border-rule bg-surface px-5 py-4 transition-colors
+           hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2;
+  }
+  [data-brand] .account-choice strong {
+    @apply text-[13.5px] font-bold text-ink;
+  }
+  [data-brand] .account-choice span {
+    @apply text-[12px] leading-relaxed text-muted;
+  }
   [data-brand] .spend-list {
     @apply grid;
   }

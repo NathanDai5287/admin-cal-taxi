@@ -5,7 +5,7 @@ import { addDuesBalance } from "@/app/(admin)/finance/accounts/receivable/action
 import { BulkFeeForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
-import { Button } from "@/components/brand/button";
+import { Button, ButtonLink } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -113,8 +113,12 @@ export default async function DuesPage({
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div>
           <p className="page-eyebrow">Chapter finances</p>
-          <h1 className="page-title">Accounts receivable</h1>
-          <p className="page-lede">Keep member balances current and see who still owes dues.</p>
+          <h1 className="page-title">Dues to collect</h1>
+          <p className="page-lede">See what members owe, record payments, and add new dues when needed.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ButtonLink href="#add-one-balance" variant="primary">Add dues</ButtonLink>
+          <ButtonLink href="#add-bulk-fee" variant="secondary">Charge multiple members</ButtonLink>
         </div>
       </div>
 
@@ -130,11 +134,13 @@ export default async function DuesPage({
           <p>{overdueRows.length ? formatMoney(overdueRows.reduce((sum, row) => sum + row.amountOwed, 0)) : "Nothing overdue"}</p>
         </div>
         <div>
-          <span>Settled total</span>
+          <span>Payments recorded</span>
           <strong>{formatMoney(totalPaid)}</strong>
           <p>{settledRows.length} fully paid {settledRows.length === 1 ? "balance" : "balances"}</p>
         </div>
       </section>
+
+      <DuesLedger rows={rows} members={members} />
 
       <DuesAnnouncement
         channelConfigured={Boolean(process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID?.trim())}
@@ -149,16 +155,16 @@ export default async function DuesPage({
         unlinkedCount={outstandingRows.filter((row) => !/^\d{15,22}$/.test(row.discordUserId)).length}
       />
 
-      <BulkFeeForm
-        feedback={result === "bulk-added" ? selectedFeedback : undefined}
-        members={members}
-        today={today}
-      />
+      <div className="border-t border-rule pt-7">
+        <p className="page-eyebrow">Create new dues</p>
+        <h2 className="mt-1 text-[18px] font-bold text-ink">Who should be charged?</h2>
+        <p className="mt-1 text-[13px] text-muted">Add one balance for an individual charge, or apply the same fee to several registered members.</p>
+      </div>
 
-      <section className="card" aria-labelledby="add-dues-title">
+      <section className="card scroll-mt-28" aria-labelledby="add-dues-title" id="add-one-balance">
         <div className="card-header">
-          <span className="card-title" id="add-dues-title">Add a member balance</span>
-          <span className="card-subtitle">Enter what the member currently owes.</span>
+          <span className="card-title" id="add-dues-title">Charge one member</span>
+          <span className="card-subtitle">Creates a new dues balance for one registered member.</span>
         </div>
         <form action={addDuesBalance} className="card-body border-t border-rule pt-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -207,7 +213,13 @@ export default async function DuesPage({
         </form>
       </section>
 
-      <DuesLedger rows={rows} members={members} />
+      <div className="scroll-mt-28" id="add-bulk-fee">
+        <BulkFeeForm
+          feedback={result === "bulk-added" ? selectedFeedback : undefined}
+          members={members}
+          today={today}
+        />
+      </div>
     </div>
   );
 }

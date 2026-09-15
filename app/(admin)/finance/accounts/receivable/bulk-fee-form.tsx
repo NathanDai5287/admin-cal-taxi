@@ -55,8 +55,8 @@ export function BulkFeeForm({
   return (
     <section className="card" aria-labelledby="bulk-fee-title">
       <div className="card-header">
-        <span className="card-title" id="bulk-fee-title">Apply a fee to members</span>
-        <span className="card-subtitle">Choose members, then add Discord IDs and a note for each fee.</span>
+        <span className="card-title" id="bulk-fee-title">Charge multiple members</span>
+        <span className="card-subtitle">Applies the same amount and due date to every selected member.</span>
       </div>
       <form action={addBulkDuesFees} className="bulk-fee-form">
         <div className="bulk-fee-settings">

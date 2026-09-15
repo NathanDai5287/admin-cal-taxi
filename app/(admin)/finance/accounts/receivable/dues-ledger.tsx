@@ -176,7 +176,7 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
                   <input name="id" type="hidden" value={row.id} />
                   <input name="paid" type="hidden" value={row.isPaid ? "false" : "true"} />
                   <Button compact type="submit" variant={row.isPaid ? "secondary" : "primary"}>
-                    {row.isPaid ? "Reopen" : "Mark paid"}
+                    {row.isPaid ? "Reopen balance" : "Mark fully paid"}
                   </Button>
                 </form>
                 <Button compact onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>

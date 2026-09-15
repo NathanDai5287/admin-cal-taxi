@@ -323,7 +323,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
             {paymentGroups.length} {paymentGroups.length === 1 ? "member" : "members"}
           </span>
           <Button variant="secondary" compact disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</Button>
-          <Button variant="primary" compact disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Review payments</Button>
+          <Button variant="primary" compact disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Confirm selected payouts</Button>
         </div>}
       </div>
       <div className="table-scroll border-t border-rule">
@@ -344,7 +344,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
                   />
                 </label>
               </th>}
-              <th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th>{payments && <th>Reimbursed</th>}
+              <th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th>{payments && <th>Paid</th>}
             </tr>
           </thead>
           <tbody>
@@ -421,8 +421,8 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
       >
         <div className="payment-review-heading">
           <div>
-            <p className="page-eyebrow m-0">Payment review</p>
-            <h2 id="payment-review-heading">Confirm reimbursements</h2>
+            <p className="page-eyebrow m-0">Record payouts</p>
+            <h2 id="payment-review-heading">Confirm selected payouts</h2>
           </div>
           <button aria-label="Close payment review" className="payment-review-close" disabled={submitting} onClick={closeReviewDialog} type="button">×</button>
         </div>
@@ -454,12 +454,12 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
           <span>Grand total</span>
           <strong>{formatMoney(selectedTotalCents / 100)}</strong>
         </div>
-        <p className="payment-review-note">This records the selected items as reimbursed. It does not send money through Zelle.</p>
+        <p className="payment-review-note">Send these payments separately, then confirm here. This records the payouts; it does not send money through Zelle.</p>
         {dialogError && <p className="payment-dialog-error" role="alert">{dialogError}</p>}
         <div className="payment-review-actions">
           <Button variant="secondary" disabled={submitting} onClick={closeReviewDialog} type="button">Cancel</Button>
           <Button variant="primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
-            {submitting ? "Marking reimbursed…" : "Mark selected as reimbursed"}
+            {submitting ? "Recording payouts…" : "Record selected as paid"}
           </Button>
         </div>
       </dialog>}

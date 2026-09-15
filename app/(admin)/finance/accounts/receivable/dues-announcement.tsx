@@ -46,7 +46,7 @@ export function DuesAnnouncement({
   channelConfigured: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState("Pay your dues guys wtf");
+  const [message, setMessage] = useState("Hi! This is a reminder that your chapter dues still have an outstanding balance. Please reach out if you have any questions.");
   const [selectedIds, setSelectedIds] = useState(() => recipients.map((recipient) => recipient.id));
   const [state, formAction, pending] = useActionState(sendDuesAnnouncement, initialState);
   const selectedRecipients = useMemo(

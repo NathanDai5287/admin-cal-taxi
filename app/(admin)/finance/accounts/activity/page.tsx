@@ -31,12 +31,22 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   }));
   const entries = results[1].data ?? [];
   const today = currentPacificDate();
+  const directSpendingTotal = manualExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const incomeTotal = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
   return <div className="grid gap-6">
-    <div><p className="page-eyebrow">Chapter finances</p><h1 className="page-title">Account activity</h1><p className="page-lede">Record direct spending and other income. Record dues collections in Receivable and reimbursement payouts in Payable.</p></div>
-      <section className="card" aria-labelledby="manual-expense-title">
+    <div><p className="page-eyebrow">Chapter finances</p><h1 className="page-title">Other transactions</h1><p className="page-lede">Use this page for money that is not already recorded through dues or reimbursements.</p></div>
+
+    <section className="grid gap-3 md:grid-cols-3" aria-labelledby="transaction-choice-title">
+      <h2 className="sr-only" id="transaction-choice-title">Choose a transaction type</h2>
+      <a className="account-choice" href="#record-expense"><strong>Chapter paid an expense</strong><span>Record a direct purchase or vendor payment.</span></a>
+      <a className="account-choice" href="#record-income"><strong>Chapter received money</strong><span>Record fundraising, donations, or other income.</span></a>
+      <a className="account-choice" href="#opening-cash"><strong>Set opening cash</strong><span>Update the starting balance used by reports.</span></a>
+    </section>
+
+      <section className="card scroll-mt-28" aria-labelledby="manual-expense-title" id="record-expense">
         <div className="card-header">
-          <span className="card-title" id="manual-expense-title">Direct spending</span>
-          <span className="card-subtitle">Record direct chapter payments. Receipt images are optional.</span>
+          <span className="card-title" id="manual-expense-title">Record a direct expense</span>
+          <span className="card-subtitle">Use this when the chapter paid directly. Member reimbursements belong in Review.</span>
         </div>
         <form action={addManualExpense} className="card-body border-t border-rule pt-5">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1fr] items-end">
@@ -61,7 +71,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           </div>
           <div className="field mt-4">
             <label className="field-label" htmlFor="manual-receipt">Receipt image (optional)</label>
-            <input className="field-input" id="manual-receipt" name="receipt" type="file" accept="image/jpeg,image/png" />
+            <input className="file-input" id="manual-receipt" name="receipt" type="file" accept="image/jpeg,image/png" />
             <p className="field-hint">JPG or PNG, up to 3 MB. Leave empty if there is no receipt.</p>
           </div>
           <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
@@ -77,6 +87,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </form>
         {manualExpenses.length ? (
           <div className="table-scroll border-t border-rule">
+            <div className="flex items-baseline justify-between gap-4 border-b border-rule px-6 py-3">
+              <strong className="text-[12px] text-ink">Recorded direct expenses</strong>
+              <span className="text-[12px] text-muted">{manualExpenses.length} entries · {formatMoney(directSpendingTotal)}</span>
+            </div>
             <table className="data-table">
               <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
@@ -97,13 +111,13 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
-        ) : <div className="empty-state border-t border-rule">No manual expenses match these filters.</div>}
+        ) : <div className="empty-state border-t border-rule">No direct expenses have been recorded.</div>}
       </section>
 
-      <section className="card" aria-labelledby="add-income-title">
+      <section className="card scroll-mt-28" aria-labelledby="add-income-title" id="record-income">
         <div className="card-header">
           <span className="card-title" id="add-income-title">Record income</span>
-          <span className="card-subtitle">Record money received outside the dues collection workflow.</span>
+          <span className="card-subtitle">Use this for money received outside dues. Dues payments belong in Dues to collect.</span>
         </div>
         <form action={addIncomeEntry} className="card-body border-t border-rule pt-5">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1.25fr_2fr_1fr] items-end">
@@ -138,6 +152,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         </form>
         {entries.length ? (
           <div className="table-scroll border-t border-rule">
+            <div className="flex items-baseline justify-between gap-4 border-b border-rule px-6 py-3">
+              <strong className="text-[12px] text-ink">Recorded other income</strong>
+              <span className="text-[12px] text-muted">{entries.length} entries · {formatMoney(incomeTotal)}</span>
+            </div>
             <table className="data-table">
               <thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Amount added</th><th><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
@@ -161,10 +179,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         ) : <div className="empty-state border-t border-rule">No income entries have been recorded yet.</div>}
       </section>
 
-    <section className="card">
-      <div className="card-header"><span className="card-title">Opening cash</span></div>
+    <section className="card scroll-mt-28" id="opening-cash">
+      <div className="card-header"><span className="card-title">Opening cash</span><span className="card-subtitle">Account setup used by financial reports.</span></div>
       <form action={saveOpeningCash} className="card-body grid gap-4">
-        <div className="field"><label className="field-label" htmlFor="opening-cash">Cash at the start of the current term</label><input className="field-input" id="opening-cash" name="openingCash" type="number" min="0" step="0.01" defaultValue={results[2].data?.opening_cash ?? 0} required /></div>
+        <div className="max-w-[360px] field"><label className="field-label" htmlFor="opening-cash-amount">Cash at the start of the current term</label><div className="money-input"><span>$</span><input className="field-input" id="opening-cash-amount" name="openingCash" type="number" min="0" step="0.01" defaultValue={results[2].data?.opening_cash ?? 0} required /></div><p className="field-hint">Change this only when correcting the starting balance. Day-to-day income and expenses belong above.</p></div>
         {settingsResult && <p role="status">{settingsResult === "saved" ? "Opening cash saved." : "Unable to save opening cash. Check the amount and try again."}</p>}
         <Button variant="secondary" type="submit">Save opening cash</Button>
       </form>
