@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-route";
 
 export const metadata = { title: { default: "Finance", template: "%s · Finance" } };
 
@@ -21,10 +22,21 @@ export default async function FinanceLayout({ children }: { children: React.Reac
 
   return (
     <div data-brand className="min-h-screen">
+      <RefreshCurrentRoute />
       <AppNav
         homeHref="/finance/accounts"
         title="Theta Xi"
         subtitle="Finance"
+        prefetchHrefs={[
+          "/finance/accounts",
+          "/finance/accounts/receivable",
+          "/finance/accounts/payable",
+          "/finance/accounts/payable?paid=true",
+          "/finance/accounts/activity",
+          "/finance/planning",
+          "/finance/review",
+          "/finance/reports",
+        ]}
         tabs={[
           { href: "/finance/accounts", label: "Accounts" },
           { href: "/finance/planning", label: "Planning" },

@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidatePath } from "next/cache";
 
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -137,6 +138,10 @@ export async function processReimbursementReceipt(reimbursementId: string) {
       status: matches ? "verified" : "mismatch",
     }).eq("id", reimbursementId).eq("status", "pending");
     if (updateError) throw updateError;
+    revalidatePath("/submit/history");
+    revalidatePath(`/submit/history/${reimbursementId}`);
+    revalidatePath("/finance/review");
+    revalidatePath(`/finance/review/${reimbursementId}`);
   } catch (error) {
     const failureReason = error instanceof Error
       ? error.message.slice(0, 500)
@@ -153,5 +158,9 @@ export async function processReimbursementReceipt(reimbursementId: string) {
       });
       throw failureUpdateError;
     }
+    revalidatePath("/submit/history");
+    revalidatePath(`/submit/history/${reimbursementId}`);
+    revalidatePath("/finance/review");
+    revalidatePath(`/finance/review/${reimbursementId}`);
   }
 }

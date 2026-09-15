@@ -299,6 +299,14 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      record_dues_payment: {
+        Args: { p_payment_amount: number; p_receivable_id: string; p_request_id: string };
+        Returns: boolean;
+      };
+      set_dues_paid_state: {
+        Args: { p_paid: boolean; p_receivable_id: string };
+        Returns: boolean;
+      };
     };
     Enums: {
       app_role: "none" | "member" | "admin";

@@ -61,6 +61,12 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
   const [rowOverrides, setRowOverrides] = useState<Map<string, Partial<PaymentTableRow>>>(() => new Map());
   const [pendingFields, setPendingFields] = useState<Set<string>>(() => new Set());
 
+  useEffect(() => {
+    if (!rows.some((row) => row.status === "pending")) return;
+    const interval = window.setInterval(() => router.refresh(), 5_000);
+    return () => window.clearInterval(interval);
+  }, [router, rows]);
+
   const optimisticRows = useMemo(() => rows.map((serverRow) => {
     const override = rowOverrides.get(serverRow.id);
     if (!override) return serverRow;

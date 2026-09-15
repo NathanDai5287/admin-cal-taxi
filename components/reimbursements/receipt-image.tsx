@@ -1,9 +1,9 @@
 "use client";
-import { Button } from "@/components/brand/button";
 
 import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
-import { updateStatus } from "@/app/(admin)/finance/review/actions";
+import { ReviewDecisionButtons } from "@/components/reimbursements/review-decision-buttons";
+import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
 
 const ZOOM_SCALE = 2.5;
 
@@ -12,8 +12,7 @@ type ReceiptImageProps = {
   comparisonMessage: string;
   paymentMethod: string;
   processingComplete: boolean;
-  reimbursementId: string;
-  reimbursementStatus: string;
+  reimbursementStatus: ReimbursementStatus;
   src: string;
   submittedTotal: string;
   tabscannerTotal: string;
@@ -25,7 +24,6 @@ export function ReceiptImage({
   comparisonMessage,
   paymentMethod,
   processingComplete,
-  reimbursementId,
   reimbursementStatus,
   src,
   submittedTotal,
@@ -237,28 +235,10 @@ export function ReceiptImage({
               <strong>{paymentMethod}</strong>
             </div>
             <div className="receipt-dialog-actions">
-              <form action={updateStatus}>
-                <input name="id" type="hidden" value={reimbursementId} />
-                <input name="status" type="hidden" value="approved" />
-                <Button
-                  variant="primary"
-                  disabled={reimbursementStatus === "approved" || !processingComplete}
-                  type="submit"
-                >
-                  {reimbursementStatus === "approved" ? "Approved" : "Approve"}
-                </Button>
-              </form>
-              <form action={updateStatus}>
-                <input name="id" type="hidden" value={reimbursementId} />
-                <input name="status" type="hidden" value="denied" />
-                <Button
-                  variant="danger"
-                  disabled={reimbursementStatus === "denied" || !processingComplete}
-                  type="submit"
-                >
-                  {reimbursementStatus === "denied" ? "Denied" : "Deny"}
-                </Button>
-              </form>
+              <ReviewDecisionButtons
+                compact
+                disabled={!processingComplete}
+              />
               {!processingComplete && reimbursementStatus === "pending" && (
                 <p>Actions are available when automatic processing finishes.</p>
               )}

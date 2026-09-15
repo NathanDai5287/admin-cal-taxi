@@ -1,15 +1,15 @@
 import { requireAdmin } from "@/lib/reimbursements/auth";
-import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { updateStatus } from "@/app/(admin)/finance/review/actions";
 import { EditableCategory } from "@/components/reimbursements/editable-category";
 import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
-import { formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
+import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { RefreshWhile } from "@/components/navigation/refresh-while";
 
 export const metadata: Metadata = { title: "Review submission" };
 export const dynamic = "force-dynamic";
@@ -28,8 +28,7 @@ export default async function SubmissionReviewPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
-  const { id } = await params;
+  const [, { id }] = await Promise.all([requireAdmin(), params]);
   const supabase = createAdminClient();
   const { data: reimbursement } = await supabase
     .from("reimbursements")
@@ -41,7 +40,7 @@ export default async function SubmissionReviewPage({
 
   const { data: receipt } = await supabase.storage
     .from("receipts")
-    .createSignedUrl(reimbursement.receipt_path, 600);
+    .createSignedUrl(reimbursement.receipt_path, 1_200);
   const requestedCents = Math.round(Number(reimbursement.amount) * 100);
   const receiptCents = reimbursement.receipt_total === null
     ? null
@@ -61,7 +60,8 @@ export default async function SubmissionReviewPage({
         : "The totals differ and need manual review.";
 
   return (
-    <>
+    <ReviewStatusProvider reimbursementId={reimbursement.id} status={reimbursement.status}>
+      <RefreshWhile active={reimbursement.status === "pending"} />
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
         <div>
           <p className="page-eyebrow">Submission review</p>
@@ -76,7 +76,7 @@ export default async function SubmissionReviewPage({
           <section className="card">
             <div className="card-header justify-between">
               <span className="card-title">Submission details</span>
-              <span className={`badge badge-${reimbursement.status}`}>{formatStatus(reimbursement.status)}</span>
+              <ReviewStatusBadge />
             </div>
             <dl className="detail-list border-t border-rule">
               <div><dt>Requested amount</dt><dd className="amount">{formatMoney(reimbursement.amount)}</dd></div>
@@ -94,20 +94,7 @@ export default async function SubmissionReviewPage({
             <div className="review-actions border-t border-rule">
               <p>{reimbursement.reimbursed ? "This reimbursement has been paid. Correct the payment in Accounts before changing the decision." : "Review the details and receipt image before making a decision."}</p>
               <div className="status-actions">
-                <form action={updateStatus}>
-                  <input name="id" type="hidden" value={reimbursement.id} />
-                  <input name="status" type="hidden" value="approved" />
-                  <Button variant="primary" disabled={reimbursement.reimbursed || reimbursement.status === "approved" || !processingComplete} type="submit">
-                    {reimbursement.status === "approved" ? "Approved" : "Approve submission"}
-                  </Button>
-                </form>
-                <form action={updateStatus}>
-                  <input name="id" type="hidden" value={reimbursement.id} />
-                  <input name="status" type="hidden" value="denied" />
-                  <Button variant="danger" disabled={reimbursement.reimbursed || reimbursement.status === "denied" || !processingComplete} type="submit">
-                    {reimbursement.status === "denied" ? "Denied" : "Deny submission"}
-                  </Button>
-                </form>
+                <ReviewDecisionButtons disabled={reimbursement.reimbursed || !processingComplete} />
               </div>
               {!processingComplete && <p className="helper-text mt-3">Approval is available when automatic processing finishes.</p>}
             </div>
@@ -125,7 +112,6 @@ export default async function SubmissionReviewPage({
                     comparisonMessage={comparisonMessage}
                     paymentMethod={reimbursement.payment_method}
                     processingComplete={processingComplete && !reimbursement.reimbursed}
-                    reimbursementId={reimbursement.id}
                     reimbursementStatus={reimbursement.status}
                     src={receipt.signedUrl}
                     submittedTotal={submittedTotal}
@@ -155,6 +141,6 @@ export default async function SubmissionReviewPage({
           </section>
         </aside>
       </div>
-    </>
+    </ReviewStatusProvider>
   );
 }

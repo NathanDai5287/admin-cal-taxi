@@ -12,6 +12,7 @@
  */
 
 import type { Order, OrderDocument, OrderStatus, OrderSummary } from "./host-orders-types";
+import { revalidateTag } from "next/cache";
 
 const ORIGIN = process.env.HOST_BACKEND_ORIGIN;
 const KEY = process.env.HOST_BACKEND_KEY;
@@ -52,15 +53,17 @@ async function call<T>(
 
   let res: Response;
   try {
+    const method = init?.method ?? "GET";
     res = await fetch(`${ORIGIN}/api/orders${path}`, {
-      method: init?.method ?? "GET",
+      method,
       headers: {
         "Content-Type": "application/json",
         "X-Admin-Key": KEY,
       },
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
-      // The archive is the source of truth; never serve a stale copy.
-      cache: "no-store",
+      ...(method === "GET"
+        ? { next: { revalidate: 600, tags: ["host-orders"] } }
+        : { cache: "no-store" as const }),
     });
   } catch (err) {
     // minmus down or unreachable — distinguish from a 4xx/5xx response.
@@ -78,7 +81,11 @@ async function call<T>(
     throw new OrdersRequestError(res.status, detail);
   }
 
-  return (await res.json()) as T;
+  const result = (await res.json()) as T;
+  if ((init?.method ?? "GET") !== "GET") {
+    revalidateTag("host-orders", { expire: 0 });
+  }
+  return result;
 }
 
 export async function listOrders(): Promise<OrderSummary[]> {

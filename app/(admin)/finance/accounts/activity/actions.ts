@@ -61,6 +61,7 @@ export async function addManualExpense(formData: FormData) {
     redirect(reportRedirectTarget(formData, "error"));
   }
   revalidatePath("/finance/accounts/activity");
+  revalidatePath("/finance/accounts");
   revalidatePath("/finance/reports");
   revalidatePath("/finance/planning");
   redirect(reportRedirectTarget(formData, "added"));
@@ -69,7 +70,7 @@ export async function addManualExpense(formData: FormData) {
 export async function deleteManualExpense(formData: FormData) {
   await requireAdmin();
   const parsed = z.string().uuid().safeParse(formData.get("id"));
-  if (!parsed.success) redirect(reportRedirectTarget(formData, "invalid"));
+  if (!parsed.success) return { ok: false, message: "Choose a valid expense." } as const;
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -79,12 +80,13 @@ export async function deleteManualExpense(formData: FormData) {
     .select("receipt_path")
     .maybeSingle();
 
-  if (error) redirect(reportRedirectTarget(formData, "error"));
+  if (error) return { ok: false, message: "The expense could not be removed." } as const;
   revalidatePath("/finance/accounts/activity");
+  revalidatePath("/finance/accounts");
   revalidatePath("/finance/reports");
   revalidatePath("/finance/planning");
   if (data?.receipt_path) await supabase.storage.from("receipts").remove([data.receipt_path]);
-  redirect(reportRedirectTarget(formData, "deleted"));
+  return { ok: true } as const;
 }
 
 const incomeSchema = z.object({
@@ -104,17 +106,19 @@ export async function addIncomeEntry(formData: FormData) {
   });
   if (error) redirect("/finance/accounts/activity?entry=error");
   revalidatePath("/finance", "layout");
+  revalidatePath("/finance/accounts");
   redirect("/finance/accounts/activity?entry=added");
 }
 
 export async function deleteIncomeEntry(formData: FormData) {
   await requireAdmin();
   const id = z.string().uuid().safeParse(formData.get("id"));
-  if (!id.success) redirect("/finance/accounts/activity?entry=invalid");
+  if (!id.success) return { ok: false, message: "Choose a valid income entry." } as const;
   const { error } = await createAdminClient().from("reimbursement_budget_entries").delete().eq("id", id.data).eq("kind", "income");
-  if (error) redirect("/finance/accounts/activity?entry=error");
+  if (error) return { ok: false, message: "The income entry could not be removed." } as const;
   revalidatePath("/finance", "layout");
-  redirect("/finance/accounts/activity?entry=deleted");
+  revalidatePath("/finance/accounts");
+  return { ok: true } as const;
 }
 
 export async function saveOpeningCash(formData: FormData) {
@@ -125,5 +129,6 @@ export async function saveOpeningCash(formData: FormData) {
     .update({ opening_cash: amount.data, updated_by: userId }).eq("id", true).select("id").single();
   if (error) redirect("/finance/accounts/activity?settings=error");
   revalidatePath("/finance", "layout");
+  revalidatePath("/finance/accounts");
   redirect("/finance/accounts/activity?settings=saved");
 }

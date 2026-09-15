@@ -7,6 +7,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -58,6 +59,7 @@ function entryErrorUrl(error: z.ZodError) {
 }
 
 function revalidateDues() {
+  revalidatePath("/finance/accounts");
   revalidatePath("/finance/accounts/receivable");
   revalidatePath("/finance/planning");
   revalidatePath("/finance/reports");
@@ -152,7 +154,7 @@ export async function updateDuesBalance(formData: FormData) {
   const supabase = createAdminClient();
   const { data: current, error: readError } = await supabase
     .from("chapter_receivables")
-    .select("member_id, member_name, amount_assessed, amount_paid")
+    .select("member_id, member_name, amount_assessed, amount_paid, updated_at")
     .eq("id", parsed.data.id)
     .single();
 
@@ -168,7 +170,7 @@ export async function updateDuesBalance(formData: FormData) {
   const currentAssessed = Number(current.amount_assessed);
   const currentPaid = Number(current.amount_paid);
   const wasPaid = currentPaid >= currentAssessed;
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("chapter_receivables")
     .update({
       member_id: parsed.data.memberId,
@@ -179,9 +181,12 @@ export async function updateDuesBalance(formData: FormData) {
       notes: parsed.data.notes,
       discord_user_id: parsed.data.discordUserId,
     })
-    .eq("id", parsed.data.id);
+    .eq("id", parsed.data.id)
+    .eq("updated_at", current.updated_at)
+    .select("id")
+    .maybeSingle();
 
-  if (error) redirect(resultUrl("error"));
+  if (error || !updated) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl("saved"));
 }
@@ -195,22 +200,30 @@ export async function setDuesPaid(formData: FormData) {
 
   if (!parsed.success) redirect(resultUrl("invalid"));
 
-  const supabase = createAdminClient();
-  const { data: current, error: readError } = await supabase
-    .from("chapter_receivables")
-    .select("amount_assessed")
-    .eq("id", parsed.data.id)
-    .single();
-
-  if (readError || !current) redirect(resultUrl("error"));
-
   const paid = parsed.data.paid === "true";
-  const { error } = await supabase
-    .from("chapter_receivables")
-    .update({ amount_paid: paid ? Number(current.amount_assessed) : 0 })
-    .eq("id", parsed.data.id);
+  const supabase = await createClient();
+  let { data: updated, error } = await supabase.rpc("set_dues_paid_state", {
+    p_receivable_id: parsed.data.id,
+    p_paid: paid,
+  });
+  if (error?.code === "PGRST202") {
+    const admin = createAdminClient();
+    const current = await admin.from("chapter_receivables")
+      .select("amount_assessed, updated_at")
+      .eq("id", parsed.data.id)
+      .maybeSingle();
+    if (current.error || !current.data) redirect(resultUrl("error"));
+    const fallback = await admin.from("chapter_receivables")
+      .update({ amount_paid: paid ? Number(current.data.amount_assessed) : 0 })
+      .eq("id", parsed.data.id)
+      .eq("updated_at", current.data.updated_at)
+      .select("id")
+      .maybeSingle();
+    error = fallback.error;
+    updated = Boolean(fallback.data);
+  }
 
-  if (error) redirect(resultUrl("error"));
+  if (error || !updated) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl(paid ? "paid" : "reopened"));
 }
@@ -220,33 +233,57 @@ export async function addDuesPayment(formData: FormData) {
   const parsed = z.object({
     id: z.string().uuid(),
     paymentAmount: z.coerce.number().positive().max(999_999_999.99),
+    requestId: z.string().uuid(),
   }).safeParse({
     id: formData.get("id"),
     paymentAmount: formData.get("paymentAmount"),
+    requestId: formData.get("requestId"),
   });
 
   if (!parsed.success) redirect(resultUrl("invalid"));
 
-  const supabase = createAdminClient();
-  const { data: current, error: readError } = await supabase
-    .from("chapter_receivables")
-    .select("amount_assessed, amount_paid")
-    .eq("id", parsed.data.id)
-    .single();
+  const supabase = await createClient();
+  let { data: recorded, error } = await supabase.rpc("record_dues_payment", {
+    p_receivable_id: parsed.data.id,
+    p_payment_amount: parsed.data.paymentAmount,
+    p_request_id: parsed.data.requestId,
+  });
 
-  if (readError || !current) redirect(resultUrl("error"));
-
-  const assessed = Number(current.amount_assessed);
-  const paid = Number(current.amount_paid);
-  const outstanding = Math.max(assessed - paid, 0);
-  if (parsed.data.paymentAmount > outstanding) redirect(resultUrl("invalid"));
-
-  const { error } = await supabase
-    .from("chapter_receivables")
-    .update({ amount_paid: paid + parsed.data.paymentAmount })
-    .eq("id", parsed.data.id);
+  // Safe rollout fallback while the atomic RPC migration is being applied.
+  // Compare-and-swap on updated_at prevents two old/new deployments or tabs
+  // from overwriting the same balance after reading it concurrently.
+  if (error?.code === "PGRST202") {
+    const admin = createAdminClient();
+    error = null;
+    recorded = false;
+    for (let attempt = 0; attempt < 4 && !recorded; attempt += 1) {
+      const current = await admin.from("chapter_receivables")
+        .select("amount_assessed, amount_paid, updated_at")
+        .eq("id", parsed.data.id)
+        .maybeSingle();
+      if (current.error) {
+        error = current.error;
+        break;
+      }
+      if (!current.data) break;
+      const nextPaid = Number(current.data.amount_paid) + parsed.data.paymentAmount;
+      if (nextPaid > Number(current.data.amount_assessed)) break;
+      const updated = await admin.from("chapter_receivables")
+        .update({ amount_paid: nextPaid })
+        .eq("id", parsed.data.id)
+        .eq("updated_at", current.data.updated_at)
+        .select("id")
+        .maybeSingle();
+      if (updated.error) {
+        error = updated.error;
+        break;
+      }
+      recorded = Boolean(updated.data);
+    }
+  }
 
   if (error) redirect(resultUrl("error"));
+  if (!recorded) redirect(resultUrl("invalid"));
   revalidateDues();
   redirect(resultUrl("payment"));
 }

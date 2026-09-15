@@ -109,28 +109,44 @@ export function MembersTable({
 }) {
   const [optimisticMembers, applyOptimistic] = useOptimistic(members, applyUpdate);
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+
+  function setMemberPending(userId: string, value: boolean) {
+    setPendingIds((current) => {
+      const next = new Set(current);
+      if (value) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+  }
 
   function changeRole(userId: string, role: "member" | "admin") {
-    setError(null);
+    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
+    setMemberPending(userId, true);
     startTransition(async () => {
       applyOptimistic({ type: "role", userId, role });
       try {
         await setUserRole(userId, role);
       } catch {
-        setError("Unable to update that role. Please try again.");
+        setErrors((current) => new Map(current).set(userId, "Unable to update that role. Please try again."));
+      } finally {
+        setMemberPending(userId, false);
       }
     });
   }
 
   function remove(userId: string) {
-    setError(null);
+    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
+    setMemberPending(userId, true);
     startTransition(async () => {
       applyOptimistic({ type: "remove", userId });
       try {
         await removeUser(userId);
       } catch {
-        setError("Unable to remove that user. Please try again.");
+        setErrors((current) => new Map(current).set(userId, "Unable to remove that user. Please try again."));
+      } finally {
+        setMemberPending(userId, false);
       }
     });
   }
@@ -154,6 +170,7 @@ export function MembersTable({
         <tbody>
           {optimisticMembers.map((member) => {
             const isYou = member.id === currentUserId;
+            const memberPending = pendingIds.has(member.id);
             return (
               <tr key={member.id}>
                 <td>
@@ -165,7 +182,7 @@ export function MembersTable({
                   <select
                     aria-label={`Role for ${member.email}`}
                     className="field-input"
-                    disabled={isYou}
+                    disabled={isYou || memberPending}
                     onChange={(event) => changeRole(member.id, event.target.value as "member" | "admin")}
                     title={isYou ? "You can't change your own role" : undefined}
                     value={member.role}
@@ -184,14 +201,14 @@ export function MembersTable({
                 </td>
                 <td className="whitespace-nowrap">{member.joinedLabel}</td>
                 <td>
-                  <RemoveButton disabled={isYou} onRemove={() => remove(member.id)} />
+                  <RemoveButton disabled={isYou || memberPending} onRemove={() => remove(member.id)} />
+                  {errors.get(member.id) ? <span className="form-message ml-2" role="alert">{errors.get(member.id)}</span> : null}
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
-      {error ? <p className="form-message px-6 pb-5">{error}</p> : null}
     </>
   );
 }

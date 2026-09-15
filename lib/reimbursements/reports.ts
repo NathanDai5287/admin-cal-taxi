@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { categories, formatCategory } from "@/lib/reimbursements/format";
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const reimbursementStatuses = [
   "pending",
@@ -105,20 +106,21 @@ export async function loadReportPageRows(
   supabase: SupabaseClient<Database>,
   filters: ReportFilters,
 ) {
-  let query = supabase
-    .from("reimbursements")
-    .select("id, full_name, category, amount, status, merchant, description, receipt_date, submitted_at")
-    .order("submitted_at", { ascending: false });
-
-  if (filters.from) query = query.gte("submitted_at", `${filters.from}T00:00:00.000Z`);
-  if (filters.to) query = query.lt("submitted_at", endExclusiveDate(filters.to));
-  if (filters.category) query = query.eq("category", filters.category as ReportPageRow["category"]);
-  if (filters.member) query = query.eq("full_name", filters.member);
-  if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
-  if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
-  if (filters.status) query = query.eq("status", filters.status as ReportPageRow["status"]);
-
-  const { data, error } = await query;
+  const { data, error } = await loadAllPages<ReportPageRow>((from, to) => {
+    let query = supabase
+      .from("reimbursements")
+      .select("id, full_name, category, amount, status, merchant, description, receipt_date, submitted_at")
+      .order("submitted_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (filters.from) query = query.gte("submitted_at", `${filters.from}T00:00:00.000Z`);
+    if (filters.to) query = query.lt("submitted_at", endExclusiveDate(filters.to));
+    if (filters.category) query = query.eq("category", filters.category as ReportPageRow["category"]);
+    if (filters.member) query = query.eq("full_name", filters.member);
+    if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
+    if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
+    if (filters.status) query = query.eq("status", filters.status as ReportPageRow["status"]);
+    return query.range(from, to);
+  });
   if (error) throw new Error(`Unable to load the reimbursement report: ${error.message}`);
   return data ?? [];
 }
@@ -133,19 +135,20 @@ export async function loadReportManualExpenses(
     return [] as ManualExpenseRow[];
   }
 
-  let query = supabase
-    .from("reimbursement_manual_expenses")
-    .select("id, category, amount, description, expense_date, receipt_path, created_by, created_at, updated_at")
-    .order("expense_date", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (filters.from) query = query.gte("expense_date", filters.from);
-  if (filters.to) query = query.lte("expense_date", filters.to);
-  if (filters.category) query = query.eq("category", filters.category as ManualExpenseRow["category"]);
-  if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
-  if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
-
-  const { data, error } = await query;
+  const { data, error } = await loadAllPages<ManualExpenseRow>((from, to) => {
+    let query = supabase
+      .from("reimbursement_manual_expenses")
+      .select("id, category, amount, description, expense_date, receipt_path, created_by, created_at, updated_at")
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (filters.from) query = query.gte("expense_date", filters.from);
+    if (filters.to) query = query.lte("expense_date", filters.to);
+    if (filters.category) query = query.eq("category", filters.category as ManualExpenseRow["category"]);
+    if (filters.minAmount) query = query.gte("amount", Number(filters.minAmount));
+    if (filters.maxAmount) query = query.lte("amount", Number(filters.maxAmount));
+    return query.range(from, to);
+  });
   if (error) throw new Error(`Unable to load manual expenses: ${error.message}`);
   return data ?? [];
 }

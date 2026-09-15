@@ -6,13 +6,13 @@ import { createClient } from "@/lib/reimbursements/supabase/server";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import { memberPaymentStatus, memberStatus, memberSubmissionDate } from "@/lib/reimbursements/member-status";
+import { RefreshWhile } from "@/components/navigation/refresh-while";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My reimbursement" };
 
 export default async function MemberReimbursementPage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await requireMember();
-  const { id } = await params;
+  const [{ userId }, { id }] = await Promise.all([requireMember(), params]);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const supabase = await createClient();
   const { data: row, error } = await supabase.from("reimbursements")
@@ -24,9 +24,10 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
   // Flat receipt filenames don't satisfy the legacy folder-based storage RLS.
   // Elevate only AFTER the session-scoped query confirms record ownership;
   // never accept an arbitrary receipt path from the browser.
-  const { data: receipt } = await createAdminClient().storage.from("receipts").createSignedUrl(row.receipt_path, 600);
+  const { data: receipt } = await createAdminClient().storage.from("receipts").createSignedUrl(row.receipt_path, 1_200);
   const status = memberStatus(row.status);
   return <>
+    <RefreshWhile active={row.status === "pending"} />
     <Link href="/history" className="text-sm text-brand underline">← My reimbursements</Link>
     <div className="my-5"><h1 className="page-title">Reimbursement details</h1></div>
     <section className="card mb-5 p-5">

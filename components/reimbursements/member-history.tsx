@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
@@ -41,6 +42,7 @@ export function MemberHistory({ rows, initialFilter, initialPage }: {
   initialFilter: MemberHistoryFilter;
   initialPage: number;
 }) {
+  const router = useRouter();
   const [filter, setFilter] = useState(initialFilter);
   const [page, setPage] = useState(initialPage);
   const filteredRows = useMemo(() => rows.filter(row => rowMatchesFilter(row, filter)), [rows, filter]);
@@ -57,6 +59,12 @@ export function MemberHistory({ rows, initialFilter, initialPage }: {
     window.addEventListener("popstate", restoreFromHistory);
     return () => window.removeEventListener("popstate", restoreFromHistory);
   }, []);
+
+  useEffect(() => {
+    if (!rows.some((row) => row.status === "pending")) return;
+    const interval = window.setInterval(() => router.refresh(), 5_000);
+    return () => window.clearInterval(interval);
+  }, [router, rows]);
 
   function updateView(nextFilter: MemberHistoryFilter, nextPage = 1) {
     setFilter(nextFilter);

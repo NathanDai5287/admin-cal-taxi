@@ -4,6 +4,7 @@ import { ButtonLink } from "@/components/brand/button";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata = { title: "Accounts overview" };
 export const dynamic = "force-dynamic";
@@ -29,10 +30,10 @@ export default async function AccountsPage() {
   await requireAdmin();
   const supabase = createAdminClient();
   const [receivablesResult, payablesResult, manualExpensesResult, incomeResult] = await Promise.all([
-    supabase.from("chapter_receivables").select("amount_assessed, amount_paid, due_date"),
-    supabase.from("reimbursements").select("amount").eq("status", "approved").eq("reimbursed", false),
-    supabase.from("reimbursement_manual_expenses").select("amount"),
-    supabase.from("reimbursement_budget_entries").select("amount").eq("kind", "income"),
+    loadAllPages((from, to) => supabase.from("chapter_receivables").select("id, amount_assessed, amount_paid, due_date").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("id, amount").eq("status", "approved").eq("reimbursed", false).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("id, amount").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("id, amount").eq("kind", "income").order("id").range(from, to)),
   ]);
 
   const failed = [receivablesResult, payablesResult, manualExpensesResult, incomeResult]

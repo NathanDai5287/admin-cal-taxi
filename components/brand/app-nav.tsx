@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { SiteHomeIcon } from "@/components/site-home-icon";
+import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 
 export type AppNavTab = {
   href: string;
@@ -19,10 +20,12 @@ type AppNavProps = {
   // Optional right-side slot for app-specific actions. Account actions live
   // exclusively in the global top-right account control.
   action?: React.ReactNode;
+  prefetchHrefs?: readonly string[];
 };
 
-export function AppNav({ homeHref, title, subtitle, tabs = [], action, variant = "app" }: AppNavProps) {
+export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchHrefs, variant = "app" }: AppNavProps) {
   const pathname = usePathname();
+  const routesToWarm = prefetchHrefs ?? tabs.map((tab) => tab.href);
 
   // The longest matching tab wins, so /finance/reports lights up
   // "Reports" rather than both "Review" and "Reports".
@@ -33,9 +36,11 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, variant =
   if (variant === "section") {
     return (
       <nav aria-label={title} className="flex gap-2 overflow-x-auto border-b border-rule pb-3">
+        <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
         {tabs.map((tab) => <Link
           key={tab.href}
           href={tab.href}
+          prefetch={false}
           aria-current={tab.href === activeHref ? "page" : undefined}
           className={`whitespace-nowrap rounded px-4 py-2 text-sm font-bold ${tab.href === activeHref ? "bg-brand text-white" : "text-muted hover:text-ink"}`}
         >{tab.label}</Link>)}
@@ -45,13 +50,14 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, variant =
 
   return (
     <header className="border-b border-rule bg-surface">
+      <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
       {/* Thin brand-blue band at the very top — echoes the 1.2pt brand rule
           under the PDF letterhead. */}
       <div className="h-[3px] bg-brand" />
       <div className="max-w-[1080px] mx-auto px-6 h-[64px] flex items-center gap-5">
         <SiteHomeIcon />
         <span className="h-6 w-px bg-rule flex-none" aria-hidden="true" />
-        <Link href={homeHref} className="flex items-baseline gap-3 group">
+        <Link href={homeHref} prefetch={false} className="flex items-baseline gap-3 group">
           <span className="text-[14px] font-bold tracking-[0.18em] uppercase text-ink group-hover:text-brand transition-colors">
             {title}
           </span>
@@ -67,6 +73,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, variant =
               <Link
                 key={tab.href}
                 href={tab.href}
+                prefetch={false}
                 aria-current={tab.href === activeHref ? "page" : undefined}
                 className={
                   "px-4 inline-flex items-center text-[12px] font-bold uppercase tracking-[0.14em] " +

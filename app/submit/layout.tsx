@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
-import { AppNav } from "@/components/brand/app-nav";
 import { MemberNavigation } from "@/components/reimbursements/member-navigation";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-route";
 
 export const metadata: Metadata = {
   title: "Submit a reimbursement",
@@ -20,7 +20,7 @@ export default async function SubmitLayout({ children }: { children: React.React
 
   return (
     <div data-brand className="min-h-screen">
-      <AppNav homeHref="/" title="Theta Xi" subtitle="Reimbursements" />
+      {hasMemberAccess ? <RefreshCurrentRoute /> : null}
       <main className="max-w-[720px] mx-auto px-6 py-8">
         {hasMemberAccess ? <MemberNavigation /> : null}
         {children}

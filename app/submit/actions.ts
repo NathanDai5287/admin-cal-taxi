@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireMember } from "@/lib/reimbursements/auth";
@@ -108,5 +109,7 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
   }
 
   after(() => processReimbursementReceipt(reimbursement.id));
+  revalidatePath("/submit/history");
+  revalidatePath("/finance/review");
   return { ok: true, reimbursementId: reimbursement.id, message: "Submitted. We’re checking the receipt now." };
 }

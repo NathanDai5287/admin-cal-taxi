@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import "./globals.css";
 
 import { AuthPill } from "@/components/auth/auth-pill";
@@ -18,9 +18,20 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [session, cookieStore] = await Promise.all([getSessionProfile(), cookies()]);
+  const [session, cookieStore, headerStore] = await Promise.all([
+    getSessionProfile(),
+    cookies(),
+    headers(),
+  ]);
   const savedTheme = cookieStore.get(THEME_COOKIE)?.value;
   const theme = savedTheme === "dark" || savedTheme === "light" ? savedTheme : undefined;
+  const hostname = (headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "")
+    .split(",", 1)[0]
+    .trim()
+    .toLowerCase()
+    .split(":", 1)[0];
+  const isMemberSite =
+    hostname === "reimbursements.cal.taxi" || hostname === "reimbursements.localhost";
   const pillSession = session
     ? {
         fullName: session.profile.full_name,
@@ -36,7 +47,7 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="antialiased">
-        <AuthPill session={pillSession} />
+        <AuthPill memberSite={isMemberSite} session={pillSession} />
         {children}
       </body>
     </html>

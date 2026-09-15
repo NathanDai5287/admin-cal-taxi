@@ -1,8 +1,10 @@
 import { Button } from "@/components/brand/button";
+import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
 import { categories, formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { addManualExpense, deleteManualExpense, addIncomeEntry, deleteIncomeEntry, saveOpeningCash } from "./actions";
 
 export const metadata = { title: "Account activity" };
@@ -16,18 +18,18 @@ function formatDate(value: string) {
 const formatExpenseDate = formatDate;
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ manual?: string; entry?: string; settings?: string }> }) {
-  await requireAdmin();
-  const { manual: manualResult, entry: entryResult, settings: settingsResult } = await searchParams;
+  const [, params] = await Promise.all([requireAdmin(), searchParams]);
+  const { manual: manualResult, entry: entryResult, settings: settingsResult } = params;
   const supabase = createAdminClient();
   const results = await Promise.all([
-    supabase.from("reimbursement_manual_expenses").select("*").order("expense_date", { ascending: false }),
-    supabase.from("reimbursement_budget_entries").select("*").eq("kind", "income").order("budget_date", { ascending: false }),
+    loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("*").order("expense_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("*").eq("kind", "income").order("budget_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
     supabase.from("chapter_financial_settings").select("opening_cash").eq("id", true).maybeSingle(),
   ]);
   for (const result of results) if (result.error) throw new Error(`Unable to load account activity: ${result.error.message}`);
-  const manualExpenses = await Promise.all((results[0].data ?? []).map(async (expense) => {
-    const receipt = expense.receipt_path ? await supabase.storage.from("receipts").createSignedUrl(expense.receipt_path, 300) : null;
-    return { ...expense, receiptUrl: receipt?.data?.signedUrl };
+  const manualExpenses = (results[0].data ?? []).map((expense) => ({
+    ...expense,
+    receiptUrl: expense.receipt_path ? `/api/reimbursements/receipts/manual/${expense.id}` : undefined,
   }));
   const entries = results[1].data ?? [];
   const today = currentPacificDate();
@@ -101,10 +103,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                     <td>{expense.description}{expense.receiptUrl && <div><a className="back-link" href={expense.receiptUrl} target="_blank" rel="noreferrer">View receipt</a></div>}</td>
                     <td className="amount">{formatMoney(expense.amount)}</td>
                     <td className="text-right">
-                      <form action={deleteManualExpense}>
-                        <input name="id" type="hidden" value={expense.id} />
-                                      <Button variant="secondary" compact type="submit">Remove</Button>
-                      </form>
+                      <OptimisticDeleteButton action={deleteManualExpense} value={expense.id} />
                     </td>
                   </tr>
                 ))}
@@ -166,10 +165,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
                     <td>{entry.description}</td>
                     <td className="amount">{formatMoney(entry.amount)}</td>
                     <td className="text-right">
-                      <form action={deleteIncomeEntry}>
-                        <input name="id" type="hidden" value={entry.id} />
-                        <Button variant="secondary" compact type="submit">Remove</Button>
-                      </form>
+                      <OptimisticDeleteButton action={deleteIncomeEntry} value={entry.id} />
                     </td>
                   </tr>
                 ))}

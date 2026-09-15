@@ -23,6 +23,7 @@ export type DuesRow = {
   discordUserId: string;
   isPaid: boolean;
   isOverdue: boolean;
+  paymentRequestId: string;
 };
 
 type Filter = "outstanding" | "overdue" | "paid" | "all";
@@ -35,6 +36,15 @@ function formatDate(value: string) {
   });
 }
 
+function currentPacificDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 function SearchIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="17" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" width="17">
@@ -44,7 +54,7 @@ function SearchIcon() {
   );
 }
 
-function DeleteBalanceButton({ id, memberName }: { id: string; memberName: string }) {
+function DeleteBalanceButton({ disabled, id, memberName, onDelete }: { disabled?: boolean; id: string; memberName: string; onDelete: () => void }) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -57,12 +67,15 @@ function DeleteBalanceButton({ id, memberName }: { id: string; memberName: strin
     <Button
       aria-label={armed ? `Confirm permanent deletion of ${memberName}'s balance` : `Delete ${memberName}'s balance`}
       compact
+      disabled={disabled}
       formAction={deleteDuesBalance}
       name="id"
       onClick={(event) => {
         if (!armed) {
           event.preventDefault();
           setArmed(true);
+        } else {
+          onDelete();
         }
       }}
       type="submit"
@@ -75,10 +88,20 @@ function DeleteBalanceButton({ id, memberName }: { id: string; memberName: strin
 }
 
 export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: string; name: string; email: string }[] }) {
+  const [optimisticRows, setOptimisticRows] = useState(rows);
+  const [optimisticBusy, setOptimisticBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const editingRow = rows.find((row) => row.id === editingId) ?? null;
+  const editingRow = optimisticRows.find((row) => row.id === editingId) ?? null;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setOptimisticRows(rows);
+      setOptimisticBusy(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [rows]);
 
   useEffect(() => {
     if (!editingRow) return;
@@ -91,7 +114,7 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return rows.filter((row) => {
+    return optimisticRows.filter((row) => {
       if (filter === "outstanding" && row.isPaid) return false;
       if (filter === "overdue" && !row.isOverdue) return false;
       if (filter === "paid" && !row.isPaid) return false;
@@ -99,13 +122,13 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
       return [row.memberName, row.notes]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [filter, query, rows]);
+  }, [filter, query, optimisticRows]);
 
   const counts: Record<Filter, number> = {
-    outstanding: rows.filter((row) => !row.isPaid).length,
-    overdue: rows.filter((row) => row.isOverdue).length,
-    paid: rows.filter((row) => row.isPaid).length,
-    all: rows.length,
+    outstanding: optimisticRows.filter((row) => !row.isPaid).length,
+    overdue: optimisticRows.filter((row) => row.isOverdue).length,
+    paid: optimisticRows.filter((row) => row.isPaid).length,
+    all: optimisticRows.length,
   };
 
   return (
@@ -172,21 +195,32 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
               </div>
 
               <div className="dues-actions">
-                <form action={setDuesPaid}>
+                <form action={setDuesPaid} onSubmit={() => {
+                  setOptimisticBusy(true);
+                  setOptimisticRows((current) => current.map((candidate) => candidate.id === row.id
+                    ? {
+                        ...candidate,
+                        amountOwed: row.isPaid ? row.assessedAmount : 0,
+                        paidAmount: row.isPaid ? 0 : row.assessedAmount,
+                        isPaid: !row.isPaid,
+                        isOverdue: row.isPaid && row.dueDate < currentPacificDate(),
+                      }
+                    : candidate));
+                }}>
                   <input name="id" type="hidden" value={row.id} />
                   <input name="paid" type="hidden" value={row.isPaid ? "false" : "true"} />
-                  <Button compact type="submit" variant={row.isPaid ? "secondary" : "primary"}>
+                  <Button compact disabled={optimisticBusy} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
                     {row.isPaid ? "Reopen balance" : "Mark fully paid"}
                   </Button>
                 </form>
-                <Button compact onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>
+                <Button compact disabled={optimisticBusy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>
               </div>
             </article>
           ))}
         </div>
       ) : (
         <div className="empty-state border-t border-rule">
-          {rows.length ? "No balances match this view." : "No dues balances yet. Add the first member above."}
+          {optimisticRows.length ? "No balances match this view." : "No dues balances yet. Add the first member above."}
         </div>
       )}
     </section>
@@ -214,19 +248,52 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
           </div>
 
           {!editingRow.isPaid ? (
-            <form action={addDuesPayment} className="dues-payment-form">
+            <form action={addDuesPayment} className="dues-payment-form" onSubmit={(event) => {
+              const amount = Number(new FormData(event.currentTarget).get("paymentAmount"));
+              if (!Number.isFinite(amount) || amount <= 0) return;
+              setOptimisticBusy(true);
+              setOptimisticRows((current) => current.map((candidate) => {
+                if (candidate.id !== editingRow.id) return candidate;
+                const paidAmount = Math.min(candidate.assessedAmount, candidate.paidAmount + amount);
+                const amountOwed = Math.max(0, candidate.assessedAmount - paidAmount);
+                return { ...candidate, paidAmount, amountOwed, isPaid: amountOwed === 0, isOverdue: amountOwed > 0 && candidate.isOverdue };
+              }));
+            }}>
               <input name="id" type="hidden" value={editingRow.id} />
+              <input name="requestId" type="hidden" value={editingRow.paymentRequestId} />
               <div className="field grow">
                 <label className="field-label" htmlFor={`payment-${editingRow.id}`}>Add a payment</label>
                 <div className="money-input"><span>$</span><input autoFocus className="field-input" id={`payment-${editingRow.id}`} max={editingRow.amountOwed} min="0.01" name="paymentAmount" placeholder="0.00" step="0.01" type="number" required /></div>
               </div>
-              <Button type="submit" variant="primary">Apply payment</Button>
+              <Button disabled={optimisticBusy} type="submit" variant="primary">Apply payment</Button>
             </form>
           ) : (
             <div className="dues-paid-notice">This balance is fully paid.</div>
           )}
 
-          <form action={updateDuesBalance} className="dues-edit-form">
+          <form action={updateDuesBalance} className="dues-edit-form" onSubmit={(event) => {
+            const form = new FormData(event.currentTarget);
+            const amountOwed = Number(form.get("amountOwed"));
+            const memberId = String(form.get("memberId") ?? "");
+            const memberName = members.find((member) => member.id === memberId)?.name ?? editingRow.memberName;
+            const dueDate = String(form.get("dueDate") ?? editingRow.dueDate);
+            setOptimisticBusy(true);
+            setOptimisticRows((current) => current.map((candidate) => candidate.id === editingRow.id
+              ? {
+                  ...candidate,
+                  memberId,
+                  memberName,
+                  amountOwed,
+                  assessedAmount: candidate.isPaid ? amountOwed : candidate.paidAmount + amountOwed,
+                  paidAmount: candidate.isPaid ? amountOwed : candidate.paidAmount,
+                  dueDate,
+                  notes: String(form.get("notes") ?? ""),
+                  discordUserId: String(form.get("discordUserId") ?? "").replace(/\D/g, ""),
+                  isOverdue: !candidate.isPaid && dueDate < currentPacificDate(),
+                }
+              : candidate));
+            setEditingId(null);
+          }}>
             <input name="id" type="hidden" value={editingRow.id} />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
@@ -265,10 +332,19 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
               </div>
             </div>
             <div className="dues-edit-footer">
-              <DeleteBalanceButton id={editingRow.id} memberName={editingRow.memberName} />
+              <DeleteBalanceButton
+                id={editingRow.id}
+                memberName={editingRow.memberName}
+                disabled={optimisticBusy}
+                onDelete={() => {
+                  setOptimisticBusy(true);
+                  setOptimisticRows((current) => current.filter((candidate) => candidate.id !== editingRow.id));
+                  setEditingId(null);
+                }}
+              />
               <div className="flex gap-2">
                 <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
-                <Button type="submit" variant="primary">Save changes</Button>
+                <Button disabled={optimisticBusy} type="submit" variant="primary">Save changes</Button>
               </div>
             </div>
           </form>

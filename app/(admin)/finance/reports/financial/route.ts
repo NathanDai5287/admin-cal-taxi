@@ -3,6 +3,7 @@ import { buildFinancialReport, type IncomeSource } from "@/lib/reimbursements/fi
 import { renderFinancialReportPdf } from "@/lib/reimbursements/financial-report-pdf";
 import type { ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,24 +30,28 @@ export async function GET(request: Request) {
   const settings = settingsResult.data ?? { chapter_name: "Theta Xi", opening_cash: 0 };
 
   const [incomeResult, budgetsResult, reimbursementsResult, manualResult, receivablesResult, liabilitiesResult] = await Promise.all([
-    supabase
+    loadAllPages((from, to) => supabase
       .from("reimbursement_budget_entries")
       .select("source, amount, budget_date")
-      .eq("kind", "income"),
+      .eq("kind", "income")
+      .order("id").range(from, to)),
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
-    supabase
+    loadAllPages((from, to) => supabase
       .from("reimbursements")
       .select("category, amount, reimbursed, submitted_at")
-      .eq("status", "approved"),
-    supabase
+      .eq("status", "approved")
+      .order("id").range(from, to)),
+    loadAllPages((from, to) => supabase
       .from("reimbursement_manual_expenses")
-      .select("category, amount, expense_date"),
-    supabase.from("chapter_receivables").select("amount_assessed, amount_paid"),
-    supabase
+      .select("category, amount, expense_date")
+      .order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("chapter_receivables").select("id, amount_assessed, amount_paid").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase
       .from("reimbursements")
       .select("amount")
       .eq("status", "approved")
-      .eq("reimbursed", false),
+      .eq("reimbursed", false)
+      .order("id").range(from, to)),
   ]);
 
   const dataError = [incomeResult, budgetsResult, reimbursementsResult, manualResult, receivablesResult, liabilitiesResult].find((result) => result.error)?.error;

@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/reimbursements/auth";
 import { ButtonLink, Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Form from "next/form";
 
 import { categories, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
@@ -13,6 +14,7 @@ import {
   summarizeApproved,
 } from "@/lib/reimbursements/reports";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata: Metadata = { title: "Reports" };
 export const dynamic = "force-dynamic";
@@ -40,14 +42,13 @@ function formatExpenseDate(value: string) {
 }
 
 export default async function ReimbursementReportsPage({ searchParams }: { searchParams: PageSearchParams }) {
-  await requireAdmin();
-  const rawSearchParams = await searchParams;
+  const [, rawSearchParams] = await Promise.all([requireAdmin(), searchParams]);
   const filters = parseReportFilters(rawSearchParams);
   const supabase = createAdminClient();
   const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([
-    supabase.from("reimbursements").select("full_name").order("full_name"),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("id, full_name").order("full_name").order("id").range(from, to)),
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
-    supabase.from("reimbursement_budget_entries").select("amount").eq("kind", "forecast"),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("id, amount").eq("kind", "forecast").order("id").range(from, to)),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
   ]);
@@ -94,7 +95,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           </div>
           {filterParams.size > 0 && <Link className="back-link" href="/finance/reports">Clear filters</Link>}
         </div>
-        <form className="card-body border-t border-rule pt-5 grid grid-cols-2 md:grid-cols-4 gap-4 items-end" method="get">
+        <Form action="/finance/reports" className="card-body border-t border-rule pt-5 grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <div className="field"><label className="field-label" htmlFor="from">From</label><input className="field-input" defaultValue={filters.from} id="from" name="from" type="date" /></div>
           <div className="field"><label className="field-label" htmlFor="to">To</label><input className="field-input" defaultValue={filters.to} id="to" name="to" type="date" /></div>
           <div className="field"><label className="field-label" htmlFor="category">Category</label><select className="field-input" defaultValue={filters.category} id="category" name="category"><option value="">All categories</option>{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
@@ -103,7 +104,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
           <div className="field"><label className="field-label" htmlFor="maxAmount">Maximum amount</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={filters.maxAmount} id="maxAmount" min="0" name="maxAmount" placeholder="Any" step="0.01" type="number" /></div></div>
           <div className="field"><label className="field-label" htmlFor="status">Status</label><select className="field-input" defaultValue={filters.status} id="status" name="status"><option value="">All statuses</option>{reimbursementStatuses.map((status) => <option key={status} value={status}>{formatStatus(status)}</option>)}</select></div>
           <Button variant="primary" className="w-full" type="submit">Apply filters</Button>
-        </form>
+        </Form>
       </section>
 
       <section className="stat-grid" aria-label="Report totals">

@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { Button } from "@/components/brand/button";
+import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
 import type { Metadata } from "next";
 
 import {
@@ -16,6 +17,7 @@ import {
   summarizeApproved,
 } from "@/lib/reimbursements/reports";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata: Metadata = { title: "Budgets" };
 export const dynamic = "force-dynamic";
@@ -47,18 +49,19 @@ function signedMoney(value: number) {
 }
 
 export default async function ReimbursementBudgetsPage({ searchParams }: { searchParams: PageSearchParams }) {
-  await requireAdmin();
-  const rawSearchParams = await searchParams;
+  const [, rawSearchParams] = await Promise.all([requireAdmin(), searchParams]);
   const supabase = createAdminClient();
   const filters = parseReportFilters({});
   const [budgetResult, entriesResult, rows, manualExpenses] = await Promise.all([
     supabase.from("reimbursement_budgets").select("budget_key, amount"),
-    supabase
+    loadAllPages((from, to) => supabase
       .from("reimbursement_budget_entries")
       .select("id, amount, description, source, budget_date, created_by, created_at, updated_at")
       .eq("kind", "forecast")
       .order("budget_date", { ascending: false })
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to)),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
   ]);
@@ -138,10 +141,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
                     <td>{entry.description}</td>
                     <td className="amount">{formatMoney(entry.amount)}</td>
                     <td className="text-right">
-                      <form action={deleteBudgetEntry}>
-                        <input name="id" type="hidden" value={entry.id} />
-                        <Button variant="secondary" compact type="submit">Remove</Button>
-                      </form>
+                      <OptimisticDeleteButton action={deleteBudgetEntry} value={entry.id} />
                     </td>
                   </tr>
                 ))}

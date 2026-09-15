@@ -12,7 +12,12 @@ const nextConfig: NextConfig = {
       { source: "/reimbursements/:id([0-9a-f-]{36})", destination: "/finance/review/:id", permanent: false },
     ];
   },
-  experimental: { serverActions: { bodySizeLimit: "4mb" } },
+  experimental: {
+    serverActions: { bodySizeLimit: "4mb" },
+    // Prefetched authenticated route payloads remain usable in the browser for
+    // ten minutes. Mutations still invalidate the affected routes explicitly.
+    staleTimes: { dynamic: 600, static: 600 },
+  },
   turbopack: { root: path.resolve(__dirname) },
   serverExternalPackages: ["@myriaddreamin/typst-ts-node-compiler"],
   // /api/host/generate/* is proxied by app/api/host/generate/[...path]/route.ts

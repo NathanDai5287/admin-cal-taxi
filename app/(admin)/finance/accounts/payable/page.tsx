@@ -4,15 +4,17 @@ import { ReimbursementPaymentTable } from "@/components/reimbursements/reimburse
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata = { title: "Accounts payable" };
 export const dynamic = "force-dynamic";
 export default async function PayablePage({ searchParams }: { searchParams: Promise<{ paid?: string }> }) {
-  await requireAdmin();
-  const paid = (await searchParams).paid === "true";
-  const { data, error } = await createAdminClient().from("reimbursements")
+  const [, params] = await Promise.all([requireAdmin(), searchParams]);
+  const paid = params.paid === "true";
+  const supabase = createAdminClient();
+  const { data, error } = await loadAllPages((from, to) => supabase.from("reimbursements")
     .select("id, user_id, full_name, amount, category, status, merchant, receipt_total, payment_method, reimbursed, submitted_at, updated_at")
-    .eq("status", "approved").eq("reimbursed", paid).order("submitted_at");
+    .eq("status", "approved").eq("reimbursed", paid).order("submitted_at").order("id").range(from, to));
   if (error) throw new Error(`Unable to load payables: ${error.message}`);
   const rows = data ?? [];
   const total = rows.reduce((sum, row) => sum + Number(row.amount), 0);

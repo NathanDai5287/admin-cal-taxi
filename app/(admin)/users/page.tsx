@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 
 import { inviteUser, revokeInvite } from "@/app/(admin)/users/actions";
 import { MembersTable } from "@/app/(admin)/users/members-table";
+import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata: Metadata = { title: "Members" };
 export const dynamic = "force-dynamic";
@@ -16,15 +18,19 @@ function formatDate(value: string) {
 export default async function UsersPage() {
   const [session, supabase] = await Promise.all([getSessionProfile(), createClient()]);
   const [profilesResult, invitesResult] = await Promise.all([
-    supabase
+    loadAllPages((from, to) => supabase
       .from("profiles")
       .select("id, full_name, email, role, created_at")
       .is("removed_at", null)
-      .order("created_at", { ascending: true }),
-    supabase
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)),
+    loadAllPages((from, to) => supabase
       .from("invites")
       .select("email, role, created_at")
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: true })
+      .order("email", { ascending: true })
+      .range(from, to)),
   ]);
 
   if (profilesResult.error) {
@@ -102,10 +108,7 @@ export default async function UsersPage() {
                   <td className="capitalize">{invite.role}</td>
                   <td className="whitespace-nowrap">{formatDate(invite.created_at)}</td>
                   <td>
-                    <form action={revokeInvite}>
-                      <input name="email" type="hidden" value={invite.email} />
-                      <Button variant="text" type="submit">Revoke</Button>
-                    </form>
+                    <OptimisticDeleteButton action={revokeInvite} label="Revoke" name="email" value={invite.email} />
                   </td>
                 </tr>
               ))}

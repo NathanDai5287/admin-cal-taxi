@@ -4,10 +4,9 @@ import {
   getPairSummaries,
   getScanStats,
 } from "@/lib/rush-data";
-import { banPairAction, unbanPairAction } from "./actions";
 import ResetVotesButton from "./ResetVotesButton";
 import { SiteHomeIcon } from "@/components/site-home-icon";
-import { Button } from "@/components/brand/button";
+import { RushAccessControl } from "./access-control";
 
 export const dynamic = "force-dynamic";
 
@@ -290,36 +289,7 @@ export default async function RushAdminPage() {
                     <td className="px-4 py-2 text-ink">
                       {entry.leadCount}
                     </td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          entry.banned
-                            ? "bg-warn-light text-warn"
-                            : "bg-ok-light text-ok"
-                        }`}
-                      >
-                        {entry.banned ? "banned" : "active"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <form
-                        action={entry.banned ? unbanPairAction : banPairAction}
-                      >
-                        <input type="hidden" name="ip" value={entry.ip} />
-                        <input
-                          type="hidden"
-                          name="deviceId"
-                          value={entry.deviceId}
-                        />
-                        <Button
-                          type="submit"
-                          variant={entry.banned ? "secondary" : "danger"}
-                          compact
-                        >
-                          {entry.banned ? "Unban" : "Ban"}
-                        </Button>
-                      </form>
-                    </td>
+                    <RushAccessControl banned={entry.banned} deviceId={entry.deviceId} ip={entry.ip} />
                   </tr>
                 ))}
               </tbody>

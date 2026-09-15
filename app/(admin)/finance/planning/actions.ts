@@ -94,7 +94,7 @@ export async function addBudgetEntry(formData: FormData) {
 export async function deleteBudgetEntry(formData: FormData) {
   await requireAdmin();
   const parsed = z.string().uuid().safeParse(formData.get("id"));
-  if (!parsed.success) redirect(budgetRedirectTarget("entry", "invalid"));
+  if (!parsed.success) return { ok: false, message: "Choose a valid forecast." } as const;
 
   const supabase = createAdminClient();
   const { error } = await supabase
@@ -103,7 +103,7 @@ export async function deleteBudgetEntry(formData: FormData) {
     .eq("id", parsed.data)
     .eq("kind", "forecast");
 
-  if (error) redirect(budgetRedirectTarget("entry", "error"));
+  if (error) return { ok: false, message: "The forecast could not be removed." } as const;
   revalidateBudgetPages();
-  redirect(budgetRedirectTarget("entry", "deleted"));
+  return { ok: true } as const;
 }

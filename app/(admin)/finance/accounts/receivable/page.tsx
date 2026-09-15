@@ -6,6 +6,7 @@ import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata: Metadata = { title: "Accounts receivable" };
 export const dynamic = "force-dynamic";
@@ -43,17 +44,21 @@ export default async function DuesPage({
   await requireAdmin();
   const [{ result }, supabase] = await Promise.all([searchParams, Promise.resolve(createAdminClient())]);
   const [receivablesResult, profilesResult] = await Promise.all([
-    supabase
+    loadAllPages((from, to) => supabase
       .from("chapter_receivables")
       .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id")
       .order("due_date", { ascending: true })
-      .order("member_name", { ascending: true }),
-    supabase
+      .order("member_name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)),
+    loadAllPages((from, to) => supabase
       .from("profiles")
       .select("id, full_name, email")
       .in("role", ["member", "admin"])
       .is("removed_at", null)
-      .order("full_name", { ascending: true }),
+      .order("full_name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to)),
   ]);
 
   if (receivablesResult.error) {
@@ -78,6 +83,7 @@ export default async function DuesPage({
       discordUserId: row.discord_user_id,
       isPaid,
       isOverdue: !isPaid && row.due_date < today,
+      paymentRequestId: crypto.randomUUID(),
     };
   });
 

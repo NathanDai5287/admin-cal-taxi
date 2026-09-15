@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { SiteHomeIcon } from "@/components/site-home-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export type AuthPillSession = {
@@ -14,8 +16,26 @@ export type AuthPillSession = {
 };
 
 export type AuthPillProps = {
+  memberSite?: boolean;
   session: AuthPillSession | null;
 };
+
+function MemberSiteBrand() {
+  return (
+    <div className="flex min-w-0 items-center gap-4">
+      <SiteHomeIcon label="Reimbursements home" />
+      <span className="h-6 w-px flex-none bg-rule" aria-hidden="true" />
+      <Link className="group flex min-w-0 items-baseline gap-3" href="/">
+        <span className="text-[14px] font-bold uppercase tracking-[0.18em] text-ink transition-colors group-hover:text-brand">
+          Theta Xi
+        </span>
+        <span className="hidden text-[10.5px] font-medium uppercase tracking-[0.16em] text-muted sm:inline">
+          Reimbursements
+        </span>
+      </Link>
+    </div>
+  );
+}
 
 function firstName(fullName: string, email: string) {
   const trimmed = fullName.trim();
@@ -169,37 +189,45 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
   );
 }
 
-export function AuthPill({ session }: AuthPillProps) {
+export function AuthPill({ memberSite = false, session }: AuthPillProps) {
   // Assume One Tap will show until it reports otherwise, so the fallback
   // button doesn't flash before Google's island appears.
   const [oneTapVisible, setOneTapVisible] = useState(true);
   const [oneTapError, setOneTapError] = useState<string | null>(null);
 
   return (
-    <div
-      className="account-controls sticky top-0 z-50 flex min-h-[62px] items-start justify-end gap-2 px-4 py-3"
+    <header
+      className={
+        "account-controls sticky top-0 z-50 px-4 py-3 "
+        + (memberSite ? "border-t-[3px] border-t-brand" : "")
+      }
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
       }}
     >
-      <ThemeToggle />
-      {session === null ? (
-        <>
-          <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />
-          {oneTapVisible ? null : (
-            <div className="flex flex-col items-end gap-1.5">
-              <GoogleSignInButton />
-              {oneTapError ? (
-                <p className="m-0 max-w-[240px] text-right text-[11px] leading-snug text-warn">
-                  Sign-in failed: {oneTapError}
-                </p>
-              ) : null}
-            </div>
+      <div className="mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4">
+        {memberSite ? <MemberSiteBrand /> : <span />}
+        <div className="flex items-start justify-end gap-2">
+          <ThemeToggle />
+          {session === null ? (
+            <>
+              <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />
+              {oneTapVisible ? null : (
+                <div className="flex flex-col items-end gap-1.5">
+                  <GoogleSignInButton />
+                  {oneTapError ? (
+                    <p className="m-0 max-w-[240px] text-right text-[11px] leading-snug text-warn">
+                      Sign-in failed: {oneTapError}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </>
+          ) : (
+            <SignOutPill session={session} />
           )}
-        </>
-      ) : (
-        <SignOutPill session={session} />
-      )}
-    </div>
+        </div>
+      </div>
+    </header>
   );
 }
