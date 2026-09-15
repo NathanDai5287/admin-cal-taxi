@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { addBulkDuesFees } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { addDuesFees } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { Button } from "@/components/brand/button";
 
 export type BulkFeeMember = {
@@ -21,7 +21,7 @@ function SubmitFeesButton({ count }: { count: number }) {
   );
 }
 
-export function BulkFeeForm({
+export function ChargeMembersForm({
   members,
   today,
   feedback,
@@ -55,10 +55,10 @@ export function BulkFeeForm({
   return (
     <section className="card" aria-labelledby="bulk-fee-title">
       <div className="card-header">
-        <span className="card-title" id="bulk-fee-title">Charge multiple members</span>
-        <span className="card-subtitle">Applies the same amount and due date to every selected member.</span>
+        <span className="card-title" id="bulk-fee-title">Charge members</span>
+        <span className="card-subtitle">Select one or more members, then apply the same amount and due date.</span>
       </div>
-      <form action={addBulkDuesFees} className="bulk-fee-form">
+      <form action={addDuesFees} className="bulk-fee-form">
         <div className="bulk-fee-settings">
           <div className="field">
             <label className="field-label" htmlFor="bulk-fee-amount">Fee per member</label>

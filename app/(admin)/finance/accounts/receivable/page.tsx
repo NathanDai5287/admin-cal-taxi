@@ -1,11 +1,9 @@
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import type { Metadata } from "next";
 
-import { addDuesBalance } from "@/app/(admin)/finance/accounts/receivable/actions";
-import { BulkFeeForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
+import { ChargeMembersForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
-import { Button, ButtonLink } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -22,8 +20,7 @@ function currentPacificDate() {
 }
 
 const feedback: Record<string, { text: string; success: boolean }> = {
-  added: { text: "Member balance added.", success: true },
-  "bulk-added": { text: "The fee was applied to every selected member.", success: true },
+  added: { text: "Dues added to the selected members.", success: true },
   saved: { text: "Member balance updated.", success: true },
   payment: { text: "Payment added to the balance.", success: true },
   paid: { text: "Balance marked paid.", success: true },
@@ -110,15 +107,11 @@ export default async function DuesPage({
 
   return (
     <div className="grid gap-7">
-      <div className="flex flex-wrap items-end justify-between gap-5">
+      <div>
         <div>
           <p className="page-eyebrow">Chapter finances</p>
           <h1 className="page-title">Dues to collect</h1>
           <p className="page-lede">See what members owe, record payments, and add new dues when needed.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ButtonLink href="#add-one-balance" variant="primary">Add dues</ButtonLink>
-          <ButtonLink href="#add-bulk-fee" variant="secondary">Charge multiple members</ButtonLink>
         </div>
       </div>
 
@@ -157,69 +150,11 @@ export default async function DuesPage({
 
       <div className="border-t border-rule pt-7">
         <p className="page-eyebrow">Create new dues</p>
-        <h2 className="mt-1 text-[18px] font-bold text-ink">Who should be charged?</h2>
-        <p className="mt-1 text-[13px] text-muted">Add one balance for an individual charge, or apply the same fee to several registered members.</p>
+        <h2 className="mt-1 text-[18px] font-bold text-ink">Charge members</h2>
+        <p className="mt-1 text-[13px] text-muted">Select one member or several members. Every selected person receives the same charge.</p>
       </div>
 
-      <section className="card scroll-mt-28" aria-labelledby="add-dues-title" id="add-one-balance">
-        <div className="card-header">
-          <span className="card-title" id="add-dues-title">Charge one member</span>
-          <span className="card-subtitle">Creates a new dues balance for one registered member.</span>
-        </div>
-        <form action={addDuesBalance} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="field">
-              <label className="field-label" htmlFor="dues-member">Member</label>
-              <select className="field-input" id="dues-member" name="memberId" defaultValue="" required>
-                <option value="" disabled>Choose a registered member</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.email}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="dues-amount">Amount owed</label>
-              <div className="money-input"><span>$</span><input className="field-input" id="dues-amount" min="0.01" name="amountOwed" placeholder="0.00" step="0.01" type="number" required /></div>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="dues-date">Due date</label>
-              <input className="field-input" defaultValue={today} id="dues-date" name="dueDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="dues-discord">Discord member ID</label>
-              <input
-                className="field-input"
-                id="dues-discord"
-                inputMode="numeric"
-                maxLength={25}
-                name="discordUserId"
-                pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
-                placeholder="Optional numeric ID"
-                title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
-              />
-              <p className="field-hint">Optional. Use Copy User ID in Discord; usernames cannot create targeted mentions.</p>
-            </div>
-            <div className="field sm:col-span-2">
-              <label className="field-label" htmlFor="dues-notes">Note</label>
-              <input className="field-input" id="dues-notes" maxLength={500} name="notes" placeholder="Semester, payment plan, etc." />
-            </div>
-          </div>
-          <div className="mt-5 flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4">
-            <div aria-live="polite">
-              {selectedFeedback && result !== "bulk-added" ? (
-                <p className={`form-message${selectedFeedback.success ? " success" : ""}`}>{selectedFeedback.text}</p>
-              ) : null}
-            </div>
-            <Button type="submit" variant="primary">Add balance</Button>
-          </div>
-        </form>
-      </section>
-
-      <div className="scroll-mt-28" id="add-bulk-fee">
-        <BulkFeeForm
-          feedback={result === "bulk-added" ? selectedFeedback : undefined}
-          members={members}
-          today={today}
-        />
-      </div>
+      <ChargeMembersForm feedback={selectedFeedback} members={members} today={today} />
     </div>
   );
 }

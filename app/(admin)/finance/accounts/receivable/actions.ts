@@ -30,7 +30,6 @@ const entrySchema = z.object({
 
 type DuesResult =
   | "added"
-  | "bulk-added"
   | "saved"
   | "payment"
   | "paid"
@@ -64,38 +63,6 @@ function revalidateDues() {
   revalidatePath("/finance/reports");
 }
 
-export async function addDuesBalance(formData: FormData) {
-  const { userId } = await requireAdmin("/");
-  const parsed = entrySchema.safeParse({
-    memberId: formData.get("memberId"),
-    amountOwed: formData.get("amountOwed"),
-    dueDate: formData.get("dueDate"),
-    notes: formData.get("notes") ?? "",
-    discordUserId: normalizeDiscordUserId(formData.get("discordUserId")),
-  });
-
-  if (!parsed.success) redirect(entryErrorUrl(parsed.error));
-
-  const supabase = createAdminClient();
-  const { data: member } = await supabase.from("profiles").select("id, full_name")
-    .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
-  if (!member) redirect(resultUrl("invalid-member"));
-  const { error } = await supabase.from("chapter_receivables").insert({
-    member_id: member.id,
-    member_name: member.full_name,
-    amount_assessed: parsed.data.amountOwed,
-    amount_paid: 0,
-    due_date: parsed.data.dueDate,
-    notes: parsed.data.notes,
-    discord_user_id: parsed.data.discordUserId,
-    created_by: userId,
-  });
-
-  if (error) redirect(resultUrl("error"));
-  revalidateDues();
-  redirect(resultUrl("added"));
-}
-
 const bulkFeeSchema = z.object({
   amountOwed: z.coerce.number().positive().max(999_999_999.99),
   dueDate: dateSchema,
@@ -107,7 +74,7 @@ const bulkMemberSchema = z.object({
   notes: z.string().trim().max(500),
 });
 
-export async function addBulkDuesFees(formData: FormData) {
+export async function addDuesFees(formData: FormData) {
   const { userId } = await requireAdmin("/");
   const memberIds = [...new Set(formData.getAll("memberId").filter(
     (value): value is string => typeof value === "string",
@@ -166,7 +133,7 @@ export async function addBulkDuesFees(formData: FormData) {
 
   if (error) redirect(resultUrl("error"));
   revalidateDues();
-  redirect(resultUrl("bulk-added"));
+  redirect(resultUrl("added"));
 }
 
 export async function updateDuesBalance(formData: FormData) {
