@@ -141,7 +141,17 @@ export default async function DuesPage({
         </div>
       </section>
 
-      <DuesLedger rows={rows} members={members} />
+      <DuesLedger mode="view" rows={rows} members={members} />
+
+      <div className="border-t border-rule pt-7">
+        <p className="page-eyebrow">Write access</p>
+        <h2 className="mt-1 text-[18px] font-bold text-ink">Manage dues</h2>
+        <p className="mt-1 text-[13px] text-muted">Add charges and make balance changes in this section.</p>
+      </div>
+
+      <ChargeMembersForm feedback={selectedFeedback} members={members} today={today} />
+
+      <DuesLedger mode="manage" rows={rows} members={members} />
 
       <DuesAnnouncement
         channelConfigured={Boolean(process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID?.trim())}
@@ -155,14 +165,6 @@ export default async function DuesPage({
           }))}
         unlinkedCount={outstandingRows.filter((row) => !/^\d{15,22}$/.test(row.discordUserId)).length}
       />
-
-      <div className="border-t border-rule pt-7">
-        <p className="page-eyebrow">Create new dues</p>
-        <h2 className="mt-1 text-[18px] font-bold text-ink">Charge members</h2>
-        <p className="mt-1 text-[13px] text-muted">Select one member or several members. Every selected person receives the same charge.</p>
-      </div>
-
-      <ChargeMembersForm feedback={selectedFeedback} members={members} today={today} />
     </div>
   );
 }

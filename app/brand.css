@@ -488,6 +488,7 @@
   [data-brand] .dues-row {
     @apply grid items-center gap-4 px-6 py-4 transition-colors lg:grid-cols-[minmax(260px,1fr)_130px_auto];
   }
+  [data-brand] .dues-row.read-only { @apply lg:grid-cols-[minmax(260px,1fr)_130px]; }
   [data-brand] .dues-row:hover { background: color-mix(in srgb, var(--color-brand-light) 34%, transparent); }
   [data-brand] .dues-row.selected { background: var(--color-brand-light); }
   [data-brand] .dues-person { @apply flex min-w-0 items-center gap-3; }
@@ -506,6 +507,7 @@
   [data-brand] .dues-actions { @apply flex items-center justify-end gap-2; }
   @media (max-width: 1023px) {
     [data-brand] .dues-row { @apply grid-cols-[minmax(0,1fr)_130px_auto]; }
+    [data-brand] .dues-row.read-only { @apply grid-cols-[minmax(0,1fr)_130px]; }
     [data-brand] .dues-balance { @apply col-start-2 row-start-1 text-right; }
     [data-brand] .dues-actions { @apply col-start-3 row-start-1; }
   }

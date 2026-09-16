@@ -94,7 +94,16 @@ function DeleteBalanceButton({
   );
 }
 
-export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: string; name: string; email: string }[] }) {
+export function DuesLedger({
+  rows,
+  members,
+  mode = "view",
+}: {
+  rows: DuesRow[];
+  members: { id: string; name: string; email: string }[];
+  mode?: "view" | "manage";
+}) {
+  const canManage = mode === "manage";
   const [optimisticRows, setOptimisticRows] = useState(rows);
   const [optimisticBusy, setOptimisticBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("outstanding");
@@ -155,11 +164,11 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
 
   return (
     <>
-    <section className="card" aria-labelledby="dues-ledger-title">
+    <section className="card" aria-labelledby={`${mode}-dues-ledger-title`}>
       <div className="dues-ledger-toolbar">
         <div>
-          <h2 className="card-title" id="dues-ledger-title">Member balances</h2>
-          <p className="mt-1 text-[13px] text-muted">Track what is still owed and settle balances as payments arrive.</p>
+          <h2 className="card-title" id={`${mode}-dues-ledger-title`}>{canManage ? "Update existing balances" : "Member balances"}</h2>
+          <p className="mt-1 text-[13px] text-muted">{canManage ? "Record payments, edit details, or remove balances." : "View what members owe and review payment status."}</p>
         </div>
         <label className="dues-search">
           <span className="sr-only">Search member balances</span>
@@ -188,7 +197,7 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
         ))}
       </div>
 
-      <div className="dues-bulk-toolbar">
+      {canManage && <div className="dues-bulk-toolbar">
         <div className="dues-bulk-selection">
           <strong>{selectedIds.length ? `${selectedIds.length} selected` : "Select balances for bulk changes"}</strong>
           <button disabled={!filtered.length || optimisticBusy} onClick={selectVisible} type="button">
@@ -225,27 +234,27 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
           </form>
           <small>Clearing marks balances fully paid and keeps their history.</small>
         </div>}
-      </div>
+      </div>}
 
       {filtered.length ? (
         <div className="dues-list">
           {filtered.map((row) => (
-            <article className={`dues-row${selectedIds.includes(row.id) ? " selected" : ""}`} key={row.id}>
+            <article className={`dues-row${canManage ? "" : " read-only"}${canManage && selectedIds.includes(row.id) ? " selected" : ""}`} key={row.id}>
               <div className="dues-person">
-                <input
+                {canManage && <input
                   aria-label={`Select ${row.memberName}'s balance`}
                   checked={selectedIds.includes(row.id)}
                   className="dues-select"
                   disabled={optimisticBusy}
                   onChange={() => toggleSelected(row.id)}
                   type="checkbox"
-                />
+                />}
                 <div className="dues-avatar" aria-hidden="true">
                   {row.memberName.slice(0, 1).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <h3>{row.memberName}</h3>
-                  {!row.memberId && <p>Account link needed — use Edit to select the registered member.</p>}
+                  {!row.memberId && <p>Account link needed{canManage ? " — use Edit to select the registered member." : "."}</p>}
                   <p>
                     Due {formatDate(row.dueDate)}
                     {row.isOverdue ? <span className="dues-overdue-label">Overdue</span> : null}
@@ -263,7 +272,7 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
                 <strong>{formatMoney(row.isPaid ? row.assessedAmount : row.amountOwed)}</strong>
               </div>
 
-              <div className="dues-actions">
+              {canManage && <div className="dues-actions">
                 <form action={setDuesPaid} onSubmit={() => {
                   setOptimisticBusy(true);
                   setOptimisticRows((current) => current.map((candidate) => candidate.id === row.id
@@ -283,17 +292,17 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
                   </Button>
                 </form>
                 <Button compact disabled={optimisticBusy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>
-              </div>
+              </div>}
             </article>
           ))}
         </div>
       ) : (
         <div className="empty-state border-t border-rule">
-          {optimisticRows.length ? "No balances match this view." : "No dues balances yet. Add the first member above."}
+          {optimisticRows.length ? "No balances match this view." : canManage ? "No balances to update." : "No dues balances yet."}
         </div>
       )}
     </section>
-    {editingRow ? (
+    {canManage && editingRow ? (
       <div
         className="dues-dialog-backdrop"
         onMouseDown={(event) => {
