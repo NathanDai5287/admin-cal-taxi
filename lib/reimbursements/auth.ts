@@ -2,6 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import type { PostgrestError } from "@supabase/supabase-js";
 
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { createClient } from "@/lib/reimbursements/supabase/server";
@@ -76,13 +77,50 @@ async function claimInviteWithoutRpc({
       return;
     }
 
-    const { error: profileError } = await admin.from("profiles").upsert({
-      id: userId,
-      email: normalizedEmail,
-      full_name: fullName,
-      role: invite.role,
-      removed_at: null,
-    });
+    const { data: provisional } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    let profileError: PostgrestError | null = null;
+    if (provisional && provisional.id !== userId) {
+      // Rollout fallback for a provisional profile created by the newer
+      // invitation flow when the claim RPC is temporarily unavailable.
+      const inserted = await admin.from("profiles").insert({
+        id: userId,
+        email: "",
+        full_name: fullName,
+        role: invite.role,
+        removed_at: null,
+      });
+      profileError = inserted.error;
+      if (!profileError) {
+        const transferred = await admin.from("chapter_receivables")
+          .update({ member_id: userId })
+          .eq("member_id", provisional.id);
+        profileError = transferred.error;
+      }
+      if (!profileError) {
+        const removed = await admin.from("profiles").delete().eq("id", provisional.id);
+        profileError = removed.error;
+      }
+      if (!profileError) {
+        const finalized = await admin.from("profiles")
+          .update({ email: normalizedEmail })
+          .eq("id", userId);
+        profileError = finalized.error;
+      }
+    } else {
+      const restored = await admin.from("profiles").upsert({
+        id: userId,
+        email: normalizedEmail,
+        full_name: fullName,
+        role: invite.role,
+        removed_at: null,
+      });
+      profileError = restored.error;
+    }
     if (profileError) {
       console.error("Could not restore the invited user's profile", {
         code: profileError.code,

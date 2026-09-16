@@ -9,7 +9,8 @@ export type MemberRow = {
   fullName: string;
   email: string;
   role: "none" | "member" | "admin";
-  joinedLabel: string;
+  hasSignedIn: boolean;
+  statusLabel: string;
 };
 
 type OptimisticUpdate =
@@ -163,7 +164,7 @@ export function MembersTable({
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
-            <th>Joined</th>
+            <th>Status</th>
             <th></th>
           </tr>
         </thead>
@@ -174,7 +175,7 @@ export function MembersTable({
             return (
               <tr key={member.id}>
                 <td>
-                  {member.fullName.trim() ? member.fullName : <span className="text-muted">—</span>}
+                  {member.fullName.trim() ? member.fullName : <span className="text-muted">Pending sign-in</span>}
                   {isYou ? <span className="text-muted"> (you)</span> : null}
                 </td>
                 <td>{member.email}</td>
@@ -199,7 +200,9 @@ export function MembersTable({
                     <option value="admin">Admin</option>
                   </select>
                 </td>
-                <td className="whitespace-nowrap">{member.joinedLabel}</td>
+                <td className="whitespace-nowrap">
+                  <span className={member.hasSignedIn ? "text-ok" : "text-caution"}>{member.statusLabel}</span>
+                </td>
                 <td>
                   <RemoveButton disabled={isYou || memberPending} onRemove={() => remove(member.id)} />
                   {errors.get(member.id) ? <span className="form-message ml-2" role="alert">{errors.get(member.id)}</span> : null}

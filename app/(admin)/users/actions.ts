@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
+import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const inviteRoles = ["member", "admin"] as const;
@@ -22,18 +23,6 @@ function isProfileRole(value: unknown): value is ProfileRole {
   return profileRoles.includes(value as ProfileRole);
 }
 
-function readEmail(formData: FormData) {
-  const raw = formData.get("email");
-  if (typeof raw !== "string") {
-    throw new Error("Enter an email address.");
-  }
-  const email = raw.trim().toLowerCase();
-  if (!email.includes("@")) {
-    throw new Error("Enter a valid email address.");
-  }
-  return email;
-}
-
 export async function inviteUser(formData: FormData) {
   await requireAdmin("/");
   const emails = parseInviteEmails(formData.get("email"));
@@ -44,8 +33,8 @@ export async function inviteUser(formData: FormData) {
   }
 
   const supabase = await createClient();
-  // Security definer function: updates an existing profile's role right away,
-  // otherwise stores the invite for their first Google sign-in.
+  // Security definer function: updates an existing profile or creates a
+  // provisional member profile that can receive dues before first sign-in.
   const results = await Promise.all(
     emails.map((email) =>
       supabase.rpc("admin_invite_email", {
@@ -65,21 +54,14 @@ export async function inviteUser(formData: FormData) {
     );
   }
 
-  revalidatePath("/users");
-}
-
-export async function revokeInvite(formData: FormData) {
-  await requireAdmin("/");
-  const email = readEmail(formData);
-
-  const supabase = await createClient();
-  const { error } = await supabase.from("invites").delete().eq("email", email);
-
-  if (error) {
-    throw new Error("Unable to revoke invite. Please try again.");
+  // Email delivery is optional; the member and their access are created even
+  // when a deployment has not configured Resend yet.
+  if (process.env.RESEND_API_KEY?.trim()) {
+    await sendInviteEmails(emails, role);
   }
 
   revalidatePath("/users");
+  revalidatePath("/finance/accounts/receivable");
 }
 
 export async function setUserRole(userId: string, role: string) {
@@ -109,6 +91,7 @@ export async function setUserRole(userId: string, role: string) {
   }
 
   revalidatePath("/users");
+  revalidatePath("/finance/accounts/receivable");
 }
 
 export async function removeUser(userId: string) {
@@ -135,4 +118,5 @@ export async function removeUser(userId: string) {
   }
 
   revalidatePath("/users");
+  revalidatePath("/finance/accounts/receivable");
 }

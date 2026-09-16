@@ -1,9 +1,8 @@
 import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 
-import { inviteUser, revokeInvite } from "@/app/(admin)/users/actions";
+import { inviteUser } from "@/app/(admin)/users/actions";
 import { MembersTable } from "@/app/(admin)/users/members-table";
-import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
@@ -17,31 +16,18 @@ function formatDate(value: string) {
 
 export default async function UsersPage() {
   const [session, supabase] = await Promise.all([getSessionProfile(), createClient()]);
-  const [profilesResult, invitesResult] = await Promise.all([
-    loadAllPages((from, to) => supabase
-      .from("profiles")
-      .select("id, full_name, email, role, created_at")
-      .is("removed_at", null)
-      .order("created_at", { ascending: true })
-      .order("id", { ascending: true })
-      .range(from, to)),
-    loadAllPages((from, to) => supabase
-      .from("invites")
-      .select("email, role, created_at")
-      .order("created_at", { ascending: true })
-      .order("email", { ascending: true })
-      .range(from, to)),
-  ]);
+  const profilesResult = await loadAllPages((from, to) => supabase
+    .from("profiles")
+    .select("id, full_name, email, role, has_signed_in, created_at")
+    .is("removed_at", null)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, to));
 
   if (profilesResult.error) {
     throw new Error(`Unable to load members: ${profilesResult.error.message}`);
   }
-  if (invitesResult.error) {
-    throw new Error(`Unable to load invites: ${invitesResult.error.message}`);
-  }
-
   const profiles = profilesResult.data ?? [];
-  const invites = invitesResult.data ?? [];
 
   return (
     <div className="grid gap-6">
@@ -81,42 +67,10 @@ export default async function UsersPage() {
           <Button variant="primary" type="submit">Invite</Button>
         </form>
         <p className="helper-text px-6 pb-5">
-          Separate multiple email addresses with commas. If someone has already signed
-          in, their role updates right away. Otherwise it applies automatically on their
-          first Google sign-in.
+          Separate multiple email addresses with commas. Each person appears as a
+          member immediately, so you can assign dues before their first Google sign-in.
+          When email delivery is configured, they also receive sign-in instructions.
         </p>
-      </section>
-
-      <section className="card table-scroll" aria-labelledby="pending-invites-title">
-        <div className="card-header">
-          <span className="card-title" id="pending-invites-title">Pending invites</span>
-        </div>
-        {invites.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Invited</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {invites.map((invite) => (
-                <tr key={invite.email}>
-                  <td>{invite.email}</td>
-                  <td className="capitalize">{invite.role}</td>
-                  <td className="whitespace-nowrap">{formatDate(invite.created_at)}</td>
-                  <td>
-                    <OptimisticDeleteButton action={revokeInvite} label="Revoke" name="email" value={invite.email} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state border-t border-rule">No pending invites.</div>
-        )}
       </section>
 
       <section className="card table-scroll" aria-labelledby="members-title">
@@ -130,12 +84,13 @@ export default async function UsersPage() {
             fullName: profile.full_name,
             email: profile.email,
             role: profile.role,
-            joinedLabel: formatDate(profile.created_at),
+            hasSignedIn: profile.has_signed_in,
+            statusLabel: profile.has_signed_in ? "Signed in" : `Invited ${formatDate(profile.created_at)}`,
           }))}
         />
         <p className="helper-text px-6 pb-5">
-          Removing someone revokes their access and hides them from this list. Their
-          reimbursement history is kept, and re-inviting their email restores them.
+          Invited people can be assigned dues before signing in. Removing someone
+          revokes their invitation or access while preserving their financial history.
         </p>
       </section>
     </div>

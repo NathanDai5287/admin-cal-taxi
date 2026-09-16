@@ -102,7 +102,7 @@ export default async function DuesPage({
     if (row.memberId && /^\d{15,22}$/.test(row.discordUserId)) discordIdsByMember.set(row.memberId, row.discordUserId);
   }
   const members = (profilesResult.data ?? []).flatMap((profile) => {
-    const name = profile.full_name.trim();
+    const name = profile.full_name.trim() || profile.email;
     return name ? [{
       id: profile.id,
       name,

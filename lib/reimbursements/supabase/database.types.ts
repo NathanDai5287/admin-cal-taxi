@@ -176,6 +176,7 @@ export type Database = {
           email: string;
           role: Database["public"]["Enums"]["app_role"];
           removed_at: string | null;
+          has_signed_in: boolean;
           created_at: string;
         };
         Insert: {
@@ -184,6 +185,7 @@ export type Database = {
           email?: string;
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
+          has_signed_in?: boolean;
           created_at?: string;
         };
         Update: {
@@ -191,6 +193,7 @@ export type Database = {
           email?: string;
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
+          has_signed_in?: boolean;
         };
         Relationships: [];
       };

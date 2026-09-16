@@ -102,7 +102,7 @@ export async function addDuesFees(formData: FormData) {
   const supabase = createAdminClient();
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, email")
     .in("id", parsed.data.memberIds)
     .in("role", ["member", "admin"])
     .is("removed_at", null);
@@ -115,10 +115,10 @@ export async function addDuesFees(formData: FormData) {
   const rows = parsed.data.memberIds.map((memberId) => {
     const profile = profilesById.get(memberId);
     const detail = memberDetails.get(memberId);
-    if (!profile?.full_name.trim() || !detail) return null;
+    if (!profile || !detail) return null;
     return {
       member_id: profile.id,
-      member_name: profile.full_name.trim(),
+      member_name: profile.full_name.trim() || profile.email,
       amount_assessed: parsed.data.amountOwed,
       amount_paid: 0,
       due_date: parsed.data.dueDate,
@@ -162,10 +162,10 @@ export async function updateDuesBalance(formData: FormData) {
 
   let memberName = current.member_name;
   if (parsed.data.memberId !== current.member_id) {
-    const { data: member } = await supabase.from("profiles").select("id, full_name")
+    const { data: member } = await supabase.from("profiles").select("id, full_name, email")
       .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
     if (!member) redirect(resultUrl("invalid-member"));
-    memberName = member.full_name;
+    memberName = member.full_name.trim() || member.email;
   }
   const currentAssessed = Number(current.amount_assessed);
   const currentPaid = Number(current.amount_paid);
