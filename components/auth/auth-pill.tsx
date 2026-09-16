@@ -200,7 +200,7 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
       className={
         memberSite
           ? "account-controls sticky top-0 z-50 border-t-[3px] border-t-brand px-4 py-3"
-          : "fixed top-3 right-4 z-50"
+          : "pointer-events-none fixed inset-x-0 top-4 z-50 px-6"
       }
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -208,7 +208,7 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
     >
       <div className={memberSite
         ? "mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4"
-        : "flex items-start justify-end gap-2"
+        : "pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-end gap-3"
       }>
         {memberSite ? <MemberSiteBrand /> : null}
         <div className="flex items-start justify-end gap-2">

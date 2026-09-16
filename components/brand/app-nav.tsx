@@ -54,7 +54,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
       {/* Thin brand-blue band at the very top — echoes the 1.2pt brand rule
           under the PDF letterhead. */}
       <div className="h-[3px] bg-brand" />
-      <div className="max-w-[1080px] mx-auto px-6 h-[64px] flex items-center gap-5">
+      <div className="max-w-[1080px] mx-auto h-[64px] flex items-center gap-5 pl-6 pr-[210px]">
         <SiteHomeIcon />
         <span className="h-6 w-px bg-rule flex-none" aria-hidden="true" />
         <Link href={homeHref} prefetch={false} className="flex items-baseline gap-3 group">
@@ -68,7 +68,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
           ) : null}
         </Link>
         {tabs.length > 0 && (
-          <nav className="ml-auto flex items-stretch h-full">
+          <nav className="ml-auto flex min-w-0 items-stretch h-full overflow-x-auto">
             {tabs.map((tab) => (
               <Link
                 key={tab.href}
@@ -76,7 +76,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
                 prefetch={false}
                 aria-current={tab.href === activeHref ? "page" : undefined}
                 className={
-                  "px-4 inline-flex items-center text-[12px] font-bold uppercase tracking-[0.14em] " +
+                  "shrink-0 px-4 inline-flex items-center text-[12px] font-bold uppercase tracking-[0.14em] " +
                   "transition-colors border-b-2 -mb-px " +
                   (tab.href === activeHref
                     ? "text-brand border-brand"
