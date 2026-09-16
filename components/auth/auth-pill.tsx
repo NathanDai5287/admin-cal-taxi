@@ -198,15 +198,19 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
   return (
     <header
       className={
-        "account-controls sticky top-0 z-50 px-4 py-3 "
-        + (memberSite ? "border-t-[3px] border-t-brand" : "")
+        memberSite
+          ? "account-controls sticky top-0 z-50 border-t-[3px] border-t-brand px-4 py-3"
+          : "fixed top-3 right-4 z-50"
       }
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
       }}
     >
-      <div className="mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4">
-        {memberSite ? <MemberSiteBrand /> : <span />}
+      <div className={memberSite
+        ? "mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4"
+        : "flex items-start justify-end gap-2"
+      }>
+        {memberSite ? <MemberSiteBrand /> : null}
         <div className="flex items-start justify-end gap-2">
           <ThemeToggle />
           {session === null ? (
