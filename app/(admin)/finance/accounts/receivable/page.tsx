@@ -27,6 +27,8 @@ const feedback: Record<string, { text: string; success: boolean }> = {
   paid: { text: "Balance marked paid.", success: true },
   reopened: { text: "Balance moved back to outstanding.", success: true },
   deleted: { text: "Member balance removed.", success: true },
+  "bulk-paid": { text: "Selected balances cleared and marked fully paid.", success: true },
+  "bulk-deleted": { text: "Selected balances removed.", success: true },
   invalid: { text: "Check the entered amount and balance details, then try again.", success: false },
   "invalid-member": { text: "Choose an active registered member.", success: false },
   "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },

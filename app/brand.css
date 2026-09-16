@@ -476,12 +476,22 @@
   [data-brand] .dues-filter-count {
     @apply min-w-5 bg-surface px-1.5 py-0.5 text-center text-[10px] tabular-nums border border-rule;
   }
+  [data-brand] .dues-bulk-toolbar {
+    @apply flex min-h-[54px] flex-wrap items-center justify-between gap-3 border-b border-rule bg-surface px-6 py-3;
+  }
+  [data-brand] .dues-bulk-selection,
+  [data-brand] .dues-bulk-actions { @apply flex flex-wrap items-center gap-3; }
+  [data-brand] .dues-bulk-selection strong { @apply text-[12px] text-ink; }
+  [data-brand] .dues-bulk-selection button { @apply cursor-pointer text-[11px] font-bold text-brand hover:underline disabled:cursor-not-allowed disabled:opacity-50; }
+  [data-brand] .dues-bulk-actions small { @apply text-[10.5px] text-muted; }
   [data-brand] .dues-list { @apply divide-y divide-rule; }
   [data-brand] .dues-row {
     @apply grid items-center gap-4 px-6 py-4 transition-colors lg:grid-cols-[minmax(260px,1fr)_130px_auto];
   }
   [data-brand] .dues-row:hover { background: color-mix(in srgb, var(--color-brand-light) 34%, transparent); }
+  [data-brand] .dues-row.selected { background: var(--color-brand-light); }
   [data-brand] .dues-person { @apply flex min-w-0 items-center gap-3; }
+  [data-brand] .dues-select { @apply h-4 w-4 shrink-0 cursor-pointer accent-brand disabled:cursor-not-allowed; }
   [data-brand] .dues-avatar {
     @apply flex h-9 w-9 shrink-0 items-center justify-center bg-brand-light text-[13px] font-bold text-brand border border-brand/20;
   }
@@ -504,6 +514,9 @@
     [data-brand] .dues-search { @apply w-full; }
     [data-brand] .dues-filter-bar { @apply px-2; }
     [data-brand] .dues-filter-bar button { @apply px-3; }
+    [data-brand] .dues-bulk-toolbar { @apply items-start px-4; }
+    [data-brand] .dues-bulk-actions { @apply w-full; }
+    [data-brand] .dues-bulk-actions small { @apply w-full; }
     [data-brand] .dues-row { @apply grid-cols-1; }
     [data-brand] .dues-balance,
     [data-brand] .dues-actions { @apply col-start-1 row-auto text-left justify-start; }
@@ -562,7 +575,7 @@
   }
   [data-brand] .dues-paid-notice { @apply border-b border-rule bg-ok-light px-6 py-4 text-[13px] font-semibold text-ok; }
   [data-brand] .dues-edit-form { @apply grid gap-5 p-6; }
-  [data-brand] .dues-edit-footer { @apply flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-5; }
+  [data-brand] .dues-edit-footer { @apply flex flex-wrap items-center justify-between gap-4 border-t border-rule px-6 pt-5 pb-6; }
   [data-brand] .dues-announcement-form { @apply grid gap-5 p-6; }
   [data-brand] .dues-recipient-fieldset {
     @apply relative border border-rule p-0;

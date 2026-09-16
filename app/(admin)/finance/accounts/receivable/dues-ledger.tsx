@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   addDuesPayment,
+  bulkDeleteDuesBalances,
+  bulkSetDuesPaid,
   deleteDuesBalance,
   setDuesPaid,
   updateDuesBalance,
@@ -54,7 +56,17 @@ function SearchIcon() {
   );
 }
 
-function DeleteBalanceButton({ disabled, id, memberName, onDelete }: { disabled?: boolean; id: string; memberName: string; onDelete: () => void }) {
+function DeleteBalanceButton({
+  disabled,
+  label,
+  idleText = "Delete balance",
+  confirmText = "Confirm delete",
+}: {
+  disabled?: boolean;
+  label: string;
+  idleText?: string;
+  confirmText?: string;
+}) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -65,24 +77,19 @@ function DeleteBalanceButton({ disabled, id, memberName, onDelete }: { disabled?
 
   return (
     <Button
-      aria-label={armed ? `Confirm permanent deletion of ${memberName}'s balance` : `Delete ${memberName}'s balance`}
+      aria-label={armed ? `Confirm permanent deletion of ${label}` : `Delete ${label}`}
       compact
       disabled={disabled}
-      formAction={deleteDuesBalance}
-      name="id"
       onClick={(event) => {
         if (!armed) {
           event.preventDefault();
           setArmed(true);
-        } else {
-          onDelete();
         }
       }}
       type="submit"
-      value={id}
       variant="danger"
     >
-      {armed ? "Confirm delete" : "Delete balance"}
+      {armed ? confirmText : idleText}
     </Button>
   );
 }
@@ -92,12 +99,14 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
   const [optimisticBusy, setOptimisticBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingRow = optimisticRows.find((row) => row.id === editingId) ?? null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setOptimisticRows(rows);
+      setSelectedIds((current) => current.filter((id) => rows.some((row) => row.id === id)));
       setOptimisticBusy(false);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -130,6 +139,19 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
     paid: optimisticRows.filter((row) => row.isPaid).length,
     all: optimisticRows.length,
   };
+  const allVisibleSelected = filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => current.includes(id)
+      ? current.filter((selectedId) => selectedId !== id)
+      : [...current, id]);
+  }
+
+  function selectVisible() {
+    setSelectedIds((current) => allVisibleSelected
+      ? current.filter((id) => !filtered.some((row) => row.id === id))
+      : [...new Set([...current, ...filtered.map((row) => row.id)])]);
+  }
 
   return (
     <>
@@ -166,11 +188,58 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
         ))}
       </div>
 
+      <div className="dues-bulk-toolbar">
+        <div className="dues-bulk-selection">
+          <strong>{selectedIds.length ? `${selectedIds.length} selected` : "Select balances for bulk changes"}</strong>
+          <button disabled={!filtered.length || optimisticBusy} onClick={selectVisible} type="button">
+            {allVisibleSelected ? "Deselect visible" : "Select visible"}
+          </button>
+          {!!selectedIds.length && <button disabled={optimisticBusy} onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
+        </div>
+        {!!selectedIds.length && <div className="dues-bulk-actions">
+          <form action={bulkSetDuesPaid} onSubmit={() => {
+            const selected = new Set(selectedIds);
+            setOptimisticBusy(true);
+            setOptimisticRows((current) => current.map((row) => selected.has(row.id)
+              ? { ...row, amountOwed: 0, paidAmount: row.assessedAmount, isPaid: true, isOverdue: false }
+              : row));
+            setSelectedIds([]);
+          }}>
+            {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
+            <Button compact disabled={optimisticBusy} type="submit" variant="primary">Clear balances</Button>
+          </form>
+          <form action={bulkDeleteDuesBalances} onSubmit={() => {
+            const selected = new Set(selectedIds);
+            setOptimisticBusy(true);
+            setOptimisticRows((current) => current.filter((row) => !selected.has(row.id)));
+            setSelectedIds([]);
+          }}>
+            {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
+            <DeleteBalanceButton
+              disabled={optimisticBusy}
+              key={selectedIds.join(",")}
+              label={`${selectedIds.length} selected balances`}
+              idleText="Delete selected"
+              confirmText="Confirm delete"
+            />
+          </form>
+          <small>Clearing marks balances fully paid and keeps their history.</small>
+        </div>}
+      </div>
+
       {filtered.length ? (
         <div className="dues-list">
           {filtered.map((row) => (
-            <article className="dues-row" key={row.id}>
+            <article className={`dues-row${selectedIds.includes(row.id) ? " selected" : ""}`} key={row.id}>
               <div className="dues-person">
+                <input
+                  aria-label={`Select ${row.memberName}'s balance`}
+                  checked={selectedIds.includes(row.id)}
+                  className="dues-select"
+                  disabled={optimisticBusy}
+                  onChange={() => toggleSelected(row.id)}
+                  type="checkbox"
+                />
                 <div className="dues-avatar" aria-hidden="true">
                   {row.memberName.slice(0, 1).toUpperCase()}
                 </div>
@@ -271,7 +340,7 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
             <div className="dues-paid-notice">This balance is fully paid.</div>
           )}
 
-          <form action={updateDuesBalance} className="dues-edit-form" onSubmit={(event) => {
+          <form action={updateDuesBalance} className="dues-edit-form" id={`edit-balance-${editingRow.id}`} onSubmit={(event) => {
             const form = new FormData(event.currentTarget);
             const amountOwed = Number(form.get("amountOwed"));
             const memberId = String(form.get("memberId") ?? "");
@@ -331,23 +400,22 @@ export function DuesLedger({ rows, members }: { rows: DuesRow[]; members: { id: 
                 <input className="field-input" defaultValue={editingRow.notes} id={`notes-${editingRow.id}`} maxLength={500} name="notes" />
               </div>
             </div>
-            <div className="dues-edit-footer">
-              <DeleteBalanceButton
-                id={editingRow.id}
-                memberName={editingRow.memberName}
-                disabled={optimisticBusy}
-                onDelete={() => {
-                  setOptimisticBusy(true);
-                  setOptimisticRows((current) => current.filter((candidate) => candidate.id !== editingRow.id));
-                  setEditingId(null);
-                }}
-              />
-              <div className="flex gap-2">
-                <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
-                <Button disabled={optimisticBusy} type="submit" variant="primary">Save changes</Button>
-              </div>
-            </div>
           </form>
+          <div className="dues-edit-footer">
+            <form action={deleteDuesBalance} onSubmit={() => {
+              setOptimisticBusy(true);
+              setOptimisticRows((current) => current.filter((candidate) => candidate.id !== editingRow.id));
+              setSelectedIds((current) => current.filter((id) => id !== editingRow.id));
+              setEditingId(null);
+            }}>
+              <input name="id" type="hidden" value={editingRow.id} />
+              <DeleteBalanceButton disabled={optimisticBusy} label={`${editingRow.memberName}'s balance`} />
+            </form>
+            <div className="flex gap-2">
+              <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
+              <Button disabled={optimisticBusy} form={`edit-balance-${editingRow.id}`} type="submit" variant="primary">Save changes</Button>
+            </div>
+          </div>
         </section>
       </div>
     ) : null}

@@ -36,6 +36,8 @@ type DuesResult =
   | "paid"
   | "reopened"
   | "deleted"
+  | "bulk-paid"
+  | "bulk-deleted"
   | "invalid"
   | "invalid-member"
   | "invalid-amount"
@@ -294,11 +296,57 @@ export async function deleteDuesBalance(formData: FormData) {
   if (!parsed.success) redirect(resultUrl("invalid"));
 
   const supabase = createAdminClient();
-  const { error } = await supabase.from("chapter_receivables").delete().eq("id", parsed.data);
+  const { data: deleted, error } = await supabase.from("chapter_receivables")
+    .delete()
+    .eq("id", parsed.data)
+    .select("id")
+    .maybeSingle();
 
-  if (error) redirect(resultUrl("error"));
+  if (error || !deleted) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl("deleted"));
+}
+
+const bulkBalanceIdsSchema = z.array(z.string().uuid()).min(1).max(200);
+
+function readBalanceIds(formData: FormData) {
+  return bulkBalanceIdsSchema.safeParse([...new Set(formData.getAll("balanceId").filter(
+    (value): value is string => typeof value === "string",
+  ))]);
+}
+
+export async function bulkSetDuesPaid(formData: FormData) {
+  await requireAdmin("/");
+  const parsed = readBalanceIds(formData);
+  if (!parsed.success) redirect(resultUrl("invalid"));
+
+  const supabase = await createClient();
+  // Keep requests bounded while reusing the atomic, idempotent payment RPC.
+  for (let offset = 0; offset < parsed.data.length; offset += 20) {
+    const results = await Promise.all(parsed.data.slice(offset, offset + 20).map((id) =>
+      supabase.rpc("set_dues_paid_state", { p_receivable_id: id, p_paid: true }),
+    ));
+    if (results.some(({ data, error }) => error || !data)) redirect(resultUrl("error"));
+  }
+
+  revalidateDues();
+  redirect(resultUrl("bulk-paid"));
+}
+
+export async function bulkDeleteDuesBalances(formData: FormData) {
+  await requireAdmin("/");
+  const parsed = readBalanceIds(formData);
+  if (!parsed.success) redirect(resultUrl("invalid"));
+
+  const supabase = createAdminClient();
+  const { data: deleted, error } = await supabase.from("chapter_receivables")
+    .delete()
+    .in("id", parsed.data)
+    .select("id");
+
+  if (error || deleted.length !== parsed.data.length) redirect(resultUrl("error"));
+  revalidateDues();
+  redirect(resultUrl("bulk-deleted"));
 }
 
 export type DuesAnnouncementState = {
