@@ -324,6 +324,9 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      mcp_budget_categories: { Args: Record<PropertyKey, never>; Returns: Json };
+      mcp_finance_overview: { Args: Record<PropertyKey, never>; Returns: Json };
+      mcp_open_dues: { Args: Record<PropertyKey, never>; Returns: Json };
       record_dues_payment: {
         Args: { p_payment_amount: number; p_receivable_id: string; p_request_id: string };
         Returns: boolean;

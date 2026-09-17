@@ -51,8 +51,11 @@ test("only active administrators can write their own secret-free MCP audit recor
     create role anon;
     create role authenticated;
     create schema auth;
+    create function auth.jwt() returns jsonb language sql as $$
+      select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb
+    $$;
     create function auth.uid() returns uuid language sql as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+      select nullif(auth.jwt() ->> 'sub', '')::uuid
     $$;
     grant usage on schema auth to authenticated;
     create table public.profiles (
@@ -67,6 +70,17 @@ test("only active administrators can write their own secret-free MCP audit recor
         where id = auth.uid() and role = 'admin' and removed_at is null
       )
     $$;
+    create table public.chapter_financial_settings (id boolean primary key, opening_cash numeric);
+    create table public.reimbursement_budget_entries (amount numeric, kind text);
+    create table public.reimbursements (amount numeric, status text, reimbursed boolean, category text);
+    create table public.reimbursement_manual_expenses (amount numeric, category text);
+    create table public.chapter_receivables (
+      member_name text,
+      amount_assessed numeric,
+      amount_paid numeric,
+      due_date date
+    );
+    create table public.reimbursement_budgets (budget_key text primary key, amount numeric);
   `);
   const migration = await readFile(
     new URL("../supabase/migrations/20260918000000_mcp_audit_log.sql", import.meta.url),
@@ -81,27 +95,24 @@ test("only active administrators can write their own secret-free MCP audit recor
   );
 
   await db.exec("set role authenticated");
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [adminId]);
-  await db.query(
-    "insert into public.mcp_audit_log (user_id, client_id, tool_name) values ($1, 'client-id', 'get_finance_overview')",
-    [adminId],
-  );
+  await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: adminId })]);
+  assert.equal((await db.query("select public.is_admin() as allowed")).rows[0].allowed, true);
+  await assert.rejects(db.query("select public.mcp_finance_overview()"), /OAuth grant is required/);
+  await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: adminId, client_id: "client-id" })]);
+  assert.equal((await db.query("select public.is_admin() as allowed")).rows[0].allowed, false);
+  assert.equal((await db.query("select public.is_mcp_admin() as allowed")).rows[0].allowed, true);
   await assert.rejects(
     db.query(
       "insert into public.mcp_audit_log (user_id, client_id, tool_name) values ($1, 'client-id', 'list_open_dues')",
-      [memberId],
+      [adminId],
     ),
-    /row-level security/,
+    /permission denied/,
   );
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [memberId]);
-  await assert.rejects(
-    db.query(
-      "insert into public.mcp_audit_log (user_id, client_id, tool_name) values ($1, 'client-id', 'list_open_dues')",
-      [memberId],
-    ),
-    /row-level security/,
-  );
-  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [adminId]);
+  await db.query("select public.mcp_finance_overview()");
+  assert.equal((await db.query("select count(*)::int as count from public.mcp_audit_log")).rows[0].count, 1);
+  await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: memberId, client_id: "client-id" })]);
+  await assert.rejects(db.query("select public.mcp_finance_overview()"), /OAuth grant is required/);
+  await db.exec("reset role");
   await assert.rejects(
     db.query(
       "insert into public.mcp_audit_log (user_id, client_id, tool_name) values ($1, 'token-value', 'unknown_tool')",
@@ -109,7 +120,6 @@ test("only active administrators can write their own secret-free MCP audit recor
     ),
     /check constraint/,
   );
-  await db.exec("reset role");
   const columns = await db.query(
     "select column_name from information_schema.columns where table_name = 'mcp_audit_log' order by column_name",
   );
