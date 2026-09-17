@@ -17,8 +17,6 @@ export default async function SubmitPage() {
     return <AccessDenied />;
   }
 
-  const { profile } = session;
-
   return (
     <>
       <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
@@ -37,7 +35,7 @@ export default async function SubmitPage() {
           <span className="card-title">New reimbursement</span>
         </div>
         <div className="card-body border-t border-rule pt-5">
-          <SubmitForm defaultFullName={profile.full_name} />
+          <SubmitForm />
         </div>
       </section>
     </>

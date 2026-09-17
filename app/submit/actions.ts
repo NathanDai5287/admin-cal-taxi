@@ -46,7 +46,6 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
   const { userId, profile } = await requireMember();
 
   const parsed = reimbursementSchema.safeParse({
-    fullName: formData.get("fullName"),
     category: formData.get("category"),
     amount: formData.get("amount"),
     description: formData.get("description"),
@@ -54,6 +53,11 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
   });
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Check the form fields." };
+  }
+
+  const submitterName = z.string().trim().min(1).max(120).safeParse(profile.full_name);
+  if (!submitterName.success) {
+    return { ok: false, message: "Your Google account name is unavailable. Sign out and sign in again." };
   }
 
   const receiptPath = formData.get("receiptPath");
@@ -79,7 +83,7 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
     .from("reimbursements")
     .insert({
       user_id: userId,
-      full_name: parsed.data.fullName,
+      full_name: submitterName.data,
       category: parsed.data.category,
       amount: parsed.data.amount,
       description: parsed.data.description,
@@ -91,21 +95,6 @@ export async function submitReimbursement(formData: FormData): Promise<SubmitRes
 
   if (insertError || !reimbursement) {
     return { ok: false, message: "Unable to submit the reimbursement. Try again." };
-  }
-
-  // Members type their full name on every submission; use it to upgrade
-  // profiles whose Google sign-in only gave us a first name.
-  const submittedName = parsed.data.fullName.trim();
-  const currentName = profile.full_name.trim();
-  if (
-    submittedName.includes(" ")
-    && (!currentName || !currentName.includes(" "))
-    && submittedName !== currentName
-  ) {
-    await supabase
-      .from("profiles")
-      .update({ full_name: submittedName })
-      .eq("id", userId);
   }
 
   after(() => processReimbursementReceipt(reimbursement.id));

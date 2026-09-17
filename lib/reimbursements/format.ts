@@ -13,7 +13,6 @@ export const categoryValues = [
 ] as const;
 
 export const reimbursementSchema = z.object({
-  fullName: z.string().trim().min(1).max(120),
   category: z.enum(categoryValues),
   amount: z.coerce.number().positive().max(99_999_999.99),
   description: z.string().trim().min(1).max(2000),

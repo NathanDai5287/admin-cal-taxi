@@ -13,7 +13,7 @@ import { prepareReceiptImage, receiptAccept, receiptFormat, receiptValidationErr
 const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
 const receiptTypes = ["image/jpeg", "image/png", "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"];
 
-export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
+export function SubmitForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const receiptRef = useRef<HTMLInputElement>(null);
@@ -73,7 +73,6 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
       const form = new FormData(event.currentTarget);
 
       const parsed = reimbursementSchema.safeParse({
-        fullName: form.get("fullName"),
         category: form.get("category"),
         amount: form.get("amount"),
         description: form.get("description"),
@@ -151,16 +150,6 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
 
   return (
     <form className="form-stack" onSubmit={handleSubmit} ref={formRef}>
-      <div className="field">
-        <label className="field-label" htmlFor="fullName">Full name</label>
-        <input
-          className="field-input"
-          defaultValue={defaultFullName}
-          id="fullName"
-          name="fullName"
-          required
-        />
-      </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="field">
           <label className="field-label" htmlFor="category">Category</label>
