@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "discord-bot": "node --env-file-if-exists=.env.local scripts/discord-bot.mjs",
+    "test:accreditation": "node --test scripts/accreditation.test.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -18,8 +19,14 @@
     "@supabase/supabase-js": "^2.112.4",
     "@upstash/redis": "^1.38.0",
     "discord.js": "^14.27.0",
+    "docxtemplater": "^3.70.0",
+    "exceljs": "^4.4.0",
     "heic-to": "^1.5.2",
+    "mammoth": "^1.12.3",
     "next": "16.3.5",
+    "openai": "^7.17.0",
+    "pdf-lib": "^1.17.1",
+    "pizzip": "^3.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "resend": "^6.28.0",
@@ -35,5 +42,15 @@
     "supabase": "^2.116.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "baseline-browser-mapping": "2.11.24",
+    "brace-expansion@1.1.15": "1.1.21",
+    "brace-expansion@5.0.7": "5.0.12",
+    "browserslist": "4.29.0",
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "js-yaml": "4.3.2"
   }
 }

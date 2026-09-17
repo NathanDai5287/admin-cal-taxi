@@ -13,7 +13,9 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    serverActions: { bodySizeLimit: "4mb" },
+    // Accreditation evidence/templates are validated at 25 MB in their
+    // authenticated server actions. Leave a small multipart overhead margin.
+    serverActions: { bodySizeLimit: "30mb" },
     // Prefetched authenticated route payloads remain usable in the browser for
     // ten minutes. Mutations still invalidate the affected routes explicitly.
     staleTimes: { dynamic: 600, static: 600 },

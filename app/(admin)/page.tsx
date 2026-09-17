@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AccessDenied, SubmitSiteLink } from "@/components/auth/access-denied";
 import { SiteHomeIcon } from "@/components/site-home-icon";
+import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,11 @@ const ADMIN_APPS = [
     label: "Finance",
     description: "Accounts, planning, reimbursement review, and reports",
   },
+  ...(accreditationEnabled() ? [{
+    href: "/accreditation",
+    label: "Accreditation",
+    description: "Evidence, official templates, grounded drafts, and approved archives",
+  }] : []),
   {
     href: "/users",
     label: "Members & invites",

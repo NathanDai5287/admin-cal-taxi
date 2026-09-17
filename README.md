@@ -126,3 +126,18 @@ as the current term; no term selection is exposed.
 See [Finance organization](docs/finance-organization.md) for page ownership,
 required migration, verification, retained accounting behavior, and the future
 whole-site snapshot/restore plan.
+
+## Accreditation reports
+
+`/accreditation` is an admin-only pilot for the Annual Report, Annual Budget,
+and Big Brother Contract. It stores evidence and templates in private Supabase
+Storage, keeps report revisions and citations in Postgres, snapshots current
+Finance values for budget drafts, and archives approved official-format files.
+
+Apply `supabase/migrations/20260916000000_accreditation_pilot.sql`, configure the
+accreditation environment variables from `.env.example`, then upload and confirm
+the three official templates before generating artifacts. Uploaded documents are
+treated as untrusted evidence; only report definitions and explicit officer input
+control generation. The OpenAI adapter is optional for text/OCR generation. With
+no key, deterministic app snapshots and explicit `field = value` overrides still
+work, while unsupported narrative fields remain unresolved.

@@ -208,10 +208,13 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
     >
       <div className={memberSite
         ? "mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4"
-        : "pointer-events-auto mx-auto flex w-full max-w-[1080px] items-center justify-end gap-3"
+        : "pointer-events-none mx-auto flex w-full max-w-[1080px] items-center justify-end gap-3"
       }>
         {memberSite ? <MemberSiteBrand /> : null}
-        <div className="flex items-start justify-end gap-2">
+        <div className={memberSite
+          ? "flex items-start justify-end gap-2"
+          : "pointer-events-auto flex items-start justify-end gap-2"
+        }>
           <ThemeToggle />
           {session === null ? (
             <>
