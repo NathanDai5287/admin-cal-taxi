@@ -538,7 +538,7 @@
   [data-brand] .bulk-fee-member-actions > div { @apply flex gap-4 font-bold text-brand; }
   [data-brand] .bulk-fee-member-actions button { @apply cursor-pointer hover:underline; }
   [data-brand] .bulk-fee-member-list { @apply max-h-[430px] overflow-y-auto border-t border-rule; }
-  [data-brand] .bulk-fee-member-list > div { @apply grid items-end gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(160px,0.8fr)_minmax(170px,0.8fr)_minmax(220px,1.4fr)]; }
+  [data-brand] .bulk-fee-member-list > div { @apply grid items-end gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(160px,0.8fr)_minmax(220px,1.4fr)]; }
   [data-brand] .bulk-fee-member-list > div[hidden] { display: none; }
   [data-brand] .bulk-fee-member-list > div.selected { @apply bg-brand-light; }
   [data-brand] .bulk-fee-member-choice { @apply flex min-h-[42px] cursor-pointer items-center gap-3 text-[13.5px] font-bold text-ink; }

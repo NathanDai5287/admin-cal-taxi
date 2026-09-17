@@ -9,7 +9,6 @@ import { Button } from "@/components/brand/button";
 export type BulkFeeMember = {
   id: string;
   name: string;
-  discordUserId: string;
 };
 
 function SubmitFeesButton({ count }: { count: number }) {
@@ -97,21 +96,6 @@ export function ChargeMembersForm({
                     <input checked={selected} name="memberId" onChange={() => toggleMember(member.id)} type="checkbox" value={member.id} />
                     <span>{member.name}</span>
                   </label>
-                  <div className="field">
-                    <label className="field-label" htmlFor={`bulk-discord-${member.id}`}>Discord ID</label>
-                    <input
-                      className="field-input"
-                      defaultValue={member.discordUserId}
-                      disabled={!selected}
-                      id={`bulk-discord-${member.id}`}
-                      inputMode="numeric"
-                      maxLength={25}
-                      name={`discordUserId:${member.id}`}
-                      pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
-                      placeholder="Optional numeric ID"
-                      title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
-                    />
-                  </div>
                   <div className="field">
                     <label className="field-label" htmlFor={`bulk-note-${member.id}`}>Note</label>
                     <input className="field-input" disabled={!selected} id={`bulk-note-${member.id}`} maxLength={500} name={`notes:${member.id}`} placeholder="Reason for fee" />

@@ -11,22 +11,11 @@ import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-function normalizeDiscordUserId(value: unknown) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.match(/^<@!?(\d{15,22})>$/)?.[1] ?? trimmed;
-}
-
 const entrySchema = z.object({
   memberId: z.string().uuid("member"),
   amountOwed: z.coerce.number().positive("amount").max(999_999_999.99, "amount"),
   dueDate: dateSchema,
   notes: z.string().trim().max(500, "notes"),
-  discordUserId: z.string().refine(
-    (value) => !value || /^\d{15,22}$/.test(value),
-    "discord",
-  ),
 });
 
 type DuesResult =
@@ -43,7 +32,6 @@ type DuesResult =
   | "invalid-amount"
   | "invalid-date"
   | "invalid-notes"
-  | "invalid-discord"
   | "error";
 
 function resultUrl(result: DuesResult) {
@@ -56,7 +44,6 @@ function entryErrorUrl(error: z.ZodError) {
   if (field === "amountOwed") return resultUrl("invalid-amount");
   if (field === "dueDate") return resultUrl("invalid-date");
   if (field === "notes") return resultUrl("invalid-notes");
-  if (field === "discordUserId") return resultUrl("invalid-discord");
   return resultUrl("invalid");
 }
 
@@ -73,10 +60,7 @@ const bulkFeeSchema = z.object({
   memberIds: z.array(z.string().uuid()).min(1).max(500),
 });
 
-const bulkMemberSchema = z.object({
-  discordUserId: z.string().refine((value) => !value || /^\d{15,22}$/.test(value)),
-  notes: z.string().trim().max(500),
-});
+const bulkMemberSchema = z.object({ notes: z.string().trim().max(500) });
 
 export async function addDuesFees(formData: FormData) {
   const { userId } = await requireAdmin("/");
@@ -94,7 +78,6 @@ export async function addDuesFees(formData: FormData) {
   const memberDetails = new Map<string, z.infer<typeof bulkMemberSchema>>();
   for (const memberId of parsed.data.memberIds) {
     const detail = bulkMemberSchema.safeParse({
-      discordUserId: normalizeDiscordUserId(formData.get(`discordUserId:${memberId}`)),
       notes: formData.get(`notes:${memberId}`) ?? "",
     });
     if (!detail.success) redirect(resultUrl("invalid"));
@@ -104,7 +87,7 @@ export async function addDuesFees(formData: FormData) {
   const supabase = createAdminClient();
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, full_name, email")
+    .select("id, full_name, email, discord_user_id")
     .in("id", parsed.data.memberIds)
     .in("role", ["member", "admin"])
     .is("removed_at", null);
@@ -125,7 +108,7 @@ export async function addDuesFees(formData: FormData) {
       amount_paid: 0,
       due_date: parsed.data.dueDate,
       notes: detail.notes,
-      discord_user_id: detail.discordUserId,
+      discord_user_id: profile.discord_user_id,
       created_by: userId,
     };
   });
@@ -148,7 +131,6 @@ export async function updateDuesBalance(formData: FormData) {
     amountOwed: formData.get("amountOwed"),
     dueDate: formData.get("dueDate"),
     notes: formData.get("notes") ?? "",
-    discordUserId: normalizeDiscordUserId(formData.get("discordUserId")),
   });
 
   if (!parsed.success) redirect(resultUrl("invalid"));
@@ -156,18 +138,20 @@ export async function updateDuesBalance(formData: FormData) {
   const supabase = createAdminClient();
   const { data: current, error: readError } = await supabase
     .from("chapter_receivables")
-    .select("member_id, member_name, amount_assessed, amount_paid, updated_at")
+    .select("member_id, member_name, amount_assessed, amount_paid, discord_user_id, updated_at")
     .eq("id", parsed.data.id)
     .single();
 
   if (readError || !current) redirect(resultUrl("error"));
 
   let memberName = current.member_name;
+  let discordUserId = current.discord_user_id;
   if (parsed.data.memberId !== current.member_id) {
-    const { data: member } = await supabase.from("profiles").select("id, full_name, email")
+    const { data: member } = await supabase.from("profiles").select("id, full_name, email, discord_user_id")
       .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
     if (!member) redirect(resultUrl("invalid-member"));
     memberName = member.full_name.trim() || member.email;
+    discordUserId = member.discord_user_id;
   }
   const currentAssessed = Number(current.amount_assessed);
   const currentPaid = Number(current.amount_paid);
@@ -181,7 +165,7 @@ export async function updateDuesBalance(formData: FormData) {
       amount_paid: wasPaid ? parsed.data.amountOwed : currentPaid,
       due_date: parsed.data.dueDate,
       notes: parsed.data.notes,
-      discord_user_id: parsed.data.discordUserId,
+      discord_user_id: discordUserId,
     })
     .eq("id", parsed.data.id)
     .eq("updated_at", current.updated_at)

@@ -177,6 +177,7 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"];
           removed_at: string | null;
           has_signed_in: boolean;
+          discord_user_id: string;
           created_at: string;
         };
         Insert: {
@@ -186,6 +187,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
+          discord_user_id?: string;
           created_at?: string;
         };
         Update: {
@@ -194,6 +196,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
+          discord_user_id?: string;
         };
         Relationships: [];
       };
@@ -313,6 +316,10 @@ export type Database = {
       };
       admin_set_pending_profile_name: {
         Args: { new_full_name: string; target_user_id: string };
+        Returns: undefined;
+      };
+      admin_set_profile_discord_id: {
+        Args: { new_discord_user_id: string; target_user_id: string };
         Returns: undefined;
       };
       admin_set_profile_role: {

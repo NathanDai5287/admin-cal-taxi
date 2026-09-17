@@ -119,6 +119,36 @@ export async function updatePendingUserName(userId: string, fullName: string) {
   revalidatePath("/finance/accounts/receivable");
 }
 
+function normalizeDiscordUserId(value: string) {
+  const trimmed = value.trim();
+  return trimmed.match(/^<@!?(\d{15,22})>$/)?.[1] ?? trimmed;
+}
+
+export async function updateDiscordUserId(userId: string, discordUserId: string) {
+  await requireAdmin("/");
+  const normalizedId = normalizeDiscordUserId(discordUserId);
+
+  if (!userId) {
+    throw new Error("Missing user.");
+  }
+  if (normalizedId && !/^\d{15,22}$/.test(normalizedId)) {
+    throw new Error("Enter a 15–22 digit Discord user ID or paste a Discord mention.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_profile_discord_id", {
+    target_user_id: userId,
+    new_discord_user_id: normalizedId,
+  });
+
+  if (error) {
+    throw new Error("Unable to update Discord ID. Please try again.");
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/finance/accounts/receivable");
+}
+
 export async function removeUser(userId: string) {
   const session = await requireAdmin("/");
 

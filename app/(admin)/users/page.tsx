@@ -18,7 +18,7 @@ export default async function UsersPage() {
   const [session, supabase] = await Promise.all([getSessionProfile(), createClient()]);
   const profilesResult = await loadAllPages((from, to) => supabase
     .from("profiles")
-    .select("id, full_name, email, role, has_signed_in, created_at")
+    .select("id, full_name, email, role, has_signed_in, discord_user_id, created_at")
     .is("removed_at", null)
     .order("created_at", { ascending: true })
     .order("id", { ascending: true })
@@ -83,6 +83,7 @@ export default async function UsersPage() {
             id: profile.id,
             fullName: profile.full_name,
             email: profile.email,
+            discordUserId: profile.discord_user_id,
             role: profile.role,
             hasSignedIn: profile.has_signed_in,
             statusLabel: profile.has_signed_in ? "Signed in" : `Invited ${formatDate(profile.created_at)}`,

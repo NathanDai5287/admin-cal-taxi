@@ -2,13 +2,14 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole, updatePendingUserName } from "@/app/(admin)/users/actions";
+import { removeUser, setUserRole, updateDiscordUserId, updatePendingUserName } from "@/app/(admin)/users/actions";
 import { Button } from "@/components/brand/button";
 
 export type MemberRow = {
   id: string;
   fullName: string;
   email: string;
+  discordUserId: string;
   role: "none" | "member" | "admin";
   hasSignedIn: boolean;
   statusLabel: string;
@@ -17,6 +18,7 @@ export type MemberRow = {
 type OptimisticUpdate =
   | { type: "role"; userId: string; role: MemberRow["role"] }
   | { type: "name"; userId: string; fullName: string }
+  | { type: "discord"; userId: string; discordUserId: string }
   | { type: "remove"; userId: string };
 
 function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[] {
@@ -28,8 +30,60 @@ function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[
       member.id === update.userId ? { ...member, fullName: update.fullName } : member,
     );
   }
+  if (update.type === "discord") {
+    return members.map((member) =>
+      member.id === update.userId ? { ...member, discordUserId: update.discordUserId } : member,
+    );
+  }
   return members.map((member) =>
     member.id === update.userId ? { ...member, role: update.role } : member,
+  );
+}
+
+function DiscordMemberId({
+  member,
+  disabled,
+  onSave,
+}: {
+  member: MemberRow;
+  disabled: boolean;
+  onSave: (discordUserId: string) => void;
+}) {
+  const [discordUserId, setDiscordUserId] = useState(member.discordUserId);
+  const normalizedId = discordUserId.trim().match(/^<@!?(\d{15,22})>$/)?.[1] ?? discordUserId.trim();
+  const valid = !normalizedId || /^\d{15,22}$/.test(normalizedId);
+
+  return (
+    <form
+      className="flex min-w-56 items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setDiscordUserId(normalizedId);
+        onSave(normalizedId);
+      }}
+    >
+      <input
+        aria-label={`Discord ID for ${member.email}`}
+        className="field-input min-w-0"
+        disabled={disabled}
+        inputMode="numeric"
+        maxLength={25}
+        onChange={(event) => setDiscordUserId(event.target.value)}
+        pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
+        placeholder="Optional ID or mention"
+        title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
+        value={discordUserId}
+      />
+      <Button
+        className="shrink-0"
+        compact
+        disabled={disabled || !valid || normalizedId === member.discordUserId}
+        type="submit"
+        variant="secondary"
+      >
+        Save
+      </Button>
+    </form>
   );
 }
 
@@ -203,6 +257,21 @@ export function MembersTable({
     });
   }
 
+  function changeDiscordUserId(userId: string, discordUserId: string) {
+    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
+    setMemberPending(userId, true);
+    startTransition(async () => {
+      applyOptimistic({ type: "discord", userId, discordUserId });
+      try {
+        await updateDiscordUserId(userId, discordUserId);
+      } catch {
+        setErrors((current) => new Map(current).set(userId, "Unable to update that Discord ID. Please try again."));
+      } finally {
+        setMemberPending(userId, false);
+      }
+    });
+  }
+
   function remove(userId: string) {
     setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
     setMemberPending(userId, true);
@@ -229,6 +298,7 @@ export function MembersTable({
           <tr>
             <th>Name</th>
             <th>Email</th>
+            <th>Discord ID</th>
             <th>Role</th>
             <th>Status</th>
             <th></th>
@@ -251,6 +321,13 @@ export function MembersTable({
                   {isYou ? <span className="text-muted"> (you)</span> : null}
                 </td>
                 <td>{member.email}</td>
+                <td>
+                  <DiscordMemberId
+                    disabled={memberPending}
+                    member={member}
+                    onSave={(discordUserId) => changeDiscordUserId(member.id, discordUserId)}
+                  />
+                </td>
                 <td>
                   <select
                     aria-label={`Role for ${member.email}`}

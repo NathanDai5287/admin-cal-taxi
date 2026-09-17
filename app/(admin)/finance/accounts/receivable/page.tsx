@@ -34,7 +34,6 @@ const feedback: Record<string, { text: string; success: boolean }> = {
   "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
   "invalid-date": { text: "Choose a valid due date.", success: false },
   "invalid-notes": { text: "Keep the note under 500 characters.", success: false },
-  "invalid-discord": { text: "Discord needs a numeric user ID or a pasted <@mention>, not a username.", success: false },
   error: { text: "The balance could not be saved. Please try again.", success: false },
 };
 
@@ -55,7 +54,7 @@ export default async function DuesPage({
       .range(from, to)),
     loadAllPages((from, to) => supabase
       .from("profiles")
-      .select("id, full_name, email")
+      .select("id, full_name, email, discord_user_id")
       .in("role", ["member", "admin"])
       .is("removed_at", null)
       .order("full_name", { ascending: true })
@@ -99,17 +98,12 @@ export default async function DuesPage({
     throw new Error(`Unable to load members: ${profilesResult.error.message}`);
   }
 
-  const discordIdsByMember = new Map<string, string>();
-  for (const row of rows) {
-    if (row.memberId && /^\d{15,22}$/.test(row.discordUserId)) discordIdsByMember.set(row.memberId, row.discordUserId);
-  }
   const members = (profilesResult.data ?? []).flatMap((profile) => {
     const name = profile.full_name.trim() || profile.email;
     return name ? [{
       id: profile.id,
       name,
       email: profile.email,
-      discordUserId: discordIdsByMember.get(profile.id) ?? "",
     }] : [];
   });
 

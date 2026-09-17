@@ -366,7 +366,6 @@ export function DuesLedger({
                   paidAmount: candidate.isPaid ? amountOwed : candidate.paidAmount,
                   dueDate,
                   notes: String(form.get("notes") ?? ""),
-                  discordUserId: String(form.get("discordUserId") ?? "").replace(/\D/g, ""),
                   isOverdue: !candidate.isPaid && dueDate < currentPacificDate(),
                 }
               : candidate));
@@ -389,20 +388,6 @@ export function DuesLedger({
               <div className="field">
                 <label className="field-label" htmlFor={`due-${editingRow.id}`}>Due date</label>
                 <input className="field-input" defaultValue={editingRow.dueDate} id={`due-${editingRow.id}`} name="dueDate" type="date" required />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor={`discord-${editingRow.id}`}>Discord member ID</label>
-                <input
-                  className="field-input"
-                  defaultValue={editingRow.discordUserId}
-                  id={`discord-${editingRow.id}`}
-                  inputMode="numeric"
-                  maxLength={25}
-                  name="discordUserId"
-                  pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
-                  placeholder="Optional numeric ID"
-                  title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
-                />
               </div>
               <div className="field sm:col-span-2">
                 <label className="field-label" htmlFor={`notes-${editingRow.id}`}>Note</label>
