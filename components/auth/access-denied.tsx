@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { siteOrigins } from "@/components/auth/site-origins";
 
 type AccessDeniedProps = {
@@ -11,8 +13,18 @@ type AccessDeniedProps = {
 // Client component so the submit-site link points at the right origin in
 // local development (reimbursements.localhost) as well as production.
 export function SubmitSiteLink({ className }: { className?: string }) {
+  // Client components are also rendered on the server. Give React a stable
+  // server snapshot, then read the environment-specific origin after
+  // hydration. There is nothing to subscribe to because location is fixed
+  // for the lifetime of this page.
+  const submitOrigin = useSyncExternalStore(
+    () => () => {},
+    () => siteOrigins().submitOrigin,
+    () => "https://reimbursements.cal.taxi",
+  );
+
   return (
-    <a className={className ?? "back-link"} href={siteOrigins().submitOrigin}>
+    <a className={className ?? "back-link"} href={submitOrigin}>
       Go to the reimbursement form →
     </a>
   );
