@@ -2,7 +2,8 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole } from "@/app/(admin)/users/actions";
+import { removeUser, setUserRole, updatePendingUserName } from "@/app/(admin)/users/actions";
+import { Button } from "@/components/brand/button";
 
 export type MemberRow = {
   id: string;
@@ -15,14 +16,64 @@ export type MemberRow = {
 
 type OptimisticUpdate =
   | { type: "role"; userId: string; role: MemberRow["role"] }
+  | { type: "name"; userId: string; fullName: string }
   | { type: "remove"; userId: string };
 
 function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[] {
   if (update.type === "remove") {
     return members.filter((member) => member.id !== update.userId);
   }
+  if (update.type === "name") {
+    return members.map((member) =>
+      member.id === update.userId ? { ...member, fullName: update.fullName } : member,
+    );
+  }
   return members.map((member) =>
     member.id === update.userId ? { ...member, role: update.role } : member,
+  );
+}
+
+function PendingMemberName({
+  member,
+  disabled,
+  onSave,
+}: {
+  member: MemberRow;
+  disabled: boolean;
+  onSave: (fullName: string) => void;
+}) {
+  const [fullName, setFullName] = useState(member.fullName);
+  const normalizedName = fullName.trim();
+  const unchanged = normalizedName === member.fullName;
+
+  return (
+    <form
+      className="flex min-w-56 items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(normalizedName);
+      }}
+    >
+      <input
+        aria-label={`Name for ${member.email}`}
+        className="field-input min-w-0"
+        disabled={disabled}
+        maxLength={120}
+        onChange={(event) => setFullName(event.target.value)}
+        placeholder="Enter name"
+        required
+        value={fullName}
+      />
+      <Button
+        className="shrink-0"
+        compact
+        disabled={disabled || !normalizedName || unchanged}
+        type="submit"
+        variant="secondary"
+      >
+        Save
+      </Button>
+    </form>
   );
 }
 
@@ -137,6 +188,21 @@ export function MembersTable({
     });
   }
 
+  function changeName(userId: string, fullName: string) {
+    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
+    setMemberPending(userId, true);
+    startTransition(async () => {
+      applyOptimistic({ type: "name", userId, fullName });
+      try {
+        await updatePendingUserName(userId, fullName);
+      } catch {
+        setErrors((current) => new Map(current).set(userId, "Unable to update that name. Please try again."));
+      } finally {
+        setMemberPending(userId, false);
+      }
+    });
+  }
+
   function remove(userId: string) {
     setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
     setMemberPending(userId, true);
@@ -175,7 +241,13 @@ export function MembersTable({
             return (
               <tr key={member.id}>
                 <td>
-                  {member.fullName.trim() ? member.fullName : <span className="text-muted">Pending sign-in</span>}
+                  {member.hasSignedIn
+                    ? member.fullName.trim() || <span className="text-muted">No name</span>
+                    : <PendingMemberName
+                        disabled={memberPending}
+                        member={member}
+                        onSave={(fullName) => changeName(member.id, fullName)}
+                      />}
                   {isYou ? <span className="text-muted"> (you)</span> : null}
                 </td>
                 <td>{member.email}</td>

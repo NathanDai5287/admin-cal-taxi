@@ -94,6 +94,31 @@ export async function setUserRole(userId: string, role: string) {
   revalidatePath("/finance/accounts/receivable");
 }
 
+export async function updatePendingUserName(userId: string, fullName: string) {
+  await requireAdmin("/");
+  const normalizedName = fullName.trim();
+
+  if (!userId) {
+    throw new Error("Missing user.");
+  }
+  if (!normalizedName || normalizedName.length > 120) {
+    throw new Error("Enter a name with 120 characters or fewer.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_pending_profile_name", {
+    target_user_id: userId,
+    new_full_name: normalizedName,
+  });
+
+  if (error) {
+    throw new Error("Unable to update name. Please try again.");
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/finance/accounts/receivable");
+}
+
 export async function removeUser(userId: string) {
   const session = await requireAdmin("/");
 

@@ -293,6 +293,10 @@ export type Database = {
         Args: { target_user_id: string };
         Returns: undefined;
       };
+      admin_set_pending_profile_name: {
+        Args: { new_full_name: string; target_user_id: string };
+        Returns: undefined;
+      };
       admin_set_profile_role: {
         Args: { new_role: "none" | "member" | "admin"; target_user_id: string };
         Returns: undefined;
