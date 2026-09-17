@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEventHandler, type RefObject } from "react";
+import Image from "next/image";
 
 import { clipboardImage } from "@/lib/reimbursements/clipboard-image";
+import { replaceImagePreviewUrl } from "@/lib/reimbursements/image-preview";
 
 type PasteImageInputProps = {
   accept: string;
@@ -35,7 +37,19 @@ export function PasteImageInput({
 }: PasteImageInputProps) {
   const localRef = useRef<HTMLInputElement>(null);
   const activeRef = inputRef ?? localRef;
+  const previewUrlRef = useRef("");
   const [pasteMessage, setPasteMessage] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  function updatePreview(image?: File) {
+    const nextUrl = replaceImagePreviewUrl(previewUrlRef.current, image);
+    previewUrlRef.current = nextUrl;
+    setPreviewUrl(nextUrl);
+  }
+
+  useEffect(() => () => {
+    replaceImagePreviewUrl(previewUrlRef.current);
+  }, []);
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
@@ -77,12 +91,25 @@ export function PasteImageInput({
       name={name}
       onChange={(event) => {
         setPasteMessage("");
+        updatePreview(event.currentTarget.files?.[0]);
         onChange?.(event);
       }}
       ref={activeRef}
       required={required}
       type="file"
     />
+    {previewUrl && (
+      <div className="relative mt-3 h-72 w-full border border-rule bg-canvas">
+        <Image
+          alt="Selected receipt preview"
+          className="object-contain"
+          fill
+          sizes="(max-width: 640px) 100vw, 640px"
+          src={previewUrl}
+          unoptimized
+        />
+      </div>
+    )}
     <p aria-live="polite" className="field-hint">{pasteMessage}</p>
   </>;
 }

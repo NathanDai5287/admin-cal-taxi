@@ -10,7 +10,7 @@
     "discord-bot": "node --env-file-if-exists=.env.local scripts/discord-bot.mjs",
     "test:accreditation": "node --test scripts/accreditation.test.mjs",
     "test:members": "node --test scripts/invite-emails.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs",
-    "test:receipt": "node --test scripts/clipboard-image.test.mjs",
+    "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
