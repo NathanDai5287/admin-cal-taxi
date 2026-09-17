@@ -13,11 +13,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:mcp": "node --test scripts/mcp.test.mjs",
     "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@myriaddreamin/typst-ts-node-compiler": "^0.7.0",
+    "@supabase/middleware": "^0.5.0",
+    "@supabase/server": "^1.7.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "@upstash/redis": "^1.38.0",

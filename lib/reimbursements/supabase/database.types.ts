@@ -197,6 +197,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      mcp_audit_log: {
+        Row: {
+          id: number;
+          user_id: string;
+          client_id: string;
+          tool_name: "get_finance_overview" | "list_budget_categories" | "list_open_dues";
+          called_at: string;
+        };
+        Insert: {
+          id?: never;
+          user_id: string;
+          client_id: string;
+          tool_name: "get_finance_overview" | "list_budget_categories" | "list_open_dues";
+          called_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
       invites: {
         Row: {
           email: string;

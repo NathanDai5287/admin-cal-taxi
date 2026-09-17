@@ -10,17 +10,25 @@ export const dynamic = "force-dynamic";
 
 type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+function safeNext(value: string | string[] | undefined) {
+  if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")) {
+    return value;
+  }
+  return "/finance";
+}
+
 export default async function ReimbursementsLoginPage({
   searchParams,
 }: {
   searchParams: PageSearchParams;
 }) {
+  const params = await searchParams;
+  const next = safeNext(params.next);
   const session = await getSessionProfile();
   if (session) {
-    redirect("/finance");
+    redirect(next);
   }
 
-  const params = await searchParams;
   const authFailed = params.error === "auth";
 
   return (
@@ -34,7 +42,7 @@ export default async function ReimbursementsLoginPage({
           {authFailed ? (
             <p className="form-message mb-5">Sign-in failed. Please try again.</p>
           ) : null}
-          <GoogleSignInButton next="/finance" />
+          <GoogleSignInButton next={next} />
         </div>
       </section>
     </main>

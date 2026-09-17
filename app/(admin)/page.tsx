@@ -35,6 +35,11 @@ const ADMIN_APPS = [
     label: "Members & invites",
     description: "Invite members and manage who has access",
   },
+  {
+    href: "/connections",
+    label: "Connected AI clients",
+    description: "Review and remove AI tools that can read finance data",
+  },
 ];
 
 export default async function Home({

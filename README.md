@@ -62,6 +62,31 @@ then a server action records the row with the Supabase secret key. Tabscanner
 performs receipt total extraction in the background. Submissions move from
 `pending` to `verified`, `mismatch`, or `processing_failed`; a reviewer at
 `admin.cal.taxi/finance/review` can then mark them `approved` or `denied`.
+
+## Connect an AI client
+
+The MCP server gives active administrators read-only access to finance summaries.
+It does not accept pasted API keys or long-lived personal tokens.
+
+1. Add `https://admin.cal.taxi/api/mcp` as a remote HTTP MCP server in your client.
+2. Sign in with the same Google account that you use for the admin site.
+3. Review the client name and read-only permissions, then select **Allow access**.
+4. Open `https://admin.cal.taxi/connections` to review or remove connected clients.
+
+The first version provides `get_finance_overview`, `list_budget_categories`, and
+`list_open_dues`. Each call verifies the current account is an active administrator
+and writes a secret-free audit record.
+
+Production setup also requires these Supabase Auth settings:
+
+- Enable the OAuth 2.1 server.
+- Set the authorization path to `/oauth/consent`.
+- Enable dynamic client registration.
+- Use an asymmetric ES256 or RS256 JWT signing key.
+
+Apply `supabase/config.toml` with `npx supabase config push`, then apply migrations
+with `npx supabase db push`. Test discovery by requesting
+`https://admin.cal.taxi/api/mcp/oauth-protected-resource`.
 Admins record payouts separately at `/finance/accounts/payable`.
 
 1. Copy `.env.example` to `.env.local` and fill in the values.
