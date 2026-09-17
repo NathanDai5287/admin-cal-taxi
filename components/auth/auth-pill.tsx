@@ -199,8 +199,8 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
     <header
       className={
         memberSite
-          ? "account-controls sticky top-0 z-50 border-t-[3px] border-t-brand px-4 py-3"
-          : "pointer-events-none fixed inset-x-0 top-4 z-50 px-6"
+          ? "account-controls z-50 border-t-[3px] border-t-brand px-4 py-3"
+          : "pointer-events-none absolute inset-x-0 top-4 z-50 px-6"
       }
       style={{
         fontFamily: 'Inter, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif',
