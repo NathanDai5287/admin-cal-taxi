@@ -19,4 +19,5 @@ alter table public.reimbursement_budgets
   );
 
 insert into public.reimbursement_budgets (budget_key, amount)
-values ('miscellaneous_fees', 690.00);
+values ('miscellaneous_fees', 690.00)
+on conflict (budget_key) do nothing;

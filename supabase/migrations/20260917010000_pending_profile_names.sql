@@ -1,4 +1,4 @@
-create function public.admin_set_pending_profile_name(target_user_id uuid, new_full_name text)
+create or replace function public.admin_set_pending_profile_name(target_user_id uuid, new_full_name text)
 returns void
 language plpgsql
 security definer set search_path = ''

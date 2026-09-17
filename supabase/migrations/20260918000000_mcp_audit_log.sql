@@ -1,4 +1,4 @@
-create table public.mcp_audit_log (
+create table if not exists public.mcp_audit_log (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete restrict,
   client_id text not null check (char_length(client_id) between 1 and 200),
@@ -42,18 +42,19 @@ as $$
   )
 $$;
 
-create index mcp_audit_log_user_called_at_idx
+create index if not exists mcp_audit_log_user_called_at_idx
   on public.mcp_audit_log (user_id, called_at desc);
 
 revoke all on public.mcp_audit_log from anon, authenticated;
 grant select on public.mcp_audit_log to authenticated;
 alter table public.mcp_audit_log enable row level security;
 
+drop policy if exists "admins can view their MCP audit records" on public.mcp_audit_log;
 create policy "admins can view their MCP audit records"
   on public.mcp_audit_log for select to authenticated
   using (user_id = auth.uid() and (public.is_admin() or public.is_mcp_admin()));
 
-create function public.mcp_finance_overview()
+create or replace function public.mcp_finance_overview()
 returns jsonb
 language plpgsql
 security definer
@@ -91,7 +92,7 @@ begin
 end;
 $$;
 
-create function public.mcp_budget_categories()
+create or replace function public.mcp_budget_categories()
 returns jsonb
 language plpgsql
 security definer
@@ -141,7 +142,7 @@ begin
 end;
 $$;
 
-create function public.mcp_open_dues()
+create or replace function public.mcp_open_dues()
 returns jsonb
 language plpgsql
 security definer

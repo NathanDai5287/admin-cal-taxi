@@ -1,17 +1,30 @@
 -- Preserve existing entries as actual income; new plans are explicitly forecasts.
 alter table public.reimbursement_budget_entries
-  add column kind text not null default 'income' check (kind in ('income', 'forecast'));
+  add column if not exists kind text not null default 'income';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'reimbursement_budget_entries_kind_check'
+      and conrelid = 'public.reimbursement_budget_entries'::regclass
+  ) then
+    alter table public.reimbursement_budget_entries
+      add constraint reimbursement_budget_entries_kind_check
+      check (kind in ('income', 'forecast'));
+  end if;
+end $$;
 
 alter table public.reimbursement_manual_expenses
-  add column receipt_path text;
+  add column if not exists receipt_path text;
 
 -- Historical name-only balances remain visible until an admin links them.
 -- Never infer identity from a potentially duplicated name.
 alter table public.chapter_receivables
-  add column member_id uuid references public.profiles(id) on delete restrict;
-create index chapter_receivables_member_idx on public.chapter_receivables(member_id);
+  add column if not exists member_id uuid references public.profiles(id) on delete restrict;
+create index if not exists chapter_receivables_member_idx on public.chapter_receivables(member_id);
 
-create function public.enforce_receivable_member()
+create or replace function public.enforce_receivable_member()
 returns trigger language plpgsql security definer set search_path = '' as $$
 declare member_name_value text;
 begin
@@ -26,12 +39,13 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists chapter_receivables_registered_member on public.chapter_receivables;
 create trigger chapter_receivables_registered_member
   before insert or update on public.chapter_receivables
   for each row execute function public.enforce_receivable_member();
 
 -- Applies to website and Discord writes, including service-role writes.
-create function public.enforce_reimbursement_payment_review()
+create or replace function public.enforce_reimbursement_payment_review()
 returns trigger language plpgsql set search_path = '' as $$
 begin
   if new.reimbursed and new.status <> 'approved' then
@@ -48,6 +62,7 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists reimbursements_payment_review_boundary on public.reimbursements;
 create trigger reimbursements_payment_review_boundary
   before insert or update on public.reimbursements
   for each row execute function public.enforce_reimbursement_payment_review();
