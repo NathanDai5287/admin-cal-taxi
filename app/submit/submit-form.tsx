@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "@/components/brand/button";
+import { PasteImageInput } from "@/components/forms/paste-image-input";
 
 import { useEffect, useRef, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import Link from "next/link";
@@ -10,6 +11,7 @@ import { categories, reimbursementSchema } from "@/lib/reimbursements/format";
 
 import { prepareReceiptImage, receiptAccept, receiptFormat, receiptValidationError } from "@/lib/reimbursements/receipt-upload";
 const paymentMethodStorageKey = "reimbursements.preferredPaymentMethod";
+const receiptTypes = ["image/jpeg", "image/png", "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"];
 
 export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
   const router = useRouter();
@@ -222,19 +224,21 @@ export function SubmitForm({ defaultFullName }: { defaultFullName?: string }) {
           onDrop={handleReceiptDrop}
         >
           <p className="mb-3 text-sm text-muted">
-            {draggingReceipt ? "Drop your receipt here" : "Drag a receipt image here, or choose a file below."}
+            {draggingReceipt ? "Drop your receipt here" : "Paste, drag, or choose a receipt image."}
           </p>
-          <input
+          <PasteImageInput
             accept={receiptAccept}
-            aria-describedby={`receipt-hint${receiptError ? " receipt-error" : ""}`}
+            acceptedTypes={receiptTypes}
             className="file-input"
+            describedBy={`receipt-hint${receiptError ? " receipt-error" : ""}`}
             disabled={pending}
             id="receipt"
+            inputRef={receiptRef}
+            maxBytes={10 * 1024 * 1024}
             name="receipt"
             onChange={() => setReceiptError("")}
-            ref={receiptRef}
-            type="file"
             required
+            validationMessage="Choose a non-empty JPG, PNG, or HEIC image up to 10 MB."
           />
         </div>
         <span className="field-hint" id="receipt-hint">JPG, PNG, or HEIC, up to 10 MB. HEIC photos are converted to JPG for viewing. One receipt per submission.</span>

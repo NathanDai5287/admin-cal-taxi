@@ -1,4 +1,5 @@
 import { Button } from "@/components/brand/button";
+import { PasteImageInput } from "@/components/forms/paste-image-input";
 import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
 import { categories, formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
@@ -73,8 +74,16 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           </div>
           <div className="field mt-4">
             <label className="field-label" htmlFor="manual-receipt">Receipt image (optional)</label>
-            <input className="file-input" id="manual-receipt" name="receipt" type="file" accept="image/jpeg,image/png" />
-            <p className="field-hint">JPG or PNG, up to 3 MB. Leave empty if there is no receipt.</p>
+            <PasteImageInput
+              accept="image/jpeg,image/png"
+              acceptedTypes={["image/jpeg", "image/png"]}
+              className="file-input"
+              id="manual-receipt"
+              maxBytes={3 * 1024 * 1024}
+              name="receipt"
+              validationMessage="Choose a non-empty JPG or PNG image up to 3 MB."
+            />
+            <p className="field-hint">Paste anywhere on this page, or choose a JPG or PNG up to 3 MB. Leave empty if there is no receipt.</p>
           </div>
           <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
             <div aria-live="polite">
