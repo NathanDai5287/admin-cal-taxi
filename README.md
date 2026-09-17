@@ -138,6 +138,96 @@ Apply `supabase/migrations/20260916000000_accreditation_pilot.sql`, configure th
 accreditation environment variables from `.env.example`, then upload and confirm
 the three official templates before generating artifacts. Uploaded documents are
 treated as untrusted evidence; only report definitions and explicit officer input
-control generation. The OpenAI adapter is optional for text/OCR generation. With
-no key, deterministic app snapshots and explicit `field = value` overrides still
-work, while unsupported narrative fields remain unresolved.
+control generation. Gemini is the default language, embedding, and PDF provider;
+the optional OpenAI language/embedding adapter remains available. PDF processing
+uses Gemini. With no key, deterministic app snapshots and explicit `field = value`
+overrides still work, while unsupported narrative fields remain unresolved.
+
+## Gemini and published policies
+
+Apply `supabase/migrations/20260917000000_gemini_policy.sql` after the pilot migration.
+The migration adds 768-dimensional vectors and HNSW indexes without replacing
+legacy vectors. Search runs in Postgres: authorized, scoped chunks are ranked by
+vector distance and full text (40 candidates each), then reciprocal-rank fusion
+returns up to 18 report passages or 12 policy passages. The filtered candidate
+set is materialized for exact ranking so metadata isolation precedes ranking;
+the HNSW indexes are available for later approximate-search tuning as corpus size grows.
+
+Set the server-only configuration in `.env.example`. Never use a `NEXT_PUBLIC_`
+name for Gemini credentials. The requested defaults are `gemini-3.8-flash` for
+language/PDF processing and `gemini-embedding-2` at 768 dimensions. Confirm those
+model IDs are available to the deployment account before enabling generation.
+Gemini Embedding 2 aggregates multi-input requests, so the adapter makes a separate
+request per chunk, formats documents as `title: … | text: …`, and uses
+`task: question answering | query: …` for questions. See the
+[Google embedding documentation](https://ai.google.dev/gemini-api/docs/embeddings).
+
+`/policy` accepts independent questions from active member/admin profiles. A
+bounded date extraction step handles dates mentioned in questions; the date field
+takes precedence and an unspecified date defaults to the current UTC date.
+Ambiguous dates require clarification. Each answer uses only policies that are
+published and effective for that date. Citation IDs and exact quotes are checked
+locally, followed by a separate bounded grounding check. This is document guidance,
+not event approval. There is no inferred hierarchy among issuing authorities.
+
+`/policy/library` lets administrators upload drafts, edit metadata, retry failed
+processing, inspect extracted passages, publish, supersede, and archive. Published
+content is immutable: upload a new version to change it and explicitly retire the
+old one. Effective end dates are inclusive. Publication requires reviewed text and
+locators, complete embeddings, title, authority, version and effective date.
+Members receive originals through an authenticated, uncached download route;
+draft and retired originals are restricted to administrators. Storage itself has
+no member download policy. Question history is visible only to its author and
+administrators; it stores the structured answer, source references/locators and
+model profile, not a duplicate of every retrieved passage.
+
+### Staged rollout
+
+1. Apply the two accreditation migrations in order. Inspect `supabase migration
+   list --linked` and `supabase db push --dry-run` first; do not inadvertently apply
+   unrelated pending migrations. The new migration also hardens the retained
+   approval RPC's caller identity and fixes its table-specific immutability checks.
+2. Deploy code with `ACCREDITATION_GEMINI_REPORTS_ENABLED=false`,
+   `POLICY_ASSISTANT_ENABLED=false`, and `POLICY_ASSISTANT_MEMBERS_ENABLED=false`.
+   Set `GEMINI_API_KEY` through the deployment's secret configuration.
+3. In Accreditation → Evidence, use **Reprocess / re-embed** on each ready or failed
+   source. Remove signatures first and confirm the source and extracted text are
+   signature-free. Successful operations are idempotent. Each source switches
+   profiles transactionally only after every chunk succeeds; old vectors and their
+   provider metadata remain stored. Failed migration attempts preserve a ready
+   legacy source and display an error for retry. Quota failures are retryable.
+4. Confirm source profiles and review retrieval for cycle/term isolation, paraphrases,
+   and exact numbers/times. Upload and confirm the actual Annual Report, Annual
+   Budget, and Big Brother Contract templates. Render and visually inspect all
+   three, checking signatures remain blank. Then enable
+   `ACCREDITATION_GEMINI_REPORTS_ENABLED=true`. Budgets and contracts continue to use
+   deterministic values and officer overrides; they do not invoke the language model.
+5. Set `POLICY_ASSISTANT_ENABLED=true` with member access still false. Upload
+   signature-free policies without unnecessary personal information as drafts.
+   Compare extracted text and citation locators to each original, then explicitly
+   publish. Evaluate a curated set of actual questions, including conflicts,
+   superseded policies, missing event details and injection documents.
+6. Enable `POLICY_ASSISTANT_MEMBERS_ENABLED=true` only after administrator evaluation.
+   Member limits default to five questions per rolling minute and fifty per rolling
+   24 hours, configured by `POLICY_QUESTIONS_PER_MINUTE` and
+   `POLICY_QUESTIONS_PER_DAY`. Reservations are atomic and failed requests count.
+   One question can make several bounded model requests, so reduce these limits
+   when the account's free-tier quota requires it. Members get a retry message if
+   Gemini capacity is unavailable.
+
+Disable either feature with its feature flag to stop application access. No policy
+is automatically published and no report is automatically approved. Archive or
+supersede a policy to remove it from future retrieval; historical question answers
+retain their original citations for audit, but source download checks run again.
+
+### Verification
+
+Run `npm run test:accreditation`, `npm run test:policy`, `npm run lint`, and
+`npm run build`. Policy tests mock Gemini and execute both migrations in disposable
+PGlite PostgreSQL with pgvector; they do not mutate the configured Supabase database.
+They cover structured-output retries, dimensions, page extraction, quota errors,
+unsupported citations/conclusions, event dates, hybrid retrieval, effective dates,
+RLS, rolling limits, immutable approvals and preserved legacy embeddings.
+The social-event fixture contains explicitly labeled test text, not actual
+fraternity rules. Actual-model quality and official-template visual review remain
+deployment acceptance checks requiring the key and official documents.

@@ -8,7 +8,7 @@ import PizZip from "pizzip";
 import type { ExtractedChunk } from "./types";
 import type { OcrProvider } from "./providers";
 
-const MAX_CHUNK_CHARS = 3_500;
+const MAX_CHUNK_CHARS = 3_200;
 const MAX_EXTRACTED_CHARS = 5_000_000;
 const MAX_CHUNKS = 2_000;
 
@@ -29,21 +29,28 @@ function assertSafeOfficeArchive(bytes: Uint8Array) {
   }
 }
 
-function chunkText(text: string, locator: Record<string, string | number> = {}) {
-  const paragraphs = text.replace(/\r/g, "").split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+export function chunkText(text: string, locator: Record<string, string | number> = {}) {
+  const sections = text.replace(/\r/g, "").split(/\n(?=#{1,6} |(?:\d+(?:\.\d+)*[.)]? |[A-Z][A-Z ]{4,}\n))/);
   const chunks: ExtractedChunk[] = [];
-  let buffer = "";
-  let startParagraph = 1;
-  for (let index = 0; index < paragraphs.length; index += 1) {
-    const paragraph = paragraphs[index];
-    if (buffer && buffer.length + paragraph.length + 2 > MAX_CHUNK_CHARS) {
-      chunks.push({ ordinal: chunks.length, content: buffer, locator: { ...locator, paragraph: startParagraph } });
-      buffer = "";
-      startParagraph = index + 1;
+  let paragraph = 1;
+  for (const raw of sections) {
+    const section = raw.trim();
+    if (!section) continue;
+    const heading = section.split("\n")[0].slice(0, 160);
+    // ~800 tokens; overlap (~100 tokens) is restricted to a split section.
+    let start = 0;
+    while (start < section.length) {
+      let end = Math.min(start + MAX_CHUNK_CHARS, section.length);
+      if (end < section.length) {
+        const boundary = section.lastIndexOf(" ", end);
+        if (boundary > start + MAX_CHUNK_CHARS / 2) end = boundary;
+      }
+      chunks.push({ ordinal: chunks.length, content: section.slice(start, end).trim(), locator: { ...locator, heading, paragraph, offset: start } });
+      if (end === section.length) break;
+      start = end - 400;
     }
-    buffer += `${buffer ? "\n\n" : ""}${paragraph}`;
+    paragraph += section.split(/\n\s*\n/).length;
   }
-  if (buffer) chunks.push({ ordinal: chunks.length, content: buffer, locator: { ...locator, paragraph: startParagraph } });
   return chunks;
 }
 
@@ -108,7 +115,8 @@ export async function extractSource(bytes: Uint8Array, filename: string, mimeTyp
     const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
     if (pdf.getPageCount() > 200) throw new Error("PDF sources are limited to 200 pages.");
     if (!ocr) throw new Error("PDF extraction requires the configured OCR provider.");
-    return assertReasonableExtraction(await ocr.extract(bytes, filename, mimeType));
+    const pages = await ocr.extract(bytes, filename, mimeType);
+    return assertReasonableExtraction(pages.flatMap((page) => chunkText(page.content, page.locator)).map((chunk, ordinal) => ({ ...chunk, ordinal })));
   }
   throw new Error("This file type cannot be extracted.");
 }

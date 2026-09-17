@@ -1,3 +1,4 @@
+import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 
@@ -5,6 +6,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!accreditationEnabled()) return new Response("Not found", { status: 404 });
   const session = await getSessionProfile();
   if (!session || session.profile.role !== "admin") return new Response("Forbidden", { status: 403 });
   const { id } = await params;

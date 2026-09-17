@@ -376,7 +376,7 @@ begin
     execute format('alter table public.%I enable row level security', table_name);
     execute format('grant select, insert, update, delete on public.%I to authenticated', table_name);
     execute format(
-      'create policy %L on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
+      'create policy %I on public.%I for all to authenticated using (public.is_admin()) with check (public.is_admin())',
       'admins manage ' || replace(table_name, '_', ' '), table_name
     );
   end loop;

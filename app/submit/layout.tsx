@@ -22,7 +22,7 @@ export default async function SubmitLayout({ children }: { children: React.React
     <div data-brand className="min-h-screen">
       {hasMemberAccess ? <RefreshCurrentRoute /> : null}
       <main className="max-w-[720px] mx-auto px-6 py-8">
-        {hasMemberAccess ? <MemberNavigation /> : null}
+        {hasMemberAccess ? <MemberNavigation showPolicy={process.env.POLICY_ASSISTANT_ENABLED === "true" && (session?.profile.role === "admin" || process.env.POLICY_ASSISTANT_MEMBERS_ENABLED === "true")} /> : null}
         {children}
       </main>
     </div>

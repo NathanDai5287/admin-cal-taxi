@@ -30,34 +30,6 @@ export type DraftBuildResult = {
   providerConfig: Record<string, unknown>;
 };
 
-function words(value: string) {
-  return new Set(value.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []);
-}
-
-function parseVector(value: unknown): number[] | null {
-  if (Array.isArray(value) && value.every((item) => typeof item === "number")) return value;
-  if (typeof value !== "string") return null;
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) && parsed.every((item) => typeof item === "number") ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function cosine(left: number[], right: number[]) {
-  if (!left.length || left.length !== right.length) return 0;
-  let dot = 0;
-  let leftMagnitude = 0;
-  let rightMagnitude = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    dot += left[index] * right[index];
-    leftMagnitude += left[index] ** 2;
-    rightMagnitude += right[index] ** 2;
-  }
-  return leftMagnitude && rightMagnitude ? dot / Math.sqrt(leftMagnitude * rightMagnitude) : 0;
-}
-
 function formatMoney(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
@@ -101,54 +73,20 @@ async function buildAppSnapshot(reportKey: string, cycleLabel: string) {
   return { capturedAt: new Date().toISOString() };
 }
 
-async function retrieveEvidence(cycleId: string, reportKey: string, instruction: string, definition: ReportDefinition) {
-  const supabase = createAccreditationAdminClient();
-  const sourcesResult = await supabase.from("accreditation_sources")
-    .select("id, original_name, kind, report_key, sha256")
-    .eq("cycle_id", cycleId)
-    .eq("status", "ready");
-  if (sourcesResult.error) throw new Error("Evidence sources could not be loaded.");
-  const sources = (sourcesResult.data ?? []).filter((source: Record<string, unknown>) => !source.report_key || source.report_key === reportKey);
-  if (!sources.length) return { evidence: [] as EvidenceRow[], manifest: [] as Array<Record<string, unknown>> };
-
+async function retrieveEvidence(cycleId: string, termId: string | null, reportKey: string, instruction: string, definition: ReportDefinition) {
   const providers = getAccreditationProviders();
+  if (!providers.embeddings) return { evidence: [] as EvidenceRow[], manifest: [] as Array<Record<string, unknown>> };
   const query = [definition.name, definition.description, instruction, ...definition.fields.map((field) => `${field.label} ${field.description}`)].join(" ");
-  const queryWords = words(query);
-  const queryEmbedding = providers.embeddings ? (await providers.embeddings.embed([query]))[0] : null;
-  const chunksResult = await supabase.from("accreditation_source_chunks")
-    .select("source_id, ordinal, content, locator, embedding, embedding_provider, embedding_model")
-    .in("source_id", sources.map((source: Record<string, unknown>) => source.id));
-  if (chunksResult.error) throw new Error("Evidence text could not be loaded.");
-
-  const sourceById = new Map<string, Record<string, unknown>>(sources.map((source: Record<string, unknown>) => [String(source.id), source]));
-  const evidence: EvidenceRow[] = (chunksResult.data ?? []).map((chunk: Record<string, unknown>) => {
-    const source = sourceById.get(String(chunk.source_id))!;
-    const contentWords = words(String(chunk.content));
-    let overlap = 0;
-    for (const word of queryWords) if (contentWords.has(word)) overlap += 1;
-    const storedEmbedding = chunk.embedding_provider === providers.embeddings?.name && chunk.embedding_model === providers.embeddings?.model
-      ? parseVector(chunk.embedding)
-      : null;
-    const semantic = queryEmbedding && storedEmbedding ? Math.max(0, cosine(queryEmbedding, storedEmbedding)) : 0;
-    return {
-      ref: `SRC:${chunk.source_id}:${chunk.ordinal}`,
-      sourceId: String(chunk.source_id),
-      sourceName: String(source.original_name),
-      kind: String(source.kind),
-      locator: (chunk.locator ?? {}) as Record<string, unknown>,
-      content: String(chunk.content),
-      score: overlap + semantic * 8 + (source.kind === "official_guideline" ? 3 : 0) + (source.kind === "prior_submission" ? -1 : 0),
-    };
-  }).sort((left: EvidenceRow, right: EvidenceRow) => right.score - left.score).slice(0, 18);
-
+  const embedding = await providers.embeddings.embedQuery(query);
+  const result = await createAccreditationAdminClient().rpc("search_report_evidence", {
+    p_query: query, p_embedding: JSON.stringify(embedding), p_profile: providers.embeddings.profile,
+    p_cycle: cycleId, p_term: termId, p_report: reportKey,
+  });
+  if (result.error) throw new Error("Evidence retrieval failed. Apply the hybrid retrieval migration first.");
+  const rows = (result.data ?? []) as Array<Record<string, unknown>>;
   return {
-    evidence,
-    manifest: sources.map((source: Record<string, unknown>) => ({
-      sourceId: source.id,
-      name: source.original_name,
-      kind: source.kind,
-      sha256: source.sha256,
-    })),
+    evidence: rows.map((row) => ({ ref: `SRC:${row.source_id}:${row.ordinal}`, sourceId: String(row.source_id), sourceName: String(row.source_name), kind: String(row.kind), locator: row.locator as Record<string, unknown>, content: String(row.content), score: Number(row.score) })),
+    manifest: [...new Map(rows.map((row) => [row.source_id, { sourceId: row.source_id, name: row.source_name, kind: row.kind, sha256: row.sha256, embeddingProfile: providers.embeddings!.profile }])).values()],
   };
 }
 
@@ -212,14 +150,14 @@ function normalizeDraft(value: unknown, definition: ReportDefinition, allowedRef
     const raw = rawFields[fieldDefinition.key];
     if (!raw || typeof raw !== "object") throw new Error(`Missing draft field: ${fieldDefinition.key}`);
     const record = raw as Record<string, unknown>;
-    const provenance = record.provenance === "app_snapshot" || record.provenance === "user_input" ? record.provenance : "retrieved";
+    const provenance = "retrieved";
     fields[fieldDefinition.key] = {
       value: typeof record.value === "string" ? record.value.trim() : "",
       provenance,
       citations: Array.isArray(record.citations) ? record.citations.filter((item): item is string => typeof item === "string" && allowedRefs.has(item)) : [],
       confidence: Math.max(0, Math.min(1, typeof record.confidence === "number" ? record.confidence : 0)),
       missingReason: typeof record.missingReason === "string" ? record.missingReason : null,
-      officerOverride: record.officerOverride === true,
+      officerOverride: false,
     };
   }
   return { fields } satisfies ReportDraft;
@@ -238,7 +176,7 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
   const cycleRelation = run.accreditation_cycles as { label?: string } | Array<{ label?: string }> | null;
   const cycleLabel = Array.isArray(cycleRelation) ? cycleRelation[0]?.label ?? "Academic year" : cycleRelation?.label ?? "Academic year";
   const [retrieval, snapshot, templateResult, storedDefinition] = await Promise.all([
-    retrieveEvidence(String(run.cycle_id), definition.key, instruction, definition),
+    definition.key === "annual_report" && process.env.ACCREDITATION_GEMINI_REPORTS_ENABLED === "true" ? retrieveEvidence(String(run.cycle_id), run.term_id ? String(run.term_id) : null, definition.key, instruction, definition) : Promise.resolve({ evidence: [] as EvidenceRow[], manifest: [] as Array<Record<string, unknown>> }),
     buildAppSnapshot(definition.key, cycleLabel),
     supabase.from("accreditation_templates").select("id").eq("report_key", definition.key).eq("is_active", true).maybeSingle(),
     supabase.from("accreditation_report_definitions").select("custom_guidance").eq("report_key", definition.key).maybeSingle(),
@@ -248,7 +186,7 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
   const allowedRefs = new Set([...retrieval.evidence.map((item) => item.ref), ...appRefs, ...(instruction.trim() ? ["USER"] : [])]);
   let draft: ReportDraft = { fields: deterministicFields(definition, snapshot) };
 
-  if (providers.language) {
+  if (providers.language && definition.key === "annual_report" && process.env.ACCREDITATION_GEMINI_REPORTS_ENABLED === "true") {
     const evidenceText = retrieval.evidence.map((item) => `[${item.ref}] ${item.sourceName} (${item.kind}) ${JSON.stringify(item.locator)}\n${item.content}`).join("\n\n");
     const request = {
       name: `${definition.key}_draft`,
@@ -264,14 +202,9 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
       ].join(" "),
       input: JSON.stringify({ report: definition, administratorGuidance: storedDefinition.data?.custom_guidance ?? "", officerInstruction: instruction, frozenAppSnapshot: snapshot, evidence: evidenceText }),
     };
-    let generated: unknown;
-    try {
-      generated = await providers.language.generateStructured(request);
-      draft = normalizeDraft(generated, definition, allowedRefs);
-    } catch {
-      generated = await providers.language.generateStructured({ ...request, input: `${request.input}\nThe previous response was invalid. Return only schema-compliant grounded data.` });
-      draft = normalizeDraft(generated, definition, allowedRefs);
-    }
+    const generated = await providers.language.generateStructured(request);
+    draft = normalizeDraft(generated, definition, allowedRefs);
+
   }
 
   const deterministic = deterministicFields(definition, snapshot);
@@ -314,8 +247,8 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
     sourceManifest: retrieval.manifest,
     citations,
     validation,
-    providerConfig: providers.language
-      ? { provider: providers.language.name, model: providers.language.model, embeddingProvider: providers.embeddings?.name, embeddingModel: providers.embeddings?.model }
+    providerConfig: providers.language && definition.key === "annual_report" && process.env.ACCREDITATION_GEMINI_REPORTS_ENABLED === "true"
+      ? { provider: providers.language.name, model: providers.language.model, embeddingProvider: providers.embeddings?.name, embeddingModel: providers.embeddings?.model, embeddingProfile: providers.embeddings?.profile }
       : { provider: "deterministic_only" },
   };
 }

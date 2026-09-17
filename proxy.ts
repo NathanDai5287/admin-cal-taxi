@@ -16,7 +16,7 @@ export default async function proxy(request: NextRequest) {
   const hostname = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const { pathname } = request.nextUrl;
 
-  if (SUBMIT_HOSTNAMES.has(hostname)) {
+  if (SUBMIT_HOSTNAMES.has(hostname) && !(pathname === "/policy" || pathname.startsWith("/policy/") || pathname.startsWith("/api/policy/"))) {
     if (
       pathname.startsWith("/_next") ||
       pathname === "/icon.png" ||

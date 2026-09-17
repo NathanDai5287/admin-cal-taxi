@@ -11,9 +11,11 @@
     "test:accreditation": "node --test scripts/accreditation.test.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs"
   },
   "dependencies": {
+    "@google/genai": "^2.23.0",
     "@myriaddreamin/typst-ts-node-compiler": "^0.7.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
@@ -33,6 +35,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

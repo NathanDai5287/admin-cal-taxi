@@ -8,13 +8,19 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getReportDefinition } from "@/lib/accreditation/definitions";
-import { extractSource, validateSourceFile } from "@/lib/accreditation/extract";
-import { getAccreditationProviders } from "@/lib/accreditation/providers";
+import { validateSourceFile } from "@/lib/accreditation/extract";
+import { processDocument } from "@/lib/accreditation/processing";
+import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
 import { REPORT_KEYS, type ReportDraft, type SourceKind, type TemplateMapping } from "@/lib/accreditation/types";
 import { buildDraft } from "@/lib/accreditation/workflow";
 import { requireAdmin } from "@/lib/reimbursements/auth";
+
+async function requireAccreditationAdmin() {
+  if (!accreditationEnabled()) throw new Error("Accreditation is disabled.");
+  return requireAdmin();
+}
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -47,7 +53,7 @@ function reportPath(runId: string, result?: string) {
 }
 
 export async function createCycle(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const parsed = z.object({
     label: z.string().trim().min(4).max(40),
     fallStart: isoDate,
@@ -83,7 +89,7 @@ export async function createCycle(formData: FormData) {
 }
 
 export async function uploadSource(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const cycleId = uuid.safeParse(formData.get("cycleId"));
   const termValue = String(formData.get("termId") ?? "");
   const termId = termValue ? uuid.safeParse(termValue) : null;
@@ -128,21 +134,7 @@ export async function uploadSource(formData: FormData) {
     redirect(`/accreditation/library?cycle=${cycleId.data}&result=upload_error`);
   }
   try {
-    const providers = getAccreditationProviders();
-    const chunks = await extractSource(bytes, file.name, mimeType, providers.ocr);
-    if (!chunks.length) throw new Error("No readable text was found.");
-    const embeddings = providers.embeddings ? await providers.embeddings.embed(chunks.map((chunk) => chunk.content)) : [];
-    const chunkInsert = await supabase.from("accreditation_source_chunks").insert(chunks.map((chunk, index) => ({
-      source_id: sourceId,
-      ordinal: chunk.ordinal,
-      content: chunk.content,
-      locator: chunk.locator,
-      embedding: embeddings[index] ? JSON.stringify(embeddings[index]) : null,
-      embedding_provider: embeddings[index] ? providers.embeddings?.name : null,
-      embedding_model: embeddings[index] ? providers.embeddings?.model : null,
-    })));
-    if (chunkInsert.error) throw new Error(chunkInsert.error.message);
-    await supabase.from("accreditation_sources").update({ status: "ready", processing_error: null }).eq("id", sourceId);
+    await processDocument(sourceId, false, formData.get("signatureFree") === "on");
     revalidatePath("/accreditation", "layout");
     redirect(`/accreditation/library?cycle=${cycleId.data}&result=uploaded`);
   } catch (error) {
@@ -156,8 +148,21 @@ export async function uploadSource(formData: FormData) {
   }
 }
 
+export async function reprocessSource(formData: FormData) {
+  await requireAccreditationAdmin();
+  const id = uuid.parse(formData.get("sourceId"));
+  try {
+    await processDocument(id, false, formData.get("signatureFree") === "on");
+  } catch {
+    revalidatePath("/accreditation/library");
+    redirect("/accreditation/library?result=processing_failed_check_source_error");
+  }
+  revalidatePath("/accreditation/library");
+  redirect("/accreditation/library?result=reembedded");
+}
+
 export async function archiveSource(formData: FormData) {
-  await requireAdmin();
+  await requireAccreditationAdmin();
   const sourceId = uuid.safeParse(formData.get("sourceId"));
   if (!sourceId.success) return;
   await createAccreditationAdminClient().from("accreditation_sources").update({ status: "archived", archived_at: new Date().toISOString() }).eq("id", sourceId.data);
@@ -165,7 +170,7 @@ export async function archiveSource(formData: FormData) {
 }
 
 export async function uploadTemplate(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const reportKey = z.enum(REPORT_KEYS).safeParse(formData.get("reportKey"));
   const file = formData.get("file");
   if (!reportKey.success || !(file instanceof File)) redirect("/accreditation/templates?result=invalid");
@@ -212,7 +217,7 @@ export async function uploadTemplate(formData: FormData) {
 }
 
 export async function confirmTemplate(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const templateId = uuid.safeParse(formData.get("templateId"));
   if (!templateId.success) redirect("/accreditation/templates?result=invalid_mapping");
   const supabase = createAccreditationAdminClient();
@@ -273,7 +278,7 @@ export async function confirmTemplate(formData: FormData) {
 }
 
 export async function updateReportGuidance(formData: FormData) {
-  await requireAdmin();
+  await requireAccreditationAdmin();
   const reportKey = z.enum(REPORT_KEYS).safeParse(formData.get("reportKey"));
   const guidance = z.string().trim().max(5_000).safeParse(formData.get("guidance"));
   if (!reportKey.success || !guidance.success) redirect("/accreditation/templates?result=invalid_requirements");
@@ -286,7 +291,7 @@ export async function updateReportGuidance(formData: FormData) {
 }
 
 export async function createRun(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const reportKey = z.enum(REPORT_KEYS).safeParse(formData.get("reportKey"));
   const cycleId = uuid.safeParse(formData.get("cycleId"));
   const termValue = String(formData.get("termId") ?? "");
@@ -314,7 +319,7 @@ export async function createRun(formData: FormData) {
 }
 
 export async function createSuccessorRun(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const runId = uuid.safeParse(formData.get("runId"));
   if (!runId.success) return;
   const supabase = createAccreditationAdminClient();
@@ -334,7 +339,7 @@ export async function createSuccessorRun(formData: FormData) {
 }
 
 export async function generateDraft(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const runId = uuid.safeParse(formData.get("runId"));
   const instruction = z.string().trim().max(10_000).catch("").parse(formData.get("instruction"));
   if (!runId.success) redirect("/accreditation?result=invalid_report");
@@ -430,7 +435,7 @@ export async function generateDraft(formData: FormData) {
 }
 
 export async function approveReport(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAccreditationAdmin();
   const runId = uuid.safeParse(formData.get("runId"));
   const revisionId = uuid.safeParse(formData.get("revisionId"));
   if (!runId.success || !revisionId.success || formData.get("reviewed") !== "on") {

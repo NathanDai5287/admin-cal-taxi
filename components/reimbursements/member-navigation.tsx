@@ -7,7 +7,7 @@ import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 
 const memberRoutes = ["/", "/history"] as const;
 
-export function MemberNavigation() {
+export function MemberNavigation({ showPolicy = false }: { showPolicy?: boolean }) {
   const pathname = usePathname();
   if (pathname.includes("/login") || pathname.includes("/auth/")) return null;
   const history = pathname.includes("/history");
@@ -16,6 +16,7 @@ export function MemberNavigation() {
       <PrefetchRoutes hrefs={memberRoutes.filter((href) => href !== pathname)} />
       <Link href="/" prefetch={false} aria-current={!history ? "page" : undefined}>Submit reimbursement</Link>
       <Link href="/history" prefetch={false} aria-current={history ? "page" : undefined}>My reimbursements</Link>
+      {showPolicy ? <Link href="/policy" prefetch={false}>Policy assistant</Link> : null}
     </nav>
   );
 }

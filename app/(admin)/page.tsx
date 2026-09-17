@@ -2,12 +2,14 @@ import Link from "next/link";
 
 import { AccessDenied, SubmitSiteLink } from "@/components/auth/access-denied";
 import { SiteHomeIcon } from "@/components/site-home-icon";
+import { policyEnabled } from "@/lib/policy/server";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 
 const ADMIN_APPS = [
+  ...(policyEnabled() ? [{ href: "/policy", label: "Policy assistant", description: "Published policy guidance, source review, and question audit" }] : []),
   {
     href: "/host",
     label: "Host",
@@ -86,6 +88,7 @@ export default async function Home({
                 You can submit chapter expenses from the reimbursement form.
               </p>
               <SubmitSiteLink />
+              {policyEnabled() && process.env.POLICY_ASSISTANT_MEMBERS_ENABLED === "true" ? <Link className="block mt-4 text-brand underline" href="/policy">Ask the Policy Assistant</Link> : null}
             </div>
           </section>
         </main>
