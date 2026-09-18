@@ -10,6 +10,7 @@ import type {
   ReportDefinition,
   ReportDraft,
 } from "./types";
+import { categoryBudgetsFromRows } from "../reimbursements/format";
 
 type EvidenceRow = {
   ref: string;
@@ -40,7 +41,7 @@ async function buildAppSnapshot(reportKey: string, cycleLabel: string) {
     const [settings, forecasts, budgets] = await Promise.all([
       supabase.from("chapter_financial_settings").select("chapter_name, opening_cash").eq("id", true).maybeSingle(),
       supabase.from("reimbursement_budget_entries").select("source, description, amount").eq("kind", "forecast").order("source"),
-      supabase.from("reimbursement_budgets").select("budget_key, amount").order("budget_key"),
+      supabase.from("reimbursement_budgets").select("*"),
     ]);
     const error = settings.error ?? forecasts.error ?? budgets.error;
     if (error) throw new Error("Current Finance data could not be snapshotted.");
@@ -49,10 +50,8 @@ async function buildAppSnapshot(reportKey: string, cycleLabel: string) {
       description: row.description,
       amount: Number(row.amount),
     }));
-    const expenses = (budgets.data ?? []).filter((row: Record<string, unknown>) => row.amount !== null).map((row: Record<string, unknown>) => ({
-      category: row.budget_key,
-      amount: Number(row.amount),
-    }));
+    const expenses = [...categoryBudgetsFromRows(budgets.data)]
+      .flatMap(([category, amount]) => amount === null ? [] : [{ category, amount }]);
     return {
       capturedAt: new Date().toISOString(),
       source: "finance_current_state",

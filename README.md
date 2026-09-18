@@ -65,17 +65,17 @@ performs receipt total extraction in the background. Submissions move from
 
 ## Connect an AI client
 
-The MCP server gives active administrators read-only access to finance summaries.
+The MCP server lets active administrators read and manage finance, reimbursement, and member records.
 It does not accept pasted API keys or long-lived personal tokens.
 
 1. Add `https://admin.cal.taxi/api/mcp` as a remote HTTP MCP server in your client.
 2. Sign in with the same Google account that you use for the admin site.
-3. Review the client name and read-only permissions, then select **Allow access**.
+3. Review the client name and permissions, then select **Allow access**.
 4. Open `https://admin.cal.taxi/connections` to review or remove connected clients.
 
-The first version provides `get_finance_overview`, `list_budget_categories`, and
-`list_open_dues`. Each call verifies the current account is an active administrator
-and writes a secret-free audit record.
+The server provides read and write tools for finance, reimbursements, and members.
+Each call verifies an active administrator and writes a secret-free audit record.
+Destructive tools require explicit confirmation, and create or payment tools accept retry-safe request IDs.
 
 Production setup also requires these Supabase Auth settings:
 

@@ -9,7 +9,7 @@ import {
   saveReimbursementBudgets,
 } from "@/app/(admin)/finance/planning/actions";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
-import { categories, formatMoney } from "@/lib/reimbursements/format";
+import { categories, categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
 import {
   loadReportManualExpenses,
   loadReportPageRows,
@@ -53,7 +53,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
   const supabase = createAdminClient();
   const filters = parseReportFilters({});
   const [budgetResult, entriesResult, rows, manualExpenses] = await Promise.all([
-    supabase.from("reimbursement_budgets").select("budget_key, amount"),
+    supabase.from("reimbursement_budgets").select("*"),
     loadAllPages((from, to) => supabase
       .from("reimbursement_budget_entries")
       .select("id, amount, description, source, budget_date, created_by, created_at, updated_at")
@@ -69,7 +69,7 @@ export default async function ReimbursementBudgetsPage({ searchParams }: { searc
   if (budgetResult.error) throw new Error(`Unable to load budget limits: ${budgetResult.error.message}`);
   if (entriesResult.error) throw new Error(`Unable to load budget history: ${entriesResult.error.message}`);
 
-  const budgets = new Map((budgetResult.data ?? []).map((row) => [row.budget_key, row.amount === null ? null : Number(row.amount)]));
+  const budgets = categoryBudgetsFromRows(budgetResult.data);
   const entries = entriesResult.data ?? [];
   const totalBudget = entries.reduce((total, entry) => total + Number(entry.amount), 0);
   const allocatedBudget = categories.reduce((total, [category]) => total + (budgets.get(category) ?? 0), 0);

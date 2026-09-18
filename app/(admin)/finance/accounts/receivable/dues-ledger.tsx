@@ -100,7 +100,7 @@ export function DuesLedger({
   mode = "view",
 }: {
   rows: DuesRow[];
-  members: { id: string; name: string; email: string }[];
+  members: { id: string; name: string }[];
   mode?: "view" | "manage";
 }) {
   const canManage = mode === "manage";
@@ -378,7 +378,7 @@ export function DuesLedger({
                 <select className="field-input" defaultValue={editingRow.memberId ?? ""} id={`member-${editingRow.id}`} name="memberId" required>
                   {!editingRow.memberId && <option value="" disabled>Link {editingRow.memberName} to a registered member</option>}
                   {editingRow.memberId && !members.some((member) => member.id === editingRow.memberId) && <option value={editingRow.memberId}>{editingRow.memberName} (archived)</option>}
-                  {members.map((member) => <option key={member.id} value={member.id}>{member.name} · {member.email}</option>)}
+                  {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
                 </select>
               </div>
               <div className="field">

@@ -22,7 +22,7 @@ export default async function OAuthConsentPage({
     redirect(`/reimbursements/login?next=${encodeURIComponent(next)}`);
   }
   if (session.profile.role !== "admin") {
-    return <ConsentMessage title="Administrator access required">Only active administrators can connect finance data.</ConsentMessage>;
+    return <ConsentMessage title="Administrator access required">Only active administrators can connect app data.</ConsentMessage>;
   }
 
   const supabase = await createClient();
@@ -37,11 +37,11 @@ export default async function OAuthConsentPage({
       <section className="card">
         <div className="card-header">
           <span className="card-title">Connect {data.client.name}</span>
-          <span className="card-subtitle">Read-only finance access</span>
+          <span className="card-subtitle">Administrator access</span>
         </div>
         <div className="card-body grid gap-5 border-t border-rule pt-5">
           <p className="m-0 text-[13.5px] leading-relaxed text-muted">
-            This client can read finance totals, budget categories, and open dues balances as you.
+            This client can read and change finance, reimbursement, and member records as you.
           </p>
           <dl className="grid gap-3 text-[13px]">
             <div><dt className="font-bold text-ink">Client</dt><dd className="mt-1 text-muted">{data.client.name}</dd></div>
@@ -49,7 +49,7 @@ export default async function OAuthConsentPage({
             <div><dt className="font-bold text-ink">Requested access</dt><dd className="mt-1 text-muted">{data.scope || "Account access"}</dd></div>
           </dl>
           <p className="m-0 text-[12px] leading-relaxed text-muted">
-            The client cannot change records. You can remove its access later from Connected AI clients.
+            It must ask for confirmation before deletions. You can remove its access later from Connected AI clients.
           </p>
           <form action="/api/oauth/decision" className="flex flex-wrap gap-3" method="post">
             <input name="authorization_id" type="hidden" value={authorizationId} />

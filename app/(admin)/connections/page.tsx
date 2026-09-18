@@ -22,7 +22,7 @@ export default async function ConnectionsPage({
       <Link className="back-link" href="/">← Admin home</Link>
       <p className="page-eyebrow mt-6">Security</p>
       <h1 className="page-title">Connected AI clients</h1>
-      <p className="page-lede">Review clients that can read finance data as your account.</p>
+      <p className="page-lede">Review clients that can manage app data as your account.</p>
       {result === "revoked" ? <p className="form-message success mt-5">Client access removed.</p> : null}
       {result === "error" || result === "invalid" ? <p className="form-message mt-5">Client access could not be removed.</p> : null}
       <section className="card mt-8">

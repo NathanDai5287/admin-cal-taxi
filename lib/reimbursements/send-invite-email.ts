@@ -67,7 +67,7 @@ function inviteCopy(role: InviteRole) {
   };
 }
 
-export async function sendInviteEmails(emails: string[], role: InviteRole) {
+export async function sendInviteEmails(emails: string[], role: InviteRole, requestId?: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("Invite email is not configured. Set RESEND_API_KEY.");
@@ -78,14 +78,11 @@ export async function sendInviteEmails(emails: string[], role: InviteRole) {
   const { subject, text, html } = inviteCopy(role);
 
   const results = await Promise.all(
-    emails.map((email) =>
-      resend.emails.send({
-        from,
-        to: email,
-        subject,
-        text,
-        html,
-      }),
+    emails.map((email, index) =>
+      resend.emails.send(
+        { from, to: email, subject, text, html },
+        requestId ? { idempotencyKey: `${requestId}:${index}` } : undefined,
+      ),
     ),
   );
 

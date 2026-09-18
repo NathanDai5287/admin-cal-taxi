@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Form from "next/form";
 
-import { categories, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { categories, categoryBudgetsFromRows, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
   filtersToSearchParams,
   loadReportManualExpenses,
@@ -47,7 +47,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   const supabase = createAdminClient();
   const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([
     loadAllPages((from, to) => supabase.from("reimbursements").select("id, full_name").order("full_name").order("id").range(from, to)),
-    supabase.from("reimbursement_budgets").select("budget_key, amount"),
+    supabase.from("reimbursement_budgets").select("*"),
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("id, amount").eq("kind", "forecast").order("id").range(from, to)),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
@@ -65,7 +65,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
   const memberNames = [...new Set((namesResult.data ?? []).map((row) => row.full_name))];
   const summary = summarizeApproved(rows, manualExpenses);
-  const budgets = new Map((budgetQueryResult.data ?? []).map((row) => [row.budget_key, row.amount === null ? null : Number(row.amount)]));
+  const budgets = categoryBudgetsFromRows(budgetQueryResult.data);
   const overallBudget = (budgetEntriesResult.data ?? [])
     .reduce((total, entry) => total + Number(entry.amount), 0);
   const maximumCategorySpend = Math.max(...Object.values(summary.byCategory), 1);

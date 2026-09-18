@@ -1,5 +1,11 @@
 type MoneyValue = number | string | null;
 
+export function isCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 export type FinanceOverviewInput = {
   openingCash: MoneyValue;
   income: MoneyValue[];
@@ -43,7 +49,7 @@ export function buildFinanceOverview(input: FinanceOverviewInput) {
 }
 
 export function buildBudgetCategories(
-  budgets: Array<{ budgetKey: string; amount: MoneyValue }>,
+  budgets: Record<string, MoneyValue>,
   reimbursements: Array<{ category: string; amount: MoneyValue; status: string }>,
   manualExpenses: Array<{ category: string; amount: MoneyValue }>,
 ) {
@@ -57,11 +63,11 @@ export function buildBudgetCategories(
   }
 
   const categoryNames = new Set([
-    ...budgets.map((row) => row.budgetKey),
+    ...Object.keys(budgets),
     ...spent.keys(),
   ]);
   return [...categoryNames].sort().map((category) => {
-    const budget = budgets.find((row) => row.budgetKey === category)?.amount;
+    const budget = budgets[category];
     const budgetCents = budget === null || budget === undefined ? null : cents(budget);
     const spentCents = spent.get(category) ?? 0;
     return {

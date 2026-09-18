@@ -1,7 +1,7 @@
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { buildFinancialReport, type IncomeSource } from "@/lib/reimbursements/financial-report";
 import { renderFinancialReportPdf } from "@/lib/reimbursements/financial-report-pdf";
-import type { ReimbursementCategory } from "@/lib/reimbursements/format";
+import { categoryBudgetsFromRows, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       .select("source, amount, budget_date")
       .eq("kind", "income")
       .order("id").range(from, to)),
-    supabase.from("reimbursement_budgets").select("budget_key, amount"),
+    supabase.from("reimbursement_budgets").select("*"),
     loadAllPages((from, to) => supabase
       .from("reimbursements")
       .select("category, amount, reimbursed, submitted_at")
@@ -62,10 +62,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const categoryBudgets = Object.fromEntries((budgetsResult.data ?? []).map((row) => [
-    row.budget_key,
-    row.amount === null ? null : Number(row.amount),
-  ]));
+  const categoryBudgets = Object.fromEntries(categoryBudgetsFromRows(budgetsResult.data));
   const outstandingLiabilities = (liabilitiesResult.data ?? [])
     .reduce((total, row) => total + Number(row.amount), 0);
 

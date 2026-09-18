@@ -7,6 +7,7 @@ import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { SiteHomeIcon } from "@/components/site-home-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { userLabel } from "@/lib/reimbursements/user-label";
 
 export type AuthPillSession = {
   fullName: string;
@@ -42,8 +43,7 @@ function firstName(fullName: string, email: string) {
   if (trimmed) {
     return trimmed.split(/\s+/)[0] ?? trimmed;
   }
-  const local = email.split("@")[0]?.trim();
-  return local || "Account";
+  return email || "Account";
 }
 
 function initials(fullName: string, email: string) {
@@ -149,7 +149,7 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
               setConfirming(true);
             }
           }}
-          title={confirming ? "Click again to sign out" : session.email}
+          title={confirming ? "Click again to sign out" : userLabel(session.fullName, session.email)}
           className={
             "relative inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3.5 !rounded-full " +
             "cursor-pointer border duration-150 hover:-translate-y-px " +

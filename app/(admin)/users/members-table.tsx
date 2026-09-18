@@ -4,6 +4,7 @@ import { useEffect, useOptimistic, useRef, useState, useTransition } from "react
 
 import { removeUser, setUserRole, updateDiscordUserId, updatePendingUserName } from "@/app/(admin)/users/actions";
 import { Button } from "@/components/brand/button";
+import { userLabel } from "@/lib/reimbursements/user-label";
 
 export type MemberRow = {
   id: string;
@@ -63,7 +64,7 @@ function DiscordMemberId({
       }}
     >
       <input
-        aria-label={`Discord ID for ${member.email}`}
+        aria-label={`Discord ID for ${userLabel(member.fullName, member.email)}`}
         className="field-input min-w-0"
         disabled={disabled}
         inputMode="numeric"
@@ -109,7 +110,7 @@ function PendingMemberName({
       }}
     >
       <input
-        aria-label={`Name for ${member.email}`}
+        aria-label={`Name for ${userLabel(member.fullName, member.email)}`}
         className="field-input min-w-0"
         disabled={disabled}
         maxLength={120}
@@ -312,7 +313,7 @@ export function MembersTable({
               <tr key={member.id}>
                 <td>
                   {member.hasSignedIn
-                    ? member.fullName.trim() || <span className="text-muted">No name</span>
+                    ? userLabel(member.fullName, member.email)
                     : <PendingMemberName
                         disabled={memberPending}
                         member={member}
@@ -330,7 +331,7 @@ export function MembersTable({
                 </td>
                 <td>
                   <select
-                    aria-label={`Role for ${member.email}`}
+                    aria-label={`Role for ${userLabel(member.fullName, member.email)}`}
                     className="field-input"
                     disabled={isYou || memberPending}
                     onChange={(event) => changeRole(member.id, event.target.value as "member" | "admin")}

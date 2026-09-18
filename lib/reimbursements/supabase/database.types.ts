@@ -11,19 +11,19 @@ export type Database = {
     Tables: {
       reimbursement_budgets: {
         Row: {
-          budget_key: string;
-          amount: number | null;
+          id: boolean;
+          category_amounts: Json;
           updated_by: string | null;
           updated_at: string;
         };
         Insert: {
-          budget_key: string;
-          amount?: number | null;
+          id?: boolean;
+          category_amounts?: Json;
           updated_by?: string | null;
           updated_at?: string;
         };
         Update: {
-          amount?: number | null;
+          category_amounts?: Json;
           updated_by?: string | null;
           updated_at?: string;
         };
@@ -205,14 +205,20 @@ export type Database = {
           id: number;
           user_id: string;
           client_id: string;
-          tool_name: "get_finance_overview" | "list_budget_categories" | "list_open_dues";
+          tool_name: string;
+          request_id: string | null;
+          target_id: string | null;
+          details: Json;
           called_at: string;
         };
         Insert: {
           id?: never;
           user_id: string;
           client_id: string;
-          tool_name: "get_finance_overview" | "list_budget_categories" | "list_open_dues";
+          tool_name: string;
+          request_id?: string | null;
+          target_id?: string | null;
+          details?: Json;
           called_at?: string;
         };
         Update: never;
@@ -332,6 +338,24 @@ export type Database = {
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       mcp_budget_categories: { Args: Record<PropertyKey, never>; Returns: Json };
+      mcp_admin_read: { Args: { p_resource: string }; Returns: Json };
+      mcp_admin_write: {
+        Args: {
+          p_action: string;
+          p_payload: Json;
+          p_request_id?: string;
+          p_confirmed?: boolean;
+        };
+        Returns: Json;
+      };
+      mcp_begin_external: {
+        Args: { p_action: string; p_payload: Json; p_request_id: string; p_confirmed: boolean };
+        Returns: Json;
+      };
+      mcp_finish_external: {
+        Args: { p_request_id: string; p_succeeded: boolean; p_result?: Json };
+        Returns: Json;
+      };
       mcp_finance_overview: { Args: Record<PropertyKey, never>; Returns: Json };
       mcp_open_dues: { Args: Record<PropertyKey, never>; Returns: Json };
       record_dues_payment: {

@@ -38,7 +38,7 @@ const ADMIN_APPS = [
   {
     href: "/connections",
     label: "Connected AI clients",
-    description: "Review and remove AI tools that can read finance data",
+    description: "Review and remove AI tools that can manage app data",
   },
 ];
 

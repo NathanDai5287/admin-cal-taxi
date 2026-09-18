@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/reimbursements/auth";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { categories } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import type { Database } from "@/lib/reimbursements/supabase/database.types";
 
 const budgetKeys = categories.map(([value]) => value);
 const incomeSourceValues = incomeSources.map(([value]) => value);
@@ -44,14 +45,24 @@ export async function saveReimbursementBudgets(formData: FormData) {
   if (!parsed.success) redirect(budgetRedirectTarget("limits", "invalid"));
 
   const supabase = createAdminClient();
-  const { error } = await supabase.from("reimbursement_budgets").upsert(
-    budgetKeys.map((budgetKey) => ({
+  const { error: categoryMapError } = await supabase.from("reimbursement_budgets").upsert({
+    id: true,
+    category_amounts: parsed.data,
+    updated_by: userId,
+  }, { onConflict: "id" });
+
+  let error = categoryMapError;
+  if (categoryMapError?.code === "PGRST204" || categoryMapError?.code === "42703") {
+    const legacyRows = budgetKeys.map((budgetKey) => ({
       budget_key: budgetKey,
       amount: parsed.data[budgetKey] ?? null,
       updated_by: userId,
-    })),
-    { onConflict: "budget_key" },
-  );
+    })) as unknown as Database["public"]["Tables"]["reimbursement_budgets"]["Insert"][];
+    error = (await supabase.from("reimbursement_budgets").upsert(
+      legacyRows,
+      { onConflict: "budget_key" },
+    )).error;
+  }
 
   if (error) redirect(budgetRedirectTarget("limits", "error"));
   revalidateBudgetPages();

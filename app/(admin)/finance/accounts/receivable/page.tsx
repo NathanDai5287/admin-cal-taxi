@@ -7,6 +7,7 @@ import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledge
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
+import { userLabel } from "@/lib/reimbursements/user-label";
 
 export const metadata: Metadata = { title: "Accounts receivable" };
 export const dynamic = "force-dynamic";
@@ -67,6 +68,15 @@ export default async function DuesPage({
   if (receivablesResult.error) {
     throw new Error(`Unable to load dues: ${receivablesResult.error.message}`);
   }
+  if (profilesResult.error) {
+    throw new Error(`Unable to load members: ${profilesResult.error.message}`);
+  }
+
+  const members = (profilesResult.data ?? []).map((profile) => ({
+    id: profile.id,
+    name: userLabel(profile.full_name, profile.email),
+  }));
+  const memberLabels = new Map(members.map((member) => [member.id, member.name]));
 
   const today = currentPacificDate();
   const rows = (receivablesResult.data ?? []).map((row) => {
@@ -77,7 +87,7 @@ export default async function DuesPage({
     return {
       id: row.id,
       memberId: row.member_id,
-      memberName: row.member_name,
+      memberName: row.member_id ? memberLabels.get(row.member_id) ?? row.member_name : row.member_name,
       amountOwed,
       assessedAmount: assessed,
       paidAmount: paid,
@@ -96,18 +106,6 @@ export default async function DuesPage({
   const totalPaid = rows.reduce((sum, row) => sum + row.paidAmount, 0);
   const settledRows = rows.filter((row) => row.isPaid);
   const selectedFeedback = result ? feedback[result] : undefined;
-  if (profilesResult.error) {
-    throw new Error(`Unable to load members: ${profilesResult.error.message}`);
-  }
-
-  const members = (profilesResult.data ?? []).flatMap((profile) => {
-    const name = profile.full_name.trim() || profile.email;
-    return name ? [{
-      id: profile.id,
-      name,
-      email: profile.email,
-    }] : [];
-  });
 
   return (
     <div className="grid gap-7">
