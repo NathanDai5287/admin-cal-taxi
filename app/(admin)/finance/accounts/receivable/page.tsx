@@ -34,6 +34,8 @@ const feedback: Record<string, { text: string; success: boolean }> = {
   "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
   "invalid-date": { text: "Choose a valid due date.", success: false },
   "invalid-notes": { text: "Keep the note under 500 characters.", success: false },
+  "member-selection-changed": { text: "The member list changed. Refresh the page and select the members again.", success: false },
+  "charge-insert-failed": { text: "The charges could not be saved. No charges were added. Please try again.", success: false },
   error: { text: "The balance could not be saved. Please try again.", success: false },
 };
 

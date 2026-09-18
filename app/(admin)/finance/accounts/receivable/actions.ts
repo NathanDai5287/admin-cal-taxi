@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import {
+  reportDuesInsertFailure,
+  reportDuesProfilePreflightFailure,
+} from "@/lib/reimbursements/dues-charge-errors";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { createClient } from "@/lib/reimbursements/supabase/server";
@@ -32,6 +36,8 @@ type DuesResult =
   | "invalid-amount"
   | "invalid-date"
   | "invalid-notes"
+  | "member-selection-changed"
+  | "charge-insert-failed"
   | "error";
 
 function resultUrl(result: DuesResult) {
@@ -93,7 +99,11 @@ export async function addDuesFees(formData: FormData) {
     .is("removed_at", null);
 
   if (profilesError || profiles?.length !== parsed.data.memberIds.length) {
-    redirect(resultUrl("error"));
+    redirect(resultUrl(reportDuesProfilePreflightFailure({
+      error: profilesError,
+      selectedMemberIds: parsed.data.memberIds,
+      loadedMemberIds: profiles?.map((profile) => profile.id),
+    })));
   }
 
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
@@ -118,7 +128,12 @@ export async function addDuesFees(formData: FormData) {
     rows.filter((row): row is NonNullable<typeof row> => row !== null),
   );
 
-  if (error) redirect(resultUrl("error"));
+  if (error) {
+    redirect(resultUrl(reportDuesInsertFailure({
+      error,
+      selectedMemberIds: parsed.data.memberIds,
+    })));
+  }
   revalidateDues();
   redirect(resultUrl("added"));
 }
