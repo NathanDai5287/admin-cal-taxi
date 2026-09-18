@@ -35,14 +35,14 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
 
   if (variant === "section") {
     return (
-      <nav aria-label={title} className="flex gap-2 overflow-x-auto border-b border-rule pb-3">
+      <nav aria-label={title} className="flex overflow-x-auto border-b border-rule">
         <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
         {tabs.map((tab) => <Link
           key={tab.href}
           href={tab.href}
           prefetch={false}
           aria-current={tab.href === activeHref ? "page" : undefined}
-          className={`whitespace-nowrap rounded px-4 py-2 text-sm font-bold ${tab.href === activeHref ? "bg-brand text-white" : "text-muted hover:text-ink"}`}
+          className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold outline-none transition-colors focus-visible:bg-subtle ${tab.href === activeHref ? "border-brand text-brand" : "border-transparent text-muted hover:border-rule hover:text-ink"}`}
         >{tab.label}</Link>)}
       </nav>
     );

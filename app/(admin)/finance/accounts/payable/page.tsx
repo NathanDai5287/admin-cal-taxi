@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ButtonLink } from "@/components/brand/button";
 import { ReimbursementPaymentTable } from "@/components/reimbursements/reimbursement-payment-table";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -8,39 +6,34 @@ import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
 export const metadata = { title: "Accounts payable" };
 export const dynamic = "force-dynamic";
-export default async function PayablePage({ searchParams }: { searchParams: Promise<{ paid?: string }> }) {
-  const [, params] = await Promise.all([requireAdmin(), searchParams]);
-  const paid = params.paid === "true";
+export default async function PayablePage() {
+  await requireAdmin();
   const supabase = createAdminClient();
   const { data, error } = await loadAllPages((from, to) => supabase.from("reimbursements")
     .select("id, user_id, full_name, amount, category, status, merchant, receipt_total, payment_method, reimbursed, submitted_at, updated_at")
-    .eq("status", "approved").eq("reimbursed", paid).order("submitted_at").order("id").range(from, to));
+    .order("submitted_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
   if (error) throw new Error(`Unable to load payables: ${error.message}`);
   const rows = data ?? [];
-  const total = rows.reduce((sum, row) => sum + Number(row.amount), 0);
+  const readyToPay = rows.filter((row) => row.status === "approved" && !row.reimbursed);
+  const total = readyToPay.reduce((sum, row) => sum + Number(row.amount), 0);
   return <div className="grid gap-6">
-    <div className="flex flex-wrap items-end justify-between gap-5">
-      <div><p className="page-eyebrow">Chapter finances</p><h1 className="page-title">Reimbursements to pay</h1><p className="page-lede">Pay requests after they are approved, then record the payout here.</p></div>
-      <ButtonLink href="/finance/review" variant="secondary">Review submitted requests</ButtonLink>
+    <div>
+      <p className="page-eyebrow">Chapter finances</p>
+      <h1 className="page-title">Reimbursements to pay</h1>
+      <p className="page-lede">Review requests, approve or deny them, and record approved payouts here.</p>
     </div>
 
-    <nav aria-label="Reimbursement payment status" className="inline-flex w-fit border border-rule bg-surface p-1">
-      <Link className={`px-4 py-2 text-[12px] font-bold ${!paid ? "bg-action text-white" : "text-muted hover:text-ink"}`} aria-current={!paid ? "page" : undefined} href="/finance/accounts/payable">Needs payment</Link>
-      <Link className={`px-4 py-2 text-[12px] font-bold ${paid ? "bg-action text-white" : "text-muted hover:text-ink"}`} aria-current={paid ? "page" : undefined} href="/finance/accounts/payable?paid=true">Paid history</Link>
-    </nav>
-
-    <section className="dues-summary" aria-label={paid ? "Paid reimbursement summary" : "Unpaid reimbursement summary"}>
-      <div className="dues-summary-primary"><span>{paid ? "Total paid" : "Ready to pay"}</span><strong>{formatMoney(total)}</strong><p>{paid ? "Recorded payout history" : "Approved and awaiting payout"}</p></div>
-      <div><span>Requests</span><strong>{rows.length}</strong><p>{rows.length === 1 ? "Reimbursement" : "Reimbursements"} in this view</p></div>
-      <div><span>{paid ? "This view" : "Next step"}</span><strong className="text-[18px]!">{paid ? "History" : rows.length ? "Select rows" : "All clear"}</strong><p>{paid ? "Uncheck Reimbursed to correct a payout" : rows.length ? "Choose one or more, then review payments" : "No payouts need attention"}</p></div>
+    <section className="dues-summary" aria-label="Reimbursement summary">
+      <div className="dues-summary-primary"><span>Ready to pay</span><strong>{formatMoney(total)}</strong><p>Approved and awaiting payout</p></div>
+      <div><span>All requests</span><strong>{rows.length}</strong><p>{rows.length === 1 ? "Reimbursement" : "Reimbursements"} submitted</p></div>
+      <div><span>Next step</span><strong className="text-[18px]!">{readyToPay.length ? "Select rows" : "Review requests"}</strong><p>{readyToPay.length ? "Choose approved requests, then confirm payments" : "Approve requests before recording payouts"}</p></div>
     </section>
 
-    {rows.length ? <ReimbursementPaymentTable mode="payment" rows={rows} /> : (
+    {rows.length ? <ReimbursementPaymentTable rows={rows} /> : (
       <section className="card">
         <div className="empty-state">
-          <strong className="block text-[15px] text-ink">{paid ? "No paid reimbursements yet" : "No reimbursements are waiting for payment"}</strong>
-          <p className="mx-auto mt-2 max-w-[420px]">{paid ? "Completed payouts will appear here." : "When a request is approved in Review, it will appear on this page automatically."}</p>
-          {!paid && <div className="mt-5"><ButtonLink href="/finance/review" variant="secondary">Go to reimbursement review</ButtonLink></div>}
+          <strong className="block text-[15px] text-ink">No reimbursements yet</strong>
+          <p className="mx-auto mt-2 max-w-[420px]">Submitted reimbursements will appear here.</p>
         </div>
       </section>
     )}

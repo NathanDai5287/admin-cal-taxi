@@ -94,7 +94,7 @@ export default async function AccountsPage() {
           </Link>
           <Link className="account-workflow-card" href="/finance/accounts/payable">
             <span className="account-workflow-number">2</span>
-            <div><h3>Pay reimbursements</h3><p>See requests that were approved in Review and record their payout.</p></div>
+            <div><h3>Manage reimbursements</h3><p>Review requests and record approved payouts in one place.</p></div>
             <ArrowIcon />
           </Link>
           <Link className="account-workflow-card" href="/finance/accounts/activity">

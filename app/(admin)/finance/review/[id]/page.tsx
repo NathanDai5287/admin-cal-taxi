@@ -68,7 +68,7 @@ export default async function SubmissionReviewPage({
           <h1 className="page-title">{reimbursement.full_name}</h1>
           <p className="page-lede">Submitted {formatDate(reimbursement.submitted_at, true)}</p>
         </div>
-        <Link className="back-link" href="/finance/review">← All submissions</Link>
+        <Link className="back-link" href="/finance/accounts/payable">← All reimbursements</Link>
       </div>
 
       <div className="review-grid">

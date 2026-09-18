@@ -10,7 +10,7 @@ import {
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
 import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
-import { formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
 import {
   InlineStatusSelect,
   type ReimbursementStatus,
@@ -48,8 +48,7 @@ function selectionKey(row: PaymentTableRow) {
   return row.id;
 }
 
-export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRow[]; mode: "review" | "payment" }) {
-  const payments = mode === "payment";
+export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] }) {
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -312,9 +311,8 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
   return (
     <section className="card">
       <div className="card-header justify-between gap-4 flex-wrap">
-        <span className="card-title">{payments ? "Approved reimbursements" : "All submissions"}</span>
-        {/* Always rendered (hidden when nothing is selected) so the header height never changes. */}
-        {payments && <div
+        <span className="card-title">All reimbursements</span>
+        <div
           aria-hidden={selectedRows.length === 0}
           className={
             "flex items-center gap-3 flex-wrap transition-opacity duration-150 " +
@@ -330,13 +328,13 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
           </span>
           <Button variant="secondary" compact disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</Button>
           <Button variant="primary" compact disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Confirm selected payouts</Button>
-        </div>}
+        </div>
       </div>
       <div className="table-scroll border-t border-rule">
         <table className="data-table">
           <thead>
             <tr>
-              {payments && <th>
+              <th>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <span>Pay</span>
                   <input
@@ -349,8 +347,8 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
                     type="checkbox"
                   />
                 </label>
-              </th>}
-              <th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th>{payments && <th>Paid</th>}
+              </th>
+              <th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Paid</th>
             </tr>
           </thead>
           <tbody>
@@ -358,7 +356,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
               const eligible = item.status === "approved" && !item.reimbursed;
               return (
                 <tr className="submission-row" key={item.id}>
-                  {payments && <td>
+                  <td>
                     <label className="inline-action checkbox-cell">
                     <input
                       aria-label={eligible
@@ -372,12 +370,12 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
                       type="checkbox"
                     />
                     </label>
-                  </td>}
+                  </td>
                   <td>
                     <Link
                       aria-label={`Review submission from ${item.full_name}`}
                       className="submission-link"
-                      href={`/finance/review/${item.id}`}
+                      href={`/finance/accounts/payable/${item.id}`}
                     >
                       {item.full_name}
                     </Link>
@@ -388,14 +386,14 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
                   <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
                   <td>
                     <div className="inline-action">
-                      {payments ? <span className={`badge badge-${item.status}`}>{formatStatus(item.status)}</span> : <InlineStatusSelect
+                      <InlineStatusSelect
                         disabled={item.reimbursed || item.status === "pending" || pendingFields.has(`${item.id}:status`)}
                         onChange={(status) => void changeStatus(item, status)}
                         status={item.status}
-                      />}
+                      />
                     </div>
                   </td>
-                  {payments && <td>
+                  <td>
                     <div className="inline-action">
                       <ReimbursedCheckbox
                         disabled={pendingFields.has(`${item.id}:reimbursed`)}
@@ -403,7 +401,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
                         reimbursed={item.reimbursed}
                       />
                     </div>
-                  </td>}
+                  </td>
                 </tr>
               );
             })}
@@ -414,7 +412,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
       {feedback && <p className="payment-feedback" role="status">{feedback}</p>}
       {mutationError && <p className="payment-dialog-error pb-3" role="alert">{mutationError}</p>}
 
-      {payments && <dialog
+      <dialog
         aria-labelledby="payment-review-heading"
         className="payment-review-dialog"
         onCancel={(event) => {
@@ -468,7 +466,7 @@ export function ReimbursementPaymentTable({ rows, mode }: { rows: PaymentTableRo
             {submitting ? "Recording payouts…" : "Record selected as paid"}
           </Button>
         </div>
-      </dialog>}
+      </dialog>
     </section>
   );
 }

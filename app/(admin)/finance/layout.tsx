@@ -31,16 +31,13 @@ export default async function FinanceLayout({ children }: { children: React.Reac
           "/finance/accounts",
           "/finance/accounts/receivable",
           "/finance/accounts/payable",
-          "/finance/accounts/payable?paid=true",
           "/finance/accounts/activity",
           "/finance/planning",
-          "/finance/review",
           "/finance/reports",
         ]}
         tabs={[
           { href: "/finance/accounts", label: "Accounts" },
           { href: "/finance/planning", label: "Planning" },
-          { href: "/finance/review", label: "Review" },
           { href: "/finance/reports", label: "Reports" },
         ]}
       />
