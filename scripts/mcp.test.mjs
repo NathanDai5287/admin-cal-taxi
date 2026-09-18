@@ -6,6 +6,7 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 import { buildBudgetCategories, buildFinanceOverview, isCalendarDate } from "../lib/mcp/finance.ts";
+import { decodeMcpReceipt } from "../lib/mcp/receipt.ts";
 import { categories, categoryBudgetMap, categoryRegistry, categoryValues } from "../lib/reimbursements/format.ts";
 
 test("one category registry derives keys, labels, and budget values", () => {
@@ -23,6 +24,17 @@ test("MCP date validation rejects impossible calendar dates", () => {
   assert.equal(isCalendarDate("2026-2-8"), false);
 });
 
+test("MCP receipt validation accepts real image data and rejects mismatched data", () => {
+  const png = decodeMcpReceipt("data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==");
+  assert.equal(png.extension, "png");
+  assert.equal(png.contentType, "image/png");
+  assert.throws(
+    () => decodeMcpReceipt("data:image/jpeg;base64,iVBORw0KGgoAAAANSUhEUg=="),
+    /does not match/,
+  );
+  assert.throws(() => decodeMcpReceipt("file:///tmp/receipt.png"), /data URL/);
+});
+
 test("external MCP tools use provider idempotency and clean receipt storage", async () => {
   const [server, discord, invites] = await Promise.all([
     readFile(new URL("../lib/mcp/server.ts", import.meta.url), "utf8"),
@@ -32,6 +44,8 @@ test("external MCP tools use provider idempotency and clean receipt storage", as
   assert.match(server, /sendInviteEmails\(\[payload\.email\], payload\.role, requestId\)/);
   assert.match(server, /content\.length > 2000/);
   assert.match(server, /storage\.from\("receipts"\)\.remove/);
+  assert.match(server, /mcp_create_reimbursement/);
+  assert.match(server, /storage\.upload\(path, receipt\.bytes/);
   assert.match(discord, /enforce_nonce: true/);
   assert.match(invites, /idempotencyKey:/);
 });
@@ -127,6 +141,7 @@ test("only active administrators can write their own secret-free MCP audit recor
       status public.reimbursement_status, reimbursed boolean, category public.reimbursement_category,
       merchant text, submitted_at timestamptz default now(), updated_at timestamptz default now()
     );
+    grant select on public.reimbursements to authenticated;
     create table public.reimbursement_manual_expenses (
       id uuid primary key default gen_random_uuid(), amount numeric, category public.reimbursement_category,
       description text, expense_date date, receipt_path text, created_by uuid,
@@ -158,10 +173,15 @@ test("only active administrators can write their own secret-free MCP audit recor
     "utf8",
   );
   await db.exec(writeMigration);
+  const reimbursementMigration = await readFile(
+    new URL("../supabase/migrations/20260920100000_mcp_reimbursement_uploads.sql", import.meta.url),
+    "utf8",
+  );
+  await db.exec(reimbursementMigration);
   const adminId = randomUUID();
   const memberId = randomUUID();
   await db.query(
-    "insert into public.profiles (id, role) values ($1, 'admin'), ($2, 'member')",
+    "insert into public.profiles (id, role, full_name, email, has_signed_in) values ($1, 'admin', 'Admin', 'admin@example.com', true), ($2, 'member', 'Invited Member', 'invited@example.com', false)",
     [adminId, memberId],
   );
 
@@ -181,6 +201,26 @@ test("only active administrators can write their own secret-free MCP audit recor
   );
   await db.query("select public.mcp_finance_overview()");
   assert.equal((await db.query("select count(*)::int as count from public.mcp_audit_log")).rows[0].count, 1);
+  const reimbursementRequest = randomUUID();
+  const reimbursementParameters = [
+    memberId, "administration", 150, "Flight reimbursement", "Zelle",
+    `mcp/${reimbursementRequest}.png`, true, reimbursementRequest,
+  ];
+  const reimbursement = await db.query(
+    "select public.mcp_create_reimbursement($1, $2, $3, $4, $5, $6, $7, $8) as result",
+    reimbursementParameters,
+  );
+  await db.query(
+    "select public.mcp_create_reimbursement($1, $2, $3, $4, $5, $6, $7, $8)",
+    reimbursementParameters,
+  );
+  assert.equal(reimbursement.rows[0].result.memberName, "Invited Member");
+  assert.equal(reimbursement.rows[0].result.paid, true);
+  assert.equal((await db.query("select count(*)::int as count from public.reimbursements")).rows[0].count, 1);
+  assert.equal(
+    (await db.query("select count(*)::int as count from public.mcp_audit_log where tool_name = 'create_reimbursement'")).rows[0].count,
+    1,
+  );
   await db.query("select set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: memberId, client_id: "client-id" })]);
   await assert.rejects(db.query("select public.mcp_finance_overview()"), /OAuth grant is required/);
   await db.exec("reset role");

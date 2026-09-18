@@ -312,6 +312,19 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      mcp_create_reimbursement: {
+        Args: {
+          p_member_id: string;
+          p_category: Database["public"]["Enums"]["reimbursement_category"];
+          p_amount: number;
+          p_description: string;
+          p_payment_method: string;
+          p_receipt_path: string;
+          p_paid: boolean;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
       admin_invite_email: {
         Args: { invite_email: string; invite_role: "none" | "member" | "admin" };
         Returns: undefined;

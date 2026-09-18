@@ -11,6 +11,7 @@ import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
 import { isCalendarDate } from "@/lib/mcp/finance";
+import { decodeMcpReceipt } from "@/lib/mcp/receipt";
 
 type Supabase = import("@supabase/supabase-js").SupabaseClient<Database>;
 
@@ -106,6 +107,22 @@ async function finishExternal(supabase: Supabase, requestId: string, succeeded: 
     p_request_id: requestId, p_succeeded: succeeded, p_result: result,
   });
   if (error) throw new Error(error.message);
+}
+
+async function storeMcpReceipt(receiptDataUrl: string, requestId: string) {
+  const receipt = decodeMcpReceipt(receiptDataUrl);
+  const path = `mcp/${requestId}.${receipt.extension}`;
+  const storage = createAdminClient().storage.from("receipts");
+  const name = `${requestId}.${receipt.extension}`;
+  const receiptExists = async () => {
+    const { data } = await storage.list("mcp", { search: name, limit: 1 });
+    return data?.some((object) => object.name === name) ?? false;
+  };
+  if (await receiptExists()) return path;
+
+  const { error } = await storage.upload(path, receipt.bytes, { contentType: receipt.contentType, upsert: false });
+  if (error && !await receiptExists()) throw new Error("The receipt image could not be uploaded.");
+  return path;
 }
 
 function createFinanceServer(supabase: Supabase) {
@@ -279,6 +296,32 @@ function createFinanceServer(supabase: Supabase) {
       .refine(({ status, paid, confirm }) => (status !== "denied" && paid !== false) || confirm),
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
   }, async ({ confirm, ...input }) => write(supabase, "update_reimbursement", input, { confirmed: confirm }));
+
+  server.registerTool("create_reimbursement", {
+    description: "Create an approved reimbursement for an active or invited member and attach a JPG or PNG receipt image.",
+    inputSchema: z.object({
+      memberId: z.uuid(), category: z.enum(categoryValues), amount: money,
+      description: z.string().trim().min(1).max(2000),
+      paymentMethod: z.string().trim().min(1).max(200), paid: z.boolean().default(false),
+      receiptDataUrl: z.string().max(14_000_000).describe("A data:image/jpeg;base64,... or data:image/png;base64,... URL up to 10 MB."),
+      requestId,
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, async ({ receiptDataUrl, requestId, ...input }) => {
+    const receiptPath = await storeMcpReceipt(receiptDataUrl, requestId);
+    const { data, error } = await supabase.rpc("mcp_create_reimbursement", {
+      p_member_id: input.memberId,
+      p_category: input.category,
+      p_amount: input.amount,
+      p_description: input.description,
+      p_payment_method: input.paymentMethod,
+      p_receipt_path: receiptPath,
+      p_paid: input.paid,
+      p_request_id: requestId,
+    });
+    if (error) throw new Error(error.message);
+    return jsonResult(data);
+  });
 
   server.registerTool("invite_user", {
     description: "Create or restore a member invitation and send its email.",
