@@ -231,6 +231,16 @@
     @apply text-[11.5px] text-muted leading-snug mt-1.5;
   }
 
+  /* Accreditation keeps its blue section headings in the brand's display style,
+     while form labels and values use conventional sentence case. */
+  [data-brand].accreditation-shell .field-label {
+    @apply normal-case tracking-normal;
+  }
+  [data-brand].accreditation-shell .field-input,
+  [data-brand].accreditation-shell .field-textarea {
+    @apply font-normal normal-case tracking-normal;
+  }
+
   /* ── Buttons ── */
   [data-brand] .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-5 py-2.5

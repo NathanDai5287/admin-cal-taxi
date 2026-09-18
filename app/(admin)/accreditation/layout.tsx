@@ -13,7 +13,7 @@ export default async function AccreditationLayout({ children }: { children: Reac
   if (!session) redirect("/");
   if (session.profile.role !== "admin") return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
   return (
-    <div data-brand className="min-h-screen">
+    <div data-brand className="accreditation-shell min-h-screen">
       <AppNav
         homeHref="/accreditation"
         title="Theta Xi"
@@ -28,4 +28,3 @@ export default async function AccreditationLayout({ children }: { children: Reac
     </div>
   );
 }
-

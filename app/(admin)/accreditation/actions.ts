@@ -134,7 +134,7 @@ export async function uploadSource(formData: FormData) {
     redirect(`/accreditation/library?cycle=${cycleId.data}&result=upload_error`);
   }
   try {
-    await processDocument(sourceId, false, formData.get("signatureFree") === "on");
+    await processDocument(sourceId, false, true);
     revalidatePath("/accreditation", "layout");
     redirect(`/accreditation/library?cycle=${cycleId.data}&result=uploaded`);
   } catch (error) {

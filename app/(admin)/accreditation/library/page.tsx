@@ -31,7 +31,7 @@ export default async function EvidenceLibrary({ searchParams }: { searchParams: 
           <label className="field-label">Source class<select className="field-input" name="kind" defaultValue="chapter_evidence"><option value="official_guideline">Official guideline</option><option value="prior_submission">Prior submission</option><option value="chapter_evidence">Chapter evidence</option><option value="blank_template">Blank template reference</option></select></label>
           <label className="field-label">Report scope<select className="field-input" name="reportKey"><option value="">Available to all reports</option>{Object.values(REPORT_DEFINITIONS).map((definition) => <option key={definition.key} value={definition.key}>{definition.name}</option>)}</select></label>
           <label className="field-label md:col-span-2">File<input className="file-input mt-1" type="file" name="file" required /></label>
-          <label className="field-label md:col-span-2"><span><input type="checkbox" name="signatureFree" required /> I have removed signatures from this source before AI processing.</span></label><div><Button type="submit" disabled={!cycle}>Upload and process</Button></div>
+          <div><Button type="submit" disabled={!cycle}>Upload and process</Button></div>
         </form>
       </section>
       <section className="card">
