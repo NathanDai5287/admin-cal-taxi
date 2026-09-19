@@ -211,10 +211,15 @@ of the answer and groups all cited passages by their overall source document.
 Policy drafts and accreditation evidence accept batches of up to 20 documents.
 Files are stored first and then embedded sequentially to smooth provider traffic.
 The upload queue polls persisted passage counts while each document is processing.
-Retryable Gemini `429`/`503` failures retry the same document up to four total
+Retryable Gemini `429`/`503` failures retry the same document up to twelve total
 attempts using jittered exponential backoff: 10–12 seconds before the first retry
 and a 20-second cap for later retries. Non-retryable validation and extraction
-errors fail only that document and do not stop the rest of the batch.
+errors fail only that document and do not stop the rest of the batch. Extracted
+passages and individual embedding checkpoints are persisted, so a retry resumes at
+the first unfinished passage instead of embedding the whole document again. A new
+profile becomes searchable only after every passage is complete. Administrators can
+permanently delete eligible originals and their cascaded chunks/checkpoints; evidence
+already cited by a retained accreditation revision must be archived instead.
 
 `/policy/library` lets administrators upload drafts, edit metadata, retry failed
 processing, inspect extracted passages, publish, supersede, and archive. Published

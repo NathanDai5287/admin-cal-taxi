@@ -113,3 +113,17 @@ export async function retirePolicy(form: FormData) {
   const result = await db.from("policy_documents").update({ status, replacement_document_id: replacementId, superseded_by: userId, superseded_at: new Date().toISOString() }).eq("id", id);
   finish(result.error ? "Policy status could not be changed." : "Policy removed from member retrieval.");
 }
+
+export async function deletePolicy(form: FormData) {
+  await policyAdmin();
+  const id = z.string().uuid().safeParse(form.get("id"));
+  if (!id.success || form.get("confirmDelete") !== "on") finish("Confirm permanent deletion first.");
+  const db = createAccreditationAdminClient();
+  const policy = await db.from("policy_documents").select("storage_path,status").eq("id", id.data).maybeSingle();
+  if (!policy.data) finish("Policy document not found.");
+  if (!["draft", "failed", "archived"].includes(policy.data.status)) finish("Published and superseded policies must be archived before permanent deletion.");
+  const removed = await db.from("policy_documents").delete().eq("id", id.data).in("status", ["draft", "failed", "archived"]).select("id");
+  if (removed.error || !removed.data?.length) finish("Policy is referenced by another record and could not be deleted.");
+  const storage = await db.storage.from("policy-documents").remove([policy.data.storage_path]);
+  finish(storage.error ? "Policy and embeddings deleted; original file cleanup failed." : "Policy, original file, and embeddings permanently deleted.");
+}

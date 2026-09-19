@@ -23,7 +23,7 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     grant all on storage.objects to authenticated,service_role;
     alter default privileges in schema public grant all on tables to service_role;
   `);
-  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
+  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql", "20260927000000_resumable_document_embeddings.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
   const admin = randomUUID(), member = randomUUID(), other = randomUUID(), removed = randomUUID();
   await db.query("insert into profiles values ($1,'admin',null),($2,'member',null),($3,'member',null),($4,'member',now())", [admin, member, other, removed]);
   const profile = "gemini-embedding-2:768:retrieval-v1";
@@ -80,6 +80,25 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     await assert.rejects(db.query("select commit_document_embeddings($1,true,$2,$3)", [draft, profile, JSON.stringify([chunk("partial", 0), chunk("bad vector", 1, { embedding_v2: "[1,2]" })])]), /dimensions/);
     assert.deepEqual((await db.query("select content from policy_chunks where source_id=$1", [draft])).rows, before.rows);
   });
+  await t.test("embedding checkpoints resume by ordinal and activate only when complete", async () => {
+    await owner();
+    const resumable = randomUUID();
+    await db.query("insert into policy_documents(id,title,authority,version_label,effective_from,content_hash,storage_path,original_name,mime_type,processing_total) values($1::uuid,'Resumable','Test authority','v1','2026-01-01','resume-hash',$1::text,'resume.txt','text/plain',2)", [resumable]);
+    const passages = [{ ordinal: 0, content: "First passage", locator: { page: 1 } }, { ordinal: 1, content: "Second passage", locator: { page: 2 } }];
+    await db.query("select checkpoint_document_chunks($1,true,$2)", [resumable, JSON.stringify(passages)]);
+    await db.query("select checkpoint_document_embedding($1,true,$2,0,$3,'gemini','gemini-embedding-2')", [resumable, profile, vec]);
+    const partial = await db.query("select processing_completed,processing_total,active_embedding_profile from policy_documents where id=$1", [resumable]);
+    assert.deepEqual(partial.rows[0], { processing_completed: 1, processing_total: 2, active_embedding_profile: null });
+    await assert.rejects(db.query("select activate_document_embeddings($1,true,$2)", [resumable, profile]), /All chunks/);
+    assert.equal((await db.query("select count(*)::int count from policy_embedding_checkpoints where source_id=$1", [resumable])).rows[0].count, 1);
+    await db.query("select checkpoint_document_embedding($1,true,$2,1,$3,'gemini','gemini-embedding-2')", [resumable, profile, vec]);
+    await db.query("select activate_document_embeddings($1,true,$2)", [resumable, profile]);
+    const ready = await db.query("select processing_state,processing_completed,active_embedding_profile from policy_documents where id=$1", [resumable]);
+    assert.deepEqual(ready.rows[0], { processing_state: "ready", processing_completed: 2, active_embedding_profile: profile });
+    assert.equal((await db.query("select count(*)::int count from policy_embedding_checkpoints where source_id=$1", [resumable])).rows[0].count, 0);
+    await db.query("delete from policy_documents where id=$1", [resumable]);
+    assert.equal((await db.query("select count(*)::int count from policy_chunks where source_id=$1", [resumable])).rows[0].count, 0);
+  });
   await t.test("member questions are isolated and quota reservations enforce minute/day limits", async () => {
     await asUser(member, "service_role");
     for (let i = 0; i < 2; i++) await db.query("select reserve_policy_question($1,'Event review?','2026-09-17',2,50)", [member]);
@@ -127,6 +146,17 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     for (const table of ["accreditation_sources","accreditation_source_chunks","accreditation_templates","accreditation_runs","accreditation_revisions","accreditation_artifacts"]) assert.equal((await db.query(`select * from ${table}`)).rows.length,0);
     await assert.rejects(db.query("select approve_accreditation_revision($1,$2,$3)",[randomUUID(),randomUUID(),admin]),/authenticated administrator/);
     await assert.rejects(db.query("select commit_document_embeddings($1,false,$2,$3)",[accepted[0],profile,JSON.stringify([chunk("attack")])]),/permission denied/);
+  });
+  await t.test("deleting accreditation evidence cascades passages and resumable checkpoints", async () => {
+    await owner();
+    const cycle = (await db.query("select id from accreditation_cycles limit 1")).rows[0].id;
+    const source = randomUUID();
+    await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path,processing_total) values($1::uuid,$2,'chapter_evidence','processing','Delete me','text/plain',10,$1::text,$1::text,1)", [source, cycle]);
+    await db.query("select checkpoint_document_chunks($1,false,$2)", [source, JSON.stringify([{ ordinal: 0, content: "Disposable evidence", locator: { page: 1 } }])]);
+    await db.query("select checkpoint_document_embedding($1,false,$2,0,$3,'gemini','gemini-embedding-2')", [source, profile, vec]);
+    await db.query("delete from accreditation_sources where id=$1", [source]);
+    assert.equal((await db.query("select count(*)::int count from accreditation_source_chunks where source_id=$1", [source])).rows[0].count, 0);
+    assert.equal((await db.query("select count(*)::int count from accreditation_embedding_checkpoints where source_id=$1", [source])).rows[0].count, 0);
   });
   await t.test("retained report approval freezes revisions, finance snapshots and artifact checksums", async () => {
     await owner();

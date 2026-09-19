@@ -1,5 +1,5 @@
 export const MAX_BATCH_DOCUMENTS = 20;
-export const MAX_PROCESSING_ATTEMPTS = 4;
+export const MAX_PROCESSING_ATTEMPTS = 12;
 
 export type BatchCreateResult = {
   ok: boolean;

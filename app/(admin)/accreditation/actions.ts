@@ -232,6 +232,22 @@ export async function archiveSource(formData: FormData) {
   revalidatePath("/accreditation/library");
 }
 
+export async function deleteSource(formData: FormData) {
+  await requireAccreditationAdmin();
+  const sourceId = uuid.safeParse(formData.get("sourceId"));
+  if (!sourceId.success || formData.get("confirmDelete") !== "on") redirect("/accreditation/library?result=confirm_deletion");
+  const db = createAccreditationAdminClient();
+  const source = await db.from("accreditation_sources").select("cycle_id,storage_path").eq("id", sourceId.data).maybeSingle();
+  if (!source.data) redirect("/accreditation/library?result=source_not_found");
+  const removed = await db.from("accreditation_sources").delete().eq("id", sourceId.data).select("id");
+  if (removed.error || !removed.data?.length) {
+    redirect(`/accreditation/library?cycle=${source.data.cycle_id}&result=source_is_in_use_archive_instead`);
+  }
+  const storage = await db.storage.from("accreditation-sources").remove([source.data.storage_path]);
+  revalidatePath("/accreditation", "layout");
+  redirect(`/accreditation/library?cycle=${source.data.cycle_id}&result=${storage.error ? "document_and_embeddings_deleted_storage_cleanup_failed" : "document_and_embeddings_deleted"}`);
+}
+
 export async function uploadTemplate(formData: FormData) {
   const { userId } = await requireAccreditationAdmin();
   const reportKey = z.enum(REPORT_KEYS).safeParse(formData.get("reportKey"));

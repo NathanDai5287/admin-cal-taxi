@@ -103,7 +103,7 @@ export async function processQueuedDocument(options: {
       return;
     }
     if (!result.retryable || attempt === MAX_PROCESSING_ATTEMPTS - 1) {
-      update(localId, { phase: "failed", message: result.retryable ? "Gemini remained unavailable after four attempts." : result.message });
+      update(localId, { phase: "failed", message: result.retryable ? `Gemini remained unavailable after ${MAX_PROCESSING_ATTEMPTS} attempts.` : result.message });
       return;
     }
     const delay = processingRetryDelayMs(attempt);
