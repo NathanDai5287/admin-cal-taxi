@@ -52,6 +52,7 @@ The public site must remain clear to signed-out visitors and users with the `non
 - The current admin visual system is in this repository.
 - Supplied photographs are in `/Users/nathan.dai/Downloads/taxi`.
 - Supplied subjects include graduation, awards, travel, informal meals, group work, outdoor trips, and social gatherings.
+- Supplied venue photographs show an indoor event setup and a backyard gathering.
 - The current public site states that Nu Chapter has been at UC Berkeley since 1910.
 - No public chapter contact email is available; venue questions use the on-site inquiry form.
 - The current public site claims venue capacity for 200 guests, a near-campus location, flexible setup, and event-team coordination.

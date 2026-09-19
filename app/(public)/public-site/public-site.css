@@ -938,6 +938,18 @@
   border: 1px solid currentColor;
 }
 
+.host-space-photo-real img {
+  object-fit: cover;
+}
+
+.host-space-indoor .host-space-photo-lead img {
+  object-position: center 58%;
+}
+
+.host-space-backyard .host-space-photo-detail-one img {
+  object-position: center 52%;
+}
+
 .host-space-backyard .host-space-photo-lead {
   grid-column: 1 / 9;
 }
@@ -1029,6 +1041,11 @@
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.host-space-photo-real figcaption {
+  background: rgba(16, 16, 20, 0.84);
+  color: white;
 }
 
 .host-spaces-mark {

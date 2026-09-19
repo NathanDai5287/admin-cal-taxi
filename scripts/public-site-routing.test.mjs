@@ -11,7 +11,7 @@ test("public routes map to their internal pages", () => {
   assert.equal(publicSitePath("/rush"), "/public-site/rush");
 });
 
-test("host presents distinct placeholders for both venue spaces", async () => {
+test("host preserves distinct future photograph slots for both venue spaces", async () => {
   const source = await readFile(
     new URL("../app/(public)/public-site/host/page.tsx", import.meta.url),
     "utf8",
@@ -19,8 +19,8 @@ test("host presents distinct placeholders for both venue spaces", async () => {
 
   assert.match(source, />Backyard venue</);
   assert.match(source, />Indoor venue</);
-  assert.equal(source.match(/Backyard (lead )?photograph/g)?.length, 4);
-  assert.equal(source.match(/Indoor (lead )?photograph/g)?.length, 4);
+  assert.equal(source.match(/Backyard photograph/g)?.length, 2);
+  assert.equal(source.match(/Indoor photograph/g)?.length, 3);
 });
 
 test("horizontal navigation cannot scroll vertically", async () => {

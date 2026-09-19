@@ -8,6 +8,7 @@ const routeFiles = {
   "/": new URL("../app/(public)/public-site/page.tsx", import.meta.url),
   "/rush": new URL("../app/(public)/public-site/rush/page.tsx", import.meta.url),
   "/events": new URL("../app/(public)/public-site/events/page.tsx", import.meta.url),
+  "/host": new URL("../app/(public)/public-site/host/page.tsx", import.meta.url),
 };
 
 async function sourceFiles(directory) {
@@ -28,10 +29,9 @@ test("each supplied photograph has one public content placement", async () => {
   const files = await Promise.all([sourceFiles(publicApp), sourceFiles(publicComponents)]);
   const publicSource = (await Promise.all(files.flat().map((file) => readFile(file, "utf8")))).join("\n");
 
-  assert.equal(provenance.length, 11);
-  assert.equal(new Set(provenance.map(({ source }) => source)).size, 11);
-  assert.equal(new Set(provenance.map(({ asset }) => asset)).size, 11);
-  assert.equal(provenance.some(({ route }) => route === "/host"), false);
+  assert.equal(provenance.length, 14);
+  assert.equal(new Set(provenance.map(({ source }) => source)).size, 14);
+  assert.equal(new Set(provenance.map(({ asset }) => asset)).size, 14);
 
   for (const { asset, route, sourceSha256 } of provenance) {
     assert.match(sourceSha256, /^[a-f0-9]{64}$/);

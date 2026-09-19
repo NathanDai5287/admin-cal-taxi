@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import Image, { type StaticImageData } from "next/image";
 
 import { Arrow } from "@/components/public/public-shell";
+import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
+import backyardWideImage from "@/public/site/venue-backyard-wide.jpg";
+import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 
 export const metadata: Metadata = {
@@ -36,10 +40,16 @@ export default function HostPage() {
         <article className="host-space-showcase host-space-indoor">
           <header>
             <h2>Indoor venue</h2>
-            <p>Four photograph locations reserved.</p>
+            <p>One photograph shown. Three reserved.</p>
           </header>
           <div className="host-space-gallery">
-            <VenuePhotoPlaceholder label="Indoor lead photograph" position="lead" />
+            <VenuePhoto
+              alt="Five people posing behind a decorated table at an indoor event"
+              label="Indoor event setup"
+              position="lead"
+              sizes="(max-width: 760px) 100vw, 58vw"
+              src={indoorEventImage}
+            />
             <VenuePhotoPlaceholder label="Indoor photograph 2" position="detail-one" />
             <VenuePhotoPlaceholder label="Indoor photograph 3" position="detail-two" />
             <VenuePhotoPlaceholder label="Indoor photograph 4" position="detail-three" />
@@ -51,11 +61,23 @@ export default function HostPage() {
         <article className="host-space-showcase host-space-backyard">
           <header>
             <h2>Backyard venue</h2>
-            <p>Four photograph locations reserved.</p>
+            <p>Two photographs shown. Two reserved.</p>
           </header>
           <div className="host-space-gallery">
-            <VenuePhotoPlaceholder label="Backyard lead photograph" position="lead" />
-            <VenuePhotoPlaceholder label="Backyard photograph 2" position="detail-one" />
+            <VenuePhoto
+              alt="A large daytime gathering in the backyard beneath blue and yellow decorations"
+              label="Backyard gathering — wide view"
+              position="lead"
+              sizes="(max-width: 760px) 100vw, 58vw"
+              src={backyardWideImage}
+            />
+            <VenuePhoto
+              alt="A large daytime gathering in the backyard viewed from above"
+              label="Backyard gathering — portrait view"
+              position="detail-one"
+              sizes="(max-width: 760px) 100vw, 30vw"
+              src={backyardPortraitImage}
+            />
             <VenuePhotoPlaceholder label="Backyard photograph 3" position="detail-two" />
             <VenuePhotoPlaceholder label="Backyard photograph 4" position="detail-three" />
           </div>
@@ -92,6 +114,27 @@ function VenuePhotoPlaceholder({ label, position }: { label: string; position: s
   return (
     <figure className={`host-space-photo host-space-photo-${position}`}>
       <div aria-hidden="true" className="host-space-frame" />
+      <figcaption>{label}</figcaption>
+    </figure>
+  );
+}
+
+function VenuePhoto({
+  alt,
+  label,
+  position,
+  sizes,
+  src,
+}: {
+  alt: string;
+  label: string;
+  position: string;
+  sizes: string;
+  src: StaticImageData;
+}) {
+  return (
+    <figure className={`host-space-photo host-space-photo-${position} host-space-photo-real`}>
+      <Image alt={alt} fill sizes={sizes} src={src} />
       <figcaption>{label}</figcaption>
     </figure>
   );

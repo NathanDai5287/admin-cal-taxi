@@ -246,8 +246,8 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 ### Venue Photograph Sequence
 
-- **Structure:** Backyard and indoor spaces each use one large lead image followed by three supporting images.
-- **Placeholders:** Reserved frames name every future photograph without presenting simulated venue evidence.
+- **Structure:** Backyard and indoor spaces each use one large lead image followed by three supporting positions.
+- **Placeholders:** Confirmed venue photographs replace matching reserved frames; unused frames remain explicit placeholders.
 - **Rhythm:** The lead image changes sides between spaces, while supporting frames keep the sequence useful on narrow screens.
 - **Replacement:** Real venue photographs can replace each reserved frame without changing the page structure.
 
