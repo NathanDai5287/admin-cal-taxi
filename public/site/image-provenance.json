@@ -1,0 +1,13 @@
+[
+  { "source": "IMG_0006.jpg", "sourceSha256": "9c145c112a2939a486024b7c478f55ae57843a612884c141e67a39e804baf126", "asset": "chapter-awards.jpg", "route": "/" },
+  { "source": "IMG_0015.jpg", "sourceSha256": "2febe6fcba167c3f557f481e8375958f135e6ac18a5a65ed4edc49195512e21e", "asset": "berkeley-graduation.jpg", "route": "/" },
+  { "source": "IMG_0251.jpg", "sourceSha256": "55e7acdfcb1bd6c06814c865266a1afc00d8df66a0e123b0264c9efec37d5e9b", "asset": "chapter-dinner.jpg", "route": "/" },
+  { "source": "IMG_8844.jpg", "sourceSha256": "39ac35bd0b4d2770e25ef46f795a9c1b9f5ba74e285de4ad55b15bc328f2d0d7", "asset": "chapter-house-meal.jpg", "route": "/" },
+  { "source": "IMG_9880.jpg", "sourceSha256": "e66c40e58196ab62669112455ce48279315c229f9a3e201c4b2b12aa67901c13", "asset": "chapter-flag.jpg", "route": "/" },
+  { "source": "DSC9280_compressed.jpg", "sourceSha256": "d28e7fa4fa40a49008f8e0f6062f0afce42859b89f6825130b153d26763258f8", "asset": "chapter-work.jpg", "route": "/" },
+  { "source": "IMG_8769.jpg", "sourceSha256": "207a5ea9acf01ee9b34aa69c101921a5127ad5aa644207b9f51c8deb4b68d547", "asset": "chapter-outdoors.jpg", "route": "/rush" },
+  { "source": "20260527_194135.jpg", "sourceSha256": "59d6d5939ea89943719a5cc4deaf6700db01cceed8d82f2565abfaf8b3899ffe", "asset": "chapter-city.jpg", "route": "/rush" },
+  { "source": "IMG_9893.jpg", "sourceSha256": "65af36dc3b19803a35b126be2dbd985d5af40b2c914b6acd5e596cc6afecdcc8", "asset": "chapter-night-flag.jpg", "route": "/rush" },
+  { "source": "DSC9428_compressed.jpg", "sourceSha256": "8b3d926a115e0c07ba1db37e42f759ca0f019e715fd31498941a3205d9983524", "asset": "chapter-social-night.jpg", "route": "/events" },
+  { "source": "IMG_9920.jpg", "sourceSha256": "f17ac8d77a399fcf0e6d878fd2d17ef43fbcc7ed915bfc36790e4a8dbaae9e7b", "asset": "chapter-cocktail-dinner.jpg", "route": "/events" }
+]

@@ -44,7 +44,7 @@ The public site must remain clear to signed-out visitors and users with the `non
 - Adapt the established admin-cal-taxi visual system from an operating interface to a public marketing surface.
 - Use Inter for Greek letters and Greek text because it includes Greek glyphs.
 - Do not use Old English Text MT because it does not include Greek glyphs.
-- Public photographs must not show alcohol.
+- Supplied documentary photographs can show alcohol.
 
 ## Evidence on Hand
 

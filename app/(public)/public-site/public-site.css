@@ -488,7 +488,7 @@
   aspect-ratio: 16 / 9;
 }
 
-.rush-life-meal {
+.rush-life-city {
   aspect-ratio: 3 / 4;
 }
 
@@ -509,8 +509,8 @@
   object-position: center;
 }
 
-.rush-life-meal img {
-  object-position: 50% 40%;
+.rush-life-city img {
+  object-position: 50% 62%;
 }
 
 .chapter-moment figcaption,
@@ -1380,7 +1380,7 @@
 
   .chapter-moment,
   .rush-life-outdoors,
-  .rush-life-meal {
+  .rush-life-city {
     aspect-ratio: 4 / 3;
   }
 

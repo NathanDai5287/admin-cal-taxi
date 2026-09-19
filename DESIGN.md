@@ -172,7 +172,7 @@ The first desktop viewport uses two equal photographic fields around a narrow ve
 
 Public sections use broad fluid gutters and hairline grid divisions. Content widths reach 1440px, while record sections use tighter 1220px reading bounds.
 
-The recruitment page uses an equal blue-and-photograph split on desktop. On mobile, the awards photograph leads before the introduction and chapter facts.
+The recruitment page uses an equal blue-and-photograph split on desktop. On mobile, its chapter-life photograph leads before the introduction and chapter facts.
 
 At 760px and below, the hero paths stack with equal height and prominence. Two-column records, actions, facts, and footers become one column without changing their order.
 
@@ -258,7 +258,7 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 ### Recruitment Introduction
 
-- **Structure:** An equal blue-and-photograph split introduces Nu Chapter and reuses the verified awards image.
+- **Structure:** An equal blue-and-photograph split introduces Nu Chapter with a dedicated chapter-life image.
 - **Primary path:** The local action moves visitors to recruitment details, then public events.
 - **Secondary path:** Public events provide the next confirmed chance to visit.
 - **Mobile:** The photograph appears first, followed by the introduction, facts, and actions.
@@ -267,9 +267,9 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 - **Style:** Full-bleed rectangular crops use factual uppercase captions.
 - **Content:** Show real chapter life and use specific alternative text.
-- **Reuse:** The verified awards image can connect the homepage and recruitment page.
+- **Reuse:** Each supplied photograph appears in one public location only.
 - **Constraint:** Never use chapter-life photography as proof of the venue.
-- **Range:** Public photographs must not show alcohol.
+- **Range:** Supplied documentary photographs can show alcohol.
 
 ## Do's and Don'ts
 

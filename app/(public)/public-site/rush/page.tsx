@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
-import awardsImage from "@/public/site/chapter-awards.jpg";
-import houseMealImage from "@/public/site/chapter-house-meal.jpg";
+import cityImage from "@/public/site/chapter-city.jpg";
+import nightFlagImage from "@/public/site/chapter-night-flag.jpg";
 import outdoorsImage from "@/public/site/chapter-outdoors.jpg";
 import { Arrow } from "@/components/public/public-shell";
 
@@ -28,11 +28,12 @@ export default function RushPage() {
         </div>
         <figure>
           <Image
-            alt="Five Nu Chapter members holding chapter awards"
+            alt="Two people holding a blue-and-white Theta Xi flag outside at night"
             fill
             fetchPriority="high"
+            loading="eager"
             sizes="(max-width: 760px) 100vw, 46vw"
-            src={awardsImage}
+            src={nightFlagImage}
           />
         </figure>
       </header>
@@ -58,14 +59,14 @@ export default function RushPage() {
             />
             <figcaption>A day outdoors</figcaption>
           </figure>
-          <figure className="rush-life-meal">
+          <figure className="rush-life-city">
             <Image
-              alt="Two chapter members sharing an informal meal"
+              alt="One person taking a selfie outside a city building"
               fill
               sizes="(max-width: 760px) 100vw, 42vw"
-              src={houseMealImage}
+              src={cityImage}
             />
-            <figcaption>An informal meal together</figcaption>
+            <figcaption>An everyday stop together</figcaption>
           </figure>
         </div>
       </section>
