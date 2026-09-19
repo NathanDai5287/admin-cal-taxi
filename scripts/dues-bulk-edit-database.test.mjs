@@ -35,11 +35,11 @@ async function setupDatabase(t) {
       updated_at timestamptz not null default now()
     );
   `);
-  const migration = await readFile(
-    new URL("../supabase/migrations/20260923000000_atomic_bulk_receivable_edits.sql", import.meta.url),
-    "utf8",
-  );
-  await db.exec(migration);
+  const migrations = await Promise.all([
+    "20260923000000_atomic_bulk_receivable_edits.sql",
+    "20260924000000_remove_bulk_receivable_member_edit.sql",
+  ].map((file) => readFile(new URL(`../supabase/migrations/${file}`, import.meta.url), "utf8")));
+  await db.exec(migrations.join("\n"));
   return db;
 }
 
