@@ -35,14 +35,14 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
 
   if (variant === "section") {
     return (
-      <nav aria-label={title} className="flex overflow-x-auto border-b border-rule">
+      <nav aria-label={title} className="flex overflow-x-auto overflow-y-hidden border-b border-rule">
         <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
         {tabs.map((tab) => <Link
           key={tab.href}
           href={tab.href}
           prefetch={false}
           aria-current={tab.href === activeHref ? "page" : undefined}
-          className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold outline-none transition-colors focus-visible:bg-subtle ${tab.href === activeHref ? "border-brand text-brand" : "border-transparent text-muted hover:border-rule hover:text-ink"}`}
+          className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold outline-none transition-colors focus-visible:bg-subtle ${tab.href === activeHref ? "border-brand text-brand" : "border-transparent text-muted hover:border-rule hover:text-ink"}`}
         >{tab.label}</Link>)}
       </nav>
     );
@@ -68,7 +68,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
           ) : null}
         </Link>
         {tabs.length > 0 && (
-          <nav className="ml-auto flex min-w-0 items-stretch h-full overflow-x-auto">
+          <nav className="ml-auto flex min-w-0 items-stretch h-full overflow-x-auto overflow-y-hidden">
             {tabs.map((tab) => (
               <Link
                 key={tab.href}
@@ -77,7 +77,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
                 aria-current={tab.href === activeHref ? "page" : undefined}
                 className={
                   "shrink-0 px-4 inline-flex items-center text-[12px] font-bold uppercase tracking-[0.14em] " +
-                  "transition-colors border-b-2 -mb-px " +
+                  "transition-colors border-b-2 " +
                   (tab.href === activeHref
                     ? "text-brand border-brand"
                     : "text-muted border-transparent hover:text-ink")

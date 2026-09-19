@@ -22,3 +22,14 @@ test("host presents distinct placeholders for both venue spaces", async () => {
   assert.equal(source.match(/Backyard (lead )?photograph/g)?.length, 4);
   assert.equal(source.match(/Indoor (lead )?photograph/g)?.length, 4);
 });
+
+test("horizontal navigation cannot scroll vertically", async () => {
+  const [publicStyles, appNav] = await Promise.all([
+    readFile(new URL("../app/(public)/public-site/public-site.css", import.meta.url), "utf8"),
+    readFile(new URL("../components/brand/app-nav.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(publicStyles, /\.public-nav\s*\{[^}]*overflow-x:\s*auto;[^}]*overflow-y:\s*hidden;/s);
+  assert.equal(appNav.match(/overflow-x-auto overflow-y-hidden/g)?.length, 2);
+  assert.doesNotMatch(appNav, /-mb-px/);
+});

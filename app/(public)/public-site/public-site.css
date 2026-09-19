@@ -1515,6 +1515,7 @@
   .public-nav {
     gap: 8px;
     overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .public-nav a {
