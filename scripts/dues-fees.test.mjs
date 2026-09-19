@@ -16,16 +16,25 @@ test("bulk charges use one shared reason", async () => {
   assert.match(action, /notes: parsed\.data\.notes/);
 });
 
-test("existing charges expose and save due date changes", async () => {
+test("selected charges expose and save due date changes", async () => {
   const [ledger, action] = await Promise.all([
     readFile(new URL("dues-ledger.tsx", receivablesDirectory), "utf8"),
     readFile(new URL("actions.ts", receivablesDirectory), "utf8"),
   ]);
 
-  assert.match(ledger, />Edit charge<\/Button>/);
-  assert.match(ledger, /name="dueDate" type="date" required/);
+  assert.doesNotMatch(ledger, />Edit charge<\/Button>/);
+  assert.match(ledger, /name="dueDate" required=\{applyDueDate\} type="date"/);
   assert.match(action, /dueDate: formData\.get\("dueDate"\)/);
   assert.match(action, /due_date: parsed\.data\.dueDate/);
+});
+
+test("existing balance rows use the bulk editor without profile icons", async () => {
+  const ledger = await readFile(new URL("dues-ledger.tsx", receivablesDirectory), "utf8");
+
+  assert.doesNotMatch(ledger, /dues-avatar|Edit charge/);
+  assert.match(ledger, /dues-bulk-inspector/);
+  assert.match(ledger, /Mark fully paid/);
+  assert.match(ledger, /Waive selected/);
 });
 
 test("charge edits use action state without redirect navigation", async () => {
@@ -36,17 +45,14 @@ test("charge edits use action state without redirect navigation", async () => {
   ]);
 
   assert.match(ledger, /useActionState\(bulkUpdateDuesBalances/);
-  assert.match(ledger, /name="applyMember"/);
-  assert.match(ledger, /name="memberId"/);
+  assert.doesNotMatch(ledger.slice(ledger.indexOf('className="dues-bulk-inspector"'), ledger.indexOf("{canManage && latestChargeState.message")), /name="applyMember"|name="memberId"/);
   assert.match(ledger, /name="applyDueDate"/);
   assert.match(ledger, /name="applyAmount"/);
   assert.match(ledger, /name="applyNotes"/);
   assert.doesNotMatch(action.slice(action.indexOf("export async function updateDuesBalance")), /redirect\(resultUrl\("saved"\)\)/);
   assert.match(action, /return actionSuccess\(`\$\{parsed\.data\.rows\.length\}/);
-  assert.match(action, /p_member_id: parsed\.data\.memberId/);
-  assert.match(migration, /set member_id = case when p_apply_member/);
-  assert.match(migration, /member_name = case when p_apply_member/);
-  assert.match(migration, /discord_user_id = case when p_apply_member/);
+  assert.doesNotMatch(action.slice(action.indexOf("const bulkEditSchema")), /applyMember|p_member_id/);
+  assert.doesNotMatch(migration, /p_apply_member|p_member_id|replacement_member/);
 });
 
 test("bulk editor stays beside charges on desktop and stacks below them on mobile", async () => {

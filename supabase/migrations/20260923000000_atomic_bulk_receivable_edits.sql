@@ -1,10 +1,8 @@
 create function public.bulk_update_receivables(
   p_rows jsonb,
-  p_member_id uuid,
   p_due_date date,
   p_amount_assessed numeric,
   p_notes text,
-  p_apply_member boolean,
   p_apply_due_date boolean,
   p_apply_amount boolean,
   p_apply_notes boolean
@@ -17,8 +15,6 @@ as $$
 declare
   requested_count integer;
   matched_count integer;
-  replacement_member_name text;
-  replacement_discord_user_id text;
 begin
   if not public.is_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
@@ -28,22 +24,11 @@ begin
   if requested_count < 1 or requested_count > 200 then
     raise exception 'Choose between 1 and 200 charges' using errcode = '22023';
   end if;
-  if not (p_apply_member or p_apply_due_date or p_apply_amount or p_apply_notes) then
+  if not (p_apply_due_date or p_apply_amount or p_apply_notes) then
     raise exception 'Choose at least one field to change' using errcode = '22023';
   end if;
   if p_apply_due_date and p_due_date is null then
     raise exception 'Choose a due date' using errcode = '22023';
-  end if;
-  if p_apply_member then
-    select coalesce(nullif(trim(profile.full_name), ''), profile.email), profile.discord_user_id
-    into replacement_member_name, replacement_discord_user_id
-    from public.profiles profile
-    where profile.id = p_member_id
-      and profile.role in ('member', 'admin')
-      and profile.removed_at is null;
-    if not found then
-      raise exception 'Choose an active member' using errcode = '22023';
-    end if;
   end if;
   if p_apply_amount and (p_amount_assessed is null or p_amount_assessed <= 0) then
     raise exception 'Enter an amount greater than zero' using errcode = '22023';
@@ -78,10 +63,7 @@ begin
   end if;
 
   update public.chapter_receivables receivable
-  set member_id = case when p_apply_member then p_member_id else receivable.member_id end,
-      member_name = case when p_apply_member then replacement_member_name else receivable.member_name end,
-      discord_user_id = case when p_apply_member then replacement_discord_user_id else receivable.discord_user_id end,
-      due_date = case when p_apply_due_date then p_due_date else receivable.due_date end,
+  set due_date = case when p_apply_due_date then p_due_date else receivable.due_date end,
       amount_assessed = case when p_apply_amount then p_amount_assessed else receivable.amount_assessed end,
       notes = case when p_apply_notes then coalesce(p_notes, '') else receivable.notes end
   from jsonb_to_recordset(p_rows) as requested(id uuid, updated_at timestamptz)
@@ -91,8 +73,8 @@ begin
 end;
 $$;
 
-revoke all on function public.bulk_update_receivables(jsonb, uuid, date, numeric, text, boolean, boolean, boolean, boolean) from public, anon;
-grant execute on function public.bulk_update_receivables(jsonb, uuid, date, numeric, text, boolean, boolean, boolean, boolean) to authenticated;
+revoke all on function public.bulk_update_receivables(jsonb, date, numeric, text, boolean, boolean, boolean) from public, anon;
+grant execute on function public.bulk_update_receivables(jsonb, date, numeric, text, boolean, boolean, boolean) to authenticated;
 
 create function public.bulk_change_receivable_state(
   p_rows jsonb,

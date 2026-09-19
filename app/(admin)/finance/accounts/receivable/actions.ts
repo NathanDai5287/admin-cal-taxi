@@ -373,18 +373,14 @@ export async function bulkWaiveDuesBalances(
 
 const bulkEditSchema = z.object({
   rows: z.array(z.object({ id: z.string().uuid(), updated_at: z.string().datetime({ offset: true }) })).min(1).max(200),
-  applyMember: z.boolean(),
   applyDueDate: z.boolean(),
   applyAmount: z.boolean(),
   applyNotes: z.boolean(),
   dueDate: dateSchema.optional(),
   amountAssessed: z.coerce.number().positive().max(999_999_999.99).optional(),
   notes: z.string().trim().max(500),
-  memberId: z.string().uuid().optional(),
-}).refine((value) => value.applyMember || value.applyDueDate || value.applyAmount || value.applyNotes, {
+}).refine((value) => value.applyDueDate || value.applyAmount || value.applyNotes, {
   message: "Choose at least one field to change.",
-}).refine((value) => !value.applyMember || Boolean(value.memberId), {
-  message: "Choose a member.",
 }).refine((value) => !value.applyDueDate || Boolean(value.dueDate), {
   message: "Choose a due date.",
 }).refine((value) => !value.applyAmount || value.amountAssessed !== undefined, {
@@ -404,14 +400,12 @@ export async function bulkUpdateDuesBalances(
       const [id, updated_at] = value.split("|");
       return { id, updated_at };
     }),
-    applyMember: formData.get("applyMember") === "on",
     applyDueDate: formData.get("applyDueDate") === "on",
     applyAmount: formData.get("applyAmount") === "on",
     applyNotes: formData.get("applyNotes") === "on",
     dueDate: formData.get("dueDate") || undefined,
     amountAssessed: formData.get("amountAssessed") || undefined,
     notes: formData.get("notes") ?? "",
-    memberId: formData.get("memberId") || undefined,
   });
 
   if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Check the bulk changes.");
@@ -419,11 +413,9 @@ export async function bulkUpdateDuesBalances(
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("bulk_update_receivables", {
     p_rows: parsed.data.rows,
-    p_member_id: parsed.data.memberId ?? null,
     p_due_date: parsed.data.dueDate ?? null,
     p_amount_assessed: parsed.data.amountAssessed ?? null,
     p_notes: parsed.data.notes,
-    p_apply_member: parsed.data.applyMember,
     p_apply_due_date: parsed.data.applyDueDate,
     p_apply_amount: parsed.data.applyAmount,
     p_apply_notes: parsed.data.applyNotes,

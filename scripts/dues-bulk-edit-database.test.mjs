@@ -55,14 +55,12 @@ async function insertCharge(db, { amount = 100, paid = 0 } = {}) {
 
 async function bulkEdit(db, rows, values = {}) {
   return db.query(
-    "select public.bulk_update_receivables($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+    "select public.bulk_update_receivables($1, $2, $3, $4, $5, $6, $7)",
     [
       JSON.stringify(rows),
-      values.memberId ?? null,
       values.dueDate ?? null,
       values.amount ?? null,
       values.notes ?? "",
-      values.applyMember ?? false,
       values.applyDueDate ?? false,
       values.applyAmount ?? false,
       values.applyNotes ?? false,
@@ -78,44 +76,6 @@ test("bulk charge edits change only enabled fields", async (t) => {
 
   const { rows } = await db.query("select amount_assessed, due_date::text, notes from public.chapter_receivables where id = $1", [charge.id]);
   assert.deepEqual(rows[0], { amount_assessed: "100.00", due_date: "2026-09-30", notes: "Shared reason" });
-});
-
-test("bulk member edits replace every selected charge with one active member", async (t) => {
-  const db = await setupDatabase(t);
-  const memberId = randomUUID();
-  await db.query(
-    "insert into public.profiles (id, email, full_name, role, discord_user_id) values ($1, 'member@example.com', 'Shared Member', 'member', 'discord-42')",
-    [memberId],
-  );
-  const first = await insertCharge(db);
-  const second = await insertCharge(db);
-
-  await bulkEdit(db, [first, second], { memberId, applyMember: true });
-
-  const { rows } = await db.query("select member_id, member_name, discord_user_id from public.chapter_receivables order by id");
-  assert.equal(rows.length, 2);
-  for (const row of rows) {
-    assert.deepEqual(row, { member_id: memberId, member_name: "Shared Member", discord_user_id: "discord-42" });
-  }
-});
-
-test("bulk member edits reject an inactive member without changing charges", async (t) => {
-  const db = await setupDatabase(t);
-  const memberId = randomUUID();
-  await db.query(
-    "insert into public.profiles (id, email, full_name, role, removed_at) values ($1, 'removed@example.com', 'Removed Member', 'member', now())",
-    [memberId],
-  );
-  const first = await insertCharge(db);
-  const second = await insertCharge(db);
-
-  await assert.rejects(bulkEdit(db, [first, second], { memberId, applyMember: true }), /active member/);
-
-  const { rows } = await db.query("select member_id, member_name from public.chapter_receivables order by id");
-  assert.deepEqual(rows, [
-    { member_id: null, member_name: "Original member" },
-    { member_id: null, member_name: "Original member" },
-  ]);
 });
 
 test("bulk charge validation rejects every selected change", async (t) => {

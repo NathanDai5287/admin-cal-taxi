@@ -519,25 +519,22 @@
   [data-brand] .dues-action-feedback.error { @apply text-warn; }
   [data-brand] .dues-list { @apply divide-y divide-rule; }
   [data-brand] .dues-row {
-    @apply grid items-center gap-4 px-6 py-4 transition-colors lg:grid-cols-[minmax(260px,1fr)_130px_auto];
+    @apply grid items-center gap-3 px-4 py-2.5 transition-colors lg:grid-cols-[minmax(240px,1fr)_110px_auto];
   }
-  [data-brand] .dues-row.read-only { @apply lg:grid-cols-[minmax(260px,1fr)_130px]; }
+  [data-brand] .dues-row.read-only { @apply lg:grid-cols-[minmax(240px,1fr)_110px]; }
   [data-brand] .dues-row.selectable { @apply cursor-pointer; }
   [data-brand] .dues-row:hover { background: color-mix(in srgb, var(--color-brand-light) 34%, transparent); }
   [data-brand] .dues-row.selected { background: var(--color-brand-light); }
-  [data-brand] .dues-person { @apply flex min-w-0 items-center gap-3; }
+  [data-brand] .dues-person { @apply flex min-w-0 items-center gap-2.5; }
   [data-brand] .dues-select { @apply h-4 w-4 shrink-0 cursor-pointer accent-brand disabled:cursor-not-allowed; }
-  [data-brand] .dues-avatar {
-    @apply flex h-9 w-9 shrink-0 items-center justify-center bg-brand-light text-[13px] font-bold text-brand border border-brand/20;
-  }
   [data-brand] .dues-person h3 { @apply truncate text-[14px] font-bold text-ink; }
-  [data-brand] .dues-person p { @apply mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-muted; }
+  [data-brand] .dues-person p { @apply mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted; }
   [data-brand] .dues-overdue-label { @apply font-bold uppercase tracking-[0.08em] text-warn; }
   [data-brand] .dues-paid-label { @apply font-bold uppercase tracking-[0.08em] text-ok; }
   [data-brand] .dues-discord-linked { @apply font-bold uppercase tracking-[0.08em] text-brand; }
   [data-brand] .dues-balance { @apply lg:text-right; }
   [data-brand] .dues-balance span { @apply block text-[10px] font-bold uppercase tracking-[0.1em] text-muted; }
-  [data-brand] .dues-balance strong { @apply mt-1 block text-[18px] font-bold tabular-nums text-ink; }
+  [data-brand] .dues-balance strong { @apply block text-base font-bold tabular-nums text-ink; }
   [data-brand] .dues-actions { @apply flex items-center justify-end gap-2; }
   @media (max-width: 1023px) {
     [data-brand] .dues-bulk-workspace.has-inspector { @apply grid-cols-1; }
@@ -562,9 +559,9 @@
     [data-brand] .dues-bulk-actions small { @apply w-full; }
     [data-brand] .dues-selection-hint { @apply hidden; }
     [data-brand] .dues-bulk-editor { @apply px-4; }
-    [data-brand] .dues-row { @apply grid-cols-1; }
-    [data-brand] .dues-balance,
-    [data-brand] .dues-actions { @apply col-start-1 row-auto text-left justify-start; }
+    [data-brand] .dues-row { @apply grid-cols-[minmax(0,1fr)_auto] px-4; }
+    [data-brand] .dues-balance { @apply col-start-2 row-start-1 text-right; }
+    [data-brand] .dues-actions { @apply col-span-2 col-start-1 row-auto justify-end; }
   }
 
   [data-brand] .dues-announcement-strip {

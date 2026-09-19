@@ -123,7 +123,7 @@ export default async function DuesPage() {
       <DuesBoard rows={rows} today={today}>
         <ChargeMembersForm members={members} today={today} />
 
-        <DuesLedger mode="manage" members={members} />
+        <DuesLedger mode="manage" />
       </DuesBoard>
 
       <DuesAnnouncement

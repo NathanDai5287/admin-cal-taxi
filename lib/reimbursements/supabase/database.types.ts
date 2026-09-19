@@ -467,11 +467,9 @@ export type Database = {
       bulk_update_receivables: {
         Args: {
           p_rows: Json;
-          p_member_id: string | null;
           p_due_date: string | null;
           p_amount_assessed: number | null;
           p_notes: string;
-          p_apply_member: boolean;
           p_apply_due_date: boolean;
           p_apply_amount: boolean;
           p_apply_notes: boolean;
