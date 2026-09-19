@@ -64,9 +64,8 @@ const bulkFeeSchema = z.object({
   amountOwed: z.coerce.number().positive().max(999_999_999.99),
   dueDate: dateSchema,
   memberIds: z.array(z.string().uuid()).min(1).max(500),
+  notes: z.string().trim().max(500),
 });
-
-const bulkMemberSchema = z.object({ notes: z.string().trim().max(500) });
 
 export async function addDuesFees(formData: FormData) {
   const { userId } = await requireAdmin("/");
@@ -77,18 +76,10 @@ export async function addDuesFees(formData: FormData) {
     amountOwed: formData.get("amountOwed"),
     dueDate: formData.get("dueDate"),
     memberIds,
+    notes: formData.get("notes") ?? "",
   });
 
   if (!parsed.success) redirect(entryErrorUrl(parsed.error));
-
-  const memberDetails = new Map<string, z.infer<typeof bulkMemberSchema>>();
-  for (const memberId of parsed.data.memberIds) {
-    const detail = bulkMemberSchema.safeParse({
-      notes: formData.get(`notes:${memberId}`) ?? "",
-    });
-    if (!detail.success) redirect(resultUrl("invalid"));
-    memberDetails.set(memberId, detail.data);
-  }
 
   const supabase = createAdminClient();
   const { data: profiles, error: profilesError } = await supabase
@@ -109,15 +100,14 @@ export async function addDuesFees(formData: FormData) {
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
   const rows = parsed.data.memberIds.map((memberId) => {
     const profile = profilesById.get(memberId);
-    const detail = memberDetails.get(memberId);
-    if (!profile || !detail) return null;
+    if (!profile) return null;
     return {
       member_id: profile.id,
       member_name: profile.full_name.trim() || profile.email,
       amount_assessed: parsed.data.amountOwed,
       amount_paid: 0,
       due_date: parsed.data.dueDate,
-      notes: detail.notes,
+      notes: parsed.data.notes,
       discord_user_id: profile.discord_user_id,
       created_by: userId,
     };

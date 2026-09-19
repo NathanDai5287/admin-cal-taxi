@@ -539,7 +539,7 @@
     border-left: 3px solid var(--color-brand);
   }
   [data-brand] .bulk-fee-form { @apply grid gap-5 border-t border-rule p-6; }
-  [data-brand] .bulk-fee-settings { @apply grid items-end gap-4 md:grid-cols-[minmax(150px,220px)_minmax(170px,220px)_1fr]; }
+  [data-brand] .bulk-fee-settings { @apply grid items-end gap-4 md:grid-cols-2 xl:grid-cols-[minmax(140px,180px)_minmax(160px,190px)_minmax(200px,1fr)_minmax(180px,1fr)]; }
   [data-brand] .bulk-fee-search { @apply w-full; }
   [data-brand] .bulk-fee-members { @apply border border-rule; }
   [data-brand] .bulk-fee-members legend { @apply ml-4 px-2 text-[11px] font-bold uppercase tracking-[0.11em] text-muted; }
@@ -548,12 +548,11 @@
   [data-brand] .bulk-fee-member-actions > div { @apply flex gap-4 font-bold text-brand; }
   [data-brand] .bulk-fee-member-actions button { @apply cursor-pointer hover:underline; }
   [data-brand] .bulk-fee-member-list { @apply max-h-[430px] overflow-y-auto border-t border-rule; }
-  [data-brand] .bulk-fee-member-list > div { @apply grid items-end gap-3 border-b border-rule px-4 py-3 last:border-b-0 md:grid-cols-[minmax(160px,0.8fr)_minmax(220px,1.4fr)]; }
+  [data-brand] .bulk-fee-member-list > div { @apply border-b border-rule px-4 py-3 last:border-b-0; }
   [data-brand] .bulk-fee-member-list > div[hidden] { display: none; }
   [data-brand] .bulk-fee-member-list > div.selected { @apply bg-brand-light; }
   [data-brand] .bulk-fee-member-choice { @apply flex min-h-[42px] cursor-pointer items-center gap-3 text-[13.5px] font-bold text-ink; }
   [data-brand] .bulk-fee-member-choice input { @apply accent-brand; }
-  [data-brand] .bulk-fee-member-list input:disabled { @apply cursor-not-allowed opacity-55; }
   [data-brand] .bulk-fee-footer { @apply flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4; }
   [data-brand] .dues-announcement-mark {
     @apply flex h-9 w-9 shrink-0 items-center justify-center bg-brand-light text-brand;
@@ -617,7 +616,6 @@
   }
   @media (max-width: 560px) {
     [data-brand] .bulk-fee-settings { @apply grid-cols-1; }
-    [data-brand] .bulk-fee-member-list > div { @apply grid-cols-1; }
     [data-brand] .bulk-fee-footer { @apply items-stretch; }
     [data-brand] .bulk-fee-footer .brand-button { @apply w-full; }
     [data-brand] .dues-announcement-strip .brand-button { @apply ml-0 w-full; }

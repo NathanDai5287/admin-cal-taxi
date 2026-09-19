@@ -55,7 +55,7 @@ export function ChargeMembersForm({
     <section className="card" aria-labelledby="bulk-fee-title">
       <div className="card-header">
         <span className="card-title" id="bulk-fee-title">Charge members</span>
-        <span className="card-subtitle">Select one or more members, then apply the same amount and due date.</span>
+        <span className="card-subtitle">Select members, then apply the same amount, due date, and reason.</span>
       </div>
       <form action={addDuesFees} className="bulk-fee-form">
         <div className="bulk-fee-settings">
@@ -66,6 +66,10 @@ export function ChargeMembersForm({
           <div className="field">
             <label className="field-label" htmlFor="bulk-fee-date">Due date</label>
             <input className="field-input" defaultValue={today} id="bulk-fee-date" name="dueDate" type="date" required />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="bulk-fee-notes">Reason for fee</label>
+            <input className="field-input" id="bulk-fee-notes" maxLength={500} name="notes" />
           </div>
           <label className="dues-search bulk-fee-search">
             <span className="sr-only">Search chapter members</span>
@@ -96,10 +100,6 @@ export function ChargeMembersForm({
                     <input checked={selected} name="memberId" onChange={() => toggleMember(member.id)} type="checkbox" value={member.id} />
                     <span>{member.name}</span>
                   </label>
-                  <div className="field">
-                    <label className="field-label" htmlFor={`bulk-note-${member.id}`}>Note</label>
-                    <input className="field-input" disabled={!selected} id={`bulk-note-${member.id}`} maxLength={500} name={`notes:${member.id}`} placeholder="Reason for fee" />
-                  </div>
                 </div>
               );
             })}

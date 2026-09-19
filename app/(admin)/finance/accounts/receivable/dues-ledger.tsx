@@ -168,7 +168,7 @@ export function DuesLedger({
       <div className="dues-ledger-toolbar">
         <div>
           <h2 className="card-title" id={`${mode}-dues-ledger-title`}>{canManage ? "Update existing balances" : "Member balances"}</h2>
-          <p className="mt-1 text-[13px] text-muted">{canManage ? "Record payments, edit details, or remove balances." : "View what members owe and review payment status."}</p>
+          <p className="mt-1 text-[13px] text-muted">{canManage ? "Change due dates, record payments, edit details, or remove balances." : "View what members owe and review payment status."}</p>
         </div>
         <label className="dues-search">
           <span className="sr-only">Search member balances</span>
@@ -291,7 +291,7 @@ export function DuesLedger({
                     {row.isPaid ? "Reopen balance" : "Mark fully paid"}
                   </Button>
                 </form>
-                <Button compact disabled={optimisticBusy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit</Button>
+                <Button compact disabled={optimisticBusy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit charge</Button>
               </div>}
             </article>
           ))}
@@ -314,7 +314,7 @@ export function DuesLedger({
           <div className="dues-dialog-header">
             <div>
               <p className="page-eyebrow">Member balance</p>
-              <h2 id="edit-balance-title">Edit {editingRow.memberName}</h2>
+              <h2 id="edit-balance-title">Edit charge for {editingRow.memberName}</h2>
             </div>
             <button aria-label="Close balance editor" onClick={() => setEditingId(null)} type="button">×</button>
           </div>
