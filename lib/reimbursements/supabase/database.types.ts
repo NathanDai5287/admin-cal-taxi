@@ -464,6 +464,24 @@ export type Database = {
         Args: { new_role: "none" | "member" | "admin"; target_user_id: string };
         Returns: undefined;
       };
+      bulk_update_receivables: {
+        Args: {
+          p_rows: Json;
+          p_member_id: string | null;
+          p_due_date: string | null;
+          p_amount_assessed: number | null;
+          p_notes: string;
+          p_apply_member: boolean;
+          p_apply_due_date: boolean;
+          p_apply_amount: boolean;
+          p_apply_notes: boolean;
+        };
+        Returns: boolean;
+      };
+      bulk_change_receivable_state: {
+        Args: { p_rows: Json; p_action: string; p_payment_date: string };
+        Returns: boolean;
+      };
       claim_pending_invite: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

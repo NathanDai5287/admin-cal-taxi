@@ -50,7 +50,7 @@ export default async function DuesPage({
   const [receivablesResult, profilesResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
-      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id")
+      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at")
       .is("waived_at", null)
       .order("due_date", { ascending: true })
       .order("member_name", { ascending: true })
@@ -98,6 +98,7 @@ export default async function DuesPage({
       isPaid,
       isOverdue: !isPaid && row.due_date < today,
       paymentRequestId: crypto.randomUUID(),
+      updatedAt: row.updated_at,
     };
   });
 
@@ -135,8 +136,6 @@ export default async function DuesPage({
           <p>{settledRows.length} fully paid {settledRows.length === 1 ? "balance" : "balances"}</p>
         </div>
       </section>
-
-      <DuesLedger mode="view" rows={rows} members={members} />
 
       <div className="border-t border-rule pt-7">
         <p className="page-eyebrow">Write access</p>

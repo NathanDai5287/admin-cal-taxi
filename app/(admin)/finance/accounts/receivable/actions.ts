@@ -49,6 +49,20 @@ type DuesResult =
   | "charge-insert-failed"
   | "error";
 
+export type DuesActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  sequence: number;
+};
+
+function actionError(message: string): DuesActionState {
+  return { status: "error", message, sequence: Date.now() };
+}
+
+function actionSuccess(message: string): DuesActionState {
+  return { status: "success", message, sequence: Date.now() };
+}
+
 function resultUrl(result: DuesResult) {
   return `/finance/accounts/receivable?result=${result}`;
 }
@@ -137,17 +151,21 @@ export async function addDuesFees(formData: FormData) {
   redirect(resultUrl("added"));
 }
 
-export async function updateDuesBalance(formData: FormData) {
+export async function updateDuesBalance(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
   await requireAdmin("/");
-  const parsed = entrySchema.extend({ id: z.string().uuid() }).safeParse({
+  const parsed = entrySchema.extend({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
     id: formData.get("id"),
+    updatedAt: formData.get("updatedAt"),
     memberId: formData.get("memberId"),
     amountOwed: formData.get("amountOwed"),
     dueDate: formData.get("dueDate"),
     notes: formData.get("notes") ?? "",
   });
 
-  if (!parsed.success) redirect(resultUrl("invalid"));
+  if (!parsed.success) return actionError("Check the charge details and try again.");
 
   const supabase = createAdminClient();
   const { data: current, error: readError } = await supabase
@@ -156,14 +174,17 @@ export async function updateDuesBalance(formData: FormData) {
     .eq("id", parsed.data.id)
     .single();
 
-  if (readError || !current) redirect(resultUrl("error"));
+  if (readError || !current) return actionError("The charge could not be loaded.");
+  if (current.updated_at !== parsed.data.updatedAt) {
+    return actionError("This charge changed in another session. Refresh and try again.");
+  }
 
   let memberName = current.member_name;
   let discordUserId = current.discord_user_id;
   if (parsed.data.memberId !== current.member_id) {
     const { data: member } = await supabase.from("profiles").select("id, full_name, email, discord_user_id")
       .eq("id", parsed.data.memberId).in("role", ["member", "admin"]).is("removed_at", null).maybeSingle();
-    if (!member) redirect(resultUrl("invalid-member"));
+    if (!member) return actionError("Choose an active registered member.");
     memberName = member.full_name.trim() || member.email;
     discordUserId = member.discord_user_id;
   }
@@ -171,7 +192,7 @@ export async function updateDuesBalance(formData: FormData) {
   const currentPaid = Number(current.amount_paid);
   const wasPaid = currentPaid >= currentAssessed;
   if (wasPaid && parsed.data.amountOwed !== currentAssessed) {
-    redirect(resultUrl("invalid-amount"));
+    return actionError("A fully paid charge amount cannot change.");
   }
   const { data: updated, error } = await supabase
     .from("chapter_receivables")
@@ -189,50 +210,42 @@ export async function updateDuesBalance(formData: FormData) {
     .select("id")
     .maybeSingle();
 
-  if (error || !updated) redirect(resultUrl("error"));
+  if (error) return actionError("The charge could not be saved.");
+  if (!updated) return actionError("This charge changed in another session. Refresh and try again.");
   revalidateDues();
-  redirect(resultUrl("saved"));
+  return actionSuccess("Charge updated.");
 }
 
-export async function setDuesPaid(formData: FormData) {
+export async function setDuesPaid(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
   await requireAdmin("/");
   const parsed = z.object({
     id: z.string().uuid(),
     paid: z.enum(["true", "false"]),
-  }).safeParse({ id: formData.get("id"), paid: formData.get("paid") });
+    updatedAt: z.string().datetime({ offset: true }),
+  }).safeParse({ id: formData.get("id"), paid: formData.get("paid"), updatedAt: formData.get("updatedAt") });
 
-  if (!parsed.success) redirect(resultUrl("invalid"));
+  if (!parsed.success) return actionError("The payment state could not be changed.");
 
   const paid = parsed.data.paid === "true";
   const supabase = await createClient();
-  let { data: updated, error } = await supabase.rpc("set_dues_paid_state", {
-    p_receivable_id: parsed.data.id,
-    p_paid: paid,
+  const { data: updated, error } = await supabase.rpc("bulk_change_receivable_state", {
+    p_rows: [{ id: parsed.data.id, updated_at: parsed.data.updatedAt }],
+    p_action: paid ? "paid" : "reopened",
     p_payment_date: currentPacificDate(),
   });
-  if (error?.code === "PGRST202") {
-    const admin = createAdminClient();
-    const current = await admin.from("chapter_receivables")
-      .select("amount_assessed, updated_at")
-      .eq("id", parsed.data.id)
-      .maybeSingle();
-    if (current.error || !current.data) redirect(resultUrl("error"));
-    const fallback = await admin.from("chapter_receivables")
-      .update({ amount_paid: paid ? Number(current.data.amount_assessed) : 0 })
-      .eq("id", parsed.data.id)
-      .eq("updated_at", current.data.updated_at)
-      .select("id")
-      .maybeSingle();
-    error = fallback.error;
-    updated = Boolean(fallback.data);
-  }
 
-  if (error || !updated) redirect(resultUrl("error"));
+  if (error || !updated) return actionError("The payment state could not be changed. Refresh and try again.");
   revalidateDues();
-  redirect(resultUrl(paid ? "paid" : "reopened"));
+  return actionSuccess(paid ? "Charge marked fully paid." : "Charge reopened.");
 }
 
-export async function addDuesPayment(formData: FormData) {
+export async function addDuesPayment(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
   await requireAdmin("/");
   const parsed = z.object({
     id: z.string().uuid(),
@@ -246,7 +259,7 @@ export async function addDuesPayment(formData: FormData) {
     requestId: formData.get("requestId"),
   });
 
-  if (!parsed.success) redirect(resultUrl("invalid"));
+  if (!parsed.success) return actionError("Check the payment amount and date.");
 
   const supabase = await createClient();
   let { data: recorded, error } = await supabase.rpc("record_dues_payment", {
@@ -289,71 +302,158 @@ export async function addDuesPayment(formData: FormData) {
     }
   }
 
-  if (error) redirect(resultUrl("error"));
-  if (!recorded) redirect(resultUrl("invalid"));
+  if (error) return actionError("The payment could not be recorded.");
+  if (!recorded) return actionError("This balance changed. Refresh and try again.");
   revalidateDues();
-  redirect(resultUrl("payment"));
+  return actionSuccess("Payment recorded.");
 }
 
-export async function waiveDuesBalance(formData: FormData) {
-  const { userId } = await requireAdmin("/");
-  const parsed = z.string().uuid().safeParse(formData.get("id"));
-  if (!parsed.success) redirect(resultUrl("invalid"));
-
-  const supabase = createAdminClient();
-  const { data: waived, error } = await supabase.from("chapter_receivables")
-    .update({ waived_at: new Date().toISOString(), waived_by: userId })
-    .eq("id", parsed.data)
-    .is("waived_at", null)
-    .select("id")
-    .maybeSingle();
-
-  if (error || !waived) redirect(resultUrl("error"));
-  revalidateDues();
-  redirect(resultUrl("deleted"));
-}
-
-const bulkBalanceIdsSchema = z.array(z.string().uuid()).min(1).max(200);
-
-function readBalanceIds(formData: FormData) {
-  return bulkBalanceIdsSchema.safeParse([...new Set(formData.getAll("balanceId").filter(
-    (value): value is string => typeof value === "string",
-  ))]);
-}
-
-export async function bulkSetDuesPaid(formData: FormData) {
+export async function waiveDuesBalance(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
   await requireAdmin("/");
-  const parsed = readBalanceIds(formData);
-  if (!parsed.success) redirect(resultUrl("invalid"));
+  const parsed = z.object({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
+    id: formData.get("id"),
+    updatedAt: formData.get("updatedAt"),
+  });
+  if (!parsed.success) return actionError("The charge could not be waived.");
 
   const supabase = await createClient();
-  // Keep requests bounded while reusing the atomic, idempotent payment RPC.
-  for (let offset = 0; offset < parsed.data.length; offset += 20) {
-    const results = await Promise.all(parsed.data.slice(offset, offset + 20).map((id) =>
-      supabase.rpc("set_dues_paid_state", { p_receivable_id: id, p_paid: true, p_payment_date: currentPacificDate() }),
-    ));
-    if (results.some(({ data, error }) => error || !data)) redirect(resultUrl("error"));
+  const { data: waived, error } = await supabase.rpc("bulk_change_receivable_state", {
+    p_rows: [{ id: parsed.data.id, updated_at: parsed.data.updatedAt }],
+    p_action: "waived",
+    p_payment_date: currentPacificDate(),
+  });
+
+  if (error || !waived) return actionError("The charge changed. Refresh and try again.");
+  revalidateDues();
+  return actionSuccess("Charge waived.");
+}
+
+const bulkBalanceVersionsSchema = z.array(z.object({ id: z.string().uuid(), updated_at: z.string().datetime({ offset: true }) })).min(1).max(200);
+
+function readBalanceVersions(formData: FormData) {
+  const values = [...new Set(formData.getAll("balanceVersion").filter(
+    (value): value is string => typeof value === "string",
+  ))];
+  return bulkBalanceVersionsSchema.safeParse(values.map((value) => {
+    const [id, updated_at] = value.split("|");
+    return { id, updated_at };
+  }));
+}
+
+export async function bulkSetDuesPaid(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const parsed = readBalanceVersions(formData);
+  if (!parsed.success) return actionError("Select at least one charge.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bulk_change_receivable_state", {
+    p_rows: parsed.data,
+    p_action: "paid",
+    p_payment_date: currentPacificDate(),
+  });
+  if (error || !data) return actionError("Some charges changed. Refresh and check the selected charges.");
+
+  revalidateDues();
+  return actionSuccess("Selected charges marked fully paid.");
+}
+
+export async function bulkWaiveDuesBalances(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const parsed = readBalanceVersions(formData);
+  if (!parsed.success) return actionError("Select at least one charge.");
+
+  const supabase = await createClient();
+  const { data: waived, error } = await supabase.rpc("bulk_change_receivable_state", {
+    p_rows: parsed.data,
+    p_action: "waived",
+    p_payment_date: currentPacificDate(),
+  });
+
+  if (error || !waived) {
+    return actionError("Some charges changed. Refresh and check the selected charges.");
+  }
+  revalidateDues();
+  return actionSuccess("Selected charges waived.");
+}
+
+const bulkEditSchema = z.object({
+  rows: z.array(z.object({ id: z.string().uuid(), updated_at: z.string().datetime({ offset: true }) })).min(1).max(200),
+  applyMember: z.boolean(),
+  applyDueDate: z.boolean(),
+  applyAmount: z.boolean(),
+  applyNotes: z.boolean(),
+  dueDate: dateSchema.optional(),
+  amountAssessed: z.coerce.number().positive().max(999_999_999.99).optional(),
+  notes: z.string().trim().max(500),
+  memberId: z.string().uuid().optional(),
+}).refine((value) => value.applyMember || value.applyDueDate || value.applyAmount || value.applyNotes, {
+  message: "Choose at least one field to change.",
+}).refine((value) => !value.applyMember || Boolean(value.memberId), {
+  message: "Choose a member.",
+}).refine((value) => !value.applyDueDate || Boolean(value.dueDate), {
+  message: "Choose a due date.",
+}).refine((value) => !value.applyAmount || value.amountAssessed !== undefined, {
+  message: "Enter a charge amount.",
+});
+
+export async function bulkUpdateDuesBalances(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const versions = formData.getAll("balanceVersion").filter(
+    (value): value is string => typeof value === "string",
+  );
+  const parsed = bulkEditSchema.safeParse({
+    rows: versions.map((value) => {
+      const [id, updated_at] = value.split("|");
+      return { id, updated_at };
+    }),
+    applyMember: formData.get("applyMember") === "on",
+    applyDueDate: formData.get("applyDueDate") === "on",
+    applyAmount: formData.get("applyAmount") === "on",
+    applyNotes: formData.get("applyNotes") === "on",
+    dueDate: formData.get("dueDate") || undefined,
+    amountAssessed: formData.get("amountAssessed") || undefined,
+    notes: formData.get("notes") ?? "",
+    memberId: formData.get("memberId") || undefined,
+  });
+
+  if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Check the bulk changes.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bulk_update_receivables", {
+    p_rows: parsed.data.rows,
+    p_member_id: parsed.data.memberId ?? null,
+    p_due_date: parsed.data.dueDate ?? null,
+    p_amount_assessed: parsed.data.amountAssessed ?? null,
+    p_notes: parsed.data.notes,
+    p_apply_member: parsed.data.applyMember,
+    p_apply_due_date: parsed.data.applyDueDate,
+    p_apply_amount: parsed.data.applyAmount,
+    p_apply_notes: parsed.data.applyNotes,
+  });
+
+  if (error || !data) {
+    const message = error?.message.includes("changed")
+      ? "One or more charges changed. Refresh and try again."
+      : error?.message.includes("fully paid") || error?.message.includes("below payments")
+        ? "The amount cannot be below payments or change a fully paid charge."
+        : "No charges changed. Check the values and try again.";
+    return actionError(message);
   }
 
   revalidateDues();
-  redirect(resultUrl("bulk-paid"));
-}
-
-export async function bulkWaiveDuesBalances(formData: FormData) {
-  const { userId } = await requireAdmin("/");
-  const parsed = readBalanceIds(formData);
-  if (!parsed.success) redirect(resultUrl("invalid"));
-
-  const supabase = createAdminClient();
-  const { data: waived, error } = await supabase.from("chapter_receivables")
-    .update({ waived_at: new Date().toISOString(), waived_by: userId })
-    .in("id", parsed.data)
-    .is("waived_at", null)
-    .select("id");
-
-  if (error || waived.length !== parsed.data.length) redirect(resultUrl("error"));
-  revalidateDues();
-  redirect(resultUrl("bulk-deleted"));
+  return actionSuccess(`${parsed.data.rows.length} ${parsed.data.rows.length === 1 ? "charge" : "charges"} updated.`);
 }
 
 export type DuesAnnouncementState = {

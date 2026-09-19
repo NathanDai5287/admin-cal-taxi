@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import {
   addDuesPayment,
+  bulkUpdateDuesBalances,
   bulkWaiveDuesBalances,
   bulkSetDuesPaid,
   waiveDuesBalance,
   setDuesPaid,
   updateDuesBalance,
+  type DuesActionState,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -26,9 +28,15 @@ export type DuesRow = {
   isPaid: boolean;
   isOverdue: boolean;
   paymentRequestId: string;
+  updatedAt: string;
 };
 
 type Filter = "outstanding" | "overdue" | "paid" | "all";
+const initialDuesActionState = { status: "idle" as const, message: "", sequence: 0 };
+
+function latestActionState(...states: DuesActionState[]) {
+  return states.reduce((latest, state) => state.sequence > latest.sequence ? state : latest);
+}
 
 function formatDate(value: string) {
   return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", {
@@ -105,21 +113,53 @@ export function DuesLedger({
 }) {
   const canManage = mode === "manage";
   const [optimisticRows, setOptimisticRows] = useState(rows);
-  const [optimisticBusy, setOptimisticBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [applyMember, setApplyMember] = useState(false);
+  const [applyDueDate, setApplyDueDate] = useState(false);
+  const [applyAmount, setApplyAmount] = useState(false);
+  const [applyNotes, setApplyNotes] = useState(false);
+  const [editState, editAction, editPending] = useActionState(updateDuesBalance, initialDuesActionState);
+  const [paymentState, paymentAction, paymentPending] = useActionState(addDuesPayment, initialDuesActionState);
+  const [paidState, paidAction, paidPending] = useActionState(setDuesPaid, initialDuesActionState);
+  const [waiveState, waiveAction, waivePending] = useActionState(waiveDuesBalance, initialDuesActionState);
+  const [bulkPaidState, bulkPaidAction, bulkPaidPending] = useActionState(bulkSetDuesPaid, initialDuesActionState);
+  const [bulkWaiveState, bulkWaiveAction, bulkWaivePending] = useActionState(bulkWaiveDuesBalances, initialDuesActionState);
+  const [bulkEditState, bulkEditAction, bulkEditPending] = useActionState(bulkUpdateDuesBalances, initialDuesActionState);
+  const latestBulkState = latestActionState(bulkPaidState, bulkWaiveState, bulkEditState);
+  const latestChargeState = latestActionState(paidState, editState, paymentState, waiveState);
+  const latestDialogState = latestActionState(editState, paymentState);
+  const busy = editPending || paymentPending || paidPending || waivePending || bulkPaidPending || bulkWaivePending || bulkEditPending;
   const editingRow = optimisticRows.find((row) => row.id === editingId) ?? null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setOptimisticRows(rows);
       setSelectedIds((current) => current.filter((id) => rows.some((row) => row.id === id)));
-      setOptimisticBusy(false);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [rows]);
+
+  useEffect(() => {
+    if (editState.status !== "success" && waiveState.status !== "success") return;
+    const timer = window.setTimeout(() => setEditingId(null), 0);
+    return () => window.clearTimeout(timer);
+  }, [editState, waiveState]);
+
+  useEffect(() => {
+    if (latestBulkState.status !== "success") return;
+    const timer = window.setTimeout(() => {
+      setSelectedIds([]);
+      setApplyMember(false);
+      setApplyDueDate(false);
+      setApplyAmount(false);
+      setApplyNotes(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [latestBulkState.sequence, latestBulkState.status]);
 
   useEffect(() => {
     if (!editingRow) return;
@@ -154,6 +194,33 @@ export function DuesLedger({
     setSelectedIds((current) => current.includes(id)
       ? current.filter((selectedId) => selectedId !== id)
       : [...current, id]);
+    setSelectionAnchorId(id);
+  }
+
+  function selectRange(id: string, addToSelection: boolean) {
+    const anchorIndex = filtered.findIndex((row) => row.id === selectionAnchorId);
+    const clickedIndex = filtered.findIndex((row) => row.id === id);
+    if (anchorIndex < 0 || clickedIndex < 0) {
+      setSelectedIds(addToSelection ? (current) => [...new Set([...current, id])] : [id]);
+      setSelectionAnchorId(id);
+      return;
+    }
+
+    const rangeStart = Math.min(anchorIndex, clickedIndex);
+    const rangeEnd = Math.max(anchorIndex, clickedIndex);
+    const rangeIds = filtered.slice(rangeStart, rangeEnd + 1).map((row) => row.id);
+    setSelectedIds(addToSelection ? (current) => [...new Set([...current, ...rangeIds])] : rangeIds);
+  }
+
+  function selectRow(id: string, shiftKey: boolean, addToSelection: boolean) {
+    if (shiftKey) {
+      selectRange(id, addToSelection);
+      return;
+    }
+    setSelectedIds(addToSelection
+      ? (current) => current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
+      : [id]);
+    setSelectionAnchorId(id);
   }
 
   function selectVisible() {
@@ -164,7 +231,7 @@ export function DuesLedger({
 
   return (
     <>
-    <section className="card" aria-labelledby={`${mode}-dues-ledger-title`}>
+    <section className="card dues-ledger-card" aria-labelledby={`${mode}-dues-ledger-title`}>
       <div className="dues-ledger-toolbar">
         <div>
           <h2 className="card-title" id={`${mode}-dues-ledger-title`}>{canManage ? "Update existing balances" : "Member balances"}</h2>
@@ -200,32 +267,21 @@ export function DuesLedger({
       {canManage && <div className="dues-bulk-toolbar">
         <div className="dues-bulk-selection">
           <strong>{selectedIds.length ? `${selectedIds.length} selected` : "Select balances for bulk changes"}</strong>
-          <button disabled={!filtered.length || optimisticBusy} onClick={selectVisible} type="button">
+          <span className="dues-selection-hint">Click a row. Shift-click selects a range.</span>
+          <button disabled={!filtered.length || busy} onClick={selectVisible} type="button">
             {allVisibleSelected ? "Deselect visible" : "Select visible"}
           </button>
-          {!!selectedIds.length && <button disabled={optimisticBusy} onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
+          {!!selectedIds.length && <button disabled={busy} onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
         </div>
         {!!selectedIds.length && <div className="dues-bulk-actions">
-          <form action={bulkSetDuesPaid} onSubmit={() => {
-            const selected = new Set(selectedIds);
-            setOptimisticBusy(true);
-            setOptimisticRows((current) => current.map((row) => selected.has(row.id)
-              ? { ...row, amountOwed: 0, paidAmount: row.assessedAmount, isPaid: true, isOverdue: false }
-              : row));
-            setSelectedIds([]);
-          }}>
-            {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
-            <Button compact disabled={optimisticBusy} type="submit" variant="primary">Clear balances</Button>
+          <form action={bulkPaidAction}>
+            {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
+            <Button compact disabled={busy} type="submit" variant="primary">Clear balances</Button>
           </form>
-          <form action={bulkWaiveDuesBalances} onSubmit={() => {
-            const selected = new Set(selectedIds);
-            setOptimisticBusy(true);
-            setOptimisticRows((current) => current.filter((row) => !selected.has(row.id)));
-            setSelectedIds([]);
-          }}>
-            {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
+          <form action={bulkWaiveAction}>
+            {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
             <WaiveBalanceButton
-              disabled={optimisticBusy}
+              disabled={busy}
               key={selectedIds.join(",")}
               label={`${selectedIds.length} selected balances`}
               idleText="Waive selected"
@@ -236,17 +292,40 @@ export function DuesLedger({
         </div>}
       </div>}
 
-      {filtered.length ? (
-        <div className="dues-list">
-          {filtered.map((row) => (
-            <article className={`dues-row${canManage ? "" : " read-only"}${canManage && selectedIds.includes(row.id) ? " selected" : ""}`} key={row.id}>
+      {canManage && latestBulkState.message ? (
+        <p aria-live="polite" className={`dues-action-feedback px-6 py-2 ${latestBulkState.status}`}>
+          {latestBulkState.message}
+        </p>
+      ) : null}
+
+      <div className={`dues-bulk-workspace${canManage && selectedIds.length ? " has-inspector" : ""}`}>
+        <div className="dues-bulk-list">
+        {filtered.length ? (
+          <div className="dues-list">
+            {filtered.map((row) => (
+            <article
+              className={`dues-row${canManage ? " selectable" : " read-only"}${canManage && selectedIds.includes(row.id) ? " selected" : ""}`}
+              key={row.id}
+              onClick={canManage ? (event) => {
+                if ((event.target as HTMLElement).closest("a, button, form, input, label, select, textarea, [role='button']")) return;
+                selectRow(row.id, event.shiftKey, event.metaKey || event.ctrlKey);
+              } : undefined}
+            >
               <div className="dues-person">
                 {canManage && <input
                   aria-label={`Select ${row.memberName}'s balance`}
                   checked={selectedIds.includes(row.id)}
                   className="dues-select"
-                  disabled={optimisticBusy}
-                  onChange={() => toggleSelected(row.id)}
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (event.shiftKey) {
+                      selectRange(row.id, event.metaKey || event.ctrlKey);
+                      return;
+                    }
+                    toggleSelected(row.id);
+                  }}
+                  onChange={() => undefined}
                   type="checkbox"
                 />}
                 <div className="dues-avatar" aria-hidden="true">
@@ -273,34 +352,64 @@ export function DuesLedger({
               </div>
 
               {canManage && <div className="dues-actions">
-                <form action={setDuesPaid} onSubmit={() => {
-                  setOptimisticBusy(true);
-                  setOptimisticRows((current) => current.map((candidate) => candidate.id === row.id
-                    ? {
-                        ...candidate,
-                        amountOwed: row.isPaid ? row.assessedAmount : 0,
-                        paidAmount: row.isPaid ? 0 : row.assessedAmount,
-                        isPaid: !row.isPaid,
-                        isOverdue: row.isPaid && row.dueDate < currentPacificDate(),
-                      }
-                    : candidate));
-                }}>
+                <form action={paidAction}>
                   <input name="id" type="hidden" value={row.id} />
                   <input name="paid" type="hidden" value={row.isPaid ? "false" : "true"} />
-                  <Button compact disabled={optimisticBusy} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
+                  <input name="updatedAt" type="hidden" value={row.updatedAt} />
+                  <Button compact disabled={busy} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
                     {row.isPaid ? "Reopen balance" : "Mark fully paid"}
                   </Button>
                 </form>
-                <Button compact disabled={optimisticBusy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit charge</Button>
+                <Button compact disabled={busy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit charge</Button>
               </div>}
             </article>
-          ))}
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state border-t border-rule">
+            {optimisticRows.length ? "No balances match this view." : canManage ? "No balances to update." : "No dues balances yet."}
+          </div>
+        )}
         </div>
-      ) : (
-        <div className="empty-state border-t border-rule">
-          {optimisticRows.length ? "No balances match this view." : canManage ? "No balances to update." : "No dues balances yet."}
-        </div>
-      )}
+        {canManage && selectedIds.length > 0 ? (
+          <aside className="dues-bulk-inspector" aria-labelledby="bulk-charge-editor-title">
+          <form action={bulkEditAction} className="dues-bulk-editor">
+            {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => (
+              <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />
+            ))}
+            <div className="dues-bulk-editor-heading">
+              <strong id="bulk-charge-editor-title">Edit {selectedIds.length} selected {selectedIds.length === 1 ? "charge" : "charges"}</strong>
+              <span>Turn on each field that you want to replace.</span>
+            </div>
+            <label className="dues-bulk-field">
+              <span><input checked={applyMember} name="applyMember" onChange={(event) => setApplyMember(event.target.checked)} type="checkbox" /> Member</span>
+              <select className="field-input" disabled={!applyMember || busy} name="memberId" required={applyMember}>
+                <option value="">Choose a member</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+              </select>
+            </label>
+            <label className="dues-bulk-field">
+              <span><input checked={applyAmount} name="applyAmount" onChange={(event) => setApplyAmount(event.target.checked)} type="checkbox" /> Total charge amount</span>
+              <div className="money-input"><span>$</span><input className="field-input" disabled={!applyAmount || busy} min="0.01" name="amountAssessed" placeholder="0.00" required={applyAmount} step="0.01" type="number" /></div>
+            </label>
+            <label className="dues-bulk-field">
+              <span><input checked={applyDueDate} name="applyDueDate" onChange={(event) => setApplyDueDate(event.target.checked)} type="checkbox" /> Due date</span>
+              <input className="field-input" disabled={!applyDueDate || busy} name="dueDate" required={applyDueDate} type="date" />
+            </label>
+            <label className="dues-bulk-field">
+              <span><input checked={applyNotes} name="applyNotes" onChange={(event) => setApplyNotes(event.target.checked)} type="checkbox" /> Note or reason</span>
+              <input className="field-input" disabled={!applyNotes || busy} maxLength={500} name="notes" placeholder="Blank removes the note" />
+            </label>
+            <Button compact disabled={busy || !(applyMember || applyDueDate || applyAmount || applyNotes)} type="submit" variant="primary">Apply changes</Button>
+          </form>
+          </aside>
+        ) : null}
+      </div>
+      {canManage && latestChargeState.message ? (
+        <p aria-live="polite" className={`dues-action-feedback px-6 py-2 ${latestChargeState.status}`}>
+          {latestChargeState.message}
+        </p>
+      ) : null}
     </section>
     {canManage && editingRow ? (
       <div
@@ -326,18 +435,9 @@ export function DuesLedger({
           </div>
 
           {!editingRow.isPaid ? (
-            <form action={addDuesPayment} className="dues-payment-form" onSubmit={(event) => {
-              const amount = Number(new FormData(event.currentTarget).get("paymentAmount"));
-              if (!Number.isFinite(amount) || amount <= 0) return;
-              setOptimisticBusy(true);
-              setOptimisticRows((current) => current.map((candidate) => {
-                if (candidate.id !== editingRow.id) return candidate;
-                const paidAmount = Math.min(candidate.assessedAmount, candidate.paidAmount + amount);
-                const amountOwed = Math.max(0, candidate.assessedAmount - paidAmount);
-                return { ...candidate, paidAmount, amountOwed, isPaid: amountOwed === 0, isOverdue: amountOwed > 0 && candidate.isOverdue };
-              }));
-            }}>
+            <form action={paymentAction} className="dues-payment-form">
               <input name="id" type="hidden" value={editingRow.id} />
+              <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
               <input name="requestId" type="hidden" value={editingRow.paymentRequestId} />
               <div className="field grow">
                 <label className="field-label" htmlFor={`payment-${editingRow.id}`}>Add a payment</label>
@@ -347,35 +447,15 @@ export function DuesLedger({
                 <label className="field-label" htmlFor={`payment-date-${editingRow.id}`}>Payment date</label>
                 <input className="field-input" defaultValue={currentPacificDate()} id={`payment-date-${editingRow.id}`} name="paymentDate" type="date" required />
               </div>
-              <Button disabled={optimisticBusy} type="submit" variant="primary">Apply payment</Button>
+              <Button disabled={busy} type="submit" variant="primary">Apply payment</Button>
             </form>
           ) : (
             <div className="dues-paid-notice">This balance is fully paid.</div>
           )}
 
-          <form action={updateDuesBalance} className="dues-edit-form" id={`edit-balance-${editingRow.id}`} onSubmit={(event) => {
-            const form = new FormData(event.currentTarget);
-            const amountOwed = Number(form.get("amountOwed"));
-            const memberId = String(form.get("memberId") ?? "");
-            const memberName = members.find((member) => member.id === memberId)?.name ?? editingRow.memberName;
-            const dueDate = String(form.get("dueDate") ?? editingRow.dueDate);
-            setOptimisticBusy(true);
-            setOptimisticRows((current) => current.map((candidate) => candidate.id === editingRow.id
-              ? {
-                  ...candidate,
-                  memberId,
-                  memberName,
-                  amountOwed,
-                  assessedAmount: candidate.isPaid ? amountOwed : candidate.paidAmount + amountOwed,
-                  paidAmount: candidate.isPaid ? amountOwed : candidate.paidAmount,
-                  dueDate,
-                  notes: String(form.get("notes") ?? ""),
-                  isOverdue: !candidate.isPaid && dueDate < currentPacificDate(),
-                }
-              : candidate));
-            setEditingId(null);
-          }}>
+          <form action={editAction} className="dues-edit-form" id={`edit-balance-${editingRow.id}`}>
             <input name="id" type="hidden" value={editingRow.id} />
+            <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="field">
                 <label className="field-label" htmlFor={`member-${editingRow.id}`}>Member</label>
@@ -399,19 +479,18 @@ export function DuesLedger({
               </div>
             </div>
           </form>
+          <p aria-live="polite" className={`dues-action-feedback ${latestDialogState.status}`}>
+            {latestDialogState.message}
+          </p>
           <div className="dues-edit-footer">
-            <form action={waiveDuesBalance} onSubmit={() => {
-              setOptimisticBusy(true);
-              setOptimisticRows((current) => current.filter((candidate) => candidate.id !== editingRow.id));
-              setSelectedIds((current) => current.filter((id) => id !== editingRow.id));
-              setEditingId(null);
-            }}>
+            <form action={waiveAction}>
               <input name="id" type="hidden" value={editingRow.id} />
-              <WaiveBalanceButton disabled={optimisticBusy} label={`${editingRow.memberName}'s charge`} />
+              <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
+              <WaiveBalanceButton disabled={busy} label={`${editingRow.memberName}'s charge`} />
             </form>
             <div className="flex gap-2">
               <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
-              <Button disabled={optimisticBusy} form={`edit-balance-${editingRow.id}`} type="submit" variant="primary">Save changes</Button>
+              <Button disabled={busy} form={`edit-balance-${editingRow.id}`} type="submit" variant="primary">Save changes</Button>
             </div>
           </div>
         </section>

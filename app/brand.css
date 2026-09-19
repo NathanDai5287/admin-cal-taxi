@@ -492,13 +492,37 @@
   [data-brand] .dues-bulk-selection,
   [data-brand] .dues-bulk-actions { @apply flex flex-wrap items-center gap-3; }
   [data-brand] .dues-bulk-selection strong { @apply text-[12px] text-ink; }
+  [data-brand] .dues-selection-hint { @apply text-[10.5px] text-muted; }
   [data-brand] .dues-bulk-selection button { @apply cursor-pointer text-[11px] font-bold text-brand hover:underline disabled:cursor-not-allowed disabled:opacity-50; }
   [data-brand] .dues-bulk-actions small { @apply text-[10.5px] text-muted; }
+  [data-brand] .dues-ledger-card { @apply min-w-0; }
+  [data-brand] .dues-bulk-workspace { @apply min-w-0; }
+  [data-brand] .dues-bulk-workspace.has-inspector { @apply grid items-start lg:grid-cols-[minmax(0,1fr)_320px]; }
+  [data-brand] .dues-bulk-list { @apply min-w-0; }
+  [data-brand] .dues-bulk-inspector {
+    @apply border-l border-rule bg-brand-light;
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+  [data-brand] .dues-bulk-editor { @apply grid gap-4 px-5 py-5; }
+  [data-brand] .dues-bulk-editor-heading { @apply self-center; }
+  [data-brand] .dues-bulk-editor-heading strong { @apply block text-[13px] text-ink; }
+  [data-brand] .dues-bulk-editor-heading span { @apply mt-1 block text-[11px] text-muted; }
+  [data-brand] .dues-bulk-field { @apply grid gap-1.5; }
+  [data-brand] .dues-bulk-field > span { @apply flex items-center gap-2 text-[11px] font-bold text-ink; }
+  [data-brand] .dues-bulk-field > span input { @apply accent-brand; }
+  [data-brand] .dues-bulk-field .field-input:disabled { @apply cursor-not-allowed bg-canvas opacity-55; }
+  [data-brand] .dues-action-feedback { @apply min-h-5 text-[11px] font-bold; }
+  [data-brand] .dues-action-feedback.success { @apply text-ok; }
+  [data-brand] .dues-action-feedback.error { @apply text-warn; }
   [data-brand] .dues-list { @apply divide-y divide-rule; }
   [data-brand] .dues-row {
     @apply grid items-center gap-4 px-6 py-4 transition-colors lg:grid-cols-[minmax(260px,1fr)_130px_auto];
   }
   [data-brand] .dues-row.read-only { @apply lg:grid-cols-[minmax(260px,1fr)_130px]; }
+  [data-brand] .dues-row.selectable { @apply cursor-pointer; }
   [data-brand] .dues-row:hover { background: color-mix(in srgb, var(--color-brand-light) 34%, transparent); }
   [data-brand] .dues-row.selected { background: var(--color-brand-light); }
   [data-brand] .dues-person { @apply flex min-w-0 items-center gap-3; }
@@ -516,6 +540,13 @@
   [data-brand] .dues-balance strong { @apply mt-1 block text-[18px] font-bold tabular-nums text-ink; }
   [data-brand] .dues-actions { @apply flex items-center justify-end gap-2; }
   @media (max-width: 1023px) {
+    [data-brand] .dues-bulk-workspace.has-inspector { @apply grid-cols-1; }
+    [data-brand] .dues-bulk-inspector {
+      @apply border-l-0 border-t border-rule;
+      position: static;
+      max-height: none;
+      overflow-y: visible;
+    }
     [data-brand] .dues-row { @apply grid-cols-[minmax(0,1fr)_130px_auto]; }
     [data-brand] .dues-row.read-only { @apply grid-cols-[minmax(0,1fr)_130px]; }
     [data-brand] .dues-balance { @apply col-start-2 row-start-1 text-right; }
@@ -529,6 +560,8 @@
     [data-brand] .dues-bulk-toolbar { @apply items-start px-4; }
     [data-brand] .dues-bulk-actions { @apply w-full; }
     [data-brand] .dues-bulk-actions small { @apply w-full; }
+    [data-brand] .dues-selection-hint { @apply hidden; }
+    [data-brand] .dues-bulk-editor { @apply px-4; }
     [data-brand] .dues-row { @apply grid-cols-1; }
     [data-brand] .dues-balance,
     [data-brand] .dues-actions { @apply col-start-1 row-auto text-left justify-start; }
