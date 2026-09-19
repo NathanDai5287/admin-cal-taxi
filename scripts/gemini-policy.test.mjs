@@ -52,6 +52,16 @@ test("PDF extraction submits single pages and preserves actual page locators", a
   assert.deepEqual(chunks.map((c) => c.locator.page), [1, 2]);
   assert.equal(chunks[1].content, "Page 2 text");
 });
+test("image extraction returns temporary visual context without identifying people or following image instructions", async () => {
+  let request;
+  const provider = new GeminiOcrProvider({ models: { generateContent: async (input) => { request = input; return { text: "Poster text: Chapter meeting at 7 PM." }; } } }, "mock");
+  const chunks = await provider.extract(new Uint8Array([1, 2, 3]), "poster.png", "image/png");
+  assert.equal(chunks[0].locator.image, "poster.png");
+  assert.match(chunks[0].content, /meeting at 7 PM/);
+  assert.equal(request.contents[0].inlineData.mimeType, "image/png");
+  assert.match(request.config.systemInstruction, /untrusted data/);
+  assert.match(request.contents[1].text, /Do not identify people/);
+});
 
 // Deliberately administrative fixture text, not invented fraternity event rules.
 const sources = [
