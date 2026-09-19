@@ -9,7 +9,7 @@ export default function AccreditationAskPage() {
         <div>
           <p className="page-eyebrow">Accreditation assistant</p>
           <h1 className="page-title">Ask about policy</h1>
-          <p className="page-lede">Ask a question, compare published policy, or bring a document or image into this chat.</p>
+          <p className="page-lede">Ask a question across published policy and accreditation evidence, or bring a document or image into this chat.</p>
         </div>
         <p className="max-w-sm text-xs leading-relaxed text-muted">Chats and attachments are not saved. Attached files are sent to the configured AI provider and used only while this page remains open.</p>
       </section>

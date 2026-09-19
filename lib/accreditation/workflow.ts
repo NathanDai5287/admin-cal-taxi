@@ -247,7 +247,7 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
     citations,
     validation,
     providerConfig: providers.language && definition.key === "annual_report" && process.env.ACCREDITATION_GEMINI_REPORTS_ENABLED === "true"
-      ? { provider: providers.language.name, model: providers.language.model, embeddingProvider: providers.embeddings?.name, embeddingModel: providers.embeddings?.model, embeddingProfile: providers.embeddings?.profile }
+      ? { provider: providers.language.name, model: providers.language.model, fallbackModel: providers.language.fallbackModel ?? null, embeddingProvider: providers.embeddings?.name, embeddingModel: providers.embeddings?.model, embeddingProfile: providers.embeddings?.profile }
       : { provider: "deterministic_only" },
   };
 }

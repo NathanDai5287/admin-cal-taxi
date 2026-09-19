@@ -5,13 +5,30 @@ import type { ExtractedChunk } from "./types";
 
 export class RetryableAiError extends Error {
   readonly retryable = true;
-  constructor() { super("AI capacity is temporarily unavailable. Please retry later; administrators can reprocess failed sources."); }
+  constructor(options?: ErrorOptions) {
+    super("AI capacity is temporarily unavailable. Please retry later; administrators can reprocess failed sources.", options);
+  }
 }
 
 export function aiError(error: unknown): never {
   const status = error && typeof error === "object" ? (error as { status?: number; code?: number }).status ?? (error as { code?: number }).code : undefined;
-  if (status === 429 || status === 503 || /RESOURCE_EXHAUSTED|quota|rate.limit/i.test(String(error))) throw new RetryableAiError();
+  if (status === 429 || status === 503 || /RESOURCE_EXHAUSTED|quota|rate.limit|UNAVAILABLE|high demand/i.test(String(error))) {
+    throw new RetryableAiError({ cause: error });
+  }
   throw error;
+}
+
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function withAiRetry<T>(operation: () => Promise<T>, delays: number[]) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (!(error instanceof RetryableAiError) || attempt >= delays.length) throw error;
+      await wait(delays[attempt]);
+    }
+  }
 }
 
 // Validate the supported JSON-schema subset locally as well as requesting structured output.
@@ -35,13 +52,20 @@ export class GeminiLanguageModelProvider implements LanguageModelProvider {
   readonly name = "gemini";
   readonly client: GoogleGenAI;
   readonly model: string;
-  constructor(client: GoogleGenAI, model: string) { this.client = client; this.model = model; }
-  async generateStructured(request: StructuredGenerationRequest): Promise<unknown> {
+  readonly fallbackModel?: string;
+  private readonly retryDelays: number[];
+  constructor(client: GoogleGenAI, model: string, fallbackModel?: string, retryDelays = [300, 1_000]) {
+    this.client = client;
+    this.model = model;
+    this.fallbackModel = fallbackModel && fallbackModel !== model ? fallbackModel : undefined;
+    this.retryDelays = retryDelays;
+  }
+  private async generateWithModel(request: StructuredGenerationRequest, model: string, retryDelays: number[]): Promise<unknown> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await this.client.models.generateContent({
-        model: this.model, contents: request.input,
+      const response = await withAiRetry(() => this.client.models.generateContent({
+        model, contents: request.input,
         config: { systemInstruction: request.instructions, responseMimeType: "application/json", responseJsonSchema: request.schema },
-      }).catch(aiError);
+      }).catch(aiError), retryDelays);
       try {
         const parsed: unknown = JSON.parse(response.text ?? "");
         if (!matchesSchema(parsed, request.schema)) throw new Error("Invalid structured response.");
@@ -49,6 +73,16 @@ export class GeminiLanguageModelProvider implements LanguageModelProvider {
       } catch { if (attempt === 1) throw new Error("The model returned malformed output twice. Please retry."); }
     }
     throw new Error("No structured response.");
+  }
+  async generateStructured(request: StructuredGenerationRequest): Promise<unknown> {
+    try {
+      // A fallback avoids spending multiple slow attempts on a model that is
+      // already reporting overload. Backoff is retained for the final model.
+      return await this.generateWithModel(request, this.model, this.fallbackModel ? [] : this.retryDelays);
+    } catch (error) {
+      if (!(error instanceof RetryableAiError) || !this.fallbackModel) throw error;
+      return this.generateWithModel(request, this.fallbackModel, this.retryDelays);
+    }
   }
 }
 

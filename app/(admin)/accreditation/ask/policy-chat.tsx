@@ -36,27 +36,29 @@ function SendIcon() {
   return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.8"><path d="m4 4 16 8-16 8 3-8-3-8Z" strokeLinejoin="round" /><path d="M7 12h13" strokeLinecap="round" /></svg>;
 }
 
-function SourceList({ sources, date }: { sources: AccreditationChatSource[]; date?: string }) {
+function CitationList({ sources, date }: { sources: AccreditationChatSource[]; date?: string }) {
   if (!sources.length) return null;
   return (
-    <details className="mt-4 border-t border-rule pt-3">
-      <summary className="cursor-pointer text-xs font-bold text-brand">{sources.length} source {sources.length === 1 ? "passage" : "passages"}</summary>
-      <ol className="mt-3 space-y-3">
-        {sources.map((source, index) => {
-          const locator = locatorLabel(source.locator);
-          const label = `${source.title}${source.subtitle ? ` · ${source.subtitle}` : ""}${locator ? ` · ${locator}` : ""}`;
+    <section className="mt-4 border-t border-rule pt-3" aria-label="Citations">
+      <p className="text-xs font-bold text-ink">Citations</p>
+      <ol className="mt-2 list-decimal space-y-2 pl-5">
+        {sources.map((source) => {
+          const locators = source.locators.map(locatorLabel).filter(Boolean).join("; ");
+          const label = `${source.title}${source.subtitle ? ` · ${source.subtitle}` : ""}`;
           const href = source.kind === "policy" && source.sourceId
-            ? `/api/policy/sources/${source.sourceId}${date ? `?date=${encodeURIComponent(date)}` : ""}${source.locator.page ? `#page=${source.locator.page}` : ""}`
+            ? `/api/policy/sources/${source.sourceId}${date ? `?date=${encodeURIComponent(date)}` : ""}`
+            : source.kind === "accreditation" && source.sourceId
+              ? `/api/accreditation/sources/${source.sourceId}`
             : null;
           return (
-            <li key={`${source.ref}:${index}`} className="text-xs leading-relaxed text-muted">
-              <blockquote className="border-l-2 border-rule pl-3 text-ink">“{source.quote}”</blockquote>
-              {href ? <a className="mt-1 block text-brand underline" href={href}>{label}</a> : <p className="mt-1">{label}</p>}
+            <li key={source.key} className="text-xs leading-relaxed text-muted">
+              {href ? <a className="text-brand underline" href={href}>{label}</a> : <span className="text-ink">{label}</span>}
+              {locators ? <span> · Cited locations: {locators}</span> : null}
             </li>
           );
         })}
       </ol>
-    </details>
+    </section>
   );
 }
 
@@ -148,7 +150,7 @@ export function PolicyChat() {
           <div className="mx-auto flex min-h-[360px] max-w-2xl flex-col items-center justify-center text-center">
             <div className="flex h-12 w-12 items-center justify-center border border-brand bg-brand-light text-xl font-bold text-brand" aria-hidden="true">A</div>
             <h2 className="mt-5 text-xl font-bold">How can I help?</h2>
-            <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">I can search published policy when your question calls for it, or work from documents and images you attach for this chat.</p>
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-muted">I can search published policy and accreditation evidence when your question calls for it, or work from documents and images you attach for this chat.</p>
             <div className="mt-6 grid w-full gap-2 sm:grid-cols-3">
               {suggestions.map((suggestion) => <button type="button" key={suggestion} onClick={() => { setInput(suggestion); textarea.current?.focus(); }} className="border border-rule bg-surface p-3 text-left text-xs leading-relaxed text-muted transition-colors hover:border-brand hover:text-ink">{suggestion}</button>)}
             </div>
@@ -160,9 +162,9 @@ export function PolicyChat() {
                 <div className={`max-w-[88%] border px-4 py-3 text-sm leading-6 sm:max-w-[78%] ${message.role === "user" ? "border-brand bg-brand text-white" : "border-rule bg-surface text-ink"}`}>
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.attachmentNames?.length ? <p className="mt-3 border-t border-white/30 pt-2 text-xs text-white/80">Attached: {message.attachmentNames.join(", ")}</p> : null}
-                  {message.role === "assistant" && message.policyUsed ? <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-muted">Published policy checked{message.policyDate ? ` for ${message.policyDate}` : ""}</p> : null}
-                  {message.role === "assistant" ? <SourceList sources={message.sources ?? []} date={message.policyDate} /> : null}
+                  {message.role === "assistant" && message.policyUsed ? <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-muted">Policy and accreditation sources checked{message.policyDate ? ` for ${message.policyDate}` : ""}</p> : null}
                   {message.role === "assistant" && message.followUps?.length ? <div className="mt-4 flex flex-wrap gap-2">{message.followUps.map((followUp) => <button key={followUp} type="button" onClick={() => { setInput(followUp); textarea.current?.focus(); }} className="border border-rule px-2.5 py-1.5 text-left text-xs text-brand hover:bg-brand-light">{followUp}</button>)}</div> : null}
+                  {message.role === "assistant" ? <CitationList sources={message.sources ?? []} date={message.policyDate} /> : null}
                 </div>
               </article>
             ))}
@@ -182,7 +184,7 @@ export function PolicyChat() {
             <textarea ref={textarea} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} disabled={pending} rows={1} maxLength={4000} placeholder="Ask a question…" className="max-h-40 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted" />
             <button type="submit" disabled={pending || !input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center bg-brand text-white hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message"><SendIcon /></button>
           </form>
-          <p className="mt-2 text-center text-[11px] text-muted">Policy answers include retrieved source passages. Verify important decisions with an officer.</p>
+          <p className="mt-2 text-center text-[11px] text-muted">Answers include retrieved policy and accreditation passages. Verify important decisions with an officer.</p>
         </div>
       </div>
     </section>

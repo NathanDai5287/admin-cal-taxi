@@ -16,6 +16,7 @@ export type StructuredGenerationRequest = {
 export interface LanguageModelProvider {
   readonly name: string;
   readonly model: string;
+  readonly fallbackModel?: string;
   generateStructured(request: StructuredGenerationRequest): Promise<unknown>;
 }
 
@@ -109,7 +110,11 @@ export function getAccreditationProviders(): AccreditationProviders {
   if (provider !== "gemini" || !gemini) return { language: null, embeddings: null, ocr: null };
   const model = process.env.ACCREDITATION_EMBEDDING_MODEL ?? "gemini-embedding-2";
   return {
-    language: new GeminiLanguageModelProvider(gemini, process.env.ACCREDITATION_LLM_MODEL ?? "gemini-3.8-flash"),
+    language: new GeminiLanguageModelProvider(
+      gemini,
+      process.env.ACCREDITATION_LLM_MODEL ?? "gemini-3.8-flash",
+      process.env.ACCREDITATION_LLM_FALLBACK_MODEL ?? "gemini-3.5-flash-lite",
+    ),
     embeddings: new GeminiEmbeddingProvider(gemini, model, process.env.ACCREDITATION_EMBEDDING_PROFILE ?? `${model}:768:retrieval-v1`),
     ocr,
   };

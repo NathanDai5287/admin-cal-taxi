@@ -23,7 +23,7 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     grant all on storage.objects to authenticated,service_role;
     alter default privileges in schema public grant all on tables to service_role;
   `);
-  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
+  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
   const admin = randomUUID(), member = randomUUID(), other = randomUUID(), removed = randomUUID();
   await db.query("insert into profiles values ($1,'admin',null),($2,'member',null),($3,'member',null),($4,'member',now())", [admin, member, other, removed]);
   const profile = "gemini-embedding-2:768:retrieval-v1";
@@ -118,8 +118,12 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     const args = ["evidence",vec,profile,cycle,fall,"annual_report"];
     const found = await db.query("select * from search_report_evidence($1,$2,$3,$4,$5,$6)",args);
     assert.deepEqual(new Set(found.rows.map((r)=>r.source_id)),new Set(accepted));
+    const combined = await db.query("select * from search_policy_and_accreditation_chunks($1,$2,$3,$4)",["event",vec,profile,"2026-09-17"]);
+    assert.ok(combined.rows.some((row) => row.source_type === "policy"));
+    assert.ok(combined.rows.some((row) => row.source_type === "accreditation" && accepted.includes(row.source_id)));
     await asUser(member);
     assert.equal((await db.query("select * from search_report_evidence($1,$2,$3,$4,$5,$6)",args)).rows.length,0);
+    assert.equal((await db.query("select * from search_policy_and_accreditation_chunks($1,$2,$3,$4)",["event",vec,profile,"2026-09-17"])).rows.length,0);
     for (const table of ["accreditation_sources","accreditation_source_chunks","accreditation_templates","accreditation_runs","accreditation_revisions","accreditation_artifacts"]) assert.equal((await db.query(`select * from ${table}`)).rows.length,0);
     await assert.rejects(db.query("select approve_accreditation_revision($1,$2,$3)",[randomUUID(),randomUUID(),admin]),/authenticated administrator/);
     await assert.rejects(db.query("select commit_document_embeddings($1,false,$2,$3)",[accepted[0],profile,JSON.stringify([chunk("attack")])]),/permission denied/);

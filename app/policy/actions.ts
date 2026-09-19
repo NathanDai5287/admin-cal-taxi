@@ -21,7 +21,7 @@ export async function askPolicy(_previous: QuestionResult, form: FormData): Prom
   try {
     const providers = getAccreditationProviders();
     if (!providers.language || !providers.embeddings) throw new Error("AI is unavailable. Please retry later.");
-    modelConfig = { provider: providers.language.name, model: providers.language.model, embeddingModel: providers.embeddings.model, embeddingProfile: providers.embeddings.profile, dimensions: 768 };
+    modelConfig = { provider: providers.language.name, model: providers.language.model, fallbackModel: providers.language.fallbackModel ?? null, embeddingModel: providers.embeddings.model, embeddingProfile: providers.embeddings.profile, dimensions: 768 };
     const resolved = await resolveQuestionDate(providers.language, input.data.question, form.get("date") ? input.data.date : null, input.data.date);
     input.data.date = resolved.date;
     const dateSaved = await db.from("policy_questions").update({ question_date: resolved.date }).eq("id", reservation.data);

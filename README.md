@@ -170,18 +170,24 @@ overrides still work, while unsupported narrative fields remain unresolved.
 
 ## Gemini and published policies
 
-Apply `supabase/migrations/20260917000000_gemini_policy.sql` after the pilot migration.
+Apply `supabase/migrations/20260917000000_gemini_policy.sql` after the pilot migration,
+then apply `20260925000000_combined_policy_accreditation_search.sql` for the
+administrator Ask Policy workspace.
 The migration adds 768-dimensional vectors and HNSW indexes without replacing
 legacy vectors. Search runs in Postgres: authorized, scoped chunks are ranked by
 vector distance and full text (40 candidates each), then reciprocal-rank fusion
-returns up to 18 report passages or 12 policy passages. The filtered candidate
+returns up to 18 report passages, 12 member-policy passages, or 24 combined policy
+and accreditation passages for administrators. The filtered candidate
 set is materialized for exact ranking so metadata isolation precedes ranking;
 the HNSW indexes are available for later approximate-search tuning as corpus size grows.
 
 Set the server-only configuration in `.env.example`. Never use a `NEXT_PUBLIC_`
-name for Gemini credentials. The requested defaults are `gemini-3.8-flash` for
-language/PDF processing and `gemini-embedding-2` at 768 dimensions. Confirm those
-model IDs are available to the deployment account before enabling generation.
+name for Gemini credentials. The primary language default is `gemini-3.8-flash`,
+with `gemini-3.5-flash-lite` as the automatic overload fallback. Set
+`ACCREDITATION_LLM_MODEL=gemini-3.5-flash-lite` to use the lower-latency model as
+the primary instead. PDF processing and embeddings keep their independently
+configured models. Confirm those model IDs are available to the deployment account
+before enabling generation.
 Gemini Embedding 2 aggregates multi-input requests, so the adapter makes a separate
 request per chunk, formats documents as `title: … | text: …`, and uses
 `task: question answering | query: …` for questions. See the
@@ -194,6 +200,13 @@ Ambiguous dates require clarification. Each answer uses only policies that are
 published and effective for that date. Citation IDs and exact quotes are checked
 locally, followed by a separate bounded grounding check. This is document guidance,
 not event approval. There is no inferred hierarchy among issuing authorities.
+
+`/accreditation/ask` searches both effective published policy and every ready,
+non-template accreditation source with the active embedding profile. Results keep
+their source class and document link so accreditation evidence or prior submissions
+are not silently presented as authoritative policy. Exact passage quotes are checked
+server-side for grounding, while the rendered bibliography appears once at the end
+of the answer and groups all cited passages by their overall source document.
 
 `/policy/library` lets administrators upload drafts, edit metadata, retry failed
 processing, inspect extracted passages, publish, supersede, and archive. Published
@@ -208,7 +221,7 @@ model profile, not a duplicate of every retrieved passage.
 
 ### Staged rollout
 
-1. Apply the two accreditation migrations in order. Inspect `supabase migration
+1. Apply the three accreditation and policy migrations in order. Inspect `supabase migration
    list --linked` and `supabase db push --dry-run` first; do not inadvertently apply
    unrelated pending migrations. The new migration also hardens the retained
    approval RPC's caller identity and fixes its table-specific immutability checks.

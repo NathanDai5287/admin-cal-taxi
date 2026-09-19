@@ -31,9 +31,18 @@ export type ChatContext = {
   ref: string;
   content: string;
   title: string;
-  kind: "policy" | "attachment";
+  kind: "policy" | "accreditation" | "attachment";
   subtitle: string;
   locator: Record<string, unknown>;
+  sourceId?: string;
+};
+
+export type DocumentCitation = {
+  key: string;
+  title: string;
+  kind: ChatContext["kind"];
+  subtitle: string;
+  locators: Record<string, unknown>[];
   sourceId?: string;
 };
 
@@ -71,6 +80,35 @@ export function keepSupportedCitations(citations: ChatCitation[], contexts: Chat
     const content = byRef.get(citation.ref);
     return Boolean(content && normalize(citation.quote).length >= 8 && content.includes(normalize(citation.quote)));
   });
+}
+
+export function groupCitationsByDocument(citations: ChatCitation[], contexts: ChatContext[]): DocumentCitation[] {
+  const byRef = new Map(contexts.map((context) => [context.ref, context]));
+  const documents = new Map<string, DocumentCitation & { locatorKeys: Set<string> }>();
+  for (const citation of citations) {
+    const context = byRef.get(citation.ref);
+    if (!context) continue;
+    const attachmentRef = context.ref.split(":").slice(0, 2).join(":");
+    const key = context.sourceId ? `${context.kind}:${context.sourceId}` : `${context.kind}:${attachmentRef}:${context.title}`;
+    let document = documents.get(key);
+    if (!document) {
+      document = { key, title: context.title, kind: context.kind, subtitle: context.subtitle, locators: [], sourceId: context.sourceId, locatorKeys: new Set() };
+      documents.set(key, document);
+    }
+    const locatorKey = JSON.stringify(context.locator);
+    if (!document.locatorKeys.has(locatorKey)) {
+      document.locatorKeys.add(locatorKey);
+      document.locators.push(context.locator);
+    }
+  }
+  return [...documents.values()].map((document) => ({
+    key: document.key,
+    title: document.title,
+    kind: document.kind,
+    subtitle: document.subtitle,
+    locators: document.locators,
+    sourceId: document.sourceId,
+  }));
 }
 
 export function locatorLabel(locator: Record<string, unknown>) {

@@ -20,6 +20,28 @@ test("Gemini malformed output cannot retry indefinitely", async () => {
   await assert.rejects(provider.generateStructured({ schema: {}, input: "", instructions: "", name: "test" }), /twice/);
   assert.equal(calls, 2);
 });
+test("Gemini falls back immediately when the primary model reports high demand", async () => {
+  const models = [];
+  const provider = new GeminiLanguageModelProvider({ models: { generateContent: async (request) => {
+    models.push(request.model);
+    if (request.model === "primary") throw { status: 503 };
+    return { text: '{"count":2}' };
+  } } }, "primary", "fallback", []);
+  const result = await provider.generateStructured({ name: "test", instructions: "", input: "", schema: { type: "object", properties: { count: { type: "number" } }, required: ["count"] } });
+  assert.deepEqual(result, { count: 2 });
+  assert.deepEqual(models, ["primary", "fallback"]);
+});
+test("Gemini retries transient errors on the final model with bounded backoff", async () => {
+  let calls = 0;
+  const provider = new GeminiLanguageModelProvider({ models: { generateContent: async () => {
+    calls++;
+    if (calls < 3) throw { status: 503 };
+    return { text: '{"count":2}' };
+  } } }, "primary", undefined, [0, 0]);
+  const result = await provider.generateStructured({ name: "test", instructions: "", input: "", schema: { type: "object", properties: { count: { type: "number" } }, required: ["count"] } });
+  assert.deepEqual(result, { count: 2 });
+  assert.equal(calls, 3);
+});
 test("each Gemini document chunk is a separate 768-dimensional normalized embedding", async () => {
   const requests = [];
   const provider = new GeminiEmbeddingProvider({ models: { embedContent: async (request) => { requests.push(request); return { embeddings: [{ values: Array(768).fill(2) }] }; } } }, "gemini-embedding-2", "profile");
@@ -35,7 +57,7 @@ test("invalid embedding dimensions and quota responses fail closed", async () =>
   const provider = new GeminiEmbeddingProvider({ models: { embedContent: async () => ({ embeddings: [{ values: [1, 2] }] }) } }, "mock", "profile");
   await assert.rejects(provider.embedQuery("x"), /768/);
   let calls = 0;
-  const language = new GeminiLanguageModelProvider({ models: { generateContent: async () => { calls++; throw { status: 429 }; } } }, "mock");
+  const language = new GeminiLanguageModelProvider({ models: { generateContent: async () => { calls++; throw { status: 429 }; } } }, "mock", undefined, []);
   await assert.rejects(language.generateStructured({}), RetryableAiError);
   assert.equal(calls, 1);
 });
