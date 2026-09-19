@@ -18,6 +18,10 @@ export function aiError(error: unknown): never {
   throw error;
 }
 
+export function isRetryableAiError(error: unknown) {
+  return error instanceof RetryableAiError || /capacity|quota|rate.limit|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand/i.test(error instanceof Error ? error.message : String(error));
+}
+
 const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 async function withAiRetry<T>(operation: () => Promise<T>, delays: number[]) {
@@ -105,10 +109,13 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
     if (result.embeddings?.length !== 1) throw new Error("Expected one embedding per chunk.");
     return validateEmbedding(result.embeddings[0].values);
   }
-  async embedDocuments(inputs: string[], title = "none") {
+  async embedDocuments(inputs: string[], title = "none", onProgress?: (completed: number, total: number) => void | Promise<void>) {
     const vectors: number[][] = [];
     // Embedding 2 aggregates multiple contents. Each chunk must be its own request.
-    for (const content of inputs) vectors.push(await this.embedOne(`title: ${title} | text: ${content}`));
+    for (const content of inputs) {
+      vectors.push(await this.embedOne(`title: ${title} | text: ${content}`));
+      await onProgress?.(vectors.length, inputs.length);
+    }
     return vectors;
   }
   embedQuery(query: string) { return this.embedOne(`task: question answering | query: ${query}`); }

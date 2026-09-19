@@ -208,6 +208,14 @@ are not silently presented as authoritative policy. Exact passage quotes are che
 server-side for grounding, while the rendered bibliography appears once at the end
 of the answer and groups all cited passages by their overall source document.
 
+Policy drafts and accreditation evidence accept batches of up to 20 documents.
+Files are stored first and then embedded sequentially to smooth provider traffic.
+The upload queue polls persisted passage counts while each document is processing.
+Retryable Gemini `429`/`503` failures retry the same document up to four total
+attempts using jittered exponential backoff: 10–12 seconds before the first retry
+and a 20-second cap for later retries. Non-retryable validation and extraction
+errors fail only that document and do not stop the rest of the batch.
+
 `/policy/library` lets administrators upload drafts, edit metadata, retry failed
 processing, inspect extracted passages, publish, supersede, and archive. Published
 content is immutable: upload a new version to change it and explicitly retire the

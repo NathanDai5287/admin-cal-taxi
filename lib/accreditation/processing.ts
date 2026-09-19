@@ -19,7 +19,10 @@ export async function processDocument(sourceId: string, policy = false, signatur
     // Existing extraction is reused so re-embedding preserves citation ordinals.
     let chunks = (existing.data ?? []) as ExtractedChunk[];
     if (!signatureFree) throw new Error("Confirm this source and its extracted text contain no signatures before sending them to AI.");
-    const started = await db.from(table).update(policy ? { processing_state: "processing", processing_error: null } : { processing_error: null }).eq("id", sourceId).in("status", policy ? ["draft", "failed"] : ["ready", "processing", "failed"]).select("id");
+    const started = await db.from(table).update(policy
+      ? { status: "draft", processing_state: "processing", processing_error: null, processing_total: 0, processing_completed: 0, processing_attempts: Number(source.data.processing_attempts ?? 0) + 1 }
+      : { status: "processing", processing_error: null, processing_total: 0, processing_completed: 0, processing_attempts: Number(source.data.processing_attempts ?? 0) + 1 })
+      .eq("id", sourceId).in("status", policy ? ["draft", "failed"] : ["ready", "processing", "failed"]).select("id");
     if (started.error || !started.data?.length) throw new Error("Source is no longer available for processing.");
     if (!chunks.length) {
       const file = await db.storage.from(policy ? "policy-documents" : "accreditation-sources").download(source.data.storage_path);
@@ -27,7 +30,22 @@ export async function processDocument(sourceId: string, policy = false, signatur
       chunks = await extractSource(new Uint8Array(await file.data.arrayBuffer()), source.data.original_name, source.data.mime_type, providers.ocr);
     }
     if (!chunks.length) throw new Error("No readable text was found.");
-    const vectors = await providers.embeddings.embedDocuments(chunks.map((c) => c.content), policy ? source.data.title : source.data.original_name);
+    const progressStarted = await db.from(table).update({ processing_total: chunks.length, processing_completed: 0 }).eq("id", sourceId);
+    if (progressStarted.error) throw new Error("Document progress could not be initialized.");
+    let lastReported = 0;
+    let lastReportedAt = 0;
+    const vectors = await providers.embeddings.embedDocuments(
+      chunks.map((c) => c.content),
+      policy ? source.data.title : source.data.original_name,
+      async (completed, total) => {
+        const now = Date.now();
+        if (completed !== total && completed - lastReported < 5 && now - lastReportedAt < 1_500) return;
+        const updated = await db.from(table).update({ processing_completed: completed }).eq("id", sourceId);
+        if (updated.error) throw new Error("Document progress could not be saved.");
+        lastReported = completed;
+        lastReportedAt = now;
+      },
+    );
     if (vectors.length !== chunks.length) throw new Error("Not every chunk received an embedding.");
     const committed = await db.rpc("commit_document_embeddings", {
       p_source: sourceId, p_policy: policy, p_profile: providers.embeddings.profile,

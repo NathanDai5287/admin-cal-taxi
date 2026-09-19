@@ -8,6 +8,7 @@ import {
   keepSupportedCitations,
   selectClosestContexts,
 } from "../lib/accreditation/chat.ts";
+import { processingRetryDelayMs } from "../lib/accreditation/batch.ts";
 
 test("chat attachments accept supported documents and common images", () => {
   for (const name of ["policy.pdf", "notes.docx", "budget.xlsx", "details.txt", "photo.PNG", "scan.jpeg", "diagram.webp"]) {
@@ -56,4 +57,11 @@ test("chat citations are grouped once per document while preserving cited locati
     key: "policy:one", title: "Policy", kind: "policy", subtitle: "Authority · v1", sourceId: "one", locators: [{ page: 1 }, { page: 2 }],
   });
   assert.equal(grouped[1].key, "accreditation:two");
+});
+
+test("batch embedding retries use bounded 10-20 second exponential backoff with jitter", () => {
+  assert.equal(processingRetryDelayMs(0, 0), 10_000);
+  assert.equal(processingRetryDelayMs(0, 1), 12_000);
+  assert.equal(processingRetryDelayMs(1, 0), 20_000);
+  assert.equal(processingRetryDelayMs(8, 0.5), 20_000);
 });

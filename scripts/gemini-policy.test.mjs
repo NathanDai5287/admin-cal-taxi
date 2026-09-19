@@ -44,14 +44,16 @@ test("Gemini retries transient errors on the final model with bounded backoff", 
 });
 test("each Gemini document chunk is a separate 768-dimensional normalized embedding", async () => {
   const requests = [];
+  const progress = [];
   const provider = new GeminiEmbeddingProvider({ models: { embedContent: async (request) => { requests.push(request); return { embeddings: [{ values: Array(768).fill(2) }] }; } } }, "gemini-embedding-2", "profile");
-  const vectors = await provider.embedDocuments(["First clause", "Second clause"], "Policy");
+  const vectors = await provider.embedDocuments(["First clause", "Second clause"], "Policy", (completed, total) => progress.push([completed, total]));
   await provider.embedQuery("Can we host?");
   assert.equal(vectors.length, 2);
   assert.equal(vectors[0].length, 768);
   assert.ok(Math.abs(vectors[0].reduce((sum, n) => sum + n * n, 0) - 1) < 1e-10);
   assert.deepEqual(requests.map((r) => r.contents), ["title: Policy | text: First clause", "title: Policy | text: Second clause", "task: question answering | query: Can we host?"]);
   assert.ok(requests.every((r) => r.config.outputDimensionality === 768));
+  assert.deepEqual(progress, [[1, 2], [2, 2]]);
 });
 test("invalid embedding dimensions and quota responses fail closed", async () => {
   const provider = new GeminiEmbeddingProvider({ models: { embedContent: async () => ({ embeddings: [{ values: [1, 2] }] }) } }, "mock", "profile");

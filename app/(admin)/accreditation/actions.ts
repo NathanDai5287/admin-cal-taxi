@@ -8,7 +8,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getReportDefinition } from "@/lib/accreditation/definitions";
+import type { BatchCreateResult, BatchProcessResult } from "@/lib/accreditation/batch";
 import { validateSourceFile } from "@/lib/accreditation/extract";
+import { isRetryableAiError } from "@/lib/accreditation/gemini";
 import { processDocument } from "@/lib/accreditation/processing";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
@@ -145,6 +147,67 @@ export async function uploadSource(formData: FormData) {
     }).eq("id", sourceId);
     revalidatePath("/accreditation/library");
     redirect(`/accreditation/library?cycle=${cycleId.data}&result=processing_failed`);
+  }
+}
+
+export async function createAccreditationBatchItem(formData: FormData): Promise<BatchCreateResult> {
+  const { userId } = await requireAccreditationAdmin();
+  const cycleId = uuid.safeParse(formData.get("cycleId"));
+  const termValue = String(formData.get("termId") ?? "");
+  const termId = termValue ? uuid.safeParse(termValue) : null;
+  const kind = z.enum(sourceKinds).safeParse(formData.get("kind"));
+  const reportValue = String(formData.get("reportKey") ?? "");
+  const reportKey = reportValue ? z.enum(REPORT_KEYS).safeParse(reportValue) : null;
+  const file = formData.get("file");
+  if (!cycleId.success || !kind.success || (termId && !termId.success) || (reportKey && !reportKey.success) || !(file instanceof File)) {
+    return { ok: false, message: "Choose valid evidence metadata and a document." };
+  }
+  if (formData.get("signatureFree") !== "on") return { ok: false, message: "Confirm signatures and unnecessary personal information were removed." };
+  try { validateSourceFile(file); } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Use a supported document up to 25 MB." }; }
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const digest = sha256(bytes);
+  const db = createAccreditationAdminClient();
+  const duplicate = await db.from("accreditation_sources").select("id").eq("cycle_id", cycleId.data).eq("sha256", digest).maybeSingle();
+  if (duplicate.data) return { ok: false, id: duplicate.data.id, message: "This document is already in the selected academic year." };
+  const id = crypto.randomUUID();
+  const storagePath = `${cycleId.data}/${id}/${safeName(file.name)}`;
+  const mimeType = fileMimeType(file);
+  const upload = await db.storage.from("accreditation-sources").upload(storagePath, bytes, { contentType: mimeType });
+  if (upload.error) return { ok: false, message: "Upload failed. Please retry this document." };
+  const inserted = await db.from("accreditation_sources").insert({
+    id,
+    cycle_id: cycleId.data,
+    term_id: termId?.success ? termId.data : null,
+    report_key: reportKey?.success ? reportKey.data : null,
+    kind: kind.data as SourceKind,
+    status: "processing",
+    original_name: file.name,
+    mime_type: mimeType,
+    size_bytes: file.size,
+    sha256: digest,
+    storage_path: storagePath,
+    created_by: userId,
+  });
+  if (inserted.error) {
+    await db.storage.from("accreditation-sources").remove([storagePath]);
+    return { ok: false, message: "Evidence could not be saved." };
+  }
+  revalidatePath("/accreditation/library");
+  return { ok: true, id, message: "Uploaded. Waiting to embed." };
+}
+
+export async function processAccreditationBatchItem(idValue: string): Promise<BatchProcessResult> {
+  await requireAccreditationAdmin();
+  const id = uuid.safeParse(idValue);
+  if (!id.success) return { ok: false, retryable: false, message: "The uploaded evidence ID is invalid." };
+  try {
+    await processDocument(id.data, false, true);
+    revalidatePath("/accreditation/library");
+    return { ok: true, retryable: false, message: "Embedding complete." };
+  } catch (error) {
+    revalidatePath("/accreditation/library");
+    const retryable = isRetryableAiError(error);
+    return { ok: false, retryable, message: retryable ? "Gemini is rate-limited or overloaded." : "Processing failed. Review the document error." };
   }
 }
 

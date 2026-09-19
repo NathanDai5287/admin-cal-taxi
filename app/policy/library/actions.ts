@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { BatchCreateResult, BatchProcessResult } from "@/lib/accreditation/batch";
 import { validateSourceFile } from "@/lib/accreditation/extract";
+import { isRetryableAiError } from "@/lib/accreditation/gemini";
 import { processDocument } from "@/lib/accreditation/processing";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { requireAdmin } from "@/lib/reimbursements/auth";
@@ -16,6 +18,43 @@ async function policyAdmin() {
 }
 const metadata = z.object({ title: z.string().trim().min(1).max(200), authority: z.string().trim().min(1).max(200), document_type: z.enum(["policy", "bylaws", "rules", "guidelines"]), version_label: z.string().trim().min(1).max(100), effective_from: z.iso.date(), effective_until: z.union([z.iso.date(), z.literal("")]).transform((s) => s || null) }).refine((m) => !m.effective_until || m.effective_until >= m.effective_from);
 function finish(message: string): never { revalidatePath("/policy", "layout"); redirect(`/policy/library?message=${encodeURIComponent(message)}`); }
+
+export async function createPolicyBatchItem(form: FormData): Promise<BatchCreateResult> {
+  const { userId } = await policyAdmin();
+  const parsed = metadata.safeParse(Object.fromEntries(form));
+  const file = form.get("file");
+  if (!parsed.success || !(file instanceof File)) return { ok: false, message: "Provide shared policy metadata and a supported file." };
+  try { validateSourceFile(file); } catch (error) { return { ok: false, message: error instanceof Error ? error.message : "Use a supported document up to 25 MB." }; }
+  if (form.get("signatureFree") !== "on") return { ok: false, message: "Confirm signatures and unnecessary personal information were removed." };
+  const db = createAccreditationAdminClient();
+  const id = crypto.randomUUID();
+  const path = `${id}/${file.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 120)}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const uploaded = await db.storage.from("policy-documents").upload(path, bytes, { contentType: file.type || "application/octet-stream" });
+  if (uploaded.error) return { ok: false, message: "Upload failed. Please retry this document." };
+  const inserted = await db.from("policy_documents").insert({ id, ...parsed.data, content_hash: createHash("sha256").update(bytes).digest("hex"), storage_path: path, original_name: file.name, mime_type: file.type || "application/octet-stream", created_by: userId });
+  if (inserted.error) {
+    await db.storage.from("policy-documents").remove([path]);
+    return { ok: false, message: "Policy could not be saved." };
+  }
+  revalidatePath("/policy/library");
+  return { ok: true, id, message: "Uploaded. Waiting to embed." };
+}
+
+export async function processPolicyBatchItem(idValue: string): Promise<BatchProcessResult> {
+  await policyAdmin();
+  const id = z.string().uuid().safeParse(idValue);
+  if (!id.success) return { ok: false, retryable: false, message: "The uploaded policy ID is invalid." };
+  try {
+    await processDocument(id.data, true, true);
+    revalidatePath("/policy/library");
+    return { ok: true, retryable: false, message: "Embedding complete. Review before publishing." };
+  } catch (error) {
+    revalidatePath("/policy/library");
+    const retryable = isRetryableAiError(error);
+    return { ok: false, retryable, message: retryable ? "Gemini is rate-limited or overloaded." : "Processing failed. Review the document error." };
+  }
+}
 
 export async function uploadPolicy(form: FormData) {
   const { userId } = await policyAdmin();

@@ -25,7 +25,7 @@ export interface EmbeddingProvider {
   readonly model: string;
   readonly dimensions: number;
   readonly profile: string;
-  embedDocuments(inputs: string[], title?: string): Promise<number[][]>;
+  embedDocuments(inputs: string[], title?: string, onProgress?: (completed: number, total: number) => void | Promise<void>): Promise<number[][]>;
   embedQuery(input: string): Promise<number[]>;
 }
 
@@ -83,10 +83,12 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
     this.model = model;
   }
 
-  async embedDocuments(inputs: string[]) {
+  async embedDocuments(inputs: string[], _title?: string, onProgress?: (completed: number, total: number) => void | Promise<void>) {
     if (!inputs.length) return [];
     const response = await this.client.embeddings.create({ model: this.model, input: inputs, dimensions: 768 });
-    return response.data.sort((a, b) => a.index - b.index).map((item) => validateEmbedding(item.embedding));
+    const vectors = response.data.sort((a, b) => a.index - b.index).map((item) => validateEmbedding(item.embedding));
+    await onProgress?.(vectors.length, vectors.length);
+    return vectors;
   }
   async embedQuery(input: string) { return (await this.embedDocuments([input]))[0]; }
 }

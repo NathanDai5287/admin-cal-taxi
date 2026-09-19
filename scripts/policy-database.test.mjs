@@ -23,7 +23,7 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     grant all on storage.objects to authenticated,service_role;
     alter default privileges in schema public grant all on tables to service_role;
   `);
-  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
+  for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
   const admin = randomUUID(), member = randomUUID(), other = randomUUID(), removed = randomUUID();
   await db.query("insert into profiles values ($1,'admin',null),($2,'member',null),($3,'member',null),($4,'member',now())", [admin, member, other, removed]);
   const profile = "gemini-embedding-2:768:retrieval-v1";
