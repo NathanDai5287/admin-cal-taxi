@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { addDuesFees } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { addDuesFees, type DuesActionState } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { useDuesRows, type DuesRow } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { Button } from "@/components/brand/button";
 
 export type BulkFeeMember = {
   id: string;
   name: string;
 };
+
+const initialState: DuesActionState = { status: "idle", message: "", sequence: 0 };
 
 function SubmitFeesButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
@@ -20,23 +23,48 @@ function SubmitFeesButton({ count }: { count: number }) {
   );
 }
 
+function newChargeRow(member: BulkFeeMember, amount: number, dueDate: string, notes: string, today: string): DuesRow {
+  return {
+    id: crypto.randomUUID(),
+    memberId: member.id,
+    memberName: member.name,
+    amountOwed: amount,
+    assessedAmount: amount,
+    paidAmount: 0,
+    dueDate,
+    notes,
+    discordUserId: "",
+    isPaid: false,
+    isOverdue: dueDate < today,
+    paymentRequestId: crypto.randomUUID(),
+    updatedAt: new Date().toISOString(),
+    pending: true,
+  };
+}
+
 export function ChargeMembersForm({
   members,
   today,
-  feedback,
 }: {
   members: BulkFeeMember[];
   today: string;
-  feedback?: { text: string; success: boolean };
 }) {
+  const { applyMutation } = useDuesRows();
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [state, formAction] = useActionState(addDuesFees, initialState);
   const filteredMembers = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return normalized
       ? members.filter((member) => member.name.toLowerCase().includes(normalized))
       : members;
   }, [members, query]);
+
+  useEffect(() => {
+    if (state.status !== "success") return;
+    const timer = window.setTimeout(() => setSelectedIds([]), 0);
+    return () => window.clearTimeout(timer);
+  }, [state]);
 
   function toggleMember(id: string) {
     setSelectedIds((current) => current.includes(id)
@@ -51,13 +79,27 @@ export function ChargeMembersForm({
     ])]);
   }
 
+  function submit(formData: FormData) {
+    const amount = Number(formData.get("amountOwed"));
+    const dueDate = String(formData.get("dueDate"));
+    const notes = String(formData.get("notes") ?? "");
+    const selected = members.filter((member) => selectedIds.includes(member.id));
+    if (amount > 0 && dueDate && selected.length) {
+      applyMutation({
+        type: "add",
+        rows: selected.map((member) => newChargeRow(member, amount, dueDate, notes, today)),
+      });
+    }
+    formAction(formData);
+  }
+
   return (
     <section className="card" aria-labelledby="bulk-fee-title">
       <div className="card-header">
         <span className="card-title" id="bulk-fee-title">Charge members</span>
         <span className="card-subtitle">Select members, then apply the same amount, due date, and reason.</span>
       </div>
-      <form action={addDuesFees} className="bulk-fee-form">
+      <form action={submit} className="bulk-fee-form">
         <div className="bulk-fee-settings">
           <div className="field">
             <label className="field-label" htmlFor="bulk-fee-amount">Fee per member</label>
@@ -109,7 +151,7 @@ export function ChargeMembersForm({
 
         <div className="bulk-fee-footer">
           <div aria-live="polite">
-            {feedback ? <p className={`form-message${feedback.success ? " success" : ""}`}>{feedback.text}</p> : null}
+            {state.message ? <p className={`form-message${state.status === "success" ? " success" : ""}`}>{state.message}</p> : null}
           </div>
           <SubmitFeesButton count={selectedIds.length} />
         </div>

@@ -1,4 +1,5 @@
 import { SpendingByCategory } from "@/components/finance/spending-by-category";
+import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categoryBudgetsFromRows } from "@/lib/reimbursements/format";
 import {
@@ -26,10 +27,19 @@ export default async function AccountsPage() {
     throw new Error(`Unable to load reimbursement budgets: ${budgetResult.error.message}`);
   }
 
+  const summary = summarizeApproved(rows, manualExpenses);
+  const reviewHrefs = Object.values(summary.byCategoryItems)
+    .flat()
+    .filter((item) => item.source === "receipt")
+    .map((item) => `/finance/review/${item.id}`);
+
   return (
-    <SpendingByCategory
-      budgets={categoryBudgetsFromRows(budgetResult.data)}
-      summary={summarizeApproved(rows, manualExpenses)}
-    />
+    <>
+      <PrefetchRoutes hrefs={reviewHrefs} />
+      <SpendingByCategory
+        budgets={categoryBudgetsFromRows(budgetResult.data)}
+        summary={summary}
+      />
+    </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
 import { useEffect } from "react";
 
 /**
@@ -19,9 +20,18 @@ export function PrefetchRoutes({ hrefs }: { hrefs: readonly string[] }) {
 
     const prefetch = () => {
       let index = 0;
+      const warm = (href: string) => {
+        router.prefetch(href, {
+          kind: PrefetchKind.AUTO,
+          // Polling and mutations drop warmed payloads. Re-warm when Next marks one stale.
+          onInvalidate: () => {
+            if (!cancelled) warm(href);
+          },
+        });
+      };
       const warmNextBatch = () => {
         if (cancelled) return;
-        for (const href of uniqueHrefs.slice(index, index + 3)) router.prefetch(href);
+        for (const href of uniqueHrefs.slice(index, index + 3)) warm(href);
         index += 3;
         if (index < uniqueHrefs.length) batchHandle = window.setTimeout(warmNextBatch, 150);
       };

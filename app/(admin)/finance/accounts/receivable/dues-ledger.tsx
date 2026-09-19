@@ -12,30 +12,21 @@ import {
   updateDuesBalance,
   type DuesActionState,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
-
-export type DuesRow = {
-  id: string;
-  memberId: string | null;
-  memberName: string;
-  amountOwed: number;
-  assessedAmount: number;
-  paidAmount: number;
-  dueDate: string;
-  notes: string;
-  discordUserId: string;
-  isPaid: boolean;
-  isOverdue: boolean;
-  paymentRequestId: string;
-  updatedAt: string;
-};
 
 type Filter = "outstanding" | "overdue" | "paid" | "all";
 const initialDuesActionState = { status: "idle" as const, message: "", sequence: 0 };
 
 function latestActionState(...states: DuesActionState[]) {
   return states.reduce((latest, state) => state.sequence > latest.sequence ? state : latest);
+}
+
+function versionIds(formData: FormData) {
+  return [...new Set(formData.getAll("balanceVersion").filter(
+    (value): value is string => typeof value === "string",
+  ).map((value) => value.split("|")[0]))];
 }
 
 function formatDate(value: string) {
@@ -103,16 +94,14 @@ function WaiveBalanceButton({
 }
 
 export function DuesLedger({
-  rows,
   members,
   mode = "view",
 }: {
-  rows: DuesRow[];
   members: { id: string; name: string }[];
   mode?: "view" | "manage";
 }) {
   const canManage = mode === "manage";
-  const [optimisticRows, setOptimisticRows] = useState(rows);
+  const { rows: optimisticRows, applyMutation } = useDuesRows();
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -124,24 +113,27 @@ export function DuesLedger({
   const [applyNotes, setApplyNotes] = useState(false);
   const [editState, editAction, editPending] = useActionState(updateDuesBalance, initialDuesActionState);
   const [paymentState, paymentAction, paymentPending] = useActionState(addDuesPayment, initialDuesActionState);
-  const [paidState, paidAction, paidPending] = useActionState(setDuesPaid, initialDuesActionState);
+  const [paidState, paidAction] = useActionState(setDuesPaid, initialDuesActionState);
   const [waiveState, waiveAction, waivePending] = useActionState(waiveDuesBalance, initialDuesActionState);
   const [bulkPaidState, bulkPaidAction, bulkPaidPending] = useActionState(bulkSetDuesPaid, initialDuesActionState);
   const [bulkWaiveState, bulkWaiveAction, bulkWaivePending] = useActionState(bulkWaiveDuesBalances, initialDuesActionState);
   const [bulkEditState, bulkEditAction, bulkEditPending] = useActionState(bulkUpdateDuesBalances, initialDuesActionState);
   const latestBulkState = latestActionState(bulkPaidState, bulkWaiveState, bulkEditState);
   const latestChargeState = latestActionState(paidState, editState, paymentState, waiveState);
-  const latestDialogState = latestActionState(editState, paymentState);
-  const busy = editPending || paymentPending || paidPending || waivePending || bulkPaidPending || bulkWaivePending || bulkEditPending;
+  const latestDialogState = latestActionState(editState, paymentState, waiveState);
+  const bulkBusy = bulkPaidPending || bulkWaivePending || bulkEditPending;
   const editingRow = optimisticRows.find((row) => row.id === editingId) ?? null;
+  const dialogBusy = editPending || paymentPending || waivePending || Boolean(editingRow?.pending);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setOptimisticRows(rows);
-      setSelectedIds((current) => current.filter((id) => rows.some((row) => row.id === id)));
+      setSelectedIds((current) => {
+        const kept = current.filter((id) => optimisticRows.some((row) => row.id === id));
+        return kept.length === current.length ? current : kept;
+      });
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [rows]);
+  }, [optimisticRows]);
 
   useEffect(() => {
     if (editState.status !== "success" && waiveState.status !== "success") return;
@@ -229,6 +221,63 @@ export function DuesLedger({
       : [...new Set([...current, ...filtered.map((row) => row.id)])]);
   }
 
+  function submitPaidToggle(formData: FormData) {
+    applyMutation({ type: "set-paid", ids: [String(formData.get("id"))], paid: formData.get("paid") === "true" });
+    paidAction(formData);
+  }
+
+  function submitPayment(formData: FormData) {
+    const amount = Number(formData.get("paymentAmount"));
+    if (amount > 0) applyMutation({ type: "payment", id: String(formData.get("id")), amount });
+    paymentAction(formData);
+  }
+
+  function submitEdit(formData: FormData) {
+    const memberId = String(formData.get("memberId"));
+    applyMutation({
+      type: "edit",
+      id: String(formData.get("id")),
+      changes: {
+        memberId,
+        memberName: members.find((member) => member.id === memberId)?.name ?? "",
+        amountOwed: Number(formData.get("amountOwed")),
+        dueDate: String(formData.get("dueDate")),
+        notes: String(formData.get("notes") ?? ""),
+      },
+    });
+    editAction(formData);
+  }
+
+  function submitWaive(formData: FormData) {
+    applyMutation({ type: "waive", ids: [String(formData.get("id"))] });
+    waiveAction(formData);
+  }
+
+  function submitBulkPaid(formData: FormData) {
+    applyMutation({ type: "set-paid", ids: versionIds(formData), paid: true });
+    bulkPaidAction(formData);
+  }
+
+  function submitBulkWaive(formData: FormData) {
+    applyMutation({ type: "waive", ids: versionIds(formData) });
+    bulkWaiveAction(formData);
+  }
+
+  function submitBulkEdit(formData: FormData) {
+    const memberId = formData.get("applyMember") === "on" ? String(formData.get("memberId")) : undefined;
+    applyMutation({
+      type: "bulk-edit",
+      ids: versionIds(formData),
+      changes: {
+        ...(memberId ? { memberId, memberName: members.find((member) => member.id === memberId)?.name ?? "" } : {}),
+        ...(formData.get("applyAmount") === "on" ? { amountAssessed: Number(formData.get("amountAssessed")) } : {}),
+        ...(formData.get("applyDueDate") === "on" ? { dueDate: String(formData.get("dueDate")) } : {}),
+        ...(formData.get("applyNotes") === "on" ? { notes: String(formData.get("notes") ?? "") } : {}),
+      },
+    });
+    bulkEditAction(formData);
+  }
+
   return (
     <>
     <section className="card dues-ledger-card" aria-labelledby={`${mode}-dues-ledger-title`}>
@@ -268,20 +317,20 @@ export function DuesLedger({
         <div className="dues-bulk-selection">
           <strong>{selectedIds.length ? `${selectedIds.length} selected` : "Select balances for bulk changes"}</strong>
           <span className="dues-selection-hint">Click a row. Shift-click selects a range.</span>
-          <button disabled={!filtered.length || busy} onClick={selectVisible} type="button">
+          <button disabled={!filtered.length} onClick={selectVisible} type="button">
             {allVisibleSelected ? "Deselect visible" : "Select visible"}
           </button>
-          {!!selectedIds.length && <button disabled={busy} onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
+          {!!selectedIds.length && <button onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
         </div>
         {!!selectedIds.length && <div className="dues-bulk-actions">
-          <form action={bulkPaidAction}>
+          <form action={submitBulkPaid}>
             {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
-            <Button compact disabled={busy} type="submit" variant="primary">Clear balances</Button>
+            <Button compact disabled={bulkBusy} type="submit" variant="primary">Clear balances</Button>
           </form>
-          <form action={bulkWaiveAction}>
+          <form action={submitBulkWaive}>
             {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
             <WaiveBalanceButton
-              disabled={busy}
+              disabled={bulkBusy}
               key={selectedIds.join(",")}
               label={`${selectedIds.length} selected balances`}
               idleText="Waive selected"
@@ -316,7 +365,7 @@ export function DuesLedger({
                   aria-label={`Select ${row.memberName}'s balance`}
                   checked={selectedIds.includes(row.id)}
                   className="dues-select"
-                  disabled={busy}
+                  disabled={row.pending}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (event.shiftKey) {
@@ -352,15 +401,15 @@ export function DuesLedger({
               </div>
 
               {canManage && <div className="dues-actions">
-                <form action={paidAction}>
+                <form action={submitPaidToggle}>
                   <input name="id" type="hidden" value={row.id} />
                   <input name="paid" type="hidden" value={row.isPaid ? "false" : "true"} />
                   <input name="updatedAt" type="hidden" value={row.updatedAt} />
-                  <Button compact disabled={busy} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
+                  <Button compact disabled={row.pending} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
                     {row.isPaid ? "Reopen balance" : "Mark fully paid"}
                   </Button>
                 </form>
-                <Button compact disabled={busy} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit charge</Button>
+                <Button compact disabled={row.pending} onClick={() => setEditingId(row.id)} type="button" variant="secondary">Edit charge</Button>
               </div>}
             </article>
             ))}
@@ -373,7 +422,7 @@ export function DuesLedger({
         </div>
         {canManage && selectedIds.length > 0 ? (
           <aside className="dues-bulk-inspector" aria-labelledby="bulk-charge-editor-title">
-          <form action={bulkEditAction} className="dues-bulk-editor">
+          <form action={submitBulkEdit} className="dues-bulk-editor">
             {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => (
               <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />
             ))}
@@ -383,24 +432,24 @@ export function DuesLedger({
             </div>
             <label className="dues-bulk-field">
               <span><input checked={applyMember} name="applyMember" onChange={(event) => setApplyMember(event.target.checked)} type="checkbox" /> Member</span>
-              <select className="field-input" disabled={!applyMember || busy} name="memberId" required={applyMember}>
+              <select className="field-input" disabled={!applyMember || bulkBusy} name="memberId" required={applyMember}>
                 <option value="">Choose a member</option>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
               </select>
             </label>
             <label className="dues-bulk-field">
               <span><input checked={applyAmount} name="applyAmount" onChange={(event) => setApplyAmount(event.target.checked)} type="checkbox" /> Total charge amount</span>
-              <div className="money-input"><span>$</span><input className="field-input" disabled={!applyAmount || busy} min="0.01" name="amountAssessed" placeholder="0.00" required={applyAmount} step="0.01" type="number" /></div>
+              <div className="money-input"><span>$</span><input className="field-input" disabled={!applyAmount || bulkBusy} min="0.01" name="amountAssessed" placeholder="0.00" required={applyAmount} step="0.01" type="number" /></div>
             </label>
             <label className="dues-bulk-field">
               <span><input checked={applyDueDate} name="applyDueDate" onChange={(event) => setApplyDueDate(event.target.checked)} type="checkbox" /> Due date</span>
-              <input className="field-input" disabled={!applyDueDate || busy} name="dueDate" required={applyDueDate} type="date" />
+              <input className="field-input" disabled={!applyDueDate || bulkBusy} name="dueDate" required={applyDueDate} type="date" />
             </label>
             <label className="dues-bulk-field">
               <span><input checked={applyNotes} name="applyNotes" onChange={(event) => setApplyNotes(event.target.checked)} type="checkbox" /> Note or reason</span>
-              <input className="field-input" disabled={!applyNotes || busy} maxLength={500} name="notes" placeholder="Blank removes the note" />
+              <input className="field-input" disabled={!applyNotes || bulkBusy} maxLength={500} name="notes" placeholder="Blank removes the note" />
             </label>
-            <Button compact disabled={busy || !(applyMember || applyDueDate || applyAmount || applyNotes)} type="submit" variant="primary">Apply changes</Button>
+            <Button compact disabled={bulkBusy || !(applyMember || applyDueDate || applyAmount || applyNotes)} type="submit" variant="primary">Apply changes</Button>
           </form>
           </aside>
         ) : null}
@@ -435,7 +484,7 @@ export function DuesLedger({
           </div>
 
           {!editingRow.isPaid ? (
-            <form action={paymentAction} className="dues-payment-form">
+            <form action={submitPayment} className="dues-payment-form">
               <input name="id" type="hidden" value={editingRow.id} />
               <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
               <input name="requestId" type="hidden" value={editingRow.paymentRequestId} />
@@ -447,13 +496,13 @@ export function DuesLedger({
                 <label className="field-label" htmlFor={`payment-date-${editingRow.id}`}>Payment date</label>
                 <input className="field-input" defaultValue={currentPacificDate()} id={`payment-date-${editingRow.id}`} name="paymentDate" type="date" required />
               </div>
-              <Button disabled={busy} type="submit" variant="primary">Apply payment</Button>
+              <Button disabled={dialogBusy} type="submit" variant="primary">Apply payment</Button>
             </form>
           ) : (
             <div className="dues-paid-notice">This balance is fully paid.</div>
           )}
 
-          <form action={editAction} className="dues-edit-form" id={`edit-balance-${editingRow.id}`}>
+          <form action={submitEdit} className="dues-edit-form" id={`edit-balance-${editingRow.id}`}>
             <input name="id" type="hidden" value={editingRow.id} />
             <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
             <div className="grid gap-4 sm:grid-cols-2">
@@ -483,14 +532,14 @@ export function DuesLedger({
             {latestDialogState.message}
           </p>
           <div className="dues-edit-footer">
-            <form action={waiveAction}>
+            <form action={submitWaive}>
               <input name="id" type="hidden" value={editingRow.id} />
               <input name="updatedAt" type="hidden" value={editingRow.updatedAt} />
-              <WaiveBalanceButton disabled={busy} label={`${editingRow.memberName}'s charge`} />
+              <WaiveBalanceButton disabled={dialogBusy} label={`${editingRow.memberName}'s charge`} />
             </form>
             <div className="flex gap-2">
               <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>
-              <Button disabled={busy} form={`edit-balance-${editingRow.id}`} type="submit" variant="primary">Save changes</Button>
+              <Button disabled={dialogBusy} form={`edit-balance-${editingRow.id}`} type="submit" variant="primary">Save changes</Button>
             </div>
           </div>
         </section>

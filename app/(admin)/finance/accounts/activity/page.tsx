@@ -1,26 +1,21 @@
-import { Button } from "@/components/brand/button";
-import { PasteImageInput } from "@/components/forms/paste-image-input";
-import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
-import { categories, formatCategory, formatMoney } from "@/lib/reimbursements/format";
-import { incomeSources } from "@/lib/reimbursements/financial-report";
-import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
-import { addDonationForecast, addIncomeEntry, addManualExpense, deleteDonationForecast, deleteIncomeEntry, deleteManualExpense, saveOpeningCash } from "./actions";
+import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+
+import { DonationForecastForm } from "./donation-forecast-form";
+import { IncomeEntryForm } from "./income-entry-form";
+import { ManualExpenseForm } from "./manual-expense-form";
+import { OpeningCashForm } from "./opening-cash-form";
 
 export const metadata = { title: "Account activity" };
 export const dynamic = "force-dynamic";
+
 function currentPacificDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
-function formatDate(value: string) {
-  return new Date(`${value}T12:00:00`).toLocaleDateString("en-US");
-}
-const formatExpenseDate = formatDate;
 
-export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ manual?: string; entry?: string; forecast?: string; settings?: string }> }) {
-  const [, params] = await Promise.all([requireAdmin(), searchParams]);
-  const { manual: manualResult, entry: entryResult, forecast: forecastResult, settings: settingsResult } = params;
+export default async function ActivityPage() {
+  await requireAdmin();
   const supabase = createAdminClient();
   const results = await Promise.all([
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("*").order("expense_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
@@ -30,14 +25,28 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   ]);
   for (const result of results) if (result.error) throw new Error(`Unable to load account activity: ${result.error.message}`);
   const manualExpenses = (results[0].data ?? []).map((expense) => ({
-    ...expense,
+    id: expense.id,
+    expense_date: expense.expense_date,
+    category: expense.category,
+    description: expense.description,
+    amount: Number(expense.amount),
     receiptUrl: expense.receipt_path ? `/api/reimbursements/receipts/manual/${expense.id}` : undefined,
   }));
-  const entries = results[1].data ?? [];
+  const entries = (results[1].data ?? []).map((entry) => ({
+    id: entry.id,
+    budget_date: entry.budget_date,
+    description: entry.description,
+    amount: Number(entry.amount),
+    source: entry.source,
+  }));
+  const donationForecasts = (results[3].data ?? []).map((entry) => ({
+    id: entry.id,
+    budget_date: entry.budget_date,
+    description: entry.description,
+    amount: Number(entry.amount),
+  }));
   const today = currentPacificDate();
-  const directSpendingTotal = manualExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
-  const incomeTotal = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const donationForecasts = results[3].data ?? [];
+
   return <div className="grid gap-6">
     <div><p className="page-eyebrow">Chapter finances</p><h1 className="page-title">Other transactions</h1><p className="page-lede">Use this page for money that is not already recorded through dues or reimbursements.</p></div>
 
@@ -48,157 +57,26 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       <a className="account-choice" href="#opening-cash"><strong>Set opening cash</strong><span>Update the starting balance used by reports.</span></a>
     </section>
 
-      <section className="card scroll-mt-28" aria-labelledby="manual-expense-title" id="record-expense">
-        <div className="card-header">
-          <span className="card-title" id="manual-expense-title">Record a direct expense</span>
-          <span className="card-subtitle">Use this when the chapter paid directly. Member reimbursements belong in Review.</span>
-        </div>
-        <form action={addManualExpense} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1fr] items-end">
-            <div className="field">
-              <label className="field-label" htmlFor="manual-category">Category</label>
-              <select className="field-input" id="manual-category" name="category" required>
-                {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-date">Expense date</label>
-              <input className="field-input" defaultValue={today} id="manual-date" name="expenseDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-description">Description</label>
-              <input className="field-input" id="manual-description" maxLength={500} name="description" placeholder="What makes up this amount?" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="manual-amount">Amount</label>
-              <div className="money-input"><span>$</span><input className="field-input" id="manual-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div>
-            </div>
-          </div>
-          <div className="field mt-4">
-            <label className="field-label" htmlFor="manual-receipt">Receipt image (optional)</label>
-            <PasteImageInput
-              accept="image/jpeg,image/png"
-              acceptedTypes={["image/jpeg", "image/png"]}
-              className="file-input"
-              id="manual-receipt"
-              maxBytes={3 * 1024 * 1024}
-              name="receipt"
-              validationMessage="Choose a non-empty JPG or PNG image up to 3 MB."
-            />
-            <p className="field-hint">Paste anywhere on this page, or choose a JPG or PNG up to 3 MB. Leave empty if there is no receipt.</p>
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {manualResult === "added" && <p className="form-message success">Manual expense added.</p>}
-              {manualResult === "deleted" && <p className="form-message success">Manual expense removed.</p>}
-              {manualResult === "receipt" && <p className="form-message">Choose a valid JPG or PNG image up to 3 MB.</p>}
-              {manualResult === "invalid" && <p className="form-message">Enter a category, date, description, and positive amount.</p>}
-              {manualResult === "error" && <p className="form-message">The manual expense could not be saved. Please try again.</p>}
-            </div>
-            <Button variant="primary" type="submit">Record expense</Button>
-          </div>
-        </form>
-        {manualExpenses.length ? (
-          <div className="table-scroll border-t border-rule">
-            <div className="flex items-baseline justify-between gap-4 border-b border-rule px-6 py-3">
-              <strong className="text-[12px] text-ink">Recorded direct expenses</strong>
-              <span className="text-[12px] text-muted">{manualExpenses.length} entries · {formatMoney(directSpendingTotal)}</span>
-            </div>
-            <table className="data-table">
-              <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                {manualExpenses.map((expense) => (
-                  <tr key={expense.id}>
-                    <td className="whitespace-nowrap">{formatExpenseDate(expense.expense_date)}</td>
-                    <td>{formatCategory(expense.category)}</td>
-                    <td>{expense.description}{expense.receiptUrl && <div><a className="back-link" href={expense.receiptUrl} target="_blank" rel="noreferrer">View receipt</a></div>}</td>
-                    <td className="amount">{formatMoney(expense.amount)}</td>
-                    <td className="text-right">
-                      <OptimisticDeleteButton action={deleteManualExpense} value={expense.id} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state border-t border-rule">No direct expenses have been recorded.</div>}
-      </section>
+    <section className="card scroll-mt-28" aria-labelledby="manual-expense-title" id="record-expense">
+      <div className="card-header">
+        <span className="card-title" id="manual-expense-title">Record a direct expense</span>
+        <span className="card-subtitle">Use this when the chapter paid directly. Member reimbursements belong in Review.</span>
+      </div>
+      <ManualExpenseForm expenses={manualExpenses} today={today} />
+    </section>
 
-      <section className="card scroll-mt-28" aria-labelledby="add-income-title" id="donations">
-        <div className="card-header">
-          <span className="card-title" id="add-income-title">Donations</span>
-          <span className="card-subtitle">Forecast expected gifts and record received gifts separately.</span>
-        </div>
-        <form action={addDonationForecast} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr] items-end">
-            <div className="field"><label className="field-label" htmlFor="forecast-date">Expected date</label><input className="field-input" defaultValue={currentPacificDate()} id="forecast-date" name="budgetDate" type="date" required /></div>
-            <div className="field"><label className="field-label" htmlFor="forecast-description">Description</label><input className="field-input" id="forecast-description" maxLength={500} name="description" placeholder="Who or what is this expected gift from?" required /></div>
-            <div className="field"><label className="field-label" htmlFor="forecast-amount">Planned amount</label><div className="money-input"><span>$</span><input className="field-input" id="forecast-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div></div>
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">{forecastResult === "added" && <p className="form-message success">Donation forecast added.</p>}{forecastResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}{forecastResult === "error" && <p className="form-message">The forecast could not be saved.</p>}</div>
-            <Button variant="secondary" type="submit">Add forecast</Button>
-          </div>
-        </form>
-        {donationForecasts.length ? <div className="table-scroll border-t border-rule"><table className="data-table"><thead><tr><th>Expected date</th><th>Description</th><th>Planned</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{donationForecasts.map((entry) => <tr key={entry.id}><td>{formatDate(entry.budget_date)}</td><td>{entry.description}</td><td className="amount">{formatMoney(entry.amount)}</td><td className="text-right"><OptimisticDeleteButton action={deleteDonationForecast} value={entry.id} /></td></tr>)}</tbody></table></div> : null}
-        <form action={addIncomeEntry} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr] items-end">
-            <div className="field">
-              <label className="field-label" htmlFor="income-date">Date</label>
-              <input className="field-input" defaultValue={currentPacificDate()} id="income-date" name="budgetDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="income-description">Description</label>
-              <input className="field-input" id="income-description" maxLength={500} name="description" placeholder="Where did these funds come from?" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="income-amount">Amount</label>
-              <div className="money-input"><span>$</span><input className="field-input" id="income-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {entryResult === "added" && <p className="form-message success">Income recorded.</p>}
-              {entryResult === "deleted" && <p className="form-message success">Income entry removed.</p>}
-              {entryResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}
-              {entryResult === "error" && <p className="form-message">The income entry could not be saved. Please try again.</p>}
-            </div>
-            <Button variant="primary" type="submit">Record donation</Button>
-          </div>
-        </form>
-        {entries.length ? (
-          <div className="table-scroll border-t border-rule">
-            <div className="flex items-baseline justify-between gap-4 border-b border-rule px-6 py-3">
-              <strong className="text-[12px] text-ink">Recorded other income</strong>
-              <span className="text-[12px] text-muted">{entries.length} entries · {formatMoney(incomeTotal)}</span>
-            </div>
-            <table className="data-table">
-              <thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Amount added</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="whitespace-nowrap">{formatDate(entry.budget_date)}</td>
-                    <td>{incomeSources.find(([value]) => value === entry.source)?.[1] ?? "Other income"}</td>
-                    <td>{entry.description}</td>
-                    <td className="amount">{formatMoney(entry.amount)}</td>
-                    <td className="text-right">
-                      <OptimisticDeleteButton action={deleteIncomeEntry} value={entry.id} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state border-t border-rule">No income entries have been recorded yet.</div>}
-      </section>
+    <section className="card scroll-mt-28" aria-labelledby="add-income-title" id="donations">
+      <div className="card-header">
+        <span className="card-title" id="add-income-title">Donations</span>
+        <span className="card-subtitle">Forecast expected gifts and record received gifts separately.</span>
+      </div>
+      <DonationForecastForm forecasts={donationForecasts} today={today} />
+      <IncomeEntryForm entries={entries} today={today} />
+    </section>
 
     <section className="card scroll-mt-28" id="opening-cash">
       <div className="card-header"><span className="card-title">Opening cash</span><span className="card-subtitle">Account setup used by financial reports.</span></div>
-      <form action={saveOpeningCash} className="card-body grid gap-4">
-        <div className="max-w-[360px] field"><label className="field-label" htmlFor="opening-cash-amount">Cash at the start of the current term</label><div className="money-input"><span>$</span><input className="field-input" id="opening-cash-amount" name="openingCash" type="number" min="0" step="0.01" defaultValue={results[2].data?.opening_cash ?? 0} required /></div><p className="field-hint">Change this only when correcting the starting balance. Day-to-day income and expenses belong above.</p></div>
-        {settingsResult && <p role="status">{settingsResult === "saved" ? "Opening cash saved." : "Unable to save opening cash. Check the amount and try again."}</p>}
-        <Button variant="secondary" type="submit">Save opening cash</Button>
-      </form>
+      <OpeningCashForm openingCash={results[2].data?.opening_cash ?? 0} />
     </section>
   </div>;
 }

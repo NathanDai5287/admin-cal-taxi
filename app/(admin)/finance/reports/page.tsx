@@ -5,6 +5,7 @@ import Link from "next/link";
 import Form from "next/form";
 
 import { SpendingByCategory } from "@/components/finance/spending-by-category";
+import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 import { categories, categoryBudgetsFromRows, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
   filtersToSearchParams,
@@ -59,6 +60,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
   return (
     <div className="grid gap-6">
+      <PrefetchRoutes hrefs={rows.map((row) => `/finance/review/${row.id}`)} />
       <div className="flex items-end justify-between gap-6 flex-wrap">
         <div>
           <p className="page-eyebrow">Chapter finances</p>

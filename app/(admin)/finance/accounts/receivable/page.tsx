@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { ChargeMembersForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
+import { DuesBoard } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -21,32 +22,9 @@ function currentPacificDate() {
   }).format(new Date());
 }
 
-const feedback: Record<string, { text: string; success: boolean }> = {
-  added: { text: "Dues added to the selected members.", success: true },
-  saved: { text: "Member balance updated.", success: true },
-  payment: { text: "Payment added to the balance.", success: true },
-  paid: { text: "Balance marked paid.", success: true },
-  reopened: { text: "Balance moved back to outstanding.", success: true },
-  deleted: { text: "Charge waived and removed from planned dues.", success: true },
-  "bulk-paid": { text: "Selected balances cleared and marked fully paid.", success: true },
-  "bulk-deleted": { text: "Selected charges waived and removed from planned dues.", success: true },
-  invalid: { text: "Check the entered amount and balance details, then try again.", success: false },
-  "invalid-member": { text: "Choose an active registered member.", success: false },
-  "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
-  "invalid-date": { text: "Choose a valid due date.", success: false },
-  "invalid-notes": { text: "Keep the note under 500 characters.", success: false },
-  "member-selection-changed": { text: "The member list changed. Refresh the page and select the members again.", success: false },
-  "charge-insert-failed": { text: "The charges could not be saved. No charges were added. Please try again.", success: false },
-  error: { text: "The balance could not be saved. Please try again.", success: false },
-};
-
-export default async function DuesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ result?: string }>;
-}) {
+export default async function DuesPage() {
   await requireAdmin();
-  const [{ result }, supabase] = await Promise.all([searchParams, Promise.resolve(createAdminClient())]);
+  const supabase = createAdminClient();
   const [receivablesResult, profilesResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
@@ -107,7 +85,6 @@ export default async function DuesPage({
   const overdueRows = rows.filter((row) => row.isOverdue);
   const totalPaid = rows.reduce((sum, row) => sum + row.paidAmount, 0);
   const settledRows = rows.filter((row) => row.isPaid);
-  const selectedFeedback = result ? feedback[result] : undefined;
 
   return (
     <div className="grid gap-7">
@@ -143,9 +120,11 @@ export default async function DuesPage({
         <p className="mt-1 text-[13px] text-muted">Add charges and make balance changes in this section.</p>
       </div>
 
-      <ChargeMembersForm feedback={selectedFeedback} members={members} today={today} />
+      <DuesBoard rows={rows} today={today}>
+        <ChargeMembersForm members={members} today={today} />
 
-      <DuesLedger mode="manage" rows={rows} members={members} />
+        <DuesLedger mode="manage" members={members} />
+      </DuesBoard>
 
       <DuesAnnouncement
         channelConfigured={Boolean(process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID?.trim())}

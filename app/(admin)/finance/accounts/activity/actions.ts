@@ -1,15 +1,23 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categoryValues } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
-function reportRedirectTarget(_formData: FormData, result: "added" | "deleted" | "invalid" | "error" | "receipt") {
-  return `/finance/accounts/activity?manual=${result}`;
+export type ActivityActionState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+function actionError(message: string): ActivityActionState {
+  return { status: "error", message };
+}
+
+function actionSuccess(message: string): ActivityActionState {
+  return { status: "success", message };
 }
 
 const manualExpenseSchema = z.object({
@@ -23,7 +31,10 @@ const manualExpenseSchema = z.object({
   }),
 });
 
-export async function addManualExpense(formData: FormData) {
+export async function addManualExpense(
+  _previousState: ActivityActionState,
+  formData: FormData,
+): Promise<ActivityActionState> {
   const { userId } = await requireAdmin();
   const parsed = manualExpenseSchema.safeParse({
     category: formData.get("category"),
@@ -32,20 +43,20 @@ export async function addManualExpense(formData: FormData) {
     expenseDate: formData.get("expenseDate"),
   });
 
-  if (!parsed.success) redirect(reportRedirectTarget(formData, "invalid"));
+  if (!parsed.success) return actionError("Enter a category, date, description, and positive amount.");
 
   const supabase = createAdminClient();
   let receiptPath: string | null = null;
   const receipt = formData.get("receipt");
   if (receipt instanceof File && receipt.name) {
-    if (receipt.size === 0 || receipt.size > 3 * 1024 * 1024) redirect(reportRedirectTarget(formData, "receipt"));
+    if (receipt.size === 0 || receipt.size > 3 * 1024 * 1024) return actionError("Choose a valid JPG or PNG image up to 3 MB.");
     const bytes = new Uint8Array(await receipt.arrayBuffer());
     const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     const png = [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => bytes[i] === byte);
-    if (!jpeg && !png) redirect(reportRedirectTarget(formData, "receipt"));
+    if (!jpeg && !png) return actionError("Choose a valid JPG or PNG image up to 3 MB.");
     receiptPath = `manual/${userId}/${crypto.randomUUID()}.${jpeg ? "jpg" : "png"}`;
     const { error: uploadError } = await supabase.storage.from("receipts").upload(receiptPath, bytes, { contentType: jpeg ? "image/jpeg" : "image/png" });
-    if (uploadError) redirect(reportRedirectTarget(formData, "error"));
+    if (uploadError) return actionError("The manual expense could not be saved. Please try again.");
   }
   const { error } = await supabase.from("reimbursement_manual_expenses").insert({
     receipt_path: receiptPath,
@@ -58,13 +69,13 @@ export async function addManualExpense(formData: FormData) {
 
   if (error) {
     if (receiptPath) await supabase.storage.from("receipts").remove([receiptPath]);
-    redirect(reportRedirectTarget(formData, "error"));
+    return actionError("The manual expense could not be saved. Please try again.");
   }
   revalidatePath("/finance/accounts/activity");
   revalidatePath("/finance/accounts");
   revalidatePath("/finance/reports");
   revalidatePath("/finance/planning");
-  redirect(reportRedirectTarget(formData, "added"));
+  return actionSuccess("Manual expense added.");
 }
 
 export async function deleteManualExpense(formData: FormData) {
@@ -95,24 +106,30 @@ const incomeSchema = z.object({
   budgetDate: manualExpenseSchema.shape.expenseDate,
 });
 
-export async function addIncomeEntry(formData: FormData) {
+export async function addIncomeEntry(
+  _previousState: ActivityActionState,
+  formData: FormData,
+): Promise<ActivityActionState> {
   const { userId } = await requireAdmin();
   const parsed = incomeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/finance/accounts/activity?entry=invalid");
+  if (!parsed.success) return actionError("Enter a date, description, and positive amount.");
   const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
     kind: "income", amount: parsed.data.amount, description: parsed.data.description,
     source: "alumni_donations", budget_date: parsed.data.budgetDate, created_by: userId,
   });
-  if (error) redirect("/finance/accounts/activity?entry=error");
+  if (error) return actionError("The income entry could not be saved. Please try again.");
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/accounts");
-  redirect("/finance/accounts/activity?entry=added");
+  return actionSuccess("Income recorded.");
 }
 
-export async function addDonationForecast(formData: FormData) {
+export async function addDonationForecast(
+  _previousState: ActivityActionState,
+  formData: FormData,
+): Promise<ActivityActionState> {
   const { userId } = await requireAdmin();
   const parsed = incomeSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) redirect("/finance/accounts/activity?forecast=invalid#donations");
+  if (!parsed.success) return actionError("Enter a date, description, and positive amount.");
   const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
     kind: "forecast",
     amount: parsed.data.amount,
@@ -121,10 +138,10 @@ export async function addDonationForecast(formData: FormData) {
     budget_date: parsed.data.budgetDate,
     created_by: userId,
   });
-  if (error) redirect("/finance/accounts/activity?forecast=error#donations");
+  if (error) return actionError("The forecast could not be saved.");
   revalidatePath("/finance/planning");
   revalidatePath("/finance/accounts/activity");
-  redirect("/finance/accounts/activity?forecast=added#donations");
+  return actionSuccess("Donation forecast added.");
 }
 
 export async function deleteDonationForecast(formData: FormData) {
@@ -153,14 +170,17 @@ export async function deleteIncomeEntry(formData: FormData) {
   return { ok: true } as const;
 }
 
-export async function saveOpeningCash(formData: FormData) {
+export async function saveOpeningCash(
+  _previousState: ActivityActionState,
+  formData: FormData,
+): Promise<ActivityActionState> {
   const { userId } = await requireAdmin();
   const amount = z.coerce.number().min(0).max(999_999_999.99).safeParse(formData.get("openingCash"));
-  if (!amount.success) redirect("/finance/accounts/activity?settings=invalid");
+  if (!amount.success) return actionError("Unable to save opening cash. Check the amount and try again.");
   const { error } = await createAdminClient().from("chapter_financial_settings")
     .update({ opening_cash: amount.data, updated_by: userId }).eq("id", true).select("id").single();
-  if (error) redirect("/finance/accounts/activity?settings=error");
+  if (error) return actionError("Unable to save opening cash. Check the amount and try again.");
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/accounts");
-  redirect("/finance/accounts/activity?settings=saved");
+  return actionSuccess("Opening cash saved.");
 }

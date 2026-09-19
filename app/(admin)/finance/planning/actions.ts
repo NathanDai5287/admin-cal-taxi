@@ -34,13 +34,21 @@ function revalidateBudgetPages() {
   revalidatePath("/finance/reports");
 }
 
-export async function saveReimbursementBudgets(formData: FormData) {
+export type ExpensePlanState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export async function saveReimbursementBudgets(
+  _previousState: ExpensePlanState,
+  formData: FormData,
+): Promise<ExpensePlanState> {
   const { userId } = await requireAdmin();
   const parsed = z.record(z.string(), amountSchema).safeParse(
     Object.fromEntries(budgetKeys.map((key) => [key, formData.get(key)])),
   );
 
-  if (!parsed.success) redirect(budgetRedirectTarget("limits", "invalid"));
+  if (!parsed.success) return { status: "error", message: "Enter valid non-negative amounts." };
 
   const supabase = createAdminClient();
   const { error: categoryMapError } = await supabase.from("reimbursement_budgets").upsert({
@@ -62,9 +70,9 @@ export async function saveReimbursementBudgets(formData: FormData) {
     )).error;
   }
 
-  if (error) redirect(budgetRedirectTarget("limits", "error"));
+  if (error) return { status: "error", message: "The expense plan could not be saved." };
   revalidateBudgetPages();
-  redirect(budgetRedirectTarget("limits", "saved"));
+  return { status: "success", message: "Expense plan saved." };
 }
 
 const budgetEntrySchema = z.object({

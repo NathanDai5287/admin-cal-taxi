@@ -15,6 +15,7 @@ import {
   InlineStatusSelect,
   type ReimbursementStatus,
 } from "@/components/reimbursements/inline-status-select";
+import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 
 export type PaymentTableRow = {
@@ -310,6 +311,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
   return (
     <section className="card">
+      <PrefetchRoutes hrefs={rows.map((row) => `/finance/accounts/payable/${row.id}`)} />
       <div className="card-header justify-between gap-4 flex-wrap">
         <span className="card-title">All reimbursements</span>
         <div
@@ -354,6 +356,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
           <tbody>
             {optimisticRows.map((item) => {
               const eligible = item.status === "approved" && !item.reimbursed;
+              const detailHref = `/finance/accounts/payable/${item.id}`;
               return (
                 <tr className="submission-row" key={item.id}>
                   <td>
@@ -375,7 +378,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     <Link
                       aria-label={`Review submission from ${item.full_name}`}
                       className="submission-link"
-                      href={`/finance/accounts/payable/${item.id}`}
+                      href={detailHref}
+                      onMouseEnter={() => router.prefetch(detailHref)}
                     >
                       {item.full_name}
                     </Link>

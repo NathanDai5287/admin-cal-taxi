@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
@@ -31,24 +30,6 @@ const entrySchema = z.object({
   notes: z.string().trim().max(500, "notes"),
 });
 
-type DuesResult =
-  | "added"
-  | "saved"
-  | "payment"
-  | "paid"
-  | "reopened"
-  | "deleted"
-  | "bulk-paid"
-  | "bulk-deleted"
-  | "invalid"
-  | "invalid-member"
-  | "invalid-amount"
-  | "invalid-date"
-  | "invalid-notes"
-  | "member-selection-changed"
-  | "charge-insert-failed"
-  | "error";
-
 export type DuesActionState = {
   status: "idle" | "success" | "error";
   message: string;
@@ -63,18 +44,18 @@ function actionSuccess(message: string): DuesActionState {
   return { status: "success", message, sequence: Date.now() };
 }
 
-function resultUrl(result: DuesResult) {
-  return `/finance/accounts/receivable?result=${result}`;
+function bulkFeeError(error: z.ZodError): DuesActionState {
+  const field = error.issues[0]?.path[0];
+  if (field === "amountOwed") return actionError("Enter an amount owed greater than $0.");
+  if (field === "dueDate") return actionError("Choose a valid due date.");
+  if (field === "notes") return actionError("Keep the note under 500 characters.");
+  return actionError("Check the entered amount and balance details, then try again.");
 }
 
-function entryErrorUrl(error: z.ZodError) {
-  const field = error.issues[0]?.path[0];
-  if (field === "memberId") return resultUrl("invalid-member");
-  if (field === "amountOwed") return resultUrl("invalid-amount");
-  if (field === "dueDate") return resultUrl("invalid-date");
-  if (field === "notes") return resultUrl("invalid-notes");
-  return resultUrl("invalid");
-}
+const chargeFailureMessages = {
+  "member-selection-changed": "The member list changed. Refresh the page and select the members again.",
+  "charge-insert-failed": "The charges could not be saved. No charges were added. Please try again.",
+} as const;
 
 function revalidateDues() {
   revalidatePath("/finance/accounts");
@@ -90,7 +71,10 @@ const bulkFeeSchema = z.object({
   notes: z.string().trim().max(500),
 });
 
-export async function addDuesFees(formData: FormData) {
+export async function addDuesFees(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
   const { userId } = await requireAdmin("/");
   const memberIds = [...new Set(formData.getAll("memberId").filter(
     (value): value is string => typeof value === "string",
@@ -102,7 +86,7 @@ export async function addDuesFees(formData: FormData) {
     notes: formData.get("notes") ?? "",
   });
 
-  if (!parsed.success) redirect(entryErrorUrl(parsed.error));
+  if (!parsed.success) return bulkFeeError(parsed.error);
 
   const supabase = createAdminClient();
   const { data: profiles, error: profilesError } = await supabase
@@ -113,11 +97,11 @@ export async function addDuesFees(formData: FormData) {
     .is("removed_at", null);
 
   if (profilesError || profiles?.length !== parsed.data.memberIds.length) {
-    redirect(resultUrl(reportDuesProfilePreflightFailure({
+    return actionError(chargeFailureMessages[reportDuesProfilePreflightFailure({
       error: profilesError,
       selectedMemberIds: parsed.data.memberIds,
       loadedMemberIds: profiles?.map((profile) => profile.id),
-    })));
+    })]);
   }
 
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
@@ -136,19 +120,21 @@ export async function addDuesFees(formData: FormData) {
     };
   });
 
-  if (rows.some((row) => row === null)) redirect(resultUrl("error"));
+  if (rows.some((row) => row === null)) {
+    return actionError("The balance could not be saved. Please try again.");
+  }
   const { error } = await supabase.from("chapter_receivables").insert(
     rows.filter((row): row is NonNullable<typeof row> => row !== null),
   );
 
   if (error) {
-    redirect(resultUrl(reportDuesInsertFailure({
+    return actionError(chargeFailureMessages[reportDuesInsertFailure({
       error,
       selectedMemberIds: parsed.data.memberIds,
-    })));
+    })]);
   }
   revalidateDues();
-  redirect(resultUrl("added"));
+  return actionSuccess("Dues added to the selected members.");
 }
 
 export async function updateDuesBalance(

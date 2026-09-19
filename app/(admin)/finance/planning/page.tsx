@@ -1,21 +1,18 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { saveReimbursementBudgets } from "@/app/(admin)/finance/planning/actions";
-import { Button } from "@/components/brand/button";
+import { ExpensePlanForm } from "@/app/(admin)/finance/planning/expense-plan-form";
 import { buildPlanVsActual } from "@/lib/finance/plan-vs-actual";
 import { requireAdmin } from "@/lib/reimbursements/auth";
-import { categories, categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
+import { categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export const metadata: Metadata = { title: "Plan vs actual" };
 export const dynamic = "force-dynamic";
 
-type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-export default async function PlanningPage({ searchParams }: { searchParams: PageSearchParams }) {
-  const [, params] = await Promise.all([requireAdmin(), searchParams]);
+export default async function PlanningPage() {
+  await requireAdmin();
   const supabase = createAdminClient();
   const settingsResult = await supabase.from("chapter_financial_settings")
     .select("term_label, term_start, term_end")
@@ -49,7 +46,6 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pag
     hostingOrders: (hostingResult.data ?? []).map((row) => ({ plannedRevenue: Number(row.planned_revenue), plannedFirePermit: Number(row.planned_fire_permit), status: row.status })),
     hostingPayments: (hostingPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount), kind: row.kind })),
   });
-  const limitsResult = typeof params.limits === "string" ? params.limits : "";
   const estimatedActualDates = (duesPaymentsResult.data ?? []).filter((row) => row.date_is_estimated).length
     + (reimbursementsResult.data ?? []).filter((row) => row.reimbursement_date_is_estimated).length;
 
@@ -98,15 +94,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pag
 
       <section className="card" id="expense-plan">
         <div className="card-header"><span className="card-title">Expense category plan</span><span className="card-subtitle">Fire permits add to the House plan automatically.</span></div>
-        <form action={saveReimbursementBudgets} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map(([category, label]) => <div className="field" key={category}><label className="field-label" htmlFor={`budget-${category}`}>{label}</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={budgets.get(category) ?? ""} id={`budget-${category}`} min="0" name={category} placeholder="No plan" step="0.01" type="number" /></div></div>)}
-          </div>
-          <div className="mt-5 flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4">
-            <div aria-live="polite">{limitsResult === "saved" && <p className="form-message success">Expense plan saved.</p>}{limitsResult === "invalid" && <p className="form-message">Enter valid non-negative amounts.</p>}{limitsResult === "error" && <p className="form-message">The expense plan could not be saved.</p>}</div>
-            <Button variant="primary" type="submit">Save expense plan</Button>
-          </div>
-        </form>
+        <ExpensePlanForm budgets={Object.fromEntries(budgets)} />
       </section>
     </div>
   );
