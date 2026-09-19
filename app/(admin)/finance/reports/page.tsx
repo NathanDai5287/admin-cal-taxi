@@ -27,12 +27,6 @@ function formatMonth(month: string) {
     .format(new Date(`${month}-01T00:00:00Z`));
 }
 
-function remainingText(limit: number | null, spent: number) {
-  if (limit === null) return "No limit";
-  const remaining = limit - spent;
-  return remaining >= 0 ? `${formatMoney(remaining)} remaining` : `${formatMoney(Math.abs(remaining))} over`;
-}
-
 export default async function ReimbursementReportsPage({ searchParams }: { searchParams: PageSearchParams }) {
   const [, rawSearchParams] = await Promise.all([requireAdmin(), searchParams]);
   const filters = parseReportFilters(rawSearchParams);
@@ -40,7 +34,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
   const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([
     loadAllPages((from, to) => supabase.from("reimbursements").select("id, full_name").order("full_name").order("id").range(from, to)),
     supabase.from("reimbursement_budgets").select("*"),
-    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("id, amount").eq("kind", "forecast").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("id, amount").eq("kind", "forecast").eq("source", "alumni_donations").order("id").range(from, to)),
     loadReportPageRows(supabase, filters),
     loadReportManualExpenses(supabase, filters),
   ]);
@@ -100,7 +94,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
       <section className="stat-grid" aria-label="Report totals">
         <article className="stat stat-primary"><span>Recorded spending</span><strong>{formatMoney(summary.approvedTotal)}</strong><small>{formatMoney(summary.receiptTotal)} receipts + {formatMoney(summary.manualTotal)} manual</small></article>
-        <article className="stat"><span>Planned income</span><strong>{formatMoney(overallBudget)}</strong><small>{remainingText(overallBudget, summary.approvedTotal)}</small></article>
+        <article className="stat"><span>Donation forecasts</span><strong>{formatMoney(overallBudget)}</strong><small>{budgetEntriesResult.data?.length ?? 0} planned gifts</small></article>
         <article className="stat"><span>Spending entries</span><strong>{summary.approvedCount + summary.manualCount}</strong><small>{summary.approvedCount} approved receipts, {summary.manualCount} manual</small></article>
       </section>
 

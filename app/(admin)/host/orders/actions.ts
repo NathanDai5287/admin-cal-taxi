@@ -17,12 +17,17 @@ import {
   addDocument,
   createOrder,
   deleteOrder,
+  getOrder,
   updateOrder,
   type NewOrder,
   type OrderPatch,
 } from "@/lib/host-orders";
 import type { Order, OrderDocument, OrderStatus } from "@/lib/host-orders-types";
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { createClient } from "@/lib/reimbursements/supabase/server";
+import { hostingPlanFromOrder } from "@/lib/finance/hosting";
+import { z } from "zod";
 
 export type ActionResult<T> =
   | { ok: true; data: T }
@@ -80,7 +85,130 @@ export async function setOrderStatusAction(
   orderId: string,
   statusOverride: OrderStatus | null,
 ): Promise<ActionResult<Order>> {
+  if (statusOverride === "cancelled") {
+    return failed(new Error("Cancel the contract in Plan and payments."));
+  }
   return updateOrderAction(orderId, { statusOverride });
+}
+
+export async function confirmHostingContractAction(orderId: string) {
+  const { userId } = await requireAdmin("/");
+  const id = z.string().min(1).max(200).safeParse(orderId);
+  if (!id.success) return failed(new Error("Choose a valid hosting order."));
+
+  try {
+    const supabase = createAdminClient();
+    const existing = await supabase.from("hosting_finance_orders").select("*").eq("order_id", id.data).maybeSingle();
+    if (existing.error) return failed(existing.error);
+
+    if (existing.data) {
+      const { data, error } = await supabase.from("hosting_finance_orders")
+        .update({ status: "confirmed", cancelled_at: null })
+        .eq("order_id", id.data)
+        .select("*")
+        .single();
+      if (error) return failed(error);
+      revalidatePath("/finance/planning");
+      revalidatePath(`/host/orders/${id.data}`);
+      return { ok: true, data } as const;
+    }
+
+    const order = await getOrder(id.data);
+    if (!order) return failed(new Error("The hosting order was not found."));
+    const plan = hostingPlanFromOrder(order);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(plan.eventDate) || plan.plannedRevenue <= 0) {
+      return failed(new Error("Add an event date and rental price before confirmation."));
+    }
+
+    let { data, error } = await supabase.from("hosting_finance_orders").insert({
+      order_id: plan.orderId,
+      organization: plan.organization,
+      event_date: plan.eventDate,
+      planned_revenue: plan.plannedRevenue,
+      planned_fire_permit: plan.plannedFirePermit,
+      confirmed_by: userId,
+    }).select("*").single();
+    if (error?.code === "23505") {
+      const current = await supabase.from("hosting_finance_orders").select("*").eq("order_id", id.data).single();
+      data = current.data;
+      error = current.error;
+    }
+    if (error) return failed(error);
+    revalidatePath("/host/orders");
+    revalidatePath(`/host/orders/${id.data}`);
+    revalidatePath("/finance/planning");
+    return { ok: true, data } as const;
+  } catch (error) {
+    return failed(error);
+  }
+}
+
+export async function cancelHostingContractAction(orderId: string) {
+  await requireAdmin("/");
+  const id = z.string().min(1).max(200).safeParse(orderId);
+  if (!id.success) return failed(new Error("Choose a valid hosting order."));
+  const { data, error } = await createAdminClient().from("hosting_finance_orders")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("order_id", id.data)
+    .eq("status", "confirmed")
+    .select("order_id")
+    .maybeSingle();
+  if (error) return failed(error);
+  if (!data) return failed(new Error("Confirm this contract before cancelling it."));
+  revalidatePath(`/host/orders/${id.data}`);
+  revalidatePath("/finance/planning");
+  return { ok: true, data: null } as const;
+}
+
+const hostingPaymentSchema = z.object({
+  orderId: z.string().min(1).max(200),
+  kind: z.enum(["revenue", "fire_permit"]),
+  amount: z.number().positive().max(999_999_999.99),
+  paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  requestId: z.string().uuid(),
+});
+
+export async function recordHostingPaymentAction(input: z.infer<typeof hostingPaymentSchema>) {
+  const { userId } = await requireAdmin("/");
+  const parsed = hostingPaymentSchema.safeParse(input);
+  if (!parsed.success) return failed(new Error("Enter a valid payment date and amount."));
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("record_hosting_payment", {
+    p_order_id: parsed.data.orderId,
+    p_kind: parsed.data.kind,
+    p_amount: parsed.data.amount,
+    p_paid_date: parsed.data.paidDate,
+    p_request_id: parsed.data.requestId,
+  });
+  if (error) return failed(error);
+  revalidatePath(`/host/orders/${parsed.data.orderId}`);
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/reports");
+  return { ok: true, data: { id: data, recordedBy: userId } } as const;
+}
+
+export async function reverseHostingPaymentAction(paymentId: string) {
+  const { userId } = await requireAdmin("/");
+  const id = z.string().uuid().safeParse(paymentId);
+  if (!id.success) return failed(new Error("Choose a valid hosting payment."));
+
+  const { data, error } = await createAdminClient().from("hosting_finance_payments")
+    .update({
+      reversed_at: new Date().toISOString(),
+      reversed_by: userId,
+      reversal_reason: "Recorded in error",
+    })
+    .eq("id", id.data)
+    .is("reversed_at", null)
+    .select("order_id")
+    .maybeSingle();
+  if (error) return failed(error);
+  if (!data) return failed(new Error("This payment was already reversed or no longer exists."));
+  revalidatePath(`/host/orders/${data.order_id}`);
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/reports");
+  return { ok: true, data: null } as const;
 }
 
 export async function setOrderNotesAction(
@@ -92,6 +220,12 @@ export async function setOrderNotesAction(
 
 export async function deleteOrderAction(orderId: string): Promise<ActionResult<null>> {
   await requireAdmin("/");
+  const finance = await createAdminClient().from("hosting_finance_orders")
+    .select("order_id")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (finance.error) return failed(finance.error);
+  if (finance.data) return failed(new Error("This order has finance history and cannot be deleted."));
   try {
     await deleteOrder(orderId);
     revalidatePath("/host/orders");

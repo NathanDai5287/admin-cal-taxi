@@ -27,9 +27,9 @@ const feedback: Record<string, { text: string; success: boolean }> = {
   payment: { text: "Payment added to the balance.", success: true },
   paid: { text: "Balance marked paid.", success: true },
   reopened: { text: "Balance moved back to outstanding.", success: true },
-  deleted: { text: "Member balance removed.", success: true },
+  deleted: { text: "Charge waived and removed from planned dues.", success: true },
   "bulk-paid": { text: "Selected balances cleared and marked fully paid.", success: true },
-  "bulk-deleted": { text: "Selected balances removed.", success: true },
+  "bulk-deleted": { text: "Selected charges waived and removed from planned dues.", success: true },
   invalid: { text: "Check the entered amount and balance details, then try again.", success: false },
   "invalid-member": { text: "Choose an active registered member.", success: false },
   "invalid-amount": { text: "Enter an amount owed greater than $0.", success: false },
@@ -51,6 +51,7 @@ export default async function DuesPage({
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
       .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id")
+      .is("waived_at", null)
       .order("due_date", { ascending: true })
       .order("member_name", { ascending: true })
       .order("id", { ascending: true })

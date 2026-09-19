@@ -92,7 +92,6 @@ export async function deleteManualExpense(formData: FormData) {
 const incomeSchema = z.object({
   amount: z.coerce.number().positive().max(999_999_999.99),
   description: z.string().trim().min(1).max(500),
-  source: z.enum(["active_member_dues", "new_member_fees", "fundraising", "alumni_donations", "other"]),
   budgetDate: manualExpenseSchema.shape.expenseDate,
 });
 
@@ -102,12 +101,45 @@ export async function addIncomeEntry(formData: FormData) {
   if (!parsed.success) redirect("/finance/accounts/activity?entry=invalid");
   const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
     kind: "income", amount: parsed.data.amount, description: parsed.data.description,
-    source: parsed.data.source, budget_date: parsed.data.budgetDate, created_by: userId,
+    source: "alumni_donations", budget_date: parsed.data.budgetDate, created_by: userId,
   });
   if (error) redirect("/finance/accounts/activity?entry=error");
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/accounts");
   redirect("/finance/accounts/activity?entry=added");
+}
+
+export async function addDonationForecast(formData: FormData) {
+  const { userId } = await requireAdmin();
+  const parsed = incomeSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) redirect("/finance/accounts/activity?forecast=invalid#donations");
+  const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
+    kind: "forecast",
+    amount: parsed.data.amount,
+    description: parsed.data.description,
+    source: "alumni_donations",
+    budget_date: parsed.data.budgetDate,
+    created_by: userId,
+  });
+  if (error) redirect("/finance/accounts/activity?forecast=error#donations");
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/accounts/activity");
+  redirect("/finance/accounts/activity?forecast=added#donations");
+}
+
+export async function deleteDonationForecast(formData: FormData) {
+  await requireAdmin();
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, message: "Choose a valid donation forecast." } as const;
+  const { error } = await createAdminClient().from("reimbursement_budget_entries")
+    .delete()
+    .eq("id", id.data)
+    .eq("kind", "forecast")
+    .eq("source", "alumni_donations");
+  if (error) return { ok: false, message: "The donation forecast could not be removed." } as const;
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/accounts/activity");
+  return { ok: true } as const;
 }
 
 export async function deleteIncomeEntry(formData: FormData) {

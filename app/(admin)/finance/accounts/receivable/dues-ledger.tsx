@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   addDuesPayment,
-  bulkDeleteDuesBalances,
+  bulkWaiveDuesBalances,
   bulkSetDuesPaid,
-  deleteDuesBalance,
+  waiveDuesBalance,
   setDuesPaid,
   updateDuesBalance,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
@@ -56,11 +56,11 @@ function SearchIcon() {
   );
 }
 
-function DeleteBalanceButton({
+function WaiveBalanceButton({
   disabled,
   label,
-  idleText = "Delete balance",
-  confirmText = "Confirm delete",
+  idleText = "Waive charge",
+  confirmText = "Confirm waiver",
 }: {
   disabled?: boolean;
   label: string;
@@ -77,7 +77,7 @@ function DeleteBalanceButton({
 
   return (
     <Button
-      aria-label={armed ? `Confirm permanent deletion of ${label}` : `Delete ${label}`}
+      aria-label={armed ? `Confirm waiver of ${label}` : `Waive ${label}`}
       compact
       disabled={disabled}
       onClick={(event) => {
@@ -217,19 +217,19 @@ export function DuesLedger({
             {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
             <Button compact disabled={optimisticBusy} type="submit" variant="primary">Clear balances</Button>
           </form>
-          <form action={bulkDeleteDuesBalances} onSubmit={() => {
+          <form action={bulkWaiveDuesBalances} onSubmit={() => {
             const selected = new Set(selectedIds);
             setOptimisticBusy(true);
             setOptimisticRows((current) => current.filter((row) => !selected.has(row.id)));
             setSelectedIds([]);
           }}>
             {selectedIds.map((id) => <input key={id} name="balanceId" type="hidden" value={id} />)}
-            <DeleteBalanceButton
+            <WaiveBalanceButton
               disabled={optimisticBusy}
               key={selectedIds.join(",")}
               label={`${selectedIds.length} selected balances`}
-              idleText="Delete selected"
-              confirmText="Confirm delete"
+              idleText="Waive selected"
+              confirmText="Confirm waiver"
             />
           </form>
           <small>Clearing marks balances fully paid and keeps their history.</small>
@@ -343,6 +343,10 @@ export function DuesLedger({
                 <label className="field-label" htmlFor={`payment-${editingRow.id}`}>Add a payment</label>
                 <div className="money-input"><span>$</span><input autoFocus className="field-input" id={`payment-${editingRow.id}`} max={editingRow.amountOwed} min="0.01" name="paymentAmount" placeholder="0.00" step="0.01" type="number" required /></div>
               </div>
+              <div className="field">
+                <label className="field-label" htmlFor={`payment-date-${editingRow.id}`}>Payment date</label>
+                <input className="field-input" defaultValue={currentPacificDate()} id={`payment-date-${editingRow.id}`} name="paymentDate" type="date" required />
+              </div>
               <Button disabled={optimisticBusy} type="submit" variant="primary">Apply payment</Button>
             </form>
           ) : (
@@ -396,14 +400,14 @@ export function DuesLedger({
             </div>
           </form>
           <div className="dues-edit-footer">
-            <form action={deleteDuesBalance} onSubmit={() => {
+            <form action={waiveDuesBalance} onSubmit={() => {
               setOptimisticBusy(true);
               setOptimisticRows((current) => current.filter((candidate) => candidate.id !== editingRow.id));
               setSelectedIds((current) => current.filter((id) => id !== editingRow.id));
               setEditingId(null);
             }}>
               <input name="id" type="hidden" value={editingRow.id} />
-              <DeleteBalanceButton disabled={optimisticBusy} label={`${editingRow.memberName}'s balance`} />
+              <WaiveBalanceButton disabled={optimisticBusy} label={`${editingRow.memberName}'s charge`} />
             </form>
             <div className="flex gap-2">
               <Button onClick={() => setEditingId(null)} type="button" variant="secondary">Cancel</Button>

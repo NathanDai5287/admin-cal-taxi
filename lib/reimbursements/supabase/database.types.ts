@@ -9,6 +9,34 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      venue_inquiries: {
+        Row: {
+          id: string;
+          contact_name: string;
+          email: string;
+          organization: string;
+          event_type: string;
+          event_date: string | null;
+          guest_count: number | null;
+          details: string;
+          source_hash: string;
+          submitted_at: string;
+        };
+        Insert: {
+          id?: string;
+          contact_name: string;
+          email: string;
+          organization: string;
+          event_type: string;
+          event_date?: string | null;
+          guest_count?: number | null;
+          details: string;
+          source_hash: string;
+          submitted_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
       reimbursement_budgets: {
         Row: {
           id: boolean;
@@ -95,6 +123,85 @@ export type Database = {
         };
         Relationships: [];
       };
+      hosting_finance_orders: {
+        Row: {
+          order_id: string;
+          organization: string;
+          event_date: string;
+          planned_revenue: number;
+          planned_fire_permit: number;
+          status: Database["public"]["Enums"]["hosting_finance_status"];
+          confirmed_by: string | null;
+          confirmed_at: string;
+          cancelled_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          order_id: string;
+          organization: string;
+          event_date: string;
+          planned_revenue: number;
+          planned_fire_permit: number;
+          status?: Database["public"]["Enums"]["hosting_finance_status"];
+          confirmed_by?: string | null;
+          confirmed_at?: string;
+          cancelled_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          status?: Database["public"]["Enums"]["hosting_finance_status"];
+          cancelled_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      hosting_finance_payments: {
+        Row: {
+          id: string;
+          order_id: string;
+          kind: Database["public"]["Enums"]["hosting_payment_kind"];
+          amount: number;
+          paid_date: string;
+          request_id: string;
+          recorded_by: string | null;
+          created_at: string;
+          reversed_at: string | null;
+          reversed_by: string | null;
+          reversal_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          kind: Database["public"]["Enums"]["hosting_payment_kind"];
+          amount: number;
+          paid_date: string;
+          request_id: string;
+          recorded_by?: string | null;
+          created_at?: string;
+          reversed_at?: string | null;
+          reversed_by?: string | null;
+          reversal_reason?: string | null;
+        };
+        Update: {
+          reversed_at?: string | null;
+          reversed_by?: string | null;
+          reversal_reason?: string | null;
+        };
+        Relationships: [];
+      };
+      chapter_dues_payment_events: {
+        Row: {
+          id: string;
+          receivable_id: string;
+          amount: number;
+          paid_date: string;
+          date_is_estimated: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       chapter_receivables: {
         Row: {
           member_id: string | null;
@@ -102,6 +209,8 @@ export type Database = {
           member_name: string;
           amount_assessed: number;
           amount_paid: number;
+          waived_at: string | null;
+          waived_by: string | null;
           due_date: string;
           discord_user_id: string;
           notes: string;
@@ -115,6 +224,8 @@ export type Database = {
           member_name: string;
           amount_assessed: number;
           amount_paid?: number;
+          waived_at?: string | null;
+          waived_by?: string | null;
           due_date: string;
           discord_user_id?: string;
           notes?: string;
@@ -127,6 +238,8 @@ export type Database = {
           member_name?: string;
           amount_assessed?: number;
           amount_paid?: number;
+          waived_at?: string | null;
+          waived_by?: string | null;
           due_date?: string;
           discord_user_id?: string;
           notes?: string;
@@ -261,6 +374,8 @@ export type Database = {
           receipt_total: number | null;
           failure_reason: string | null;
           reimbursed: boolean;
+          reimbursed_at: string | null;
+          reimbursement_date_is_estimated: boolean;
           discord_message_id: string | null;
           discord_channel_id: string | null;
           discord_notified_at: string | null;
@@ -284,6 +399,8 @@ export type Database = {
           receipt_total?: number | null;
           failure_reason?: string | null;
           reimbursed?: boolean;
+          reimbursed_at?: string | null;
+          reimbursement_date_is_estimated?: boolean;
           discord_message_id?: string | null;
           discord_channel_id?: string | null;
           discord_notified_at?: string | null;
@@ -300,6 +417,8 @@ export type Database = {
           receipt_total?: number | null;
           failure_reason?: string | null;
           reimbursed?: boolean;
+          reimbursed_at?: string | null;
+          reimbursement_date_is_estimated?: boolean;
           discord_message_id?: string | null;
           discord_channel_id?: string | null;
           discord_notified_at?: string | null;
@@ -372,11 +491,15 @@ export type Database = {
       mcp_finance_overview: { Args: Record<PropertyKey, never>; Returns: Json };
       mcp_open_dues: { Args: Record<PropertyKey, never>; Returns: Json };
       record_dues_payment: {
-        Args: { p_payment_amount: number; p_receivable_id: string; p_request_id: string };
+        Args: { p_payment_amount: number; p_payment_date: string; p_receivable_id: string; p_request_id: string };
         Returns: boolean;
       };
+      record_hosting_payment: {
+        Args: { p_amount: number; p_kind: Database["public"]["Enums"]["hosting_payment_kind"]; p_order_id: string; p_paid_date: string; p_request_id: string };
+        Returns: string;
+      };
       set_dues_paid_state: {
-        Args: { p_paid: boolean; p_receivable_id: string };
+        Args: { p_paid: boolean; p_payment_date: string; p_receivable_id: string };
         Returns: boolean;
       };
     };
@@ -405,6 +528,8 @@ export type Database = {
         | "approved"
         | "denied"
         | "processing_failed";
+      hosting_finance_status: "confirmed" | "cancelled";
+      hosting_payment_kind: "revenue" | "fire_permit";
     };
     CompositeTypes: Record<string, never>;
   };

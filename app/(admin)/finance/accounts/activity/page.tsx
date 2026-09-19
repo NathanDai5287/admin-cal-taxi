@@ -6,7 +6,7 @@ import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
-import { addManualExpense, deleteManualExpense, addIncomeEntry, deleteIncomeEntry, saveOpeningCash } from "./actions";
+import { addDonationForecast, addIncomeEntry, addManualExpense, deleteDonationForecast, deleteIncomeEntry, deleteManualExpense, saveOpeningCash } from "./actions";
 
 export const metadata = { title: "Account activity" };
 export const dynamic = "force-dynamic";
@@ -18,14 +18,15 @@ function formatDate(value: string) {
 }
 const formatExpenseDate = formatDate;
 
-export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ manual?: string; entry?: string; settings?: string }> }) {
+export default async function ActivityPage({ searchParams }: { searchParams: Promise<{ manual?: string; entry?: string; forecast?: string; settings?: string }> }) {
   const [, params] = await Promise.all([requireAdmin(), searchParams]);
-  const { manual: manualResult, entry: entryResult, settings: settingsResult } = params;
+  const { manual: manualResult, entry: entryResult, forecast: forecastResult, settings: settingsResult } = params;
   const supabase = createAdminClient();
   const results = await Promise.all([
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("*").order("expense_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("*").eq("kind", "income").order("budget_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
     supabase.from("chapter_financial_settings").select("opening_cash").eq("id", true).maybeSingle(),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("*").eq("kind", "forecast").eq("source", "alumni_donations").order("budget_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),
   ]);
   for (const result of results) if (result.error) throw new Error(`Unable to load account activity: ${result.error.message}`);
   const manualExpenses = (results[0].data ?? []).map((expense) => ({
@@ -36,13 +37,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   const today = currentPacificDate();
   const directSpendingTotal = manualExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
   const incomeTotal = entries.reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const donationForecasts = results[3].data ?? [];
   return <div className="grid gap-6">
     <div><p className="page-eyebrow">Chapter finances</p><h1 className="page-title">Other transactions</h1><p className="page-lede">Use this page for money that is not already recorded through dues or reimbursements.</p></div>
 
     <section className="grid gap-3 md:grid-cols-3" aria-labelledby="transaction-choice-title">
       <h2 className="sr-only" id="transaction-choice-title">Choose a transaction type</h2>
       <a className="account-choice" href="#record-expense"><strong>Chapter paid an expense</strong><span>Record a direct purchase or vendor payment.</span></a>
-      <a className="account-choice" href="#record-income"><strong>Chapter received money</strong><span>Record fundraising, donations, or other income.</span></a>
+      <a className="account-choice" href="#donations"><strong>Plan or record a donation</strong><span>Keep expected and received donations separate.</span></a>
       <a className="account-choice" href="#opening-cash"><strong>Set opening cash</strong><span>Update the starting balance used by reports.</span></a>
     </section>
 
@@ -122,22 +124,28 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
         ) : <div className="empty-state border-t border-rule">No direct expenses have been recorded.</div>}
       </section>
 
-      <section className="card scroll-mt-28" aria-labelledby="add-income-title" id="record-income">
+      <section className="card scroll-mt-28" aria-labelledby="add-income-title" id="donations">
         <div className="card-header">
-          <span className="card-title" id="add-income-title">Record income</span>
-          <span className="card-subtitle">Use this for money received outside dues. Dues payments belong in Dues to collect.</span>
+          <span className="card-title" id="add-income-title">Donations</span>
+          <span className="card-subtitle">Forecast expected gifts and record received gifts separately.</span>
         </div>
+        <form action={addDonationForecast} className="card-body border-t border-rule pt-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr] items-end">
+            <div className="field"><label className="field-label" htmlFor="forecast-date">Expected date</label><input className="field-input" defaultValue={currentPacificDate()} id="forecast-date" name="budgetDate" type="date" required /></div>
+            <div className="field"><label className="field-label" htmlFor="forecast-description">Description</label><input className="field-input" id="forecast-description" maxLength={500} name="description" placeholder="Who or what is this expected gift from?" required /></div>
+            <div className="field"><label className="field-label" htmlFor="forecast-amount">Planned amount</label><div className="money-input"><span>$</span><input className="field-input" id="forecast-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div></div>
+          </div>
+          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
+            <div aria-live="polite">{forecastResult === "added" && <p className="form-message success">Donation forecast added.</p>}{forecastResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}{forecastResult === "error" && <p className="form-message">The forecast could not be saved.</p>}</div>
+            <Button variant="secondary" type="submit">Add forecast</Button>
+          </div>
+        </form>
+        {donationForecasts.length ? <div className="table-scroll border-t border-rule"><table className="data-table"><thead><tr><th>Expected date</th><th>Description</th><th>Planned</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{donationForecasts.map((entry) => <tr key={entry.id}><td>{formatDate(entry.budget_date)}</td><td>{entry.description}</td><td className="amount">{formatMoney(entry.amount)}</td><td className="text-right"><OptimisticDeleteButton action={deleteDonationForecast} value={entry.id} /></td></tr>)}</tbody></table></div> : null}
         <form action={addIncomeEntry} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1.25fr_2fr_1fr] items-end">
+          <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr] items-end">
             <div className="field">
               <label className="field-label" htmlFor="income-date">Date</label>
               <input className="field-input" defaultValue={currentPacificDate()} id="income-date" name="budgetDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="income-source">Income source</label>
-              <select className="field-input" id="income-source" name="source" required>
-                {incomeSources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
             </div>
             <div className="field">
               <label className="field-label" htmlFor="income-description">Description</label>
@@ -155,7 +163,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
               {entryResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}
               {entryResult === "error" && <p className="form-message">The income entry could not be saved. Please try again.</p>}
             </div>
-            <Button variant="primary" type="submit">Record income</Button>
+            <Button variant="primary" type="submit">Record donation</Button>
           </div>
         </form>
         {entries.length ? (

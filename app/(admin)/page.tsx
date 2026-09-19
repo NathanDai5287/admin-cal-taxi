@@ -13,7 +13,7 @@ const ADMIN_APPS = [
   {
     href: "/host",
     label: "Host",
-    description: "Rental contracts, pricing, and invoices",
+    description: "Venue inquiries, rental contracts, pricing, and invoices",
   },
   {
     href: "/rush",

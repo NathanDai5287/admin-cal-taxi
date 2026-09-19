@@ -15,6 +15,15 @@ import { createClient } from "@/lib/reimbursements/supabase/server";
 
 const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+function currentPacificDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 const entrySchema = z.object({
   memberId: z.string().uuid("member"),
   amountOwed: z.coerce.number().positive("amount").max(999_999_999.99, "amount"),
@@ -161,13 +170,16 @@ export async function updateDuesBalance(formData: FormData) {
   const currentAssessed = Number(current.amount_assessed);
   const currentPaid = Number(current.amount_paid);
   const wasPaid = currentPaid >= currentAssessed;
+  if (wasPaid && parsed.data.amountOwed !== currentAssessed) {
+    redirect(resultUrl("invalid-amount"));
+  }
   const { data: updated, error } = await supabase
     .from("chapter_receivables")
     .update({
       member_id: parsed.data.memberId,
       member_name: memberName,
-      amount_assessed: wasPaid ? parsed.data.amountOwed : currentPaid + parsed.data.amountOwed,
-      amount_paid: wasPaid ? parsed.data.amountOwed : currentPaid,
+      amount_assessed: wasPaid ? currentAssessed : currentPaid + parsed.data.amountOwed,
+      amount_paid: currentPaid,
       due_date: parsed.data.dueDate,
       notes: parsed.data.notes,
       discord_user_id: discordUserId,
@@ -196,6 +208,7 @@ export async function setDuesPaid(formData: FormData) {
   let { data: updated, error } = await supabase.rpc("set_dues_paid_state", {
     p_receivable_id: parsed.data.id,
     p_paid: paid,
+    p_payment_date: currentPacificDate(),
   });
   if (error?.code === "PGRST202") {
     const admin = createAdminClient();
@@ -224,10 +237,12 @@ export async function addDuesPayment(formData: FormData) {
   const parsed = z.object({
     id: z.string().uuid(),
     paymentAmount: z.coerce.number().positive().max(999_999_999.99),
+    paymentDate: dateSchema,
     requestId: z.string().uuid(),
   }).safeParse({
     id: formData.get("id"),
     paymentAmount: formData.get("paymentAmount"),
+    paymentDate: formData.get("paymentDate"),
     requestId: formData.get("requestId"),
   });
 
@@ -237,6 +252,7 @@ export async function addDuesPayment(formData: FormData) {
   let { data: recorded, error } = await supabase.rpc("record_dues_payment", {
     p_receivable_id: parsed.data.id,
     p_payment_amount: parsed.data.paymentAmount,
+    p_payment_date: parsed.data.paymentDate,
     p_request_id: parsed.data.requestId,
   });
 
@@ -279,19 +295,20 @@ export async function addDuesPayment(formData: FormData) {
   redirect(resultUrl("payment"));
 }
 
-export async function deleteDuesBalance(formData: FormData) {
-  await requireAdmin("/");
+export async function waiveDuesBalance(formData: FormData) {
+  const { userId } = await requireAdmin("/");
   const parsed = z.string().uuid().safeParse(formData.get("id"));
   if (!parsed.success) redirect(resultUrl("invalid"));
 
   const supabase = createAdminClient();
-  const { data: deleted, error } = await supabase.from("chapter_receivables")
-    .delete()
+  const { data: waived, error } = await supabase.from("chapter_receivables")
+    .update({ waived_at: new Date().toISOString(), waived_by: userId })
     .eq("id", parsed.data)
+    .is("waived_at", null)
     .select("id")
     .maybeSingle();
 
-  if (error || !deleted) redirect(resultUrl("error"));
+  if (error || !waived) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl("deleted"));
 }
@@ -313,7 +330,7 @@ export async function bulkSetDuesPaid(formData: FormData) {
   // Keep requests bounded while reusing the atomic, idempotent payment RPC.
   for (let offset = 0; offset < parsed.data.length; offset += 20) {
     const results = await Promise.all(parsed.data.slice(offset, offset + 20).map((id) =>
-      supabase.rpc("set_dues_paid_state", { p_receivable_id: id, p_paid: true }),
+      supabase.rpc("set_dues_paid_state", { p_receivable_id: id, p_paid: true, p_payment_date: currentPacificDate() }),
     ));
     if (results.some(({ data, error }) => error || !data)) redirect(resultUrl("error"));
   }
@@ -322,18 +339,19 @@ export async function bulkSetDuesPaid(formData: FormData) {
   redirect(resultUrl("bulk-paid"));
 }
 
-export async function bulkDeleteDuesBalances(formData: FormData) {
-  await requireAdmin("/");
+export async function bulkWaiveDuesBalances(formData: FormData) {
+  const { userId } = await requireAdmin("/");
   const parsed = readBalanceIds(formData);
   if (!parsed.success) redirect(resultUrl("invalid"));
 
   const supabase = createAdminClient();
-  const { data: deleted, error } = await supabase.from("chapter_receivables")
-    .delete()
+  const { data: waived, error } = await supabase.from("chapter_receivables")
+    .update({ waived_at: new Date().toISOString(), waived_by: userId })
     .in("id", parsed.data)
+    .is("waived_at", null)
     .select("id");
 
-  if (error || deleted.length !== parsed.data.length) redirect(resultUrl("error"));
+  if (error || waived.length !== parsed.data.length) redirect(resultUrl("error"));
   revalidateDues();
   redirect(resultUrl("bulk-deleted"));
 }

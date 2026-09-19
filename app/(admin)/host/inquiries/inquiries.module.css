@@ -1,0 +1,125 @@
+.list {
+  margin-top: 32px;
+  border-top: 3px solid var(--color-brand);
+}
+
+.inquiry {
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-surface);
+}
+
+.inquiry summary {
+  display: grid;
+  min-height: 76px;
+  padding: 18px 22px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.inquiry summary:hover {
+  background: var(--color-brand-light);
+}
+
+.inquiry summary:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
+.inquiry summary span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.inquiry summary strong {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inquiry summary small,
+.inquiry summary time {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.inquiry summary time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.body {
+  display: grid;
+  padding: 28px 22px 32px;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  gap: 40px;
+  border-top: 1px solid var(--color-rule);
+}
+
+.body dl {
+  margin: 0;
+}
+
+.body dl div {
+  display: grid;
+  padding: 12px 0;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 16px;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.body dt,
+.message h2 {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.body dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-ink);
+  font-size: 13px;
+}
+
+.body a {
+  color: var(--color-brand);
+  text-underline-offset: 3px;
+}
+
+.message h2 {
+  margin: 0 0 12px;
+}
+
+.message p {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .inquiry summary {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .body {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .body dl div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}

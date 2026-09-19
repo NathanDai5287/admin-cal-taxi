@@ -6,6 +6,7 @@ export const incomeSources = [
   ["new_member_fees", "New member fees"],
   ["fundraising", "Fundraising"],
   ["alumni_donations", "Alumni donations"],
+  ["hosting", "Hosting"],
   ["other", "Other income"],
 ] as const;
 
@@ -75,8 +76,10 @@ export function buildFinancialReport(input: FinancialReportInput) {
 
   for (const reimbursement of input.reimbursements) {
     const amount = cents(reimbursement.amount);
-    actualCents[reimbursement.category] += amount;
-    if (reimbursement.reimbursed) paidReimbursementCents += amount;
+    if (reimbursement.reimbursed) {
+      actualCents[reimbursement.category] += amount;
+      paidReimbursementCents += amount;
+    }
   }
 
   let manualExpenseCents = 0;

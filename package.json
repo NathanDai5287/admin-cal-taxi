@@ -16,7 +16,10 @@
     "start": "next start",
     "lint": "eslint",
     "test:mcp": "node --test scripts/mcp.test.mjs",
-    "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs"
+    "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs",
+    "test:public-site": "node --test scripts/public-site-routing.test.mjs",
+    "test:venue": "node --test scripts/venue-inquiries.test.mjs",
+    "test:finance": "node --test scripts/finance-plan.test.mjs && bash scripts/finance-plan-database.test.sh"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",

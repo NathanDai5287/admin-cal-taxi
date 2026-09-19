@@ -1,180 +1,131 @@
-import { requireAdmin } from "@/lib/reimbursements/auth";
-import { Button } from "@/components/brand/button";
-import { OptimisticDeleteButton } from "@/components/forms/optimistic-delete-button";
+import Link from "next/link";
 import type { Metadata } from "next";
 
-import {
-  addBudgetEntry,
-  deleteBudgetEntry,
-  saveReimbursementBudgets,
-} from "@/app/(admin)/finance/planning/actions";
-import { incomeSources } from "@/lib/reimbursements/financial-report";
+import { saveReimbursementBudgets } from "@/app/(admin)/finance/planning/actions";
+import { Button } from "@/components/brand/button";
+import { buildPlanVsActual } from "@/lib/finance/plan-vs-actual";
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categories, categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
-import {
-  loadReportManualExpenses,
-  loadReportPageRows,
-  parseReportFilters,
-  summarizeApproved,
-} from "@/lib/reimbursements/reports";
-import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
+import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
-export const metadata: Metadata = { title: "Budgets" };
+export const metadata: Metadata = { title: "Plan vs actual" };
 export const dynamic = "force-dynamic";
 
 type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
-}
-
-function currentPacificDate() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "America/Los_Angeles",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function signedMoney(value: number) {
-  return value >= 0 ? formatMoney(value) : `${formatMoney(Math.abs(value))} over`;
-}
-
-export default async function ReimbursementBudgetsPage({ searchParams }: { searchParams: PageSearchParams }) {
-  const [, rawSearchParams] = await Promise.all([requireAdmin(), searchParams]);
+export default async function PlanningPage({ searchParams }: { searchParams: PageSearchParams }) {
+  const [, params] = await Promise.all([requireAdmin(), searchParams]);
   const supabase = createAdminClient();
-  const filters = parseReportFilters({});
-  const [budgetResult, entriesResult, rows, manualExpenses] = await Promise.all([
+  const settingsResult = await supabase.from("chapter_financial_settings")
+    .select("term_label, term_start, term_end")
+    .eq("id", true)
+    .single();
+  if (settingsResult.error) throw new Error(`Unable to load the current term: ${settingsResult.error.message}`);
+
+  const { term_label: termLabel, term_start: termStart, term_end: termEnd } = settingsResult.data;
+  const [budgetResult, incomeResult, receivablesResult, duesPaymentsResult, reimbursementsResult, expensesResult, hostingResult, hostingPaymentsResult] = await Promise.all([
     supabase.from("reimbursement_budgets").select("*"),
-    loadAllPages((from, to) => supabase
-      .from("reimbursement_budget_entries")
-      .select("id, amount, description, source, budget_date, created_by, created_at, updated_at")
-      .eq("kind", "forecast")
-      .order("budget_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, to)),
-    loadReportPageRows(supabase, filters),
-    loadReportManualExpenses(supabase, filters),
+    loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("kind, amount, source").gte("budget_date", termStart).lte("budget_date", termEnd).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("chapter_receivables").select("amount_assessed, waived_at").gte("due_date", termStart).lte("due_date", termEnd).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("chapter_dues_payment_events").select("amount, date_is_estimated").gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("category, amount, reimbursement_date_is_estimated").eq("status", "approved").eq("reimbursed", true).gte("reimbursed_at", `${termStart}T00:00:00.000Z`).lt("reimbursed_at", nextDate(termEnd)).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("category, amount").gte("expense_date", termStart).lte("expense_date", termEnd).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("hosting_finance_orders").select("planned_revenue, planned_fire_permit, status").gte("event_date", termStart).lte("event_date", termEnd).order("order_id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("hosting_finance_payments").select("amount, kind").is("reversed_at", null).gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
   ]);
 
-  if (budgetResult.error) throw new Error(`Unable to load budget limits: ${budgetResult.error.message}`);
-  if (entriesResult.error) throw new Error(`Unable to load budget history: ${entriesResult.error.message}`);
+  const failed = [budgetResult, incomeResult, receivablesResult, duesPaymentsResult, reimbursementsResult, expensesResult, hostingResult, hostingPaymentsResult].find((result) => result.error);
+  if (failed?.error) throw new Error(`Unable to load the finance plan: ${failed.error.message}`);
 
   const budgets = categoryBudgetsFromRows(budgetResult.data);
-  const entries = entriesResult.data ?? [];
-  const totalBudget = entries.reduce((total, entry) => total + Number(entry.amount), 0);
-  const allocatedBudget = categories.reduce((total, [category]) => total + (budgets.get(category) ?? 0), 0);
-  const unallocatedBudget = totalBudget - allocatedBudget;
-  const spending = summarizeApproved(rows, manualExpenses).approvedTotal;
-  const remainingBudget = totalBudget - spending;
-  const entryResult = typeof rawSearchParams.entry === "string" ? rawSearchParams.entry : "";
-  const limitsResult = typeof rawSearchParams.limits === "string" ? rawSearchParams.limits : "";
+  const summary = buildPlanVsActual({
+    categoryBudgets: Object.fromEntries(budgets),
+    receivables: (receivablesResult.data ?? []).map((row) => ({ amountAssessed: Number(row.amount_assessed), waived: Boolean(row.waived_at) })),
+    duesPayments: (duesPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount) })),
+    incomeEntries: (incomeResult.data ?? []).map((entry) => ({ amount: Number(entry.amount), kind: entry.kind, source: entry.source })),
+    paidReimbursements: (reimbursementsResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
+    directExpenses: (expensesResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
+    hostingOrders: (hostingResult.data ?? []).map((row) => ({ plannedRevenue: Number(row.planned_revenue), plannedFirePermit: Number(row.planned_fire_permit), status: row.status })),
+    hostingPayments: (hostingPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount), kind: row.kind })),
+  });
+  const limitsResult = typeof params.limits === "string" ? params.limits : "";
+  const estimatedActualDates = (duesPaymentsResult.data ?? []).filter((row) => row.date_is_estimated).length
+    + (reimbursementsResult.data ?? []).filter((row) => row.reimbursement_date_is_estimated).length;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <p className="page-eyebrow">Chapter finances</p>
-        <h1 className="page-title">Planning &amp; budgets</h1>
-        <p className="page-lede">Plan expected income and category allocations for the current term. Plans do not record payments.</p>
+    <div className="grid gap-7">
+      <div className="flex flex-wrap items-end justify-between gap-5">
+        <div>
+          <p className="page-eyebrow">Chapter finances</p>
+          <h1 className="page-title">Plan vs actual</h1>
+          <p className="page-lede">See the term plan, current results, and the source behind every value.</p>
+        </div>
+        <span className="border border-rule bg-surface px-3 py-2 text-[12px] font-semibold text-muted">{termLabel}</span>
       </div>
 
-      <section className="stat-grid" aria-label="Budget totals">
-        <article className="stat stat-primary"><span>Planned income</span><strong>{formatMoney(totalBudget)}</strong><small>{entries.length} forecast {entries.length === 1 ? "entry" : "entries"}</small></article>
-        <article className="stat"><span>Unallocated</span><strong>{signedMoney(unallocatedBudget)}</strong><small>{formatMoney(allocatedBudget)} assigned to category limits</small></article>
-        <article className="stat"><span>After commitments</span><strong>{signedMoney(remainingBudget)}</strong><small>{formatMoney(spending)} approved spending and direct expenses</small></article>
+      <section aria-label="Plan and actual totals">
+        <div className="grid grid-cols-2" aria-hidden="true">
+          <span className="border-t-[3px] border-brand px-4 py-2 text-xs font-bold uppercase tracking-[.13em] text-brand">Income</span>
+          <span className="border-l border-t-[3px] border-brand px-4 py-2 text-xs font-bold uppercase tracking-[.13em] text-brand">Expenses</span>
+        </div>
+        <div className="grid grid-cols-2 border-y border-rule md:grid-cols-4">
+          <Total label="Planned income" value={summary.plannedIncome} planned />
+          <Total label="Actual income" value={summary.actualIncome} />
+          <Total label="Planned expenses" value={summary.plannedExpenses} planned />
+          <Total label="Actual expenses" value={summary.actualExpenses} />
+        </div>
       </section>
 
-      <section className="card" aria-labelledby="add-budget-title">
-        <div className="card-header">
-          <span className="card-title" id="add-budget-title">Add expected income</span>
-          <span className="card-subtitle">Forecast income without recording money received.</span>
-        </div>
-        <form action={addBudgetEntry} className="card-body border-t border-rule pt-5">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1.25fr_2fr_1fr] items-end">
-            <div className="field">
-              <label className="field-label" htmlFor="budget-date">Date</label>
-              <input className="field-input" defaultValue={currentPacificDate()} id="budget-date" name="budgetDate" type="date" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="budget-source">Income source</label>
-              <select className="field-input" id="budget-source" name="source" required>
-                {incomeSources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="budget-description">Description</label>
-              <input className="field-input" id="budget-description" maxLength={500} name="description" placeholder="What income do you expect?" required />
-            </div>
-            <div className="field">
-              <label className="field-label" htmlFor="budget-amount">Amount</label>
-              <div className="money-input"><span>$</span><input className="field-input" id="budget-amount" min="0.01" name="amount" placeholder="0.00" step="0.01" type="number" required /></div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {entryResult === "added" && <p className="form-message success">Income forecast added.</p>}
-              {entryResult === "deleted" && <p className="form-message success">Budget entry removed.</p>}
-              {entryResult === "invalid" && <p className="form-message">Enter a date, description, and positive amount.</p>}
-              {entryResult === "error" && <p className="form-message">The budget entry could not be saved. Please try again.</p>}
-            </div>
-            <Button variant="primary" type="submit">Add forecast</Button>
-          </div>
-        </form>
-        {entries.length ? (
-          <div className="table-scroll border-t border-rule">
-            <table className="data-table">
-              <thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Amount added</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="whitespace-nowrap">{formatDate(entry.budget_date)}</td>
-                    <td>{incomeSources.find(([value]) => value === entry.source)?.[1] ?? "Other income"}</td>
-                    <td>{entry.description}</td>
-                    <td className="amount">{formatMoney(entry.amount)}</td>
-                    <td className="text-right">
-                      <OptimisticDeleteButton action={deleteBudgetEntry} value={entry.id} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state border-t border-rule">No income has been forecast yet.</div>}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Breakdown title="Income by source" note="Select a row to open its source page">
+          {summary.incomeBreakdown.map((row) => <tr key={row.source}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={row.href}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
+        </Breakdown>
+        <Breakdown title="Expenses by category" note="Uses reimbursement categories">
+          {summary.expenseBreakdown.map((row) => <tr key={row.category}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={`/finance/reports?category=${row.category}`}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
+        </Breakdown>
+      </div>
+
+      <section className="grid border border-rule bg-surface sm:grid-cols-2 lg:grid-cols-4" aria-label="Finance workflow">
+        <WorkflowStep label="Add dues" href="/finance/accounts/receivable" detail="A charge adds to planned income." />
+        <WorkflowStep label="Record donations" href="/finance/accounts/activity#donations" detail="Payments change actual income only." />
+        <WorkflowStep label="Confirm hosting" href="/host/orders" detail="A confirmed contract adds both plans." />
+        <WorkflowStep label="Review results" href="/finance/planning" detail="Open any row to inspect its records." />
       </section>
 
-      <section className="card">
-        <div className="card-header">
-          <span className="card-title">Category limits</span>
-          <span className="card-subtitle">These allocations do not change the total budget.</span>
-        </div>
+      {summary.excludedLegacyDues.length ? <p className="border border-rule bg-surface px-4 py-3 text-[12px] text-muted">{summary.excludedLegacyDues.length} legacy manual dues {summary.excludedLegacyDues.length === 1 ? "entry is" : "entries are"} visible in Account Activity and excluded here to prevent double counting.</p> : null}
+      {estimatedActualDates ? <p className="border border-rule bg-surface px-4 py-3 text-xs text-muted">{estimatedActualDates} legacy {estimatedActualDates === 1 ? "payment uses" : "payments use"} the best available historical date.</p> : null}
+
+      <section className="card" id="expense-plan">
+        <div className="card-header"><span className="card-title">Expense category plan</span><span className="card-subtitle">Fire permits add to the House plan automatically.</span></div>
         <form action={saveReimbursementBudgets} className="card-body border-t border-rule pt-5">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map(([category, label]) => (
-              <div className="field" key={category}>
-                <label className="field-label" htmlFor={`budget-${category}`}>{label}</label>
-                <div className="money-input"><span>$</span><input className="field-input" defaultValue={budgets.get(category) ?? ""} id={`budget-${category}`} min="0" name={category} placeholder="No limit" step="0.01" type="number" /></div>
-              </div>
-            ))}
+            {categories.map(([category, label]) => <div className="field" key={category}><label className="field-label" htmlFor={`budget-${category}`}>{label}</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={budgets.get(category) ?? ""} id={`budget-${category}`} min="0" name={category} placeholder="No plan" step="0.01" type="number" /></div></div>)}
           </div>
-          <div className="flex items-center justify-between gap-5 flex-wrap border-t border-rule mt-5 pt-4 min-h-[44px]">
-            <div aria-live="polite">
-              {limitsResult === "saved" && <p className="form-message success">Category limits saved.</p>}
-              {limitsResult === "invalid" && <p className="form-message">Enter valid non-negative amounts.</p>}
-              {limitsResult === "error" && <p className="form-message">Category limits could not be saved.</p>}
-            </div>
-            <Button variant="primary" type="submit">Save category limits</Button>
+          <div className="mt-5 flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4">
+            <div aria-live="polite">{limitsResult === "saved" && <p className="form-message success">Expense plan saved.</p>}{limitsResult === "invalid" && <p className="form-message">Enter valid non-negative amounts.</p>}{limitsResult === "error" && <p className="form-message">The expense plan could not be saved.</p>}</div>
+            <Button variant="primary" type="submit">Save expense plan</Button>
           </div>
         </form>
       </section>
     </div>
   );
+}
+
+function Total({ label, value, planned = false }: { label: string; value: number; planned?: boolean }) {
+  return <article className={`min-w-0 border-r border-rule p-4 last:border-r-0 md:p-5 ${planned ? "bg-brand-light text-brand" : "bg-surface"}`}><span className={`block text-xs font-bold uppercase tracking-[.1em] ${planned ? "text-brand" : "text-muted"}`}>{label}</span><strong className="mt-2 block text-[clamp(20px,3vw,30px)] font-bold tracking-[-.03em] tabular-nums">{formatMoney(value)}</strong></article>;
+}
+
+function Breakdown({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+  return <section className="min-w-0 border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="table-scroll"><table className="data-table border border-rule"><thead><tr><th>Source</th><th className="text-right">Planned</th><th className="text-right">Actual</th></tr></thead><tbody>{children}</tbody></table></div></section>;
+}
+
+function WorkflowStep({ label, href, detail }: { label: string; href: string; detail: string }) {
+  return <Link className="border-b border-rule p-4 last:border-b-0 hover:bg-brand-light sm:border-b-0 sm:border-r sm:last:border-r-0" href={href}><strong className="text-xs text-brand">{label} →</strong><span className="mt-1 block text-xs leading-relaxed text-muted">{detail}</span></Link>;
+}
+
+function nextDate(value: string) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString();
 }

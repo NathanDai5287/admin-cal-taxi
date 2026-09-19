@@ -5,6 +5,7 @@ const tabs = [
   { href: "/host/contract",  label: "Contract"  },
   { href: "/host/documents", label: "Documents" },
   { href: "/host/orders",    label: "Orders"    },
+  { href: "/host/inquiries", label: "Inquiries" },
 ];
 
 export default function Nav() {

@@ -17,7 +17,6 @@ const OPTIONS: { value: OrderStatus | ""; label: string }[] = [
   { value: "contracted",  label: STATUS_LABELS.contracted },
   { value: "invoiced",    label: STATUS_LABELS.invoiced },
   { value: "completed",   label: STATUS_LABELS.completed },
-  { value: "cancelled",   label: STATUS_LABELS.cancelled },
 ];
 
 export default function StatusControl({
@@ -60,6 +59,7 @@ export default function StatusControl({
         disabled={busy}
         onChange={e => onChange(e.target.value as OrderStatus | "")}
       >
+        {value === "cancelled" ? <option value="cancelled">Cancelled (legacy)</option> : null}
         {OPTIONS.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}

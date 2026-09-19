@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { publicSitePath } from "@/lib/public-site-routing";
 import { updateSession } from "@/lib/reimbursements/supabase/proxy";
 
 // Google sign-in is used on every host. This proxy only refreshes the
@@ -12,9 +13,35 @@ const SUBMIT_HOSTNAMES = new Set([
   "reimbursements.localhost",
 ]);
 
+const PUBLIC_HOSTNAMES = new Set([
+  "cal.taxi",
+  "www.cal.taxi",
+  "cal.localhost",
+]);
+
 export default async function proxy(request: NextRequest) {
   const hostname = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const { pathname } = request.nextUrl;
+
+  if (PUBLIC_HOSTNAMES.has(hostname)) {
+    const publicPath = publicSitePath(pathname);
+    if (publicPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = publicPath;
+      return NextResponse.rewrite(url);
+    }
+    if (
+      pathname.startsWith("/_next/") ||
+      pathname.startsWith("/site/") ||
+      pathname === "/icon.png" ||
+      pathname === "/favicon.ico"
+    ) {
+      return NextResponse.next();
+    }
+    const url = request.nextUrl.clone();
+    url.pathname = `/public-site${pathname}`;
+    return NextResponse.rewrite(url);
+  }
 
   if (SUBMIT_HOSTNAMES.has(hostname) && !(pathname === "/policy" || pathname.startsWith("/policy/") || pathname.startsWith("/api/policy/"))) {
     if (

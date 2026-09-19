@@ -1,53 +1,38 @@
 import type { Metadata } from "next";
-import { cookies, headers } from "next/headers";
+import Script from "next/script";
 import "./globals.css";
 
-import { AuthPill } from "@/components/auth/auth-pill";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
-import { THEME_COOKIE, themeInitScript } from "@/lib/theme";
-
-export const dynamic = "force-dynamic";
+import { themeInitScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "cal.taxi admin",
-  description: "Internal admin tools",
+  title: "cal.taxi",
+  description: "Theta Xi, Nu Chapter at UC Berkeley.",
 };
+
+const directionContract = `<!--
+THESIS: One public crossroads gives recruitment and venue hosting equal weight; it refuses the usual single-purpose fraternity hero.
+OWN-WORLD: Brand blue, cool white fields, documentary photography, sharp corners, hairline rules, and compact uppercase Inter labels define every surface.
+STORY: Visitors identify Nu Chapter, see real chapter life, choose recruitment or hosting, and contact the chapter with accurate expectations.
+FIRST VIEWPORT: Two equal full-height photographs flank a vertical ΘΞ divider; matched actions sit low in each image and chapter facts close the frame.
+FORM: Crossroads Index, position 1 in the ordered list; seed surface-7-1-6.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+-->`;
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [session, cookieStore, headerStore] = await Promise.all([
-    getSessionProfile(),
-    cookies(),
-    headers(),
-  ]);
-  const savedTheme = cookieStore.get(THEME_COOKIE)?.value;
-  const theme = savedTheme === "dark" || savedTheme === "light" ? savedTheme : undefined;
-  const hostname = (headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "")
-    .split(",", 1)[0]
-    .trim()
-    .toLowerCase()
-    .split(":", 1)[0];
-  const isMemberSite =
-    hostname === "reimbursements.cal.taxi" || hostname === "reimbursements.localhost";
-  const pillSession = session
-    ? {
-        fullName: session.profile.full_name,
-        email: session.email,
-        avatarUrl: session.avatarUrl,
-        role: session.profile.role,
-      }
-    : null;
-
   return (
-    <html lang="en" data-theme={theme} suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-      </head>
+    <html lang="en" suppressHydrationWarning>
       <body className="antialiased">
-        <AuthPill memberSite={isMemberSite} session={pillSession} />
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
+        <template
+          data-impeccable-direction="crossroads-index"
+          dangerouslySetInnerHTML={{ __html: directionContract }}
+        />
         {children}
       </body>
     </html>

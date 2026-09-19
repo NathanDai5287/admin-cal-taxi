@@ -5,13 +5,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
-import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { categories } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
 
 const budgetKeys = categories.map(([value]) => value);
-const incomeSourceValues = incomeSources.map(([value]) => value);
 const amountSchema = z.preprocess(
   (value) => value === "" ? null : value,
   z.coerce.number().min(0).max(999_999_999.99).nullable(),
@@ -72,7 +70,6 @@ export async function saveReimbursementBudgets(formData: FormData) {
 const budgetEntrySchema = z.object({
   amount: z.coerce.number().positive().max(999_999_999.99),
   description: z.string().trim().min(1).max(500),
-  source: z.enum(incomeSourceValues),
   budgetDate: dateSchema,
 });
 
@@ -81,7 +78,6 @@ export async function addBudgetEntry(formData: FormData) {
   const parsed = budgetEntrySchema.safeParse({
     amount: formData.get("amount"),
     description: formData.get("description"),
-    source: formData.get("source"),
     budgetDate: formData.get("budgetDate"),
   });
 
@@ -92,7 +88,7 @@ export async function addBudgetEntry(formData: FormData) {
     kind: "forecast",
     amount: parsed.data.amount,
     description: parsed.data.description,
-    source: parsed.data.source,
+    source: "alumni_donations",
     budget_date: parsed.data.budgetDate,
     created_by: userId,
   });

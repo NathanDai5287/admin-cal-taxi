@@ -18,6 +18,8 @@ import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-o
 import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
 import { formatDateISO } from "@/lib/host-format";
 import { fmtUSD } from "../order-format";
+import { hostingPlanFromOrder } from "@/lib/finance/hosting";
+import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import StatusPill from "../StatusPill";
 import ContractSnapshot from "./ContractSnapshot";
 import DeleteOrderButton from "./DeleteOrderButton";
@@ -26,6 +28,7 @@ import OrderNotes from "./OrderNotes";
 import PricingSnapshot from "./PricingSnapshot";
 import StatusControl from "./StatusControl";
 import WorkspaceActions from "./WorkspaceActions";
+import HostingFinancePanel from "./HostingFinancePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +85,19 @@ export default async function OrderDetailPage({
 
   const status = deriveStatus(order);
   const ledger = computeLedger(order.documents);
+  const planPreview = hostingPlanFromOrder(order);
+  const supabase = createAdminClient();
+  const [financeResult, paymentsResult] = await Promise.all([
+    supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", order.id).maybeSingle(),
+    supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", order.id).order("paid_date", { ascending: false }),
+  ]);
+  if (financeResult.error || paymentsResult.error) throw new Error("Unable to load hosting finance details.");
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
   return (
     <div className="space-y-10">
@@ -133,6 +149,25 @@ export default async function OrderDetailPage({
           <LedgerStat label="Balance" value={ledger.balance} emphasize />
         </div>
       </section>
+
+      <HostingFinancePanel
+        financeOrder={financeResult.data ? {
+          status: financeResult.data.status,
+          plannedRevenue: Number(financeResult.data.planned_revenue),
+          plannedFirePermit: Number(financeResult.data.planned_fire_permit),
+        } : null}
+        orderId={order.id}
+        payments={(paymentsResult.data ?? []).map((payment) => ({
+          id: payment.id,
+          kind: payment.kind,
+          amount: Number(payment.amount),
+          paidDate: payment.paid_date,
+          reversedAt: payment.reversed_at,
+        }))}
+        previewFirePermit={planPreview.plannedFirePermit}
+        previewRevenue={planPreview.plannedRevenue}
+        today={today}
+      />
 
       <PricingSnapshot snapshot={order.snapshot} />
       <ContractSnapshot snapshot={order.snapshot} />
