@@ -26,7 +26,7 @@ export default async function PlanningPage() {
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("kind, amount, source").gte("budget_date", termStart).lte("budget_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("chapter_receivables").select("amount_assessed, waived_at").gte("due_date", termStart).lte("due_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("chapter_dues_payment_events").select("amount, date_is_estimated").gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
-    loadAllPages((from, to) => supabase.from("reimbursements").select("category, amount, reimbursement_date_is_estimated").eq("status", "approved").eq("reimbursed", true).gte("reimbursed_at", `${termStart}T00:00:00.000Z`).lt("reimbursed_at", nextDate(termEnd)).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("category, amount, reimbursed_at, receipt_date, submitted_at, reimbursement_date_is_estimated").eq("status", "approved").order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("category, amount").gte("expense_date", termStart).lte("expense_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_orders").select("planned_revenue, planned_fire_permit, status").gte("event_date", termStart).lte("event_date", termEnd).order("order_id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_payments").select("amount, kind").is("reversed_at", null).gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
@@ -36,18 +36,25 @@ export default async function PlanningPage() {
   if (failed?.error) throw new Error(`Unable to load the finance plan: ${failed.error.message}`);
 
   const budgets = categoryBudgetsFromRows(budgetResult.data);
+  // Approved reimbursements count toward actual spending whether or not the
+  // chapter has paid them yet. Paid rows count by payment date; unpaid rows
+  // count by the receipt (or submission) date.
+  const actualReimbursements = (reimbursementsResult.data ?? []).filter((row) => {
+    const activityDate = row.reimbursed_at?.slice(0, 10) ?? row.receipt_date ?? row.submitted_at.slice(0, 10);
+    return activityDate >= termStart && activityDate <= termEnd;
+  });
   const summary = buildPlanVsActual({
     categoryBudgets: Object.fromEntries(budgets),
     receivables: (receivablesResult.data ?? []).map((row) => ({ amountAssessed: Number(row.amount_assessed), waived: Boolean(row.waived_at) })),
     duesPayments: (duesPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount) })),
     incomeEntries: (incomeResult.data ?? []).map((entry) => ({ amount: Number(entry.amount), kind: entry.kind, source: entry.source })),
-    paidReimbursements: (reimbursementsResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
+    approvedReimbursements: actualReimbursements.map((row) => ({ category: row.category, amount: Number(row.amount) })),
     directExpenses: (expensesResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
     hostingOrders: (hostingResult.data ?? []).map((row) => ({ plannedRevenue: Number(row.planned_revenue), plannedFirePermit: Number(row.planned_fire_permit), status: row.status })),
     hostingPayments: (hostingPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount), kind: row.kind })),
   });
   const estimatedActualDates = (duesPaymentsResult.data ?? []).filter((row) => row.date_is_estimated).length
-    + (reimbursementsResult.data ?? []).filter((row) => row.reimbursement_date_is_estimated).length;
+    + actualReimbursements.filter((row) => row.reimbursement_date_is_estimated).length;
 
   return (
     <div className="grid gap-7">
@@ -77,7 +84,7 @@ export default async function PlanningPage() {
         <Breakdown title="Income by source" note="Select a row to open its source page">
           {summary.incomeBreakdown.map((row) => <tr key={row.source}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={row.href}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
         </Breakdown>
-        <Breakdown title="Expenses by category" note="Uses reimbursement categories">
+        <Breakdown title="Expenses by category" note="Includes approved reimbursements not yet paid">
           {summary.expenseBreakdown.map((row) => <tr key={row.category}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={`/finance/reports?category=${row.category}`}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
         </Breakdown>
       </div>
@@ -110,10 +117,4 @@ function Breakdown({ title, note, children }: { title: string; note: string; chi
 
 function WorkflowStep({ label, href, detail }: { label: string; href: string; detail: string }) {
   return <Link className="border-b border-rule p-4 last:border-b-0 hover:bg-brand-light sm:border-b-0 sm:border-r sm:last:border-r-0" href={href}><strong className="text-xs text-brand">{label} →</strong><span className="mt-1 block text-xs leading-relaxed text-muted">{detail}</span></Link>;
-}
-
-function nextDate(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString();
 }
