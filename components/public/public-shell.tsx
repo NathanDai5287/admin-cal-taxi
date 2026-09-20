@@ -28,7 +28,7 @@ export function PublicFooter() {
       <div className="public-footer-links">
         <Link href="/rush">Meet the chapter</Link>
         <Link href="/events">Events</Link>
-        <Link href="/host">Host at the house</Link>
+        <Link href="/host">Host with us</Link>
         <a href="https://www.thetaxi.org" target="_blank" rel="noreferrer">National Theta Xi</a>
       </div>
       <p className="public-footer-history">Nu Chapter at UC Berkeley since 1910.</p>

@@ -3,12 +3,11 @@ import Image, { type StaticImageData } from "next/image";
 
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
-import backyardWideImage from "@/public/site/venue-backyard-wide.jpg";
 import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 
 export const metadata: Metadata = {
-  title: "Host at the House",
+  title: "Host with Us",
   description: "Ask about hosting an event at the Theta Xi chapter house near UC Berkeley.",
 };
 
@@ -47,7 +46,7 @@ export default function HostPage() {
               alt="Five people posing behind a decorated table at an indoor event"
               label="Indoor event setup"
               position="lead"
-              sizes="(max-width: 760px) 100vw, 58vw"
+              sizes="(max-width: 760px) 100vw, 42vw"
               src={indoorEventImage}
             />
             <VenuePhotoPlaceholder label="Indoor photograph 2" position="detail-one" />
@@ -61,23 +60,17 @@ export default function HostPage() {
         <article className="host-space-showcase host-space-backyard">
           <header>
             <h2>Backyard venue</h2>
-            <p>Two photographs shown. Two reserved.</p>
+            <p>One photograph shown. Three reserved.</p>
           </header>
           <div className="host-space-gallery">
             <VenuePhoto
-              alt="A large daytime gathering in the backyard beneath blue and yellow decorations"
-              label="Backyard gathering — wide view"
-              position="lead"
-              sizes="(max-width: 760px) 100vw, 58vw"
-              src={backyardWideImage}
-            />
-            <VenuePhoto
               alt="A large daytime gathering in the backyard viewed from above"
-              label="Backyard gathering — portrait view"
-              position="detail-one"
-              sizes="(max-width: 760px) 100vw, 30vw"
+              label="Backyard gathering"
+              position="lead"
+              sizes="(max-width: 760px) 100vw, 42vw"
               src={backyardPortraitImage}
             />
+            <VenuePhotoPlaceholder label="Backyard photograph 2" position="detail-one" />
             <VenuePhotoPlaceholder label="Backyard photograph 3" position="detail-two" />
             <VenuePhotoPlaceholder label="Backyard photograph 4" position="detail-three" />
           </div>

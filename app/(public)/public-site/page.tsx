@@ -47,7 +47,7 @@ export default function PublicHomePage() {
           />
           <div className="crossroads-shade" />
           <div className="crossroads-copy">
-            <h2>At the house</h2>
+            <h2>Host with us</h2>
             <Link className="public-action public-action-on-image" href="/host">
               Plan an event <Arrow />
             </Link>

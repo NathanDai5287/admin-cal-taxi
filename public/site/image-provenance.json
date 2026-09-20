@@ -11,6 +11,5 @@
   { "source": "DSC9428_compressed.jpg", "sourceSha256": "8b3d926a115e0c07ba1db37e42f759ca0f019e715fd31498941a3205d9983524", "asset": "chapter-social-night.jpg", "route": "/events" },
   { "source": "IMG_9920.jpg", "sourceSha256": "f17ac8d77a399fcf0e6d878fd2d17ef43fbcc7ed915bfc36790e4a8dbaae9e7b", "asset": "chapter-cocktail-dinner.jpg", "route": "/events" },
   { "source": "IMG_9740.jpg", "sourceSha256": "78bc7284514ea99590e72601e61d28f54db66adb05285001a706c709e2d70f55", "asset": "venue-indoor-event.jpg", "route": "/host" },
-  { "source": "backyard.jpg", "sourceSha256": "1c109c83eb3b4367386a0a2739b2a925ef71605deddc8ade09298b9631175be7", "asset": "venue-backyard-portrait.jpg", "route": "/host" },
-  { "source": "backyard1.jpg", "sourceSha256": "095bcdf21369e6dcf05f461c8ace2052f149d44159b871e0cdb33c90af3f7357", "asset": "venue-backyard-wide.jpg", "route": "/host" }
+  { "source": "backyard.jpg", "sourceSha256": "1c109c83eb3b4367386a0a2739b2a925ef71605deddc8ade09298b9631175be7", "asset": "venue-backyard-portrait.jpg", "route": "/host" }
 ]

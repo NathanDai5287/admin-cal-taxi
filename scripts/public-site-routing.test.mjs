@@ -19,7 +19,7 @@ test("host preserves distinct future photograph slots for both venue spaces", as
 
   assert.match(source, />Backyard venue</);
   assert.match(source, />Indoor venue</);
-  assert.equal(source.match(/Backyard photograph/g)?.length, 2);
+  assert.equal(source.match(/Backyard photograph/g)?.length, 3);
   assert.equal(source.match(/Indoor photograph/g)?.length, 3);
 });
 
