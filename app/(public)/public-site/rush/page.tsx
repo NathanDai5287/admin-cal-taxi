@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 import cityImage from "@/public/site/chapter-city.jpg";
 import nightFlagImage from "@/public/site/chapter-night-flag.jpg";
 import outdoorsImage from "@/public/site/chapter-outdoors.jpg";
+import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 
 export const metadata: Metadata = {
@@ -26,16 +26,12 @@ export default function RushPage() {
             Check public events <Arrow />
           </Link>
         </div>
-        <figure>
-          <Image
-            alt="Two people holding a blue-and-white Theta Xi flag outside at night"
-            fill
-            fetchPriority="high"
-            loading="eager"
-            sizes="(max-width: 760px) 100vw, (max-width: 2240px) 50vw, 1120px"
-            src={nightFlagImage}
-          />
-        </figure>
+        <LightboxImage
+          alt="Two people holding a blue-and-white Theta Xi flag outside at night"
+          eager
+          sizes="(max-width: 760px) 100vw, (max-width: 2240px) 50vw, 1120px"
+          src={nightFlagImage}
+        />
       </header>
 
       <dl className="chapter-facts" aria-label="Chapter facts">
@@ -50,24 +46,20 @@ export default function RushPage() {
           <h2 id="rush-life-title">More than one kind of day.</h2>
         </header>
         <div className="rush-life-grid">
-          <figure className="rush-life-outdoors">
-            <Image
-              alt="A chapter member beside a large rock during an outdoor trip"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 60vw, 737px"
-              src={outdoorsImage}
-            />
-            <figcaption>A day outdoors</figcaption>
-          </figure>
-          <figure className="rush-life-city">
-            <Image
-              alt="One person taking a selfie outside a city building"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 40vw, 492px"
-              src={cityImage}
-            />
-            <figcaption>An everyday stop together</figcaption>
-          </figure>
+          <LightboxImage
+            alt="A chapter member beside a large rock during an outdoor trip"
+            caption="A day outdoors"
+            className="rush-life-outdoors"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 60vw, 737px"
+            src={outdoorsImage}
+          />
+          <LightboxImage
+            alt="One person taking a selfie outside a city building"
+            caption="An everyday stop together"
+            className="rush-life-city"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 40vw, 492px"
+            src={cityImage}
+          />
         </div>
       </section>
 

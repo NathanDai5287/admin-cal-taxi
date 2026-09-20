@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Image, { type StaticImageData } from "next/image";
+import type { StaticImageData } from "next/image";
 
+import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
 import exteriorImage from "@/public/site/venue-exterior.jpg";
@@ -38,21 +39,18 @@ export default function HostPage() {
             Ask about a date <Arrow />
           </a>
         </div>
-        <figure className="host-intro-photo">
-          <Image
-            alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
-            fill
-            sizes="(max-width: 760px) 100vw, 420px"
-            src={exteriorImage}
-          />
-        </figure>
+        <LightboxImage
+          alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
+          className="host-intro-photo"
+          sizes="(max-width: 760px) 100vw, 420px"
+          src={exteriorImage}
+        />
       </header>
 
       <section className="host-spaces" aria-label="Venue spaces">
         <article className="host-space-showcase host-space-indoor">
           <header>
             <h2>Indoor venue</h2>
-            <p>Four photographs and a video.</p>
           </header>
           <div className="host-space-gallery">
             <VenuePhoto
@@ -92,19 +90,15 @@ export default function HostPage() {
         <article className="host-space-showcase host-space-backyard">
           <header>
             <h2>Backyard venue</h2>
-            <p>One photograph shown. Three reserved.</p>
           </header>
           <div className="host-space-gallery">
             <VenuePhoto
               alt="A large daytime gathering in the backyard viewed from above"
               label="Backyard gathering"
               position="lead"
-              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 66vw, 1043px"
+              sizes="(max-width: 760px) 100vw, 760px"
               src={backyardPortraitImage}
             />
-            <VenuePhotoPlaceholder label="Backyard photograph 2" position="detail-one" />
-            <VenuePhotoPlaceholder label="Backyard photograph 3" position="detail-two" />
-            <VenuePhotoPlaceholder label="Backyard photograph 4" position="detail-three" />
           </div>
         </article>
       </section>
@@ -135,15 +129,6 @@ export default function HostPage() {
   );
 }
 
-function VenuePhotoPlaceholder({ label, position }: { label: string; position: string }) {
-  return (
-    <figure className={`host-space-photo host-space-photo-${position}`}>
-      <div aria-hidden="true" className="host-space-frame" />
-      <figcaption>{label}</figcaption>
-    </figure>
-  );
-}
-
 function VenuePhoto({
   alt,
   label,
@@ -158,9 +143,12 @@ function VenuePhoto({
   src: StaticImageData;
 }) {
   return (
-    <figure className={`host-space-photo host-space-photo-${position} host-space-photo-real`}>
-      <Image alt={alt} fill sizes={sizes} src={src} />
-      <figcaption>{label}</figcaption>
-    </figure>
+    <LightboxImage
+      alt={alt}
+      caption={label}
+      className={`host-space-photo host-space-photo-${position} host-space-photo-real`}
+      sizes={sizes}
+      src={src}
+    />
   );
 }

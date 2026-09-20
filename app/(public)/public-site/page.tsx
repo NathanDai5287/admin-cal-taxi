@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import awardsImage from "@/public/site/chapter-awards.jpg";
@@ -7,6 +6,7 @@ import flagImage from "@/public/site/chapter-flag.jpg";
 import graduationImage from "@/public/site/berkeley-graduation.jpg";
 import houseMealImage from "@/public/site/chapter-house-meal.jpg";
 import workImage from "@/public/site/chapter-work.jpg";
+import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 
 export default function PublicHomePage() {
@@ -14,15 +14,13 @@ export default function PublicHomePage() {
     <main id="main-content">
       <section className="crossroads" aria-labelledby="crossroads-title">
         <h1 className="sr-only" id="crossroads-title">Meet Theta Xi or host an event at the chapter house</h1>
-        <article className="crossroads-path crossroads-chapter">
-          <Image
-            alt="Five Nu Chapter members holding awards"
-            fill
-            fetchPriority="high"
-            loading="eager"
-            sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
-            src={awardsImage}
-          />
+        <LightboxImage
+          alt="Five Nu Chapter members holding awards"
+          className="crossroads-path crossroads-chapter"
+          eager
+          sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
+          src={awardsImage}
+        >
           <div className="crossroads-shade" />
           <div className="crossroads-copy">
             <h2>The chapter</h2>
@@ -30,21 +28,20 @@ export default function PublicHomePage() {
               Rush Theta Xi <Arrow />
             </Link>
           </div>
-        </article>
+        </LightboxImage>
 
         <div className="crossroads-mark" aria-hidden="true">
           <span lang="el">Θ</span>
           <span lang="el">Ξ</span>
         </div>
 
-        <article className="crossroads-path crossroads-host">
-          <Image
-            alt="Two Nu Chapter members holding the chapter flag during a trip"
-            fill
-            loading="eager"
-            sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
-            src={flagImage}
-          />
+        <LightboxImage
+          alt="Two Nu Chapter members holding the chapter flag during a trip"
+          className="crossroads-path crossroads-host"
+          eager
+          sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
+          src={flagImage}
+        >
           <div className="crossroads-shade" />
           <div className="crossroads-copy">
             <h2>Host with us</h2>
@@ -52,7 +49,7 @@ export default function PublicHomePage() {
               Plan an event <Arrow />
             </Link>
           </div>
-        </article>
+        </LightboxImage>
       </section>
 
       <dl className="chapter-facts" aria-label="Chapter facts">
@@ -69,24 +66,20 @@ export default function PublicHomePage() {
             chapter traditions, and life beyond the classroom.
           </p>
         </div>
-        <figure className="record-image record-image-work">
-          <Image
-            alt="Nu Chapter members working together on an outdoor chapter project"
-            fill
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 58vw, 763px"
-            src={workImage}
-          />
-          <figcaption>Shared work at the chapter house</figcaption>
-        </figure>
-        <figure className="record-image record-image-graduation">
-          <Image
-            alt="Two friends together at a UC Berkeley graduation"
-            fill
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 32vw, 436px"
-            src={graduationImage}
-          />
-          <figcaption>Berkeley graduation</figcaption>
-        </figure>
+        <LightboxImage
+          alt="Nu Chapter members working together on an outdoor chapter project"
+          caption="Shared work at the chapter house"
+          className="record-image record-image-work"
+          sizes="(max-width: 760px) 100vw, (max-width: 1440px) 58vw, 763px"
+          src={workImage}
+        />
+        <LightboxImage
+          alt="Two friends together at a UC Berkeley graduation"
+          caption="Berkeley graduation"
+          className="record-image record-image-graduation"
+          sizes="(max-width: 760px) 100vw, (max-width: 1440px) 32vw, 436px"
+          src={graduationImage}
+        />
         <div className="chapter-invitation">
           <p>Come meet the people who make the chapter.</p>
         </div>
@@ -98,24 +91,20 @@ export default function PublicHomePage() {
           <h2 id="chapter-moments-title">The everyday moments matter too.</h2>
         </header>
         <div className="chapter-moments-grid">
-          <figure className="chapter-moment chapter-moment-social">
-            <Image
-              alt="Two chapter members sharing a meal at the chapter house"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
-              src={houseMealImage}
-            />
-            <figcaption>A meal at the chapter house</figcaption>
-          </figure>
-          <figure className="chapter-moment chapter-moment-dinner">
-            <Image
-              alt="Four chapter members gathered around a restaurant table"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
-              src={dinnerImage}
-            />
-            <figcaption>Dinner together</figcaption>
-          </figure>
+          <LightboxImage
+            alt="Two chapter members sharing a meal at the chapter house"
+            caption="A meal at the chapter house"
+            className="chapter-moment chapter-moment-social"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
+            src={houseMealImage}
+          />
+          <LightboxImage
+            alt="Four chapter members gathered around a restaurant table"
+            caption="Dinner together"
+            className="chapter-moment chapter-moment-dinner"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
+            src={dinnerImage}
+          />
         </div>
       </section>
 

@@ -246,10 +246,9 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 ### Venue Photograph Sequence
 
-- **Structure:** Backyard and indoor spaces each use one large lead image followed by three supporting positions.
-- **Placeholders:** Confirmed venue photographs replace matching reserved frames; unused frames remain explicit placeholders.
-- **Rhythm:** The lead image changes sides between spaces, while supporting frames keep the sequence useful on narrow screens.
-- **Replacement:** Real venue photographs can replace each reserved frame without changing the page structure.
+- **Structure:** The indoor space uses a four-photograph grid with a walkthrough video, while the backyard shows its confirmed gathering photograph on its own.
+- **Rhythm:** The indoor lead image anchors the grid, and every photograph keeps its own frame on narrow screens.
+- **Honesty:** Show only confirmed venue photographs. Never describe counts, reserved slots, or other page bookkeeping.
 
 ### Empty States
 
@@ -267,6 +266,7 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 - **Style:** Full-bleed rectangular crops use factual uppercase captions.
 - **Content:** Show real chapter life and use specific alternative text.
+- **Lightbox:** Selecting any photograph opens the full, uncropped image in a dimmed overlay; Escape or the close action returns to the page.
 - **Reuse:** Each supplied photograph appears in one public location only.
 - **Constraint:** Never use chapter-life photography as proof of the venue.
 - **Range:** Supplied documentary photographs can show alcohol.

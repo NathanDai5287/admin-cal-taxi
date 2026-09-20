@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 import cocktailDinnerImage from "@/public/site/chapter-cocktail-dinner.jpg";
 import socialNightImage from "@/public/site/chapter-social-night.jpg";
+import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 
 export const metadata: Metadata = {
@@ -39,24 +39,20 @@ export default function EventsPage() {
           <h2 id="events-moments-title">Gatherings beyond the schedule.</h2>
         </header>
         <div className="chapter-moments-grid">
-          <figure className="chapter-moment chapter-moment-social">
-            <Image
-              alt="Three people holding drinks during an outdoor evening gathering"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
-              src={socialNightImage}
-            />
-            <figcaption>A social night together</figcaption>
-          </figure>
-          <figure className="chapter-moment chapter-moment-dinner">
-            <Image
-              alt="Five people seated together at a restaurant table"
-              fill
-              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
-              src={cocktailDinnerImage}
-            />
-            <figcaption>Dinner together</figcaption>
-          </figure>
+          <LightboxImage
+            alt="Three people holding drinks during an outdoor evening gathering"
+            caption="A social night together"
+            className="chapter-moment chapter-moment-social"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
+            src={socialNightImage}
+          />
+          <LightboxImage
+            alt="Five people seated together at a restaurant table"
+            caption="Dinner together"
+            className="chapter-moment chapter-moment-dinner"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
+            src={cocktailDinnerImage}
+          />
         </div>
       </section>
     </main>
