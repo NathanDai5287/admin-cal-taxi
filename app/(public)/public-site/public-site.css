@@ -514,24 +514,27 @@
 }
 
 .chapter-moments-grid-home {
-  grid-template-columns: 9fr 16fr;
+  grid-template-columns: 1fr 2fr;
 }
 
 .chapter-moments-grid-events {
-  grid-template-columns: 9fr 8fr;
+  grid-template-columns: 4fr 3fr;
 }
 
 .chapter-moments-grid-home .chapter-moment-social {
   aspect-ratio: 3 / 4;
 }
 
-.chapter-moments-grid-home .chapter-moment-dinner,
+.chapter-moments-grid-home .chapter-moment-dinner {
+  aspect-ratio: 3 / 2;
+}
+
 .chapter-moments-grid-events .chapter-moment-dinner {
   aspect-ratio: 4 / 3;
 }
 
 .chapter-moments-grid-events .chapter-moment-social {
-  aspect-ratio: 3 / 2;
+  aspect-ratio: 16 / 9;
 }
 
 .chapter-moment,
@@ -1123,13 +1126,13 @@
 }
 
 .rush-life-grid {
-  grid-template-columns: 64fr 27fr;
+  grid-template-columns: 16fr 9fr;
   gap: clamp(20px, 2vw, 28px);
   align-items: start;
 }
 
-.rush-life-outdoors {
-  aspect-ratio: 16 / 9;
+.rush-life-dinner {
+  aspect-ratio: 4 / 3;
 }
 
 .rush-life-city {

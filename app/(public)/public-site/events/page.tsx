@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import cocktailDinnerImage from "@/public/site/chapter-cocktail-dinner.jpg";
-import socialNightImage from "@/public/site/chapter-social-night.jpg";
+import outdoorsImage from "@/public/site/chapter-outdoors.jpg";
 import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 
@@ -36,17 +36,17 @@ export default function EventsPage() {
       <section className="chapter-moments" aria-label="Chapter life">
         <div className="chapter-moments-grid chapter-moments-grid-events">
           <LightboxImage
-            alt="Three people holding drinks during an outdoor evening gathering"
-            caption="A social night together"
+            alt="A chapter member beside a large rock during an outdoor trip"
+            caption="A day outdoors"
             className="chapter-moment chapter-moment-social"
-            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 45vw, 747px"
-            src={socialNightImage}
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 53vw, 805px"
+            src={outdoorsImage}
           />
           <LightboxImage
             alt="Five people seated together at a restaurant table"
             caption="Dinner together"
             className="chapter-moment chapter-moment-dinner"
-            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 40vw, 664px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 40vw, 604px"
             src={cocktailDinnerImage}
           />
         </div>

@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 import awardsImage from "@/public/site/chapter-awards.jpg";
-import dinnerImage from "@/public/site/chapter-dinner.jpg";
 import flagImage from "@/public/site/chapter-flag.jpg";
 import graduationImage from "@/public/site/berkeley-graduation.jpg";
 import houseMealImage from "@/public/site/chapter-house-meal.jpg";
+import socialNightImage from "@/public/site/chapter-social-night.jpg";
 import workImage from "@/public/site/chapter-work.jpg";
 import exteriorImage from "@/public/site/venue-exterior.jpg";
 import { LightboxImage } from "@/components/public/lightbox-image";
@@ -92,15 +92,15 @@ export default function PublicHomePage() {
             alt="Two chapter members sharing a meal at the chapter house"
             caption="A meal at the chapter house"
             className="chapter-moment chapter-moment-social"
-            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 31vw, 508px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 31vw, 470px"
             src={houseMealImage}
           />
           <LightboxImage
-            alt="Four chapter members gathered around a restaurant table"
-            caption="Dinner together"
+            alt="Three people holding drinks during an outdoor evening gathering"
+            caption="A social night together"
             className="chapter-moment chapter-moment-dinner"
-            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 55vw, 904px"
-            src={dinnerImage}
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 61vw, 940px"
+            src={socialNightImage}
           />
         </div>
       </section>

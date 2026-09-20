@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import cityImage from "@/public/site/chapter-city.jpg";
+import dinnerImage from "@/public/site/chapter-dinner.jpg";
 import nightFlagImage from "@/public/site/chapter-night-flag.jpg";
-import outdoorsImage from "@/public/site/chapter-outdoors.jpg";
 import accentureLogo from "@/public/site/logos/accenture.png";
 import chpLogo from "@/public/site/logos/california-highway-patrol.png";
 import eliLillyLogo from "@/public/site/logos/eli-lilly.png";
@@ -87,19 +87,19 @@ export default function RushPage() {
         </header>
         <div className="rush-life-grid">
           <LightboxImage
-            alt="A chapter member beside a large rock during an outdoor trip"
-            caption="A day outdoors"
-            className="rush-life-outdoors"
+            alt="Four chapter members gathered around a restaurant table"
+            caption="Dinner together"
+            className="rush-life-dinner"
             naturalAspect
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 66vw, 990px"
-            src={outdoorsImage}
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 59vw, 904px"
+            src={dinnerImage}
           />
           <LightboxImage
             alt="One person taking a selfie outside a city building"
             caption="An everyday stop together"
             className="rush-life-city"
             naturalAspect
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 28vw, 418px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 33vw, 508px"
             src={cityImage}
           />
         </div>
