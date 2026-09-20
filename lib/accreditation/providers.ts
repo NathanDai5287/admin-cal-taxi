@@ -6,6 +6,15 @@ import { GeminiLanguageModelProvider, GeminiEmbeddingProvider, GeminiOcrProvider
 
 import type { ExtractedChunk } from "./types";
 
+export type OcrLayoutBlock = {
+  text: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type StructuredGenerationRequest = {
   name: string;
   instructions: string;
@@ -33,6 +42,7 @@ export interface OcrProvider {
   readonly name: string;
   readonly model: string;
   extract(bytes: Uint8Array, filename: string, mimeType: string): Promise<ExtractedChunk[]>;
+  extractLayout?(bytes: Uint8Array, filename: string, mimeType: string): Promise<OcrLayoutBlock[]>;
 }
 
 class OpenAILanguageModelProvider implements LanguageModelProvider {

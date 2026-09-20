@@ -40,6 +40,7 @@ async function inspectPdf(bytes: Uint8Array): Promise<TemplateInspection> {
     format: "pdf",
     candidates,
     warnings: Object.keys(candidates).length ? [] : ["No fillable PDF fields were found. Confirm coordinate mappings before activation."],
+    inventory: `PDF pages: ${document.getPageCount()}\nAcroForm fields: ${Object.keys(candidates).join(", ") || "none"}`,
   };
 }
 
@@ -50,11 +51,17 @@ function inspectDocx(bytes: Uint8Array): TemplateInspection {
   // joins those runs again before candidate detection; Docxtemplater performs
   // the actual XML-safe replacement later.
   const visibleText = xml.replace(/<[^>]+>/g, "");
-  const tags = [...visibleText.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)].map((match) => match[1]);
+  const tags = [
+    ...[...visibleText.matchAll(/\[\[\s*([^\]]+?)\s*\]\]/g)].map((match) => match[1].trim()),
+    ...[...visibleText.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)].map((match) => match[1]),
+  ];
+  const paragraphs = [...xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g)].map((match) => match[0].replace(/<[^>]+>/g, "").trim()).filter(Boolean);
   return {
     format: "docx",
     candidates: Object.fromEntries([...new Set(tags)].map((tag) => [tag, { placeholder: tag }])),
-    warnings: tags.length ? [] : ["No {{field_name}} placeholders were found. Add placeholders to a mapped copy before activation."],
+    warnings: tags.length ? [] : ["No placeholders were found. The AI will infer answer anchors from the document structure."],
+    inventory: paragraphs.map((paragraph, index) => `Paragraph ${index + 1}: ${paragraph}`).join("\n"),
+    tags: [...new Set(tags)],
   };
 }
 
@@ -62,16 +69,27 @@ async function inspectXlsx(bytes: Uint8Array): Promise<TemplateInspection> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(bytes) as never);
   const candidates: TemplateMapping = {};
+  const inventory: string[] = [];
   for (const item of workbook.definedNames.model) {
     const range = item.ranges?.[0];
     if (!item.name || !range) continue;
     const match = /^'?(.+?)'?\!\$?([A-Z]+)\$?(\d+)$/.exec(range);
     if (match) candidates[item.name] = { sheet: match[1].replace(/''/g, "'"), cell: `${match[2]}${match[3]}` };
   }
+  workbook.eachSheet((sheet) => {
+    sheet.eachRow((row, rowNumber) => {
+      const cells: string[] = [];
+      row.eachCell({ includeEmpty: false }, (cell, column) => {
+        if (cell.text.trim()) cells.push(`${sheet.getColumn(column).letter}${rowNumber}: ${cell.text.trim()}`);
+      });
+      if (cells.length) inventory.push(`Sheet ${sheet.name}: ${cells.join(" | ")}`);
+    });
+  });
   return {
     format: "xlsx",
     candidates,
-    warnings: Object.keys(candidates).length ? [] : ["No named cells were found. Confirm sheet-and-cell mappings before activation."],
+    warnings: Object.keys(candidates).length ? [] : ["No named cells were found. The AI will infer answer cells from labels and layout."],
+    inventory: inventory.join("\n"),
   };
 }
 
@@ -88,6 +106,13 @@ function draftValues(draft: ReportDraft) {
 function renderDocx(bytes: Uint8Array, mapping: TemplateMapping, draft: ReportDraft): RenderedTemplate {
   const values = draftValues(draft);
   const data: Record<string, string> = { ...values };
+  const sourceZip = new PizZip(bytes);
+  const sourceXml = sourceZip.file("word/document.xml")?.asText();
+  if (sourceXml) {
+    const normalized = sourceXml.replace(/\[\[\s*([^\]]+?)\s*\]\]/g, (_match, tag: string) => `{{${tag.trim().replace(/\s+/g, "_").toLowerCase()}}}`);
+    sourceZip.file("word/document.xml", normalized);
+    bytes = sourceZip.generate({ type: "uint8array" });
+  }
   for (const [fieldKey, fieldMapping] of Object.entries(mapping)) {
     if (fieldMapping.placeholder) data[fieldMapping.placeholder] = values[fieldKey] ?? "";
   }
@@ -98,7 +123,24 @@ function renderDocx(bytes: Uint8Array, mapping: TemplateMapping, draft: ReportDr
     nullGetter: () => "",
   });
   template.render(data);
-  return { bytes: template.getZip().generate({ type: "uint8array" }), mimeType: MIME_TYPES.docx, extension: "docx" };
+  let output = template.getZip().generate({ type: "uint8array" });
+  const zip = new PizZip(output);
+  let xml = zip.file("word/document.xml")?.asText();
+  if (xml) {
+    for (const [fieldKey, target] of Object.entries(mapping)) {
+      if (!target.paragraph || !values[fieldKey]) continue;
+      let paragraphIndex = 0;
+      const value = String(values[fieldKey]).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "&#10;");
+      xml = xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (paragraph) => {
+        paragraphIndex += 1;
+        if (paragraphIndex !== target.paragraph) return paragraph;
+        return paragraph.replace("</w:p>", `<w:r><w:br/><w:t xml:space="preserve">${value}</w:t></w:r></w:p>`);
+      });
+    }
+    zip.file("word/document.xml", xml);
+    output = zip.generate({ type: "uint8array" });
+  }
+  return { bytes: output, mimeType: MIME_TYPES.docx, extension: "docx" };
 }
 
 async function renderXlsx(bytes: Uint8Array, mapping: TemplateMapping, draft: ReportDraft): Promise<RenderedTemplate> {
@@ -146,14 +188,20 @@ async function renderPdf(bytes: Uint8Array, mapping: TemplateMapping, draft: Rep
       }
       continue;
     }
-    if (fieldMapping.page && fieldMapping.x !== undefined && fieldMapping.y !== undefined) {
+    if (fieldMapping.page && (fieldMapping.x !== undefined || fieldMapping.normalizedX !== undefined) && (fieldMapping.y !== undefined || fieldMapping.normalizedY !== undefined)) {
       const page = document.getPages()[fieldMapping.page - 1];
       if (!page) throw new Error(`Mapped PDF page not found: ${fieldMapping.page}`);
+      const pageSize = page.getSize();
+      const x = fieldMapping.normalizedX !== undefined ? fieldMapping.normalizedX * pageSize.width : fieldMapping.x!;
+      const y = fieldMapping.normalizedY !== undefined ? (1 - fieldMapping.normalizedY) * pageSize.height : fieldMapping.y!;
+      const width = fieldMapping.normalizedWidth !== undefined ? fieldMapping.normalizedWidth * pageSize.width : fieldMapping.width;
+      const height = fieldMapping.normalizedHeight !== undefined ? fieldMapping.normalizedHeight * pageSize.height : fieldMapping.height;
       const size = fieldMapping.size ?? 10;
-      const maxWidth = fieldMapping.maxWidth ?? 440;
+      const maxWidth = fieldMapping.maxWidth ?? width ?? 440;
+      if (width && height) page.drawRectangle({ x, y: y - height, width, height, color: rgb(1, 1, 1) });
       const characters = Math.max(15, Math.floor(maxWidth / (size * 0.55)));
       wrapText(value, characters).forEach((line, lineIndex) => {
-        page.drawText(line, { x: fieldMapping.x, y: fieldMapping.y! - lineIndex * size * 1.25, size, font, color: rgb(0, 0, 0), maxWidth });
+        page.drawText(line, { x, y: y - lineIndex * size * 1.25, size, font, color: rgb(0, 0, 0), maxWidth });
       });
     }
   }

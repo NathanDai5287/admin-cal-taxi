@@ -49,6 +49,7 @@ export type ReportFieldDefinition = {
   required: boolean;
   multiline?: boolean;
   lockedBlank?: boolean;
+  valueMode?: "exact" | "narrative" | "signature";
 };
 
 export type ReportDefinition = {
@@ -71,22 +72,54 @@ export type ExtractedChunk = {
 export type TemplateFieldMapping = {
   type?: "text";
   placeholder?: string;
+  /** DOCX paragraph anchor used when a template has no explicit placeholder. */
+  paragraph?: number;
   fieldName?: string;
   sheet?: string;
   cell?: string;
   page?: number;
   x?: number;
   y?: number;
+  width?: number;
+  height?: number;
+  normalizedX?: number;
+  normalizedY?: number;
+  normalizedWidth?: number;
+  normalizedHeight?: number;
   size?: number;
   maxWidth?: number;
 };
 
 export type TemplateMapping = Record<string, TemplateFieldMapping>;
 
+export type TemplateAnalysisField = {
+  key: string;
+  label: string;
+  description: string;
+  required: boolean;
+  multiline?: boolean;
+  valueMode: "exact" | "narrative" | "signature";
+  target: TemplateFieldMapping | null;
+  confidence: number;
+  rationale: string;
+};
+
+export type TemplateAnalysis = {
+  name: string;
+  description: string;
+  cadence: "annual" | "term";
+  fields: TemplateAnalysisField[];
+  warnings: string[];
+  model: string;
+};
+
 export type TemplateInspection = {
   format: TemplateFormat;
   candidates: Record<string, TemplateFieldMapping>;
   warnings: string[];
+  /** Human-readable structure passed to the model; never treated as instructions. */
+  inventory?: string;
+  tags?: string[];
 };
 
 export type RenderedTemplate = {
@@ -94,4 +127,3 @@ export type RenderedTemplate = {
   mimeType: string;
   extension: TemplateFormat;
 };
-

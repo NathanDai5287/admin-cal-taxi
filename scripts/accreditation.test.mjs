@@ -107,3 +107,19 @@ test("DOCX inspection finds split placeholders and rendering preserves the packa
   assert.match(outputXml, /Theta Xi/);
   assert.doesNotMatch(outputXml, /chapter_name/);
 });
+
+test("DOCX inspection and rendering support human-friendly double-bracket tags", async () => {
+  const zip = new PizZip();
+  zip.file("[Content_Types].xml", `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
+  zip.folder("_rels").file(".rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
+  zip.folder("word").file("document.xml", `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>[[CHAPTER NAME]]</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`);
+  const input = zip.generate({ type: "uint8array" });
+  const inspection = await inspectTemplate(input, "docx");
+  assert.deepEqual(inspection.tags, ["CHAPTER NAME"]);
+  const rendered = await renderTemplate(input, "docx", { chapter_name: { placeholder: "chapter_name" } }, {
+    fields: { chapter_name: { value: "Theta Xi", provenance: "user_input", citations: ["USER"], confidence: 1, missingReason: null, officerOverride: true } },
+  });
+  const outputXml = new PizZip(rendered.bytes).file("word/document.xml").asText();
+  assert.match(outputXml, /Theta Xi/);
+  assert.doesNotMatch(outputXml, /CHAPTER NAME/);
+});

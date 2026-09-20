@@ -15,6 +15,9 @@ import { processDocument } from "@/lib/accreditation/processing";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
+import { analyzeTemplateWithAi, mappingFromAnalysis } from "@/lib/accreditation/template-ai";
+import { getAccreditationProviders } from "@/lib/accreditation/providers";
+import { extractSource } from "@/lib/accreditation/extract";
 import { REPORT_KEYS, type ReportDraft, type SourceKind, type TemplateMapping } from "@/lib/accreditation/types";
 import { buildDraft } from "@/lib/accreditation/workflow";
 import { requireAdmin } from "@/lib/reimbursements/auth";
@@ -252,6 +255,8 @@ export async function uploadTemplate(formData: FormData) {
   const { userId } = await requireAccreditationAdmin();
   const reportKey = z.enum(REPORT_KEYS).safeParse(formData.get("reportKey"));
   const file = formData.get("file");
+  const example = formData.get("example");
+  const exampleFile = example instanceof File && example.size > 0 ? example : null;
   if (!reportKey.success || !(file instanceof File)) redirect("/accreditation/templates?result=invalid");
   let format;
   try {
@@ -260,11 +265,54 @@ export async function uploadTemplate(formData: FormData) {
     redirect("/accreditation/templates?result=invalid_file");
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
+  if (exampleFile) {
+    let exampleFormat;
+    try { exampleFormat = validateTemplateFile(exampleFile); } catch { redirect("/accreditation/templates?result=invalid_example"); }
+    if (exampleFormat !== format) redirect("/accreditation/templates?result=example_format_mismatch");
+  }
   let inspection;
   try {
     inspection = await inspectTemplate(bytes, format);
   } catch {
     redirect("/accreditation/templates?result=invalid_file");
+  }
+  const providers = getAccreditationProviders();
+  if (format === "pdf" && providers.ocr?.extractLayout) {
+    try {
+      const blocks = await providers.ocr.extractLayout(bytes, file.name, fileMimeType(file));
+      const tags: string[] = [...(inspection.tags ?? [])];
+      for (const block of blocks) {
+        for (const match of block.text.matchAll(/\[\[\s*([^\]]+?)\s*\]\]|\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)) {
+          const tag = (match[1] ?? match[2]).trim();
+          tags.push(tag);
+          const key = tag.replace(/\s+/g, "_").toLowerCase();
+          inspection.candidates[key] = { page: block.page, normalizedX: block.x, normalizedY: block.y, normalizedWidth: block.width, normalizedHeight: block.height };
+        }
+      }
+      inspection.tags = [...new Set(tags)];
+      inspection.inventory = `${inspection.inventory ?? ""}\nOCR layout:\n${blocks.map((block) => `Page ${block.page} (${block.x},${block.y},${block.width},${block.height}): ${block.text}`).join("\n")}`;
+    } catch (error) {
+      console.warn("PDF layout OCR unavailable; continuing with native PDF fields", error);
+    }
+  }
+  let analysis;
+  try {
+    const templateChunks = await extractSource(bytes, file.name, fileMimeType(file), providers.ocr);
+    let exampleChunks: Awaited<ReturnType<typeof extractSource>> = [];
+    if (exampleFile) {
+      const exampleBytes = new Uint8Array(await exampleFile.arrayBuffer());
+      exampleChunks = await extractSource(exampleBytes, exampleFile.name, fileMimeType(exampleFile), providers.ocr);
+    }
+    analysis = await analyzeTemplateWithAi({
+      definition: getReportDefinition(reportKey.data)!,
+      format,
+      inspection,
+      templateText: templateChunks.map((chunk) => chunk.content).join("\n\n"),
+      exampleText: exampleChunks.map((chunk) => chunk.content).join("\n\n"),
+    });
+  } catch (error) {
+    console.error("Accreditation template analysis failed", error);
+    redirect("/accreditation/templates?result=analysis_failed");
   }
   const supabase = createAccreditationAdminClient();
   const versions = await supabase.from("accreditation_templates").select("version").eq("report_key", reportKey.data).order("version", { ascending: false }).limit(1);
@@ -274,6 +322,34 @@ export async function uploadTemplate(formData: FormData) {
   const mimeType = fileMimeType(file);
   const uploaded = await supabase.storage.from("accreditation-templates").upload(path, bytes, { contentType: mimeType });
   if (uploaded.error) redirect("/accreditation/templates?result=upload_error");
+  const mapping = mappingFromAnalysis(analysis);
+  let examplePath: string | null = null;
+  if (exampleFile) {
+    examplePath = `${reportKey.data}/${templateId}/example-${safeName(exampleFile.name)}`;
+    const exampleUpload = await supabase.storage.from("accreditation-templates").upload(examplePath, new Uint8Array(await exampleFile.arrayBuffer()), { contentType: fileMimeType(exampleFile) });
+    if (exampleUpload.error) {
+      await supabase.storage.from("accreditation-templates").remove([path]);
+      redirect("/accreditation/templates?result=example_upload_error");
+    }
+  }
+  const definition = getReportDefinition(reportKey.data)!;
+  const sampleDraft: ReportDraft = { fields: Object.fromEntries(definition.fields.map((field) => [field.key, {
+    value: field.lockedBlank ? "" : `Sample ${field.label}`,
+    provenance: "user_input" as const,
+    citations: ["USER"], confidence: 1, missingReason: null, officerOverride: true,
+  }])) };
+  let previewPath: string | null = null;
+  try {
+    const rendered = await renderTemplate(bytes, format, mapping, sampleDraft);
+    previewPath = `${reportKey.data}/${templateId}/preview.${rendered.extension}`;
+    const previewUpload = await supabase.storage.from("accreditation-templates").upload(previewPath, rendered.bytes, { contentType: rendered.mimeType });
+    if (previewUpload.error) throw new Error("Preview upload failed.");
+  } catch (error) {
+    if (examplePath) await supabase.storage.from("accreditation-templates").remove([examplePath]);
+    await supabase.storage.from("accreditation-templates").remove([path]);
+    console.error("Accreditation template preview failed", error);
+    redirect("/accreditation/templates?result=preview_failed");
+  }
   const inserted = await supabase.from("accreditation_templates").insert({
     id: templateId,
     report_key: reportKey.data,
@@ -283,12 +359,17 @@ export async function uploadTemplate(formData: FormData) {
     mime_type: mimeType,
     storage_path: path,
     sha256: sha256(bytes),
-    mapping: inspection.candidates,
+    mapping,
+    analysis_status: "needs_review",
+    analysis,
+    example_storage_path: examplePath,
+    example_original_name: exampleFile?.name ?? null,
+    preview_storage_path: previewPath,
     is_active: false,
     created_by: userId,
   });
   if (inserted.error) {
-    await supabase.storage.from("accreditation-templates").remove([path]);
+    await supabase.storage.from("accreditation-templates").remove([path, ...(examplePath ? [examplePath] : []), ...(previewPath ? [previewPath] : [])]);
     redirect("/accreditation/templates?result=upload_error");
   }
   revalidatePath("/accreditation/templates");
@@ -300,44 +381,22 @@ export async function confirmTemplate(formData: FormData) {
   const templateId = uuid.safeParse(formData.get("templateId"));
   if (!templateId.success) redirect("/accreditation/templates?result=invalid_mapping");
   const supabase = createAccreditationAdminClient();
-  const template = await supabase.from("accreditation_templates").select("report_key, format, mapping, storage_path").eq("id", templateId.data).single();
+  const template = await supabase.from("accreditation_templates").select("report_key, format, mapping, storage_path, analysis_status, analysis").eq("id", templateId.data).single();
   if (template.error) redirect("/accreditation/templates?result=invalid_mapping");
   const definition = getReportDefinition(template.data.report_key);
   if (!definition) redirect(`/accreditation/templates?template=${templateId.data}&result=invalid_mapping`);
-  const mapping: TemplateMapping = {};
-  for (const field of definition.fields) {
-    const prefix = `map_${field.key}`;
-    if (template.data.format === "docx") {
-      const placeholder = String(formData.get(`${prefix}_placeholder`) ?? "").trim();
-      if (placeholder && /^[a-zA-Z0-9_.-]+$/.test(placeholder)) mapping[field.key] = { placeholder };
-    } else if (template.data.format === "xlsx") {
-      const sheet = String(formData.get(`${prefix}_sheet`) ?? "").trim();
-      const cell = String(formData.get(`${prefix}_cell`) ?? "").trim().toUpperCase();
-      if (sheet && /^[A-Z]+[1-9][0-9]*$/.test(cell)) mapping[field.key] = { sheet, cell };
-    } else {
-      const fieldName = String(formData.get(`${prefix}_field`) ?? "").trim();
-      const page = Number(formData.get(`${prefix}_page`));
-      const x = Number(formData.get(`${prefix}_x`));
-      const y = Number(formData.get(`${prefix}_y`));
-      if (fieldName) mapping[field.key] = { fieldName };
-      else if (Number.isInteger(page) && page > 0 && Number.isFinite(x) && Number.isFinite(y)) mapping[field.key] = { page, x, y };
-    }
-  }
-  const missingRequired = definition?.fields.some((field) => field.required && !mapping[field.key]);
-  const candidatePlaceholders = new Set(Object.values((template.data.mapping ?? {}) as TemplateMapping).map((target) => target.placeholder).filter(Boolean));
-  const unknownDocxPlaceholder = template.data.format === "docx" && Object.values(mapping).some((target) => target.placeholder && !candidatePlaceholders.has(target.placeholder));
-  if (missingRequired || unknownDocxPlaceholder) {
-    redirect(`/accreditation/templates?template=${templateId.data}&result=invalid_mapping`);
+  if (template.data.analysis_status !== "needs_review") redirect(`/accreditation/templates?template=${templateId.data}&result=analysis_not_ready`);
+  const mapping: TemplateMapping = (template.data.mapping ?? {}) as TemplateMapping;
+  const analyzedFields = Array.isArray((template.data.analysis as Record<string, unknown> | null)?.fields) ? (template.data.analysis as { fields: Array<{ key?: unknown; required?: unknown }> }).fields : [];
+  const requiredKeys = analyzedFields.length ? analyzedFields.filter((field) => field.required && typeof field.key === "string").map((field) => String(field.key)) : definition.fields.filter((field) => field.required).map((field) => field.key);
+  const missingRequired = requiredKeys.some((key) => !mapping[key]);
+  if (missingRequired) {
+    redirect(`/accreditation/templates?template=${templateId.data}&result=analysis_incomplete`);
   }
   const storedFile = await supabase.storage.from("accreditation-templates").download(template.data.storage_path);
   if (storedFile.error) redirect(`/accreditation/templates?template=${templateId.data}&result=invalid_mapping`);
   const sampleDraft: ReportDraft = { fields: Object.fromEntries(definition.fields.map((field) => [field.key, {
-    value: field.lockedBlank ? "" : `Sample ${field.label}`,
-    provenance: "user_input" as const,
-    citations: ["USER"],
-    confidence: 1,
-    missingReason: null,
-    officerOverride: true,
+    value: field.lockedBlank ? "" : `Sample ${field.label}`, provenance: "user_input" as const, citations: ["USER"], confidence: 1, missingReason: null, officerOverride: true,
   }])) };
   try {
     await renderTemplate(new Uint8Array(await storedFile.data.arrayBuffer()), template.data.format, mapping, sampleDraft);
@@ -348,6 +407,7 @@ export async function confirmTemplate(formData: FormData) {
   const updated = await supabase.from("accreditation_templates").update({
     mapping,
     is_active: true,
+    analysis_status: "active",
     confirmed_at: new Date().toISOString(),
     confirmed_by: userId,
   }).eq("id", templateId.data);

@@ -46,6 +46,7 @@ export default async function ReportWorkspace({
     revisions.length ? supabase.from("accreditation_artifacts").select("*").in("revision_id", revisions.map((revision: Record<string, unknown>) => revision.id)).order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
     latest ? supabase.from("accreditation_citations").select("*, accreditation_sources(original_name)").eq("revision_id", latest.id).order("created_at") : Promise.resolve({ data: [] }),
   ]);
+  const latestTemplate = latest?.template_id ? await supabase.from("accreditation_templates").select("analysis").eq("id", latest.template_id).maybeSingle() : { data: null };
   const artifacts = artifactsResult.data ?? [];
   const latestArtifacts = artifacts.filter((artifact: Record<string, unknown>) => artifact.revision_id === latest?.id);
   const draftArtifact = latestArtifacts.find((artifact: Record<string, unknown>) => artifact.kind === "draft");
@@ -53,7 +54,11 @@ export default async function ReportWorkspace({
   const citations = citationsResult.data ?? [];
   const draft = latest?.draft as ReportDraft | undefined;
   const validation = (latest?.validation ?? []) as Array<{ level: "error" | "warning"; field?: string; message: string }>;
-  const missing = definition.fields.filter((field) => field.required && !draft?.fields[field.key]?.value);
+  const analyzedFields = (latestTemplate.data?.analysis as { fields?: Array<Record<string, unknown>> } | null)?.fields;
+  const displayFields = analyzedFields?.length ? analyzedFields.map((field) => ({
+    key: String(field.key), label: String(field.label ?? field.key), description: String(field.description ?? ""), required: Boolean(field.required), multiline: Boolean(field.multiline),
+  })) : definition.fields;
+  const missing = displayFields.filter((field) => field.required && !draft?.fields[field.key]?.value);
   const cycleRelation = Array.isArray(run.accreditation_cycles) ? run.accreditation_cycles[0] : run.accreditation_cycles;
   const termRelation = Array.isArray(run.accreditation_terms) ? run.accreditation_terms[0] : run.accreditation_terms;
 
@@ -94,7 +99,7 @@ export default async function ReportWorkspace({
         <section className="card">
           <div className="card-header"><span className="card-title">{latest ? `Draft revision ${latest.revision_number}` : "Draft fields"}</span>{latest ? <span className="card-subtitle">{new Date(latest.created_at).toLocaleString()}</span> : null}</div>
           <div className="divide-y divide-rule border-t border-rule">
-            {definition.fields.map((field) => {
+            {displayFields.map((field) => {
               const value = draft?.fields[field.key];
               const fieldCitations = citations.filter((citation: Record<string, unknown>) => citation.field_key === field.key);
               return <article key={field.key} className="p-5"><div className="flex items-start justify-between gap-3"><div><h2 className="text-sm font-bold">{field.label}</h2><p className="mt-1 text-xs text-muted">{field.description}</p></div>{value ? <span className={`badge ${value.officerOverride ? "badge-verified" : value.value ? "badge-approved" : "badge-pending"}`}>{value.officerOverride ? "Officer input" : `${Math.round(value.confidence * 100)}%`}</span> : null}</div>{value?.value ? <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-ink">{value.value}</div> : <p className="mt-4 rounded bg-canvas p-3 text-sm text-muted">{value?.missingReason ?? "Not drafted yet."}</p>}{fieldCitations.length ? <div className="mt-4 space-y-2">{fieldCitations.map((citation: Record<string, unknown>) => { const relation = citation.accreditation_sources; const source = (Array.isArray(relation) ? relation[0] : relation) as Record<string, unknown> | null; const excerpt = typeof citation.excerpt === "string" && citation.excerpt ? citation.excerpt : JSON.stringify(citation.app_record, null, 2); return <details key={String(citation.id)} className="rounded border border-rule p-3 text-xs"><summary className="cursor-pointer font-bold text-brand">{citation.provenance === "user_input" ? "Officer instruction" : citation.provenance === "app_snapshot" ? "Frozen app record" : String(source?.original_name ?? "Evidence source")}</summary><pre className="mt-2 whitespace-pre-wrap font-sans text-muted">{excerpt}</pre></details>; })}</div> : null}</article>;

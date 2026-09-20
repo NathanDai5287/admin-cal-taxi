@@ -22,9 +22,10 @@ export function validateDraft(draft: ReportDraft, definition: ReportDefinition, 
     const value = draft.fields[field.key];
     if (field.lockedBlank && value.value) validation.push({ level: "error", field: field.key, message: `${field.label} must remain blank.` });
     if (field.required && !value.value) validation.push({ level: "error", field: field.key, message: value.missingReason || `${field.label} is required.` });
-    if (definition.key === "annual_report" && value.value && !value.citations.length) validation.push({ level: "error", field: field.key, message: `${field.label} needs a current source citation.` });
+    if (definition.key === "annual_report" && value.value && !value.citations.length) {
+      validation.push({ level: field.valueMode === "narrative" || field.multiline ? "warning" : "error", field: field.key, message: field.valueMode === "narrative" || field.multiline ? `${field.label} contains AI-generated narrative without a current citation; review it carefully.` : `${field.label} needs a current source citation.` });
+    }
   }
   if (!templateAvailable) validation.push({ level: "error", message: "Confirm an active official template before generating an artifact." });
   return validation;
 }
-
