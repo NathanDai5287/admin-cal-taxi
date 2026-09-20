@@ -426,9 +426,10 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td>
                     <div className="inline-action">
                       <ReimbursedCheckbox
-                        disabled={pendingFields.has(`${item.id}:reimbursed`)}
+                        disabled={item.status !== "approved" || pendingFields.has(`${item.id}:reimbursed`)}
                         onChange={(reimbursed) => void changeReimbursed(item, reimbursed)}
                         reimbursed={item.reimbursed}
+                        title={item.status === "approved" ? undefined : "Only approved reimbursements can be marked paid"}
                       />
                     </div>
                   </td>

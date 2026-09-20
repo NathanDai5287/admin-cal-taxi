@@ -116,3 +116,11 @@ test("denial prompts and member-facing reason stay wired", async () => {
   assert.match(memberPage, /denial_reason/);
   assert.match(memberPage, /Reason for denial/);
 });
+
+test("the paid checkbox is only clickable for approved reimbursements", async () => {
+  const paymentTable = await readFile(new URL("../components/reimbursements/reimbursement-payment-table.tsx", import.meta.url), "utf8");
+  const payableActions = await readFile(new URL("../app/(admin)/finance/accounts/payable/actions.ts", import.meta.url), "utf8");
+
+  assert.match(paymentTable, /disabled=\{item\.status !== "approved"/);
+  assert.match(payableActions, /\.eq\("status", "approved"\)/);
+});
