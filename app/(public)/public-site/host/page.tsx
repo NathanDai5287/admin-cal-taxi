@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { StaticImageData } from "next/image";
 
+import { HouseMap, houseDirectionsUrl } from "@/components/public/house-map";
 import { LightboxImage } from "@/components/public/lightbox-image";
 import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 
 const venueFacts = [
   ["Capacity", "Up to 200 guests"],
-  ["Location", "Near the UC Berkeley campus"],
+  ["Location", "2639 Durant Ave, Berkeley"],
   ["Space", "Large, open event area"],
   ["Layout", "Flexible setup"],
   ["Equipment", "Sound system available"],
@@ -124,6 +125,30 @@ export default function HostPage() {
             </div>
           ))}
         </dl>
+      </section>
+
+      <section className="house-location" aria-labelledby="house-location-title">
+        <div>
+          <h2 id="house-location-title">Find the house.</h2>
+          <p>
+            The chapter house sits on Durant Ave, just across from the south edge of
+            the UC Berkeley campus — an easy walk from Sproul Plaza and Telegraph.
+          </p>
+          <dl className="house-location-address">
+            <div><dt>Address</dt><dd>2639 Durant Ave</dd></div>
+            <div><dt>City</dt><dd>Berkeley, CA 94704</dd></div>
+            <div><dt>Campus</dt><dd>Across from the south edge</dd></div>
+          </dl>
+          <a
+            className="public-action public-action-dark"
+            href={houseDirectionsUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Get directions <Arrow />
+          </a>
+        </div>
+        <HouseMap />
       </section>
 
       <section className="logo-showcase" aria-labelledby="clubs-title">

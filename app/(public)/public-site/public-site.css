@@ -692,6 +692,80 @@
   font-weight: 650;
 }
 
+.house-location {
+  display: grid;
+  padding: clamp(88px, 11vw, 160px) clamp(24px, 7vw, 112px);
+  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1.1fr);
+  gap: clamp(48px, 8vw, 120px);
+  align-items: center;
+  background: var(--public-blue-pale);
+}
+
+.house-location h2 {
+  margin: 0;
+  font-size: clamp(34px, 4.5vw, 64px);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.house-location p {
+  max-width: 60ch;
+  margin: 26px 0 0;
+  color: var(--public-muted);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.house-location-address {
+  margin: 34px 0 0;
+  border-top: 2px solid var(--public-blue);
+}
+
+.house-location-address div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 20px 0;
+  border-bottom: 1px solid #b6ccd9;
+}
+
+.house-location-address dt {
+  color: var(--public-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.house-location-address dd {
+  margin: 0;
+  text-align: right;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.house-location .public-action-dark {
+  display: inline-flex;
+}
+
+.house-map {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--public-rule);
+  background: #d9d9dc;
+}
+
+.house-map iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 .public-footer {
   display: grid;
   padding: 68px clamp(24px, 7vw, 112px) 44px;
@@ -1412,6 +1486,7 @@
 
   .venue-preview,
   .host-process,
+  .house-location,
   .rush-intro,
   .rush-invitation,
   .rush-history {

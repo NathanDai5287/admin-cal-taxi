@@ -132,7 +132,7 @@ export default function PublicHomePage() {
         />
         <dl>
           <div><dt>Guest capacity</dt><dd>Up to 200</dd></div>
-          <div><dt>Location</dt><dd>Near campus</dd></div>
+          <div><dt>Location</dt><dd>2639 Durant Ave</dd></div>
           <div><dt>Setup</dt><dd>Flexible layout</dd></div>
           <div><dt>Support</dt><dd>Event coordination</dd></div>
         </dl>
