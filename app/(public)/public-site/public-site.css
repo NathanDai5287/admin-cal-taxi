@@ -506,11 +506,11 @@
 }
 
 .rush-life-outdoors img {
-  object-position: center;
+  object-position: 56% 50%;
 }
 
 .rush-life-city img {
-  object-position: 50% 62%;
+  object-position: 50% 58%;
 }
 
 .chapter-moment figcaption,
@@ -1189,7 +1189,20 @@
 }
 
 .rush-life-grid {
-  align-items: stretch;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: clamp(20px, 2vw, 28px);
+  align-items: start;
+}
+
+.rush-life-grid figure {
+  height: clamp(320px, 36vw, 520px);
+  min-width: 0;
+  aspect-ratio: auto;
+}
+
+.rush-life figcaption {
+  right: auto;
+  left: 0;
 }
 
 .rush-invitation {
@@ -1395,10 +1408,26 @@
     grid-template-columns: 1fr;
   }
 
-  .chapter-moment,
-  .rush-life-outdoors,
-  .rush-life-city {
+  .rush-life-grid {
+    gap: 16px;
+  }
+
+  .chapter-moment {
     aspect-ratio: 4 / 3;
+  }
+
+  .rush-life-grid figure {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .rush-life-city img {
+    object-position: 50% 68%;
+  }
+
+  .rush-life figcaption {
+    right: 0;
+    text-align: left;
   }
 
   .chapter-invitation {

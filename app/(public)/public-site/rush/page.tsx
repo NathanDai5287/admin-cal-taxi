@@ -54,7 +54,7 @@ export default function RushPage() {
             <Image
               alt="A chapter member beside a large rock during an outdoor trip"
               fill
-              sizes="(max-width: 760px) 100vw, 58vw"
+              sizes="(max-width: 760px) 100vw, 60vw"
               src={outdoorsImage}
             />
             <figcaption>A day outdoors</figcaption>
@@ -63,7 +63,7 @@ export default function RushPage() {
             <Image
               alt="One person taking a selfie outside a city building"
               fill
-              sizes="(max-width: 760px) 100vw, 42vw"
+              sizes="(max-width: 760px) 100vw, 40vw"
               src={cityImage}
             />
             <figcaption>An everyday stop together</figcaption>
