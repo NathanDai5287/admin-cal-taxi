@@ -20,7 +20,7 @@ import { VenueInquiryForm } from "./venue-inquiry-form";
 import { VenueWalkthroughVideo } from "./venue-walkthrough-video";
 
 const clubs: LogoItem[] = [
-  { name: "Gamma Zeta Alpha", src: gammaZetaAlphaLogo },
+  { name: "Gamma Zeta Alpha", src: gammaZetaAlphaLogo, wordmark: true },
   { name: "BerkeleyTime", src: berkeleytimeLogo },
   { name: "Codebase", src: codebaseLogo },
   { name: "WebDev at Berkeley", src: webdevLogo },
