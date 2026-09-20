@@ -6,7 +6,7 @@ import PizZip from "pizzip";
 
 import { REPORT_DEFINITIONS } from "../lib/accreditation/definitions.ts";
 import { parseOfficerOverrides, validateDraft } from "../lib/accreditation/rules.ts";
-import { inspectTemplate, renderTemplate } from "../lib/accreditation/templates.ts";
+import { findVisibleTemplateTags, inspectTemplate, renderTemplate } from "../lib/accreditation/templates.ts";
 
 function emptyDraft(definition) {
   return {
@@ -26,6 +26,13 @@ test("pilot definitions cover narrative, budget, and contract workflows", () => 
   const contract = REPORT_DEFINITIONS.big_brother_contract;
   assert.equal(contract.fields.find((field) => field.key === "signature_big_brother")?.lockedBlank, true);
   assert.equal(contract.fields.find((field) => field.key === "signature_little_brother")?.lockedBlank, true);
+});
+
+test("template tags include explicit and parenthesized PDF placeholders", () => {
+  assert.deepEqual(findVisibleTemplateTags("[[CHAPTER NAME]] {{effective_date}} (BIG BROTHER), and (LITTLE BROTHER)"), [
+    "CHAPTER NAME", "effective_date", "BIG BROTHER", "LITTLE BROTHER",
+  ]);
+  assert.deepEqual(findVisibleTemplateTags("ordinary (parenthetical) text and (AM)"), []);
 });
 
 test("officer overrides accept field keys and labels but ignore unknown instructions", () => {

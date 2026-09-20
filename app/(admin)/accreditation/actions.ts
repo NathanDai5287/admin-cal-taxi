@@ -14,7 +14,7 @@ import { isRetryableAiError } from "@/lib/accreditation/gemini";
 import { processDocument } from "@/lib/accreditation/processing";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
-import { inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
+import { findVisibleTemplateTags, inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
 import { analyzeTemplateWithAi, mappingFromAnalysis } from "@/lib/accreditation/template-ai";
 import { getAccreditationProviders } from "@/lib/accreditation/providers";
 import { extractSource } from "@/lib/accreditation/extract";
@@ -153,6 +153,39 @@ export async function uploadSource(formData: FormData) {
   }
 }
 
+function serviceErrorText(error: unknown) {
+  if (!error || typeof error !== "object") return String(error ?? "");
+  const row = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown; statusCode?: unknown };
+  return [row.code, row.statusCode, row.message, row.details, row.hint].filter(Boolean).join(" ");
+}
+
+function templateAnalysisResult(error: unknown) {
+  const message = error instanceof Error ? error.message : serviceErrorText(error);
+  if (isRetryableAiError(error)) return "template_ai_temporarily_unavailable";
+  if (/language-model provider|server AI credentials|api key/i.test(message)) return "template_ai_not_configured";
+  if (/PDF extraction requires|OCR provider/i.test(message)) return "template_ocr_not_configured";
+  if (/encrypted|PDF signature is invalid/i.test(message)) return "template_pdf_invalid_or_encrypted";
+  if (/safe processing limit|limited to 200 pages/i.test(message)) return "template_too_complex";
+  if (/malformed|Invalid structured response|Invalid structure/i.test(message)) return "template_ai_response_invalid";
+  return "template_analysis_failed";
+}
+
+function templateStorageResult(error: unknown, fallback = "template_storage_failed") {
+  const message = serviceErrorText(error);
+  if (/bucket.*not found|not found.*bucket/i.test(message)) return "template_storage_not_configured";
+  if (/row.level|unauthorized|forbidden|permission|42501/i.test(message)) return "template_storage_permission_denied";
+  if (/payload|too large|maximum|size/i.test(message)) return "template_file_too_large";
+  return fallback;
+}
+
+function templateRecordResult(error: unknown) {
+  const message = serviceErrorText(error);
+  if (/PGRST204|schema cache|analysis_status|example_storage_path|preview_storage_path/i.test(message)) return "template_database_update_required";
+  if (/23505|duplicate key|unique constraint/i.test(message)) return "template_version_conflict";
+  if (/row.level|permission|42501/i.test(message)) return "template_database_permission_denied";
+  return "template_record_failed";
+}
+
 export async function createAccreditationBatchItem(formData: FormData): Promise<BatchCreateResult> {
   const { userId } = await requireAccreditationAdmin();
   const cycleId = uuid.safeParse(formData.get("cycleId"));
@@ -282,8 +315,7 @@ export async function uploadTemplate(formData: FormData) {
       const blocks = await providers.ocr.extractLayout(bytes, file.name, fileMimeType(file));
       const tags: string[] = [...(inspection.tags ?? [])];
       for (const block of blocks) {
-        for (const match of block.text.matchAll(/\[\[\s*([^\]]+?)\s*\]\]|\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g)) {
-          const tag = (match[1] ?? match[2]).trim();
+        for (const tag of findVisibleTemplateTags(block.text)) {
           tags.push(tag);
           const key = tag.replace(/\s+/g, "_").toLowerCase();
           inspection.candidates[key] = { page: block.page, normalizedX: block.x, normalizedY: block.y, normalizedWidth: block.width, normalizedHeight: block.height };
@@ -312,16 +344,23 @@ export async function uploadTemplate(formData: FormData) {
     });
   } catch (error) {
     console.error("Accreditation template analysis failed", error);
-    redirect("/accreditation/templates?result=analysis_failed");
+    redirect(`/accreditation/templates?result=${templateAnalysisResult(error)}`);
   }
   const supabase = createAccreditationAdminClient();
   const versions = await supabase.from("accreditation_templates").select("version").eq("report_key", reportKey.data).order("version", { ascending: false }).limit(1);
+  if (versions.error) {
+    console.error("Accreditation template version lookup failed", versions.error);
+    redirect(`/accreditation/templates?result=${templateRecordResult(versions.error)}`);
+  }
   const version = Number(versions.data?.[0]?.version ?? 0) + 1;
   const templateId = crypto.randomUUID();
   const path = `${reportKey.data}/${templateId}/${safeName(file.name)}`;
   const mimeType = fileMimeType(file);
   const uploaded = await supabase.storage.from("accreditation-templates").upload(path, bytes, { contentType: mimeType });
-  if (uploaded.error) redirect("/accreditation/templates?result=upload_error");
+  if (uploaded.error) {
+    console.error("Accreditation template original upload failed", uploaded.error);
+    redirect(`/accreditation/templates?result=${templateStorageResult(uploaded.error)}`);
+  }
   const mapping = mappingFromAnalysis(analysis);
   let examplePath: string | null = null;
   if (exampleFile) {
@@ -329,7 +368,8 @@ export async function uploadTemplate(formData: FormData) {
     const exampleUpload = await supabase.storage.from("accreditation-templates").upload(examplePath, new Uint8Array(await exampleFile.arrayBuffer()), { contentType: fileMimeType(exampleFile) });
     if (exampleUpload.error) {
       await supabase.storage.from("accreditation-templates").remove([path]);
-      redirect("/accreditation/templates?result=example_upload_error");
+      console.error("Accreditation template example upload failed", exampleUpload.error);
+      redirect(`/accreditation/templates?result=${templateStorageResult(exampleUpload.error, "template_example_storage_failed")}`);
     }
   }
   const definition = getReportDefinition(reportKey.data)!;
@@ -339,16 +379,18 @@ export async function uploadTemplate(formData: FormData) {
     citations: ["USER"], confidence: 1, missingReason: null, officerOverride: true,
   }])) };
   let previewPath: string | null = null;
+  let previewFailure = "template_preview_render_failed";
   try {
     const rendered = await renderTemplate(bytes, format, mapping, sampleDraft);
     previewPath = `${reportKey.data}/${templateId}/preview.${rendered.extension}`;
+    previewFailure = "template_preview_storage_failed";
     const previewUpload = await supabase.storage.from("accreditation-templates").upload(previewPath, rendered.bytes, { contentType: rendered.mimeType });
-    if (previewUpload.error) throw new Error("Preview upload failed.");
+    if (previewUpload.error) throw previewUpload.error;
   } catch (error) {
     if (examplePath) await supabase.storage.from("accreditation-templates").remove([examplePath]);
     await supabase.storage.from("accreditation-templates").remove([path]);
     console.error("Accreditation template preview failed", error);
-    redirect("/accreditation/templates?result=preview_failed");
+    redirect(`/accreditation/templates?result=${previewFailure}`);
   }
   const inserted = await supabase.from("accreditation_templates").insert({
     id: templateId,
@@ -370,7 +412,8 @@ export async function uploadTemplate(formData: FormData) {
   });
   if (inserted.error) {
     await supabase.storage.from("accreditation-templates").remove([path, ...(examplePath ? [examplePath] : []), ...(previewPath ? [previewPath] : [])]);
-    redirect("/accreditation/templates?result=upload_error");
+    console.error("Accreditation template record insert failed", inserted.error);
+    redirect(`/accreditation/templates?result=${templateRecordResult(inserted.error)}`);
   }
   revalidatePath("/accreditation/templates");
   redirect(`/accreditation/templates?template=${templateId}&result=template_uploaded`);

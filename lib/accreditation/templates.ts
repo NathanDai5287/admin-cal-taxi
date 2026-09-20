@@ -29,6 +29,11 @@ export function validateTemplateFile(file: File) {
   return format;
 }
 
+export function findVisibleTemplateTags(text: string) {
+  return [...text.matchAll(/\[\[\s*([^\]]+?)\s*\]\]|\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}|\(\s*([A-Z][A-Z0-9 _.-]{2,})\s*\)/g)]
+    .map((match) => (match[1] ?? match[2] ?? match[3]).trim());
+}
+
 async function inspectPdf(bytes: Uint8Array): Promise<TemplateInspection> {
   const document = await PDFDocument.load(bytes, { ignoreEncryption: false });
   const candidates: TemplateMapping = {};
