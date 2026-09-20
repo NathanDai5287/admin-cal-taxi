@@ -43,7 +43,7 @@ export default function EventsPage() {
             <Image
               alt="Three people holding drinks during an outdoor evening gathering"
               fill
-              sizes="(max-width: 760px) 100vw, 55vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
               src={socialNightImage}
             />
             <figcaption>A social night together</figcaption>
@@ -52,27 +52,11 @@ export default function EventsPage() {
             <Image
               alt="Five people seated together at a restaurant table"
               fill
-              sizes="(max-width: 760px) 100vw, 45vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
               src={cocktailDinnerImage}
             />
             <figcaption>Dinner together</figcaption>
           </figure>
-        </div>
-      </section>
-
-      <section className="events-context" aria-labelledby="events-context-title">
-        <h2 id="events-context-title">Find your way in</h2>
-        <div>
-          <article>
-            <h3>Meet the chapter</h3>
-            <p>Prospective students can ask about recruitment and the next chance to visit.</p>
-            <Link href="/rush">Meet the chapter <Arrow /></Link>
-          </article>
-          <article>
-            <h3>Plan your own event</h3>
-            <p>Student groups and organizers can ask about dates at the chapter house.</p>
-            <Link href="/host#venue-inquiry">Start a venue inquiry <Arrow /></Link>
-          </article>
         </div>
       </section>
     </main>

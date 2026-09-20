@@ -20,7 +20,7 @@ export default function PublicHomePage() {
             fill
             fetchPriority="high"
             loading="eager"
-            sizes="(max-width: 760px) 100vw, 43vw"
+            sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
             src={awardsImage}
           />
           <div className="crossroads-shade" />
@@ -42,7 +42,7 @@ export default function PublicHomePage() {
             alt="Two Nu Chapter members holding the chapter flag during a trip"
             fill
             loading="eager"
-            sizes="(max-width: 760px) 100vw, 43vw"
+            sizes="(max-width: 760px) 100vw, (max-width: 2160px) 43vw, 908px"
             src={flagImage}
           />
           <div className="crossroads-shade" />
@@ -73,7 +73,7 @@ export default function PublicHomePage() {
           <Image
             alt="Nu Chapter members working together on an outdoor chapter project"
             fill
-            sizes="(max-width: 760px) 100vw, 58vw"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 58vw, 763px"
             src={workImage}
           />
           <figcaption>Shared work at the chapter house</figcaption>
@@ -82,14 +82,13 @@ export default function PublicHomePage() {
           <Image
             alt="Two friends together at a UC Berkeley graduation"
             fill
-            sizes="(max-width: 760px) 100vw, 32vw"
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 32vw, 436px"
             src={graduationImage}
           />
           <figcaption>Berkeley graduation</figcaption>
         </figure>
         <div className="chapter-invitation">
           <p>Come meet the people who make the chapter.</p>
-          <Link href="/rush">Meet the chapter <Arrow /></Link>
         </div>
       </section>
 
@@ -103,7 +102,7 @@ export default function PublicHomePage() {
             <Image
               alt="Two chapter members sharing a meal at the chapter house"
               fill
-              sizes="(max-width: 760px) 100vw, 55vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
               src={houseMealImage}
             />
             <figcaption>A meal at the chapter house</figcaption>
@@ -112,7 +111,7 @@ export default function PublicHomePage() {
             <Image
               alt="Four chapter members gathered around a restaurant table"
               fill
-              sizes="(max-width: 760px) 100vw, 45vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
               src={dinnerImage}
             />
             <figcaption>Dinner together</figcaption>
@@ -123,7 +122,6 @@ export default function PublicHomePage() {
       <section className="public-ledger" aria-labelledby="events-title">
         <div className="public-ledger-heading">
           <h2 id="events-title">What is happening</h2>
-          <Link href="/events">View events <Arrow /></Link>
         </div>
         <div className="public-empty-state">
           <p>New event dates are being prepared.</p>
@@ -139,9 +137,6 @@ export default function PublicHomePage() {
             The chapter house offers a large, flexible event space near the UC Berkeley campus.
             Our event team can help coordinate the setup.
           </p>
-          <Link className="public-action public-action-dark" href="/host">
-            Explore the venue <Arrow />
-          </Link>
         </div>
         <dl>
           <div><dt>Guest capacity</dt><dd>Up to 200</dd></div>
@@ -149,19 +144,6 @@ export default function PublicHomePage() {
           <div><dt>Setup</dt><dd>Flexible layout</dd></div>
           <div><dt>Support</dt><dd>Event coordination</dd></div>
         </dl>
-      </section>
-
-      <section className="paired-actions" aria-label="Contact options">
-        <Link href="/rush">
-          <span>For students</span>
-          <strong>Meet Nu Chapter</strong>
-          <Arrow />
-        </Link>
-        <Link href="/host#venue-inquiry">
-          <span>For organizers</span>
-          <strong>Ask about the house</strong>
-          <Arrow />
-        </Link>
       </section>
     </main>
   );

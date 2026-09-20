@@ -8,7 +8,7 @@
   --public-page: #f5f5f7;
   --public-surface: #ffffff;
   min-height: 100dvh;
-  overflow: hidden;
+  overflow-x: clip;
   background: var(--public-page);
   color: var(--public-ink);
   font-feature-settings: "ss01", "cv01", "cv11";
@@ -68,7 +68,8 @@
 }
 
 .public-header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 10;
   display: flex;
   min-height: 106px;
@@ -120,26 +121,15 @@
   transition: color 160ms ease, box-shadow 160ms ease;
 }
 
-.public-nav a:hover {
+.public-nav a:hover,
+.public-nav a[aria-current="page"] {
   color: var(--public-blue);
   box-shadow: inset 0 -2px var(--public-blue);
 }
 
-.public-nav-contact {
-  --public-contact-offset: clamp(24px, 3vw, 44px);
-  position: relative;
-  margin-left: var(--public-contact-offset);
-}
-
-.public-nav-contact::before {
-  position: absolute;
-  top: 50%;
-  left: calc(-1 * var(--public-contact-offset));
-  width: 1px;
-  height: 100%;
-  background: #9e9ea4;
-  content: "";
-  transform: translateY(-50%);
+#main-content,
+#venue-inquiry {
+  scroll-margin-top: 120px;
 }
 
 .crossroads {
@@ -251,12 +241,7 @@
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
-.public-action svg,
-.public-ledger-heading svg,
-.chapter-invitation svg,
-.events-context svg,
-.paired-actions svg,
-.host-process svg {
+.public-action svg {
   width: 22px;
   flex: 0 0 22px;
   fill: none;
@@ -266,12 +251,7 @@
   transition: transform 160ms ease;
 }
 
-.public-action:hover svg,
-.public-ledger-heading a:hover svg,
-.chapter-invitation a:hover svg,
-.events-context a:hover svg,
-.paired-actions a:hover svg,
-.host-process a:hover svg {
+.public-action:hover svg {
   transform: translateX(4px);
 }
 
@@ -414,19 +394,6 @@
   letter-spacing: -0.025em;
 }
 
-.chapter-invitation a,
-.public-ledger-heading a,
-.events-context a {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  color: var(--public-blue);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
 .chapter-moments,
 .rush-life {
   padding: clamp(80px, 10vw, 144px) clamp(24px, 6vw, 92px);
@@ -487,14 +454,6 @@
   aspect-ratio: 4 / 3;
 }
 
-.rush-life-outdoors {
-  aspect-ratio: 16 / 9;
-}
-
-.rush-life-city {
-  aspect-ratio: 3 / 4;
-}
-
 .chapter-moment img,
 .rush-life figure img {
   object-fit: cover;
@@ -546,7 +505,6 @@
 }
 
 .public-ledger-heading h2,
-.events-context h2,
 .venue-facts h2,
 .host-process h2 {
   margin: 0;
@@ -554,10 +512,6 @@
   font-weight: 720;
   letter-spacing: -0.035em;
   line-height: 1;
-}
-
-.public-ledger-heading a {
-  color: #8bc1df;
 }
 
 .public-empty-state {
@@ -642,51 +596,6 @@
   text-align: right;
   font-size: 18px;
   font-weight: 650;
-}
-
-.paired-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  background: var(--public-surface);
-}
-
-.paired-actions a {
-  position: relative;
-  display: grid;
-  min-height: 280px;
-  padding: clamp(44px, 6vw, 84px);
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto 1fr;
-  gap: 16px;
-  border-right: 1px solid var(--public-rule);
-  text-decoration: none;
-  transition: background-color 180ms ease, color 180ms ease;
-}
-
-.paired-actions a:hover {
-  background: var(--public-blue);
-  color: white;
-}
-
-.paired-actions span,
-.host-process a span {
-  grid-column: 1 / -1;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.paired-actions strong {
-  align-self: end;
-  font-size: clamp(28px, 3.5vw, 52px);
-  letter-spacing: -0.035em;
-  line-height: 1;
-}
-
-.paired-actions svg {
-  width: 34px;
-  align-self: end;
 }
 
 .public-footer {
@@ -799,42 +708,6 @@
   margin-top: 12px;
   color: var(--public-muted);
   font-size: 15px;
-  line-height: 1.6;
-}
-
-.events-context {
-  padding: clamp(80px, 10vw, 140px) clamp(24px, 7vw, 112px);
-  background: var(--public-page);
-}
-
-.events-context > div {
-  display: grid;
-  margin-top: 54px;
-  grid-template-columns: 1fr 1fr;
-  border-top: 1px solid var(--public-rule);
-}
-
-.events-context article {
-  padding: 36px 48px 16px 0;
-  border-right: 1px solid var(--public-rule);
-}
-
-.events-context article + article {
-  padding-right: 0;
-  padding-left: 48px;
-  border-right: 0;
-}
-
-.events-context h3 {
-  margin: 0;
-  font-size: 24px;
-}
-
-.events-context p {
-  max-width: 52ch;
-  min-height: 50px;
-  margin: 14px 0 26px;
-  color: var(--public-muted);
   line-height: 1.6;
 }
 
@@ -966,6 +839,28 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.host-space-video-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 0;
+  background: rgba(16, 16, 20, 0.84);
+  color: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background-color 160ms ease;
+}
+
+.host-space-video-toggle:hover {
+  background: rgba(16, 16, 20, 0.96);
 }
 
 .host-space-indoor .host-space-photo-lead img {
@@ -1174,33 +1069,6 @@
   line-height: 1.65;
 }
 
-.host-process > a {
-  display: grid;
-  min-height: 220px;
-  padding: 34px;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto 1fr;
-  background: var(--public-blue);
-  color: white;
-  text-decoration: none;
-  transition: background-color 160ms ease, transform 160ms ease;
-}
-
-.host-process > a:hover {
-  background: var(--public-blue-dark);
-  transform: translateY(-3px);
-}
-
-.host-process a strong {
-  align-self: end;
-  overflow-wrap: anywhere;
-  font-size: clamp(18px, 2vw, 26px);
-}
-
-.host-process a svg {
-  align-self: end;
-}
-
 .rush-intro {
   display: grid;
   max-width: 2240px;
@@ -1307,22 +1175,6 @@
   line-height: 1.65;
 }
 
-.rush-actions {
-  display: grid;
-  gap: 24px;
-}
-
-.rush-actions .public-action {
-  margin: 0;
-}
-
-.rush-actions > a:last-child {
-  justify-self: start;
-  color: var(--public-blue);
-  font-size: 13px;
-  font-weight: 750;
-}
-
 .rush-history {
   display: grid;
   padding: clamp(80px, 10vw, 140px) clamp(24px, 7vw, 112px);
@@ -1344,10 +1196,6 @@
 
   .public-nav {
     gap: 22px;
-  }
-
-  .public-nav-contact {
-    --public-contact-offset: 22px;
   }
 
   .crossroads {
@@ -1406,10 +1254,6 @@
     padding: 14px 0;
     font-size: 10px;
     letter-spacing: 0.11em;
-  }
-
-  .public-nav-contact {
-    --public-contact-offset: 12px;
   }
 
   .crossroads {
@@ -1503,11 +1347,6 @@
   .rush-life figcaption {
     right: 0;
     text-align: left;
-  }
-
-  .chapter-invitation {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .public-ledger-heading {
@@ -1624,16 +1463,8 @@
     grid-row: 4;
   }
 
-  .paired-actions,
-  .events-context > div,
   .venue-facts dl {
     grid-template-columns: 1fr;
-  }
-
-  .paired-actions a {
-    min-height: 220px;
-    border-right: 0;
-    border-bottom: 1px solid var(--public-rule);
   }
 
   .public-footer {
@@ -1645,19 +1476,11 @@
     text-align: left;
   }
 
-  .events-context article,
-  .events-context article + article {
-    padding: 32px 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--public-rule);
-  }
-
   .venue-facts dl div,
   .venue-facts dl div:nth-child(even) {
     padding: 24px 0;
     border-right: 0;
   }
-
 }
 
 @media (max-width: 420px) {
@@ -1675,10 +1498,6 @@
     flex: 0 0 auto;
     font-size: 9px;
     letter-spacing: 0.07em;
-  }
-
-  .public-nav-contact {
-    --public-contact-offset: 8px;
   }
 
   .crossroads-path {
@@ -1715,11 +1534,6 @@
   .events-ledger-heading {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .host-process > a {
-    min-height: 240px;
-    padding: 26px;
   }
 
   .rush-intro h1,

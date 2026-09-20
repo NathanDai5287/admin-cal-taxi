@@ -9,6 +9,7 @@ import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import indoorHallImage from "@/public/site/venue-indoor-hall.jpg";
 import indoorHallPortraitImage from "@/public/site/venue-indoor-hall-portrait.jpg";
 import { VenueInquiryForm } from "./venue-inquiry-form";
+import { VenueWalkthroughVideo } from "./venue-walkthrough-video";
 
 export const metadata: Metadata = {
   title: "Host with Us",
@@ -58,41 +59,31 @@ export default function HostPage() {
               alt="Five people posing behind a decorated table at an indoor event"
               label="Indoor event setup"
               position="lead"
-              sizes="(max-width: 760px) 100vw, 33vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 33vw, 510px"
               src={indoorEventImage}
             />
             <VenuePhoto
               alt="Chapter members at a cocktail night beneath blue and yellow balloons"
               label="Cocktail night"
               position="detail-one"
-              sizes="(max-width: 760px) 50vw, 33vw"
+              sizes="(max-width: 760px) 50vw, (max-width: 1800px) 33vw, 510px"
               src={indoorCocktailImage}
             />
             <VenuePhoto
               alt="The event hall dressed with pennant flags and a chapter banner"
               label="Chapter banner"
               position="detail-two"
-              sizes="(max-width: 760px) 50vw, 33vw"
+              sizes="(max-width: 760px) 50vw, (max-width: 1800px) 33vw, 510px"
               src={indoorHallPortraitImage}
             />
             <VenuePhoto
               alt="The open event hall with wood floors, pennant flags, and a Theta Xi banner"
               label="The open floor"
               position="detail-three"
-              sizes="(max-width: 760px) 100vw, 75vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 75vw, 1176px"
               src={indoorHallImage}
             />
-            <figure className="host-space-photo host-space-photo-video host-space-photo-real">
-              <video
-                aria-label="Video walkthrough of the indoor event space"
-                autoPlay
-                loop
-                muted
-                playsInline
-                src="/site/venue-indoor-walkthrough.mp4"
-              />
-              <figcaption>Walkthrough</figcaption>
-            </figure>
+            <VenueWalkthroughVideo />
           </div>
         </article>
 
@@ -108,7 +99,7 @@ export default function HostPage() {
               alt="A large daytime gathering in the backyard viewed from above"
               label="Backyard gathering"
               position="lead"
-              sizes="(max-width: 760px) 100vw, 66vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 66vw, 1043px"
               src={backyardPortraitImage}
             />
             <VenuePhotoPlaceholder label="Backyard photograph 2" position="detail-one" />

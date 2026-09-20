@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PublicNavLinks } from "./public-nav-links";
+
 export function PublicHeader() {
   return (
     <header className="public-header">
@@ -7,12 +9,7 @@ export function PublicHeader() {
         <span className="public-brand-mark" lang="el" aria-hidden="true">ΘΞ</span>
         <span>Theta Xi — Nu Chapter</span>
       </Link>
-      <nav className="public-nav" aria-label="Public site">
-        <Link href="/#chapter">Chapter</Link>
-        <Link href="/rush">Rush</Link>
-        <Link href="/events">Events</Link>
-        <Link href="/host">Host</Link>
-      </nav>
+      <PublicNavLinks />
     </header>
   );
 }

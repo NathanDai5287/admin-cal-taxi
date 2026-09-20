@@ -22,8 +22,8 @@ export default function RushPage() {
             Theta Xi has been part of UC Berkeley since 1910.
             Get to know the chapter and ask when you can visit next.
           </p>
-          <Link className="public-action public-action-light" href="#rush-contact">
-            Start here <Arrow />
+          <Link className="public-action public-action-light" href="/events">
+            Check public events <Arrow />
           </Link>
         </div>
         <figure>
@@ -32,7 +32,7 @@ export default function RushPage() {
             fill
             fetchPriority="high"
             loading="eager"
-            sizes="(max-width: 760px) 100vw, 46vw"
+            sizes="(max-width: 760px) 100vw, (max-width: 2240px) 50vw, 1120px"
             src={nightFlagImage}
           />
         </figure>
@@ -54,7 +54,7 @@ export default function RushPage() {
             <Image
               alt="A chapter member beside a large rock during an outdoor trip"
               fill
-              sizes="(max-width: 760px) 100vw, 60vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 60vw, 737px"
               src={outdoorsImage}
             />
             <figcaption>A day outdoors</figcaption>
@@ -63,7 +63,7 @@ export default function RushPage() {
             <Image
               alt="One person taking a selfie outside a city building"
               fill
-              sizes="(max-width: 760px) 100vw, 40vw"
+              sizes="(max-width: 760px) 100vw, (max-width: 1440px) 40vw, 492px"
               src={cityImage}
             />
             <figcaption>An everyday stop together</figcaption>
@@ -71,18 +71,13 @@ export default function RushPage() {
         </div>
       </section>
 
-      <section className="rush-invitation" id="rush-contact" aria-labelledby="rush-invitation-title">
+      <section className="rush-invitation" aria-labelledby="rush-invitation-title">
         <div>
           <h2 id="rush-invitation-title">Come say hello.</h2>
           <p>
             If you are interested in Theta Xi at UC Berkeley, check the public schedule.
             It will show the next confirmed chance to meet Nu Chapter.
           </p>
-        </div>
-        <div className="rush-actions">
-          <Link className="public-action public-action-dark" href="/events">
-            Check public events <Arrow />
-          </Link>
         </div>
       </section>
 
