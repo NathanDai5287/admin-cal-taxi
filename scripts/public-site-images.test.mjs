@@ -29,9 +29,9 @@ test("each supplied photograph has one public content placement", async () => {
   const files = await Promise.all([sourceFiles(publicApp), sourceFiles(publicComponents)]);
   const publicSource = (await Promise.all(files.flat().map((file) => readFile(file, "utf8")))).join("\n");
 
-  assert.equal(provenance.length, 13);
-  assert.equal(new Set(provenance.map(({ source }) => source)).size, 13);
-  assert.equal(new Set(provenance.map(({ asset }) => asset)).size, 13);
+  assert.equal(provenance.length, 17);
+  assert.equal(new Set(provenance.map(({ source }) => source)).size, 17);
+  assert.equal(new Set(provenance.map(({ asset }) => asset)).size, 17);
 
   for (const { asset, route, sourceSha256 } of provenance) {
     assert.match(sourceSha256, /^[a-f0-9]{64}$/);

@@ -3,7 +3,11 @@ import Image, { type StaticImageData } from "next/image";
 
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
+import exteriorImage from "@/public/site/venue-exterior.jpg";
+import indoorCocktailImage from "@/public/site/venue-indoor-cocktail.jpg";
 import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
+import indoorHallImage from "@/public/site/venue-indoor-hall.jpg";
+import indoorHallPortraitImage from "@/public/site/venue-indoor-hall-portrait.jpg";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 
 export const metadata: Metadata = {
@@ -33,25 +37,62 @@ export default function HostPage() {
             Ask about a date <Arrow />
           </a>
         </div>
+        <figure className="host-intro-photo">
+          <Image
+            alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
+            fill
+            sizes="(max-width: 760px) 100vw, 420px"
+            src={exteriorImage}
+          />
+        </figure>
       </header>
 
       <section className="host-spaces" aria-label="Venue spaces">
         <article className="host-space-showcase host-space-indoor">
           <header>
             <h2>Indoor venue</h2>
-            <p>One photograph shown. Three reserved.</p>
+            <p>Four photographs and a video.</p>
           </header>
           <div className="host-space-gallery">
             <VenuePhoto
               alt="Five people posing behind a decorated table at an indoor event"
               label="Indoor event setup"
               position="lead"
-              sizes="(max-width: 760px) 100vw, 42vw"
+              sizes="(max-width: 760px) 100vw, 33vw"
               src={indoorEventImage}
             />
-            <VenuePhotoPlaceholder label="Indoor photograph 2" position="detail-one" />
-            <VenuePhotoPlaceholder label="Indoor photograph 3" position="detail-two" />
-            <VenuePhotoPlaceholder label="Indoor photograph 4" position="detail-three" />
+            <VenuePhoto
+              alt="Chapter members at a cocktail night beneath blue and yellow balloons"
+              label="Cocktail night"
+              position="detail-one"
+              sizes="(max-width: 760px) 50vw, 33vw"
+              src={indoorCocktailImage}
+            />
+            <VenuePhoto
+              alt="The event hall dressed with pennant flags and a chapter banner"
+              label="Chapter banner"
+              position="detail-two"
+              sizes="(max-width: 760px) 50vw, 33vw"
+              src={indoorHallPortraitImage}
+            />
+            <VenuePhoto
+              alt="The open event hall with wood floors, pennant flags, and a Theta Xi banner"
+              label="The open floor"
+              position="detail-three"
+              sizes="(max-width: 760px) 100vw, 75vw"
+              src={indoorHallImage}
+            />
+            <figure className="host-space-photo host-space-photo-video host-space-photo-real">
+              <video
+                aria-label="Video walkthrough of the indoor event space"
+                autoPlay
+                loop
+                muted
+                playsInline
+                src="/site/venue-indoor-walkthrough.mp4"
+              />
+              <figcaption>Walkthrough</figcaption>
+            </figure>
           </div>
         </article>
 

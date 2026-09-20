@@ -11,5 +11,9 @@
   { "source": "DSC9428_compressed.jpg", "sourceSha256": "8b3d926a115e0c07ba1db37e42f759ca0f019e715fd31498941a3205d9983524", "asset": "chapter-social-night.jpg", "route": "/events" },
   { "source": "IMG_9920.jpg", "sourceSha256": "f17ac8d77a399fcf0e6d878fd2d17ef43fbcc7ed915bfc36790e4a8dbaae9e7b", "asset": "chapter-cocktail-dinner.jpg", "route": "/events" },
   { "source": "IMG_9740.jpg", "sourceSha256": "78bc7284514ea99590e72601e61d28f54db66adb05285001a706c709e2d70f55", "asset": "venue-indoor-event.jpg", "route": "/host" },
-  { "source": "backyard.jpg", "sourceSha256": "1c109c83eb3b4367386a0a2739b2a925ef71605deddc8ade09298b9631175be7", "asset": "venue-backyard-portrait.jpg", "route": "/host" }
+  { "source": "backyard.jpg", "sourceSha256": "1c109c83eb3b4367386a0a2739b2a925ef71605deddc8ade09298b9631175be7", "asset": "venue-backyard-portrait.jpg", "route": "/host" },
+  { "source": "0AA82406-FA3C-4C51-B14D-ADA1B78D0B11.webp", "sourceSha256": "31452582af774f5f4480779aeffd62edc3518dee9d1f6a85761c23b3d29539c1", "asset": "venue-indoor-hall.jpg", "route": "/host" },
+  { "source": "IMG_9308.webp", "sourceSha256": "ff96eeccfd42b1a5ea5b5a34e78a49dc7ca46a1c3db14502def8618f7162f967", "asset": "venue-indoor-cocktail.jpg", "route": "/host" },
+  { "source": "IMG_5235.webp", "sourceSha256": "e68c08ce214bc8be8cbdcac271bb3fc770d80611b5db79037f9ca526ec5f0d02", "asset": "venue-indoor-hall-portrait.jpg", "route": "/host" },
+  { "source": "IMG_5010.webp", "sourceSha256": "31f8e32bcc84d63db9036dff8e97f328e3e42759c909285294590857348096d3", "asset": "venue-exterior.jpg", "route": "/host" }
 ]
