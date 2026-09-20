@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { getReportDefinition } from "@/lib/accreditation/definitions";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
-import type { ReportDraft } from "@/lib/accreditation/types";
+import type { ReportDraft, TemplateAnalysis } from "@/lib/accreditation/types";
 import { approveReport, createSuccessorRun, generateDraft } from "../../actions";
+import { TemplateSubmissionChat } from "./template-submission-chat";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ const RESULT_MESSAGES: Record<string, string> = {
   approval_blocked: "Resolve validation errors before approval.",
   approval_error: "The approved archive could not be created.",
   approved: "Approved artifact archived successfully.",
+  generation_error: "The completed file could not be generated. Your conversation is still saved; retry after checking the template status.",
 };
 
 export default async function ReportWorkspace({
@@ -38,6 +40,43 @@ export default async function ReportWorkspace({
   if (!runResult.data) notFound();
   const run = runResult.data;
   const definition = getReportDefinition(run.report_key);
+  if (run.template_family_id) {
+    const [familyResult, templateResult, messagesResult, stateResult, revisionsResult] = await Promise.all([
+      supabase.from("accreditation_template_families").select("id,name,description").eq("id", run.template_family_id).maybeSingle(),
+      supabase.from("accreditation_templates").select("id,analysis,format").eq(run.template_id ? "id" : "template_family_id", run.template_id ?? run.template_family_id).maybeSingle(),
+      supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId).in("role", ["user", "assistant"]).order("created_at", { ascending: true }),
+      supabase.from("accreditation_run_working_state").select("draft,readiness").eq("run_id", runId).maybeSingle(),
+      supabase.from("accreditation_revisions").select("id").eq("run_id", runId).order("revision_number", { ascending: false }).limit(10),
+    ]);
+    const family = familyResult.data;
+    const template = templateResult.data;
+    if (!family || !template) notFound();
+    const analysis = template.analysis as TemplateAnalysis;
+    const state = stateResult.data;
+    const draft = (state?.draft as ReportDraft | null) ?? { fields: {} };
+    const missing = Array.isArray((state?.readiness as Record<string, unknown> | null)?.missing) ? (state?.readiness as { missing: string[] }).missing : analysis.fields.filter((field) => field.required && field.target && !draft.fields[field.key]?.value).map((field) => field.label);
+    const revisionIds = (revisionsResult.data ?? []).map((item: Record<string, unknown>) => String(item.id));
+    const artifactsResult = revisionIds.length ? await supabase.from("accreditation_artifacts").select("id,filename,kind").in("revision_id", revisionIds).order("created_at", { ascending: false }) : { data: [] };
+    const artifact = artifactsResult.data?.find((item: Record<string, unknown>) => item.kind === "draft") ?? null;
+    const messages = (messagesResult.data ?? []).map((item: Record<string, unknown>) => ({ role: item.role as "user" | "assistant", content: String(item.content) }));
+    const cycleRelation = Array.isArray(run.accreditation_cycles) ? run.accreditation_cycles[0] : run.accreditation_cycles;
+    const termRelation = Array.isArray(run.accreditation_terms) ? run.accreditation_terms[0] : run.accreditation_terms;
+    return (
+      <div className="space-y-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <section>
+            <Link href="/accreditation/templates" className="text-sm font-bold text-brand hover:underline">← Template library</Link>
+            <p className="page-eyebrow mt-5">{String(cycleRelation?.label ?? "Current academic year")}{termRelation?.label ? ` · ${termRelation.label}` : ""}</p>
+            <h1 className="page-title">{String(family.name)}</h1>
+            <p className="page-lede">{String(family.description || "Complete this official form through a short conversation.")}</p>
+          </section>
+          <span className={`badge mt-8 ${run.status === "ready_for_review" || run.status === "approved" ? "badge-approved" : "badge-pending"}`}>{label(String(run.status))}</span>
+        </div>
+        {query.result && RESULT_MESSAGES[query.result] ? <p className={`form-message ${query.result === "draft_ready" ? "success" : ""}`} role="status">{RESULT_MESSAGES[query.result]}</p> : null}
+        <TemplateSubmissionChat runId={runId} initialMessages={messages} initialDraft={draft} initialMissing={missing} initialReady={Boolean((state?.readiness as Record<string, unknown> | null)?.ready) && !missing.length} status={String(run.status)} draftArtifact={artifact ? { id: String(artifact.id), filename: String(artifact.filename) } : null} />
+      </div>
+    );
+  }
   if (!definition) notFound();
   const revisionsResult = await supabase.from("accreditation_revisions").select("*").eq("run_id", runId).order("revision_number", { ascending: false });
   const revisions = revisionsResult.data ?? [];

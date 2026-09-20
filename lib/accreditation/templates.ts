@@ -39,7 +39,8 @@ async function inspectPdf(bytes: Uint8Array): Promise<TemplateInspection> {
   const candidates: TemplateMapping = {};
   for (const field of document.getForm().getFields()) {
     const name = field.getName();
-    candidates[name] = { type: "text", fieldName: name };
+    const kind = field.constructor.name.toLowerCase();
+    candidates[name] = { type: kind.includes("checkbox") ? "checkbox" : kind.includes("radio") || kind.includes("dropdown") ? "choice" : "text", fieldName: name };
   }
   return {
     format: "pdf",
@@ -187,9 +188,17 @@ async function renderPdf(bytes: Uint8Array, mapping: TemplateMapping, draft: Rep
     const value = values[fieldKey] ?? "";
     if (fieldMapping.fieldName) {
       try {
-        form.getTextField(fieldMapping.fieldName).setText(value);
+        if (fieldMapping.type === "checkbox") {
+          const checkbox = form.getCheckBox(fieldMapping.fieldName);
+          if (/^(true|1|yes|on|checked)$/i.test(value)) checkbox.check(); else checkbox.uncheck();
+        } else if (fieldMapping.type === "choice") {
+          try { form.getDropdown(fieldMapping.fieldName).select(value); }
+          catch { form.getRadioGroup(fieldMapping.fieldName).select(value); }
+        } else {
+          form.getTextField(fieldMapping.fieldName).setText(value);
+        }
       } catch {
-        throw new Error(`Mapped PDF text field not found: ${fieldMapping.fieldName}`);
+        throw new Error(`Mapped PDF field not found: ${fieldMapping.fieldName}`);
       }
       continue;
     }
@@ -204,6 +213,14 @@ async function renderPdf(bytes: Uint8Array, mapping: TemplateMapping, draft: Rep
       const size = fieldMapping.size ?? 10;
       const maxWidth = fieldMapping.maxWidth ?? width ?? 440;
       if (width && height) page.drawRectangle({ x, y: y - height, width, height, color: rgb(1, 1, 1) });
+      if (fieldMapping.type === "checkbox") {
+        if (/^(true|1|yes|on|checked)$/i.test(value)) {
+          const markSize = Math.min(width ?? 10, height ?? 10);
+          page.drawLine({ start: { x: x + markSize * 0.15, y: y - markSize * 0.55 }, end: { x: x + markSize * 0.42, y: y - markSize * 0.82 }, thickness: 1, color: rgb(0, 0, 0) });
+          page.drawLine({ start: { x: x + markSize * 0.42, y: y - markSize * 0.82 }, end: { x: x + markSize * 0.9, y: y - markSize * 0.1 }, thickness: 1, color: rgb(0, 0, 0) });
+        }
+        continue;
+      }
       const characters = Math.max(15, Math.floor(maxWidth / (size * 0.55)));
       wrapText(value, characters).forEach((line, lineIndex) => {
         page.drawText(line, { x, y: y - lineIndex * size * 1.25, size, font, color: rgb(0, 0, 0), maxWidth });

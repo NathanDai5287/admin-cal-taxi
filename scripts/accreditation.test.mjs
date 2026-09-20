@@ -99,6 +99,19 @@ test("PDF inspection and rendering use confirmed AcroForm names", async () => {
   assert.equal(output.getForm().getTextField("chapter_name").getText(), "Theta Xi");
 });
 
+test("dynamic PDF mappings support checkbox fields", async () => {
+  const document = await PDFDocument.create();
+  const page = document.addPage([612, 792]);
+  const checkbox = document.getForm().createCheckBox("agree");
+  checkbox.addToPage(page, { x: 72, y: 700, width: 18, height: 18 });
+  const input = await document.save();
+  const rendered = await renderTemplate(input, "pdf", { agree: { type: "checkbox", fieldName: "agree" } }, {
+    fields: { agree: { value: "true", provenance: "user_input", citations: [], confidence: 1, missingReason: null, officerOverride: true } },
+  });
+  const output = await PDFDocument.load(rendered.bytes);
+  assert.equal(output.getForm().getCheckBox("agree").isChecked(), true);
+});
+
 test("DOCX inspection finds split placeholders and rendering preserves the package", async () => {
   const zip = new PizZip();
   zip.file("[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);

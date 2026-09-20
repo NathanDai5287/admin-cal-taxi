@@ -20,6 +20,8 @@ export type SourceKind =
 export type TemplateFormat = "pdf" | "docx" | "xlsx";
 export type FieldProvenance = "retrieved" | "app_snapshot" | "user_input";
 
+export type DynamicFieldValueMode = "exact" | "narrative" | "signature" | "date" | "checkbox" | "choice";
+
 export type CitationRef = {
   ref: string;
   sourceId?: string;
@@ -49,7 +51,7 @@ export type ReportFieldDefinition = {
   required: boolean;
   multiline?: boolean;
   lockedBlank?: boolean;
-  valueMode?: "exact" | "narrative" | "signature";
+  valueMode?: DynamicFieldValueMode;
 };
 
 export type ReportDefinition = {
@@ -70,7 +72,7 @@ export type ExtractedChunk = {
 };
 
 export type TemplateFieldMapping = {
-  type?: "text";
+  type?: "text" | "multiline" | "checkbox" | "choice" | "signature";
   placeholder?: string;
   /** DOCX paragraph anchor used when a template has no explicit placeholder. */
   paragraph?: number;
@@ -98,7 +100,7 @@ export type TemplateAnalysisField = {
   description: string;
   required: boolean;
   multiline?: boolean;
-  valueMode: "exact" | "narrative" | "signature";
+  valueMode: DynamicFieldValueMode;
   target: TemplateFieldMapping | null;
   confidence: number;
   rationale: string;
@@ -107,10 +109,26 @@ export type TemplateAnalysisField = {
 export type TemplateAnalysis = {
   name: string;
   description: string;
-  cadence: "annual" | "term";
+  cadence?: "annual" | "term";
   fields: TemplateAnalysisField[];
   warnings: string[];
   model: string;
+};
+
+export type TemplateFamily = {
+  id: string;
+  name: string;
+  description: string;
+  archived_at?: string | null;
+};
+
+export type DynamicDraftField = DraftField & {
+  label?: string;
+  mode?: DynamicFieldValueMode;
+};
+
+export type DynamicDraft = {
+  fields: Record<string, DynamicDraftField>;
 };
 
 export type TemplateInspection = {
