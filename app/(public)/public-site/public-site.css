@@ -144,7 +144,10 @@
 
 .crossroads {
   display: grid;
-  min-height: clamp(min(780px, calc(100dvh - 106px)), 44vw, 940px);
+  max-width: 2160px;
+  min-height: 620px;
+  margin: 0 auto;
+  aspect-ratio: 2.2 / 1;
   grid-template-columns: minmax(0, 1fr) minmax(190px, 16%) minmax(0, 1fr);
   background: var(--public-surface);
 }
@@ -325,7 +328,7 @@
   margin: 0 auto;
   padding: clamp(88px, 10vw, 150px) clamp(24px, 6vw, 92px);
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
-  grid-template-rows: auto minmax(280px, 38vw) auto;
+  grid-template-rows: auto minmax(280px, min(38vw, 700px)) auto;
   gap: clamp(24px, 4vw, 58px);
 }
 
@@ -910,7 +913,9 @@
 
 .host-space-showcase > header {
   display: flex;
+  max-width: 1800px;
   margin-bottom: clamp(38px, 5vw, 68px);
+  margin-inline: auto;
   align-items: end;
   justify-content: space-between;
   gap: 32px;
@@ -936,7 +941,7 @@
 
 .host-space-gallery {
   display: grid;
-  min-height: clamp(760px, 70vw, 1040px);
+  min-height: 760px;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: minmax(480px, 2fr) minmax(230px, 1fr);
   gap: clamp(12px, 1.5vw, 24px);
@@ -972,7 +977,10 @@
 }
 
 .host-space-backyard .host-space-gallery {
-  min-height: clamp(760px, 70vw, 1600px);
+  max-width: 1800px;
+  min-height: 760px;
+  margin-inline: auto;
+  aspect-ratio: 5 / 4;
   grid-template-rows: repeat(3, minmax(0, 1fr));
 }
 
@@ -997,7 +1005,10 @@
 }
 
 .host-space-indoor .host-space-gallery {
-  min-height: clamp(900px, 72vw, 1480px);
+  max-width: 1800px;
+  min-height: 900px;
+  margin-inline: auto;
+  aspect-ratio: 5 / 4;
   grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
@@ -1192,7 +1203,10 @@
 
 .rush-intro {
   display: grid;
-  min-height: min(760px, calc(100dvh - 106px));
+  max-width: 2240px;
+  min-height: 700px;
+  margin: 0 auto;
+  aspect-ratio: 2.4 / 1;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background: var(--public-blue);
   color: white;
@@ -1402,6 +1416,7 @@
     display: flex;
     min-height: 0;
     flex-direction: column;
+    aspect-ratio: auto;
   }
 
   .crossroads-path {
@@ -1515,6 +1530,7 @@
 
   .rush-intro {
     min-height: 0;
+    aspect-ratio: auto;
   }
 
   .rush-intro figure {
@@ -1557,11 +1573,13 @@
 
   .host-space-backyard .host-space-gallery {
     min-height: 0;
+    aspect-ratio: auto;
     grid-template-rows: minmax(390px, 1.3fr) minmax(230px, 0.8fr) minmax(230px, 0.8fr);
   }
 
   .host-space-indoor .host-space-gallery {
     min-height: 0;
+    aspect-ratio: auto;
     grid-template-rows: minmax(390px, 1.2fr) minmax(240px, 0.7fr) minmax(300px, 0.9fr) minmax(430px, 1.2fr);
   }
 
