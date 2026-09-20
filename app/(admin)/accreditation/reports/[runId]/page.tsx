@@ -35,19 +35,32 @@ export default async function ReportWorkspace({
   const [{ runId }, query] = await Promise.all([params, searchParams]);
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs")
-    .select("*, accreditation_cycles(label), accreditation_terms(label)")
+    .select("*, accreditation_cycles(label), accreditation_terms!accreditation_runs_term_cycle_fk(label)")
     .eq("id", runId).maybeSingle();
+  if (runResult.error) {
+    console.error("Accreditation submission lookup failed", runResult.error);
+    throw new Error("The submission could not be loaded.");
+  }
   if (!runResult.data) notFound();
   const run = runResult.data;
   const definition = getReportDefinition(run.report_key);
   if (run.template_family_id) {
+    let templateQuery = supabase.from("accreditation_templates").select("id,analysis,format");
+    templateQuery = run.template_id
+      ? templateQuery.eq("id", run.template_id)
+      : templateQuery.eq("template_family_id", run.template_family_id).eq("is_active", true);
     const [familyResult, templateResult, messagesResult, stateResult, revisionsResult] = await Promise.all([
       supabase.from("accreditation_template_families").select("id,name,description").eq("id", run.template_family_id).maybeSingle(),
-      supabase.from("accreditation_templates").select("id,analysis,format").eq(run.template_id ? "id" : "template_family_id", run.template_id ?? run.template_family_id).maybeSingle(),
+      templateQuery.maybeSingle(),
       supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId).in("role", ["user", "assistant"]).order("created_at", { ascending: true }),
       supabase.from("accreditation_run_working_state").select("draft,readiness").eq("run_id", runId).maybeSingle(),
       supabase.from("accreditation_revisions").select("id").eq("run_id", runId).order("revision_number", { ascending: false }).limit(10),
     ]);
+    const relatedError = familyResult.error ?? templateResult.error ?? messagesResult.error ?? stateResult.error ?? revisionsResult.error;
+    if (relatedError) {
+      console.error("Accreditation submission details failed", relatedError);
+      throw new Error("The submission details could not be loaded.");
+    }
     const family = familyResult.data;
     const template = templateResult.data;
     if (!family || !template) notFound();

@@ -498,7 +498,7 @@ export async function startTemplateSubmission(formData: FormData) {
     report_key: null,
     cycle_id: cycle.id,
     term_id: term?.id ?? null,
-    title: `${cycle.label} ${family.data.name}`,
+    title: `${cycle.label} ${family.data.name}`.slice(0, 160),
     created_by: userId,
   }).select("id").single();
   if (inserted.error) redirect("/accreditation/templates?result=start_error");
@@ -529,14 +529,19 @@ export async function sendTemplateMessage(formData: FormData) {
   const supabase = createAccreditationAdminClient();
   const run = await supabase.from("accreditation_runs").select("id,template_family_id,template_id,status").eq("id", runId.data).single();
   if (run.error || !run.data?.template_family_id || run.data.status === "approved") return { error: "This submission is no longer editable." };
+  let templateQuery = supabase.from("accreditation_templates").select("id,analysis,template_family_id");
+  templateQuery = run.data.template_id
+    ? templateQuery.eq("id", run.data.template_id)
+    : templateQuery.eq("template_family_id", run.data.template_family_id).eq("is_active", true);
   const [template, family, messages, state] = await Promise.all([
-    supabase.from("accreditation_templates").select("id,analysis,template_family_id").eq(run.data.template_id ? "id" : "template_family_id", run.data.template_id ?? run.data.template_family_id).maybeSingle(),
+    templateQuery.maybeSingle(),
     supabase.from("accreditation_template_families").select("name,description,guidance").eq("id", run.data.template_family_id).single(),
     supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId.data).order("created_at", { ascending: true }).limit(TEMPLATE_CHAT_MAX_HISTORY),
     supabase.from("accreditation_run_working_state").select("draft").eq("run_id", runId.data).maybeSingle(),
   ]);
   const analysis = parseTemplateAnalysis(template.data?.analysis);
   if (template.error || !template.data || !analysis || family.error || !family.data) return { error: "The active template is not ready for chat." };
+  if (messages.error || state.error) return { error: "The saved conversation could not be loaded. Try again." };
   const history = (messages.data ?? []).filter((item: Record<string, unknown>): item is TemplateChatMessage => (item.role === "user" || item.role === "assistant") && typeof item.content === "string");
   try {
     const result = await resolveTemplateChat({ analysis, guidance: family.data.guidance ?? "", history, draft: state.data?.draft as { fields: Record<string, import("@/lib/accreditation/types").DraftField> } | undefined, message: message.data });
@@ -574,15 +579,19 @@ export async function generateTemplateSubmission(formData: FormData) {
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs").select("id,template_family_id,template_id,cycle_id,status").eq("id", runId.data).single();
   if (runResult.error || !runResult.data?.template_family_id || runResult.data.status === "approved") redirect(reportPath(runId.data, "generation_error"));
+  let templateQuery = supabase.from("accreditation_templates").select("id,format,mapping,storage_path,analysis");
+  templateQuery = runResult.data.template_id
+    ? templateQuery.eq("id", runResult.data.template_id)
+    : templateQuery.eq("template_family_id", runResult.data.template_family_id).eq("is_active", true);
   const [templateResult, familyResult, stateResult] = await Promise.all([
-    supabase.from("accreditation_templates").select("id,format,mapping,storage_path,analysis").eq(runResult.data.template_id ? "id" : "template_family_id", runResult.data.template_id ?? runResult.data.template_family_id).maybeSingle(),
+    templateQuery.maybeSingle(),
     supabase.from("accreditation_template_families").select("name").eq("id", runResult.data.template_family_id).single(),
     supabase.from("accreditation_run_working_state").select("draft,readiness").eq("run_id", runId.data).maybeSingle(),
   ]);
   const analysis = parseTemplateAnalysis(templateResult.data?.analysis);
   const draft = stateResult.data?.draft as ReportDraft | undefined;
   const missing = analysis?.fields.filter((field) => field.required && field.target && !draft?.fields?.[field.key]?.value).map((field) => field.label) ?? [];
-  if (templateResult.error || !templateResult.data || !familyResult.data || !analysis || !draft || missing.length) redirect(reportPath(runId.data, "needs_input"));
+  if (templateResult.error || familyResult.error || stateResult.error || !templateResult.data || !familyResult.data || !analysis || !draft || missing.length) redirect(reportPath(runId.data, "needs_input"));
   await supabase.from("accreditation_runs").update({ status: "drafting" }).eq("id", runId.data).neq("status", "approved");
   try {
     const stored = await supabase.storage.from("accreditation-templates").download(templateResult.data.storage_path);

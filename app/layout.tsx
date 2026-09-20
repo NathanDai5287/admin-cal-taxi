@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+import { InlineScript } from "@/components/inline-script";
 import { themeInitScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -25,10 +26,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          id="theme-init"
-          dangerouslySetInnerHTML={{ __html: themeInitScript }}
-        />
+        <InlineScript id="theme-init" html={themeInitScript} />
       </head>
       <body className="antialiased">
         <template

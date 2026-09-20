@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import ExcelJS from "exceljs";
 import { PDFDocument } from "pdf-lib";
@@ -7,6 +8,19 @@ import PizZip from "pizzip";
 import { REPORT_DEFINITIONS } from "../lib/accreditation/definitions.ts";
 import { parseOfficerOverrides, validateDraft } from "../lib/accreditation/rules.ts";
 import { findVisibleTemplateTags, inspectTemplate, renderTemplate } from "../lib/accreditation/templates.ts";
+
+test("submission navigation disambiguates term relationships and keeps scripts inert on soft navigation", async () => {
+  const [workspace, layout, inlineScript] = await Promise.all([
+    readFile(new URL("../app/(admin)/accreditation/reports/[runId]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/inline-script.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(workspace, /accreditation_terms!accreditation_runs_term_cycle_fk/);
+  assert.ok(workspace.indexOf("if (runResult.error)") < workspace.indexOf("if (!runResult.data) notFound()"));
+  assert.match(layout, /<InlineScript id="theme-init"/);
+  assert.doesNotMatch(layout, /<script\b/);
+  assert.match(inlineScript, /typeof window === "undefined" \? "text\/javascript" : "text\/plain"/);
+});
 
 function emptyDraft(definition) {
   return {
