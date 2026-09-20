@@ -67,7 +67,7 @@ export default function HostPage() {
               alt="A large daytime gathering in the backyard viewed from above"
               label="Backyard gathering"
               position="lead"
-              sizes="(max-width: 760px) 100vw, 42vw"
+              sizes="(max-width: 760px) 100vw, 66vw"
               src={backyardPortraitImage}
             />
             <VenuePhotoPlaceholder label="Backyard photograph 2" position="detail-one" />
