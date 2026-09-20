@@ -1050,6 +1050,21 @@
   [data-brand] .spend-row-meta.is-good span:last-child {
     @apply text-ok font-semibold;
   }
+  [data-brand] .plan-grid {
+    @apply grid gap-px border border-rule bg-rule;
+  }
+  [data-brand] .plan-row {
+    @apply bg-surface px-4 py-3;
+  }
+  [data-brand] .plan-row-head {
+    @apply flex items-baseline justify-between gap-3;
+  }
+  [data-brand] .plan-row-head span {
+    @apply text-[13.5px] font-bold tabular-nums;
+  }
+  [data-brand] .plan-row-head small {
+    @apply text-[11.5px] font-normal text-muted;
+  }
   [data-brand] .spend-breakdown {
     @apply mt-3 border-t border-rule pt-3;
   }

@@ -124,9 +124,12 @@ test("planning page shows color-coded plan vs actual bars", async () => {
   assert.match(planningPage, /kind="income"/);
   assert.match(planningPage, /kind="expense"/);
   assert.match(planningPage, /spend-track/);
+  assert.match(planningPage, /plan-grid/);
   assert.match(planningPage, /kind === "income" \? "is-good" : "is-over"/);
   assert.match(brand, /\.spend-track span\.is-good/);
   assert.match(brand, /\.spend-row-meta\.is-good span:last-child/);
+  assert.match(brand, /\.plan-grid/);
+  assert.match(brand, /\.plan-row-head/);
 });
 
 test("hosting writes enforce source retention and payment integrity", async () => {
