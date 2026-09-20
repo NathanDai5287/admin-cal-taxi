@@ -48,8 +48,9 @@ export async function addManualExpense(
   const supabase = createAdminClient();
   let receiptPath: string | null = null;
   const receipt = formData.get("receipt");
-  if (receipt instanceof File && receipt.name) {
-    if (receipt.size === 0 || receipt.size > 3 * 1024 * 1024) return actionError("Choose a valid JPG or PNG image up to 3 MB.");
+  // The image is optional: an empty file input arrives as a zero-byte File.
+  if (receipt instanceof File && receipt.size > 0) {
+    if (receipt.size > 3 * 1024 * 1024) return actionError("Choose a valid JPG or PNG image up to 3 MB.");
     const bytes = new Uint8Array(await receipt.arrayBuffer());
     const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     const png = [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => bytes[i] === byte);

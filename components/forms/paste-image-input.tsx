@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { clipboardImage } from "@/lib/reimbursements/clipboard-image";
 import { replaceImagePreviewUrl } from "@/lib/reimbursements/image-preview";
+import { Button } from "@/components/brand/button";
 
 type PasteImageInputProps = {
   accept: string;
@@ -45,6 +46,15 @@ export function PasteImageInput({
     const nextUrl = replaceImagePreviewUrl(previewUrlRef.current, image);
     previewUrlRef.current = nextUrl;
     setPreviewUrl(nextUrl);
+  }
+
+  function clearImage() {
+    const input = activeRef.current;
+    if (!input) return;
+    // Clearing the value empties the file list; the change event lets this
+    // component and any parent onChange handler reset their state.
+    input.value = "";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   useEffect(() => () => {
@@ -99,16 +109,19 @@ export function PasteImageInput({
       type="file"
     />
     {previewUrl && (
-      <div className="relative mt-3 h-72 w-full border border-rule bg-canvas">
-        <Image
-          alt="Selected receipt preview"
-          className="object-contain"
-          fill
-          sizes="(max-width: 640px) 100vw, 640px"
-          src={previewUrl}
-          unoptimized
-        />
-      </div>
+      <>
+        <div className="relative mt-3 h-72 w-full border border-rule bg-canvas">
+          <Image
+            alt="Selected receipt preview"
+            className="object-contain"
+            fill
+            sizes="(max-width: 640px) 100vw, 640px"
+            src={previewUrl}
+            unoptimized
+          />
+        </div>
+        <Button className="mt-2" compact onClick={clearImage} type="button" variant="secondary">Remove image</Button>
+      </>
     )}
     <p aria-live="polite" className="field-hint">{pasteMessage}</p>
   </>;
