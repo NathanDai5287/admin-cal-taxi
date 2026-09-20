@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { StaticImageData } from "next/image";
 
 import { LightboxImage } from "@/components/public/lightbox-image";
+import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
 import exteriorImage from "@/public/site/venue-exterior.jpg";
@@ -9,8 +10,25 @@ import indoorCocktailImage from "@/public/site/venue-indoor-cocktail.jpg";
 import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import indoorHallImage from "@/public/site/venue-indoor-hall.jpg";
 import indoorHallPortraitImage from "@/public/site/venue-indoor-hall-portrait.jpg";
+import berkeleytimeLogo from "@/public/site/logos/berkeleytime.png";
+import codebaseLogo from "@/public/site/logos/codebase.png";
+import diversatechLogo from "@/public/site/logos/diversatech.png";
+import dssLogo from "@/public/site/logos/data-science-society.png";
+import gammaZetaAlphaLogo from "@/public/site/logos/gamma-zeta-alpha.png";
+import plextechLogo from "@/public/site/logos/plextech.png";
+import webdevLogo from "@/public/site/logos/webdev-at-berkeley.png";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 import { VenueWalkthroughVideo } from "./venue-walkthrough-video";
+
+const clubs: LogoItem[] = [
+  { name: "Gamma Zeta Alpha", src: gammaZetaAlphaLogo },
+  { name: "BerkeleyTime", src: berkeleytimeLogo },
+  { name: "Codebase", src: codebaseLogo },
+  { name: "WebDev at Berkeley", src: webdevLogo },
+  { name: "DiversaTech", src: diversatechLogo },
+  { name: "PlexTech", src: plextechLogo },
+  { name: "Data Science Society", src: dssLogo },
+];
 
 export const metadata: Metadata = {
   title: "Host with Us",
@@ -113,6 +131,11 @@ export default function HostPage() {
             </div>
           ))}
         </dl>
+      </section>
+
+      <section className="logo-showcase" aria-labelledby="clubs-title">
+        <h2 id="clubs-title">Clubs that have hosted with us.</h2>
+        <LogoGrid items={clubs} variant="clubs" />
       </section>
 
       <section className="host-process" aria-labelledby="host-process-title">

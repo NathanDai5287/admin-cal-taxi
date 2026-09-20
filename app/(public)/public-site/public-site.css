@@ -1178,6 +1178,63 @@
   background: var(--public-page);
 }
 
+.logo-showcase {
+  padding: clamp(80px, 10vw, 144px) clamp(24px, 6vw, 92px);
+  border-top: 1px solid var(--public-rule);
+}
+
+.logo-showcase h2 {
+  max-width: 1440px;
+  margin: 0 auto clamp(36px, 5vw, 72px);
+  font-size: clamp(34px, 4.5vw, 64px);
+  font-weight: 740;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.logo-grid {
+  display: grid;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-top: 1px solid var(--public-rule);
+  border-left: 1px solid var(--public-rule);
+  list-style: none;
+}
+
+.logo-grid-clubs {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.logo-grid li {
+  display: grid;
+  min-height: clamp(150px, 15vw, 200px);
+  padding: clamp(18px, 2.5vw, 32px);
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  border-right: 1px solid var(--public-rule);
+  border-bottom: 1px solid var(--public-rule);
+}
+
+.logo-grid img {
+  max-width: 76%;
+  max-height: 52px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.logo-grid span {
+  color: var(--public-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 @media (max-width: 960px) {
   .public-header {
     min-height: 88px;
@@ -1321,6 +1378,18 @@
 
   .rush-life-grid {
     gap: 16px;
+  }
+
+  .logo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .logo-grid-clubs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .logo-grid li {
+    min-height: 128px;
   }
 
   .rush-life figcaption {
