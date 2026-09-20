@@ -642,8 +642,25 @@
 }
 
 .venue-preview dl {
+  grid-column: 1;
+  grid-row: 2;
   margin: 0;
   border-top: 2px solid var(--public-blue);
+}
+
+.venue-preview-photo {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  width: 100%;
+  margin: 0;
+  align-self: center;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+}
+
+.venue-preview-photo img {
+  object-fit: cover;
 }
 
 .venue-preview dl div {
@@ -788,25 +805,13 @@
 .host-intro {
   display: grid;
   padding: clamp(82px, 10vw, 140px) clamp(24px, 7vw, 112px);
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
-  gap: clamp(48px, 8vw, 120px);
   background: var(--public-surface);
   color: var(--public-ink);
 }
 
-.host-intro-photo {
-  position: relative;
-  min-height: 460px;
-  margin: 0;
-  overflow: hidden;
-}
-
-.host-intro-photo img {
-  object-fit: cover;
-}
-
 .host-intro > div:first-child {
   display: flex;
+  max-width: 760px;
   align-items: flex-start;
   flex-direction: column;
   gap: 28px;
@@ -928,10 +933,6 @@
 
 .host-space-video-toggle:hover {
   background: rgba(16, 16, 20, 0.96);
-}
-
-.host-space-indoor .host-space-photo-lead img {
-  object-position: center 58%;
 }
 
 .host-space-backyard .host-space-photo-lead img {
@@ -1407,7 +1408,6 @@
   }
 
   .venue-preview,
-  .host-intro,
   .host-process,
   .rush-intro,
   .rush-invitation,
@@ -1429,12 +1429,17 @@
     grid-row: 2;
   }
 
-  .host-intro {
-    min-height: 0;
-  }
-
   .host-intro > div:first-child {
     gap: 24px;
+  }
+
+  .venue-preview dl {
+    grid-row: auto;
+  }
+
+  .venue-preview-photo {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .host-spaces {

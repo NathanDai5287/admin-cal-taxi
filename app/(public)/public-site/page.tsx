@@ -6,6 +6,7 @@ import flagImage from "@/public/site/chapter-flag.jpg";
 import graduationImage from "@/public/site/berkeley-graduation.jpg";
 import houseMealImage from "@/public/site/chapter-house-meal.jpg";
 import workImage from "@/public/site/chapter-work.jpg";
+import exteriorImage from "@/public/site/venue-exterior.jpg";
 import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 
@@ -123,6 +124,12 @@ export default function PublicHomePage() {
             Our event team can help coordinate the setup.
           </p>
         </div>
+        <LightboxImage
+          alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
+          className="venue-preview-photo"
+          sizes="(max-width: 760px) 100vw, (max-width: 1500px) 30vw, calc(40vw - 150px)"
+          src={exteriorImage}
+        />
         <dl>
           <div><dt>Guest capacity</dt><dd>Up to 200</dd></div>
           <div><dt>Location</dt><dd>Near campus</dd></div>

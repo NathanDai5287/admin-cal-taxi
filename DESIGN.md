@@ -248,6 +248,7 @@ The ΘΞ divider and square brand mark are the signature silhouettes. Directiona
 
 - **Structure:** The indoor space uses a four-photograph grid with a walkthrough video, while the backyard shows its confirmed gathering photograph on its own.
 - **Rhythm:** The indoor lead image anchors the grid, and every photograph keeps its own frame on narrow screens.
+- **Playback:** The walkthrough video plays automatically once half of it scrolls into view and pauses when it leaves; reduced-motion visitors and anyone who presses pause stay in control.
 - **Honesty:** Show only confirmed venue photographs. Never describe counts, reserved slots, or other page bookkeeping.
 
 ### Empty States

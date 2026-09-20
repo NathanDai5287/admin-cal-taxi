@@ -5,7 +5,6 @@ import { LightboxImage } from "@/components/public/lightbox-image";
 import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
-import exteriorImage from "@/public/site/venue-exterior.jpg";
 import indoorCocktailImage from "@/public/site/venue-indoor-cocktail.jpg";
 import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import indoorHallImage from "@/public/site/venue-indoor-hall.jpg";
@@ -57,12 +56,6 @@ export default function HostPage() {
             Ask about a date <Arrow />
           </a>
         </div>
-        <LightboxImage
-          alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
-          className="host-intro-photo"
-          sizes="(max-width: 760px) 100vw, 420px"
-          src={exteriorImage}
-        />
       </header>
 
       <section className="host-spaces" aria-label="Venue spaces">
@@ -72,25 +65,25 @@ export default function HostPage() {
           </header>
           <div className="host-space-gallery">
             <VenuePhoto
-              alt="Five people posing behind a decorated table at an indoor event"
-              label="Indoor event setup"
-              position="lead"
-              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 33vw, 510px"
-              src={indoorEventImage}
-            />
-            <VenuePhoto
               alt="Chapter members at a cocktail night beneath blue and yellow balloons"
               label="Cocktail night"
-              position="detail-one"
-              sizes="(max-width: 760px) 50vw, (max-width: 1800px) 33vw, 510px"
+              position="lead"
+              sizes="(max-width: 760px) 100vw, (max-width: 1800px) 33vw, 510px"
               src={indoorCocktailImage}
             />
             <VenuePhoto
               alt="The event hall dressed with pennant flags and a chapter banner"
               label="Chapter banner"
-              position="detail-two"
+              position="detail-one"
               sizes="(max-width: 760px) 50vw, (max-width: 1800px) 33vw, 510px"
               src={indoorHallPortraitImage}
+            />
+            <VenuePhoto
+              alt="Five people posing behind a decorated table at an indoor event"
+              label="Indoor event setup"
+              position="detail-two"
+              sizes="(max-width: 760px) 50vw, (max-width: 1800px) 33vw, 510px"
+              src={indoorEventImage}
             />
             <VenuePhoto
               alt="The open event hall with wood floors, pennant flags, and a Theta Xi banner"

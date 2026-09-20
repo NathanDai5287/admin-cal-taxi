@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 export function VenueWalkthroughVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const visibleRef = useRef(false);
+  const userPausedRef = useRef(false);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -11,28 +13,57 @@ export function VenueWalkthroughVideo() {
     if (!video) return;
 
     const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPlayback = () => {
-      if (motionQuery.matches) {
-        video.pause();
-        setPlaying(false);
-      } else {
-        video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-      }
+
+    const syncState = () => setPlaying(!video.paused);
+    video.addEventListener("play", syncState);
+    video.addEventListener("pause", syncState);
+
+    const attemptAutoplay = () => {
+      if (motionQuery.matches || userPausedRef.current || !visibleRef.current) return;
+      video.play().catch(() => setPlaying(false));
     };
 
-    syncPlayback();
-    motionQuery.addEventListener("change", syncPlayback);
-    return () => motionQuery.removeEventListener("change", syncPlayback);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          visibleRef.current = entry.isIntersecting;
+          if (entry.isIntersecting) {
+            attemptAutoplay();
+          } else {
+            video.pause();
+          }
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(video);
+
+    const onMotionChange = () => {
+      if (motionQuery.matches) {
+        video.pause();
+      } else {
+        attemptAutoplay();
+      }
+    };
+    motionQuery.addEventListener("change", onMotionChange);
+
+    return () => {
+      observer.disconnect();
+      motionQuery.removeEventListener("change", onMotionChange);
+      video.removeEventListener("play", syncState);
+      video.removeEventListener("pause", syncState);
+    };
   }, []);
 
   const togglePlayback = () => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
-      video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      userPausedRef.current = false;
+      video.play().catch(() => setPlaying(false));
     } else {
+      userPausedRef.current = true;
       video.pause();
-      setPlaying(false);
     }
   };
 
