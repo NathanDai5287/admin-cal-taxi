@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { BatchUploadQueue, processQueuedDocument, useBatchUploadQueue, type BatchQueueItem } from "@/components/accreditation/batch-upload-queue";
+import { Button } from "@/components/brand/button";
 import { MAX_BATCH_DOCUMENTS } from "@/lib/accreditation/batch";
 import { REPORT_DEFINITIONS } from "@/lib/accreditation/definitions";
 import { createAccreditationBatchItem, processAccreditationBatchItem } from "../actions";
@@ -69,7 +70,7 @@ export function BatchEvidenceUpload({ cycle, terms }: { cycle: Option | null; te
       <label className="field-label md:col-span-2">Documents<input className="file-input mt-1" type="file" name="files" multiple required accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json" /></label>
       <label className="block text-sm md:col-span-2"><input type="checkbox" name="signatureFree" required /> I removed signatures and unnecessary personal information from every selected document.</label>
       {error ? <p className="form-message md:col-span-2" role="alert">{error}</p> : null}
-      <div className="md:col-span-2"><button type="submit" disabled={!cycle || running} className="rounded bg-brand px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{running ? "Processing batch…" : "Upload and process documents"}</button></div>
+      <div className="md:col-span-2"><Button type="submit" disabled={!cycle || running}>{running ? "Processing batch…" : "Upload and process documents"}</Button></div>
       <div className="md:col-span-2"><BatchUploadQueue items={items} /></div>
     </form>
   );
