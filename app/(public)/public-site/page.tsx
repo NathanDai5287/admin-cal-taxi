@@ -85,24 +85,20 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      <section className="chapter-moments" aria-labelledby="chapter-moments-title">
-        <header>
-          <p>Chapter life</p>
-          <h2 id="chapter-moments-title">The everyday moments matter too.</h2>
-        </header>
-        <div className="chapter-moments-grid">
+      <section className="chapter-moments" aria-label="Chapter life">
+        <div className="chapter-moments-grid chapter-moments-grid-home">
           <LightboxImage
             alt="Two chapter members sharing a meal at the chapter house"
             caption="A meal at the chapter house"
             className="chapter-moment chapter-moment-social"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 31vw, 508px"
             src={houseMealImage}
           />
           <LightboxImage
             alt="Four chapter members gathered around a restaurant table"
             caption="Dinner together"
             className="chapter-moment chapter-moment-dinner"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 55vw, 904px"
             src={dinnerImage}
           />
         </div>

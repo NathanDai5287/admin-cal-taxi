@@ -50,14 +50,16 @@ export default function RushPage() {
             alt="A chapter member beside a large rock during an outdoor trip"
             caption="A day outdoors"
             className="rush-life-outdoors"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 60vw, 737px"
+            naturalAspect
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 66vw, 990px"
             src={outdoorsImage}
           />
           <LightboxImage
             alt="One person taking a selfie outside a city building"
             caption="An everyday stop together"
             className="rush-life-city"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 40vw, 492px"
+            naturalAspect
+            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 28vw, 418px"
             src={cityImage}
           />
         </div>

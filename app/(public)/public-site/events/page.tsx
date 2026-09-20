@@ -33,24 +33,20 @@ export default function EventsPage() {
         </div>
       </section>
 
-      <section className="chapter-moments" aria-labelledby="events-moments-title">
-        <header>
-          <p>Chapter life</p>
-          <h2 id="events-moments-title">Gatherings beyond the schedule.</h2>
-        </header>
-        <div className="chapter-moments-grid">
+      <section className="chapter-moments" aria-label="Chapter life">
+        <div className="chapter-moments-grid chapter-moments-grid-events">
           <LightboxImage
             alt="Three people holding drinks during an outdoor evening gathering"
             caption="A social night together"
             className="chapter-moment chapter-moment-social"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 55vw, 704px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 45vw, 747px"
             src={socialNightImage}
           />
           <LightboxImage
             alt="Five people seated together at a restaurant table"
             caption="Dinner together"
             className="chapter-moment chapter-moment-dinner"
-            sizes="(max-width: 760px) 100vw, (max-width: 1440px) 45vw, 521px"
+            sizes="(max-width: 760px) 100vw, (max-width: 1680px) 40vw, 664px"
             src={cocktailDinnerImage}
           />
         </div>

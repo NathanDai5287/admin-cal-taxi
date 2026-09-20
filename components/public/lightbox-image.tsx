@@ -9,6 +9,7 @@ type LightboxImageProps = {
   children?: React.ReactNode;
   className?: string;
   eager?: boolean;
+  naturalAspect?: boolean;
   sizes: string;
   src: StaticImageData;
 };
@@ -19,6 +20,7 @@ export function LightboxImage({
   children,
   className,
   eager = false,
+  naturalAspect = false,
   sizes,
   src,
 }: LightboxImageProps) {
@@ -34,7 +36,18 @@ export function LightboxImage({
 
   return (
     <>
-      <figure className={className}>
+      <figure
+        className={className}
+        style={
+          naturalAspect
+            ? {
+                aspectRatio: `${src.width} / ${src.height}`,
+                flexBasis: 0,
+                flexGrow: src.width / src.height,
+              }
+            : undefined
+        }
+      >
         <button
           type="button"
           className="lightbox-open"

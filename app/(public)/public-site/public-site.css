@@ -476,7 +476,6 @@
   background: var(--public-surface);
 }
 
-.chapter-moments > header,
 .rush-life > header {
   display: grid;
   max-width: 1440px;
@@ -486,7 +485,6 @@
   align-items: end;
 }
 
-.chapter-moments > header > p,
 .rush-life > header > p {
   margin: 0;
   color: var(--public-blue);
@@ -496,7 +494,6 @@
   text-transform: uppercase;
 }
 
-.chapter-moments h2,
 .rush-life h2 {
   max-width: 900px;
   margin: 0;
@@ -516,6 +513,27 @@
   gap: clamp(16px, 2vw, 32px);
 }
 
+.chapter-moments-grid-home {
+  grid-template-columns: 9fr 16fr;
+}
+
+.chapter-moments-grid-events {
+  grid-template-columns: 9fr 8fr;
+}
+
+.chapter-moments-grid-home .chapter-moment-social {
+  aspect-ratio: 3 / 4;
+}
+
+.chapter-moments-grid-home .chapter-moment-dinner,
+.chapter-moments-grid-events .chapter-moment-dinner {
+  aspect-ratio: 4 / 3;
+}
+
+.chapter-moments-grid-events .chapter-moment-social {
+  aspect-ratio: 3 / 2;
+}
+
 .chapter-moment,
 .rush-life figure {
   position: relative;
@@ -525,21 +543,9 @@
   background: #d9d9dc;
 }
 
-.chapter-moment {
-  aspect-ratio: 4 / 3;
-}
-
 .chapter-moment img,
 .rush-life figure img {
   object-fit: cover;
-}
-
-.chapter-moment-social img {
-  object-position: 56% center;
-}
-
-.chapter-moment-dinner img {
-  object-position: center;
 }
 
 .chapter-moment figcaption,
@@ -1303,7 +1309,6 @@
 
   .chapter-record-intro,
   .public-page-header,
-  .chapter-moments > header,
   .rush-life > header {
     grid-template-columns: 1fr;
     gap: 26px;
@@ -1316,10 +1321,6 @@
 
   .rush-life-grid {
     gap: 16px;
-  }
-
-  .chapter-moment {
-    aspect-ratio: 4 / 3;
   }
 
   .rush-life figcaption {
