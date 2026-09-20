@@ -115,6 +115,20 @@ test("approved reimbursements count toward actual expenses before they are paid"
   assert.match(planningPage, /reimbursed_at\?\.slice\(0, 10\) \?\? row\.receipt_date/);
 });
 
+test("planning page shows color-coded plan vs actual bars", async () => {
+  const [planningPage, brand] = await Promise.all([
+    readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/brand.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(planningPage, /kind="income"/);
+  assert.match(planningPage, /kind="expense"/);
+  assert.match(planningPage, /spend-track/);
+  assert.match(planningPage, /kind === "income" \? "is-good" : "is-over"/);
+  assert.match(brand, /\.spend-track span\.is-good/);
+  assert.match(brand, /\.spend-row-meta\.is-good span:last-child/);
+});
+
 test("hosting writes enforce source retention and payment integrity", async () => {
   const [migration, actions] = await Promise.all([
     readFile(new URL("../supabase/migrations/20260922000000_finance_plan_actual.sql", import.meta.url), "utf8"),

@@ -81,11 +81,31 @@ export default async function PlanningPage() {
       </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Breakdown title="Income by source" note="Select a row to open its source page">
-          {summary.incomeBreakdown.map((row) => <tr key={row.source}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={row.href}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
+        <Breakdown title="Income by source" note="Bars fill toward the plan; green means the plan was exceeded">
+          {summary.incomeBreakdown.map((row) => (
+            <PlanBarRow
+              actual={row.actual}
+              hasPlan={row.planned > 0}
+              href={row.href}
+              key={row.source}
+              kind="income"
+              label={row.label}
+              planned={row.planned}
+            />
+          ))}
         </Breakdown>
         <Breakdown title="Expenses by category" note="Includes approved reimbursements not yet paid">
-          {summary.expenseBreakdown.map((row) => <tr key={row.category}><td><Link className="font-semibold text-brand underline-offset-4 hover:underline" href={`/finance/reports?category=${row.category}`}>{row.label} →</Link></td><td className="amount">{formatMoney(row.planned)}</td><td className="amount">{formatMoney(row.actual)}</td></tr>)}
+          {summary.expenseBreakdown.map((row) => (
+            <PlanBarRow
+              actual={row.actual}
+              hasPlan={row.planned > 0 || budgets.get(row.category) != null}
+              href={`/finance/reports?category=${row.category}`}
+              key={row.category}
+              kind="expense"
+              label={row.label}
+              planned={row.planned}
+            />
+          ))}
         </Breakdown>
       </div>
 
@@ -112,7 +132,35 @@ function Total({ label, value, planned = false }: { label: string; value: number
 }
 
 function Breakdown({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
-  return <section className="min-w-0 border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="table-scroll"><table className="data-table border border-rule"><thead><tr><th>Source</th><th className="text-right">Planned</th><th className="text-right">Actual</th></tr></thead><tbody>{children}</tbody></table></div></section>;
+  return <section className="min-w-0 border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="spend-list border border-rule">{children}</div></section>;
+}
+
+function PlanBarRow({ actual, hasPlan, href, kind, label, planned }: { actual: number; hasPlan: boolean; href: string; kind: "income" | "expense"; label: string; planned: number }) {
+  const maximum = Math.max(planned, actual, 1);
+  const width = actual === 0 ? 0 : Math.max(2, Math.min(100, (actual / maximum) * 100));
+  const over = hasPlan && actual > planned;
+  // Going over is good news for income (green) but bad news for expenses (red).
+  const tone = over ? (kind === "income" ? "is-good" : "is-over") : "";
+  const percent = hasPlan && planned > 0 ? Math.round((actual / planned) * 100) : null;
+
+  let status = "";
+  if (over) status = `${formatMoney(actual - planned)} ${kind === "income" ? "above" : "over"} plan`;
+  else if (hasPlan && actual === planned) status = "On plan";
+  else if (hasPlan) status = `${formatMoney(planned - actual)} remaining`;
+
+  return (
+    <article className="spend-row">
+      <div className="spend-row-heading">
+        <Link className="text-[13.5px] font-semibold text-brand underline-offset-4 hover:underline" href={href}>{label} →</Link>
+        <span>{formatMoney(actual)}</span>
+      </div>
+      <div className="spend-track" aria-hidden="true"><span className={tone} style={{ width: `${width}%` }} /></div>
+      <div className={`spend-row-meta${tone ? ` ${tone}` : ""}`}>
+        <span>{hasPlan ? `${formatMoney(planned)} plan${percent === null ? "" : ` · ${percent}%`}` : "No plan set"}</span>
+        <span>{status}</span>
+      </div>
+    </article>
+  );
 }
 
 function WorkflowStep({ label, href, detail }: { label: string; href: string; detail: string }) {

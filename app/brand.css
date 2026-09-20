@@ -1038,11 +1038,17 @@
   [data-brand] .spend-track span.is-over {
     @apply bg-warn;
   }
+  [data-brand] .spend-track span.is-good {
+    @apply bg-ok;
+  }
   [data-brand] .spend-row-meta {
     @apply text-[11.5px] text-muted;
   }
   [data-brand] .spend-row-meta.is-over span:last-child {
     @apply text-warn font-semibold;
+  }
+  [data-brand] .spend-row-meta.is-good span:last-child {
+    @apply text-ok font-semibold;
   }
   [data-brand] .spend-breakdown {
     @apply mt-3 border-t border-rule pt-3;
