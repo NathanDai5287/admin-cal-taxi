@@ -12,6 +12,7 @@
     "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs",
     "test:members": "node --test scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs",
     "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs",
+    "test:review": "node --test scripts/review-decisions.test.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

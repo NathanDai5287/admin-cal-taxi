@@ -373,6 +373,7 @@ export type Database = {
           receipt_date: string | null;
           receipt_total: number | null;
           failure_reason: string | null;
+          denial_reason: string | null;
           reimbursed: boolean;
           reimbursed_at: string | null;
           reimbursement_date_is_estimated: boolean;
@@ -398,6 +399,7 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          denial_reason?: string | null;
           reimbursed?: boolean;
           reimbursed_at?: string | null;
           reimbursement_date_is_estimated?: boolean;
@@ -416,6 +418,7 @@ export type Database = {
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;
+          denial_reason?: string | null;
           reimbursed?: boolean;
           reimbursed_at?: string | null;
           reimbursement_date_is_estimated?: boolean;

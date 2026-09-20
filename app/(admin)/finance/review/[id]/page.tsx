@@ -32,7 +32,7 @@ export default async function SubmissionReviewPage({
   const supabase = createAdminClient();
   const { data: reimbursement } = await supabase
     .from("reimbursements")
-    .select("id, full_name, category, amount, description, payment_method, receipt_path, status, reimbursed, merchant, receipt_date, receipt_total, failure_reason, submitted_at")
+    .select("id, full_name, category, amount, description, payment_method, receipt_path, status, reimbursed, merchant, receipt_date, receipt_total, failure_reason, denial_reason, submitted_at")
     .eq("id", id)
     .single();
 
@@ -60,7 +60,7 @@ export default async function SubmissionReviewPage({
         : "The totals differ and need manual review.";
 
   return (
-    <ReviewStatusProvider reimbursementId={reimbursement.id} status={reimbursement.status}>
+    <ReviewStatusProvider initialDenialReason={reimbursement.denial_reason ?? ""} reimbursementId={reimbursement.id} status={reimbursement.status}>
       <RefreshWhile active={reimbursement.status === "pending"} />
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
         <div>
