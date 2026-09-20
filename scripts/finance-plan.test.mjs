@@ -33,7 +33,7 @@ function baseInput() {
     receivables: [],
     duesPayments: [],
     incomeEntries: [],
-    paidReimbursements: [],
+    approvedReimbursements: [],
     directExpenses: [],
     hostingOrders: [],
     hostingPayments: [],
@@ -97,8 +97,22 @@ test("dated payments are separate from planned charge dates", async () => {
 
   assert.match(planningPage, /chapter_dues_payment_events/);
   assert.match(planningPage, /\.gte\("paid_date", termStart\)/);
-  assert.match(planningPage, /\.gte\("reimbursed_at",/);
   assert.doesNotMatch(planningPage, /reimbursements[^\n]+\.gte\("submitted_at"/);
+});
+
+test("approved reimbursements count toward actual expenses before they are paid", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({
+    ...baseInput(),
+    approvedReimbursements: [{ category: "rush", amount: 391.22 }],
+  });
+
+  assert.equal(summary.actualExpenses, 391.22);
+  assert.equal(summary.expenseBreakdown.find((row) => row.category === "rush")?.actual, 391.22);
+
+  const planningPage = await readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(planningPage, /\.eq\("reimbursed", true\)/);
+  assert.match(planningPage, /reimbursed_at\?\.slice\(0, 10\) \?\? row\.receipt_date/);
 });
 
 test("hosting writes enforce source retention and payment integrity", async () => {

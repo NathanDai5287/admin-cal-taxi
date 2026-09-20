@@ -16,7 +16,7 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const supabase = await createClient();
   const { data: row, error } = await supabase.from("reimbursements")
-    .select("id, full_name, description, category, amount, status, reimbursed, submitted_at, payment_method, receipt_path")
+    .select("id, full_name, description, category, amount, status, reimbursed, denial_reason, submitted_at, payment_method, receipt_path")
     .eq("id", id).eq("user_id", userId).maybeSingle();
   if (error) return <p role="alert" className="form-message">We couldn’t load this reimbursement. Please refresh and try again.</p>;
   if (!row) notFound();
@@ -33,6 +33,7 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
     <section className="card mb-5 p-5">
       <div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">{status.label}</h2><span className="font-semibold text-brand">{memberPaymentStatus(row.status, row.reimbursed)}</span></div>
       <p className="mt-2 text-sm text-muted">{status.explanation}</p>
+      {row.status === "denied" && row.denial_reason && <p className="mt-2 text-sm text-ink"><span className="font-semibold">Reason for denial:</span> {row.denial_reason}</p>}
       {row.reimbursed && <p className="mt-2 text-sm text-muted">A treasurer has marked this request as paid.</p>}
       {row.status === "approved" && !row.reimbursed && <p className="mt-2 text-sm text-muted">Payment has not yet been marked as sent.</p>}
     </section>

@@ -4,10 +4,12 @@ export function ReimbursedCheckbox({
   disabled = false,
   onChange,
   reimbursed,
+  title,
 }: {
   disabled?: boolean;
   onChange: (reimbursed: boolean) => void;
   reimbursed: boolean;
+  title?: string;
 }) {
   return (
     <input
@@ -16,6 +18,7 @@ export function ReimbursedCheckbox({
       className="checkbox-brand"
       disabled={disabled}
       onChange={(event) => onChange(event.currentTarget.checked)}
+      title={title}
       type="checkbox"
     />
   );

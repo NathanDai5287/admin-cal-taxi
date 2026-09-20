@@ -36,7 +36,7 @@ export type PlanVsActualInput = {
   receivables: Receivable[];
   duesPayments: DuesPayment[];
   incomeEntries: IncomeEntry[];
-  paidReimbursements: Expense[];
+  approvedReimbursements: Expense[];
   directExpenses: Expense[];
   hostingOrders: HostingOrder[];
   hostingPayments: HostingPayment[];
@@ -66,7 +66,7 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
   const hostingPlanned = sum(confirmedHosting.map((order) => order.plannedRevenue));
   const hostingActual = sum(input.hostingPayments.filter((payment) => payment.kind === "revenue").map((payment) => payment.amount));
 
-  const actualExpenses = [...input.paidReimbursements, ...input.directExpenses];
+  const actualExpenses = [...input.approvedReimbursements, ...input.directExpenses];
   const expenseBreakdown = categories.map(([category, label]) => {
     const planned = cents(input.categoryBudgets[category] ?? 0)
       + (category === "house"

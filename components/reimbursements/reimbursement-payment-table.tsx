@@ -53,6 +53,9 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const denialDialogRef = useRef<HTMLDialogElement>(null);
+  const [denialTarget, setDenialTarget] = useState<PaymentTableRow | null>(null);
+  const [denialNote, setDenialNote] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [feedback, setFeedback] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -105,7 +108,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     });
   }
 
-  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus) {
+  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus, denialReason?: string) {
     const key = `${row.id}:status`;
     const previousStatus = row.status;
     setMutationError("");
@@ -113,7 +116,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     setFieldPending(key, true);
 
     try {
-      const result = await setReimbursementStatus(row.id, status);
+      const result = await setReimbursementStatus(row.id, status, denialReason);
       if (!result.ok) {
         patchRow(row.id, { status: previousStatus });
         setMutationError(result.message);
@@ -238,6 +241,29 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   function openReviewDialog() {
     setDialogError("");
     dialogRef.current?.showModal();
+  }
+
+  function requestStatusChange(row: PaymentTableRow, status: ReimbursementStatus) {
+    if (status === "denied") {
+      setDenialNote("");
+      setDenialTarget(row);
+      denialDialogRef.current?.showModal();
+      return;
+    }
+    void changeStatus(row, status);
+  }
+
+  function closeDenialDialog() {
+    denialDialogRef.current?.close();
+    setDenialTarget(null);
+  }
+
+  async function confirmDenial() {
+    const row = denialTarget;
+    if (!row) return;
+    denialDialogRef.current?.close();
+    setDenialTarget(null);
+    await changeStatus(row, "denied", denialNote.trim());
   }
 
   function closeReviewDialog() {
@@ -392,7 +418,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     <div className="inline-action">
                       <InlineStatusSelect
                         disabled={item.reimbursed || item.status === "pending" || pendingFields.has(`${item.id}:status`)}
-                        onChange={(status) => void changeStatus(item, status)}
+                        onChange={(status) => requestStatusChange(item, status)}
                         status={item.status}
                       />
                     </div>
@@ -400,9 +426,10 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td>
                     <div className="inline-action">
                       <ReimbursedCheckbox
-                        disabled={pendingFields.has(`${item.id}:reimbursed`)}
+                        disabled={item.status !== "approved" || pendingFields.has(`${item.id}:reimbursed`)}
                         onChange={(reimbursed) => void changeReimbursed(item, reimbursed)}
                         reimbursed={item.reimbursed}
+                        title={item.status === "approved" ? undefined : "Only approved reimbursements can be marked paid"}
                       />
                     </div>
                   </td>
@@ -469,6 +496,41 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
           <Button variant="primary" disabled={submitting || !selectedRows.length} onClick={confirmPayments} type="button">
             {submitting ? "Recording payouts…" : "Record selected as paid"}
           </Button>
+        </div>
+      </dialog>
+
+      <dialog
+        aria-labelledby="denial-note-heading"
+        className="payment-review-dialog"
+        onCancel={closeDenialDialog}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeDenialDialog();
+        }}
+        ref={denialDialogRef}
+      >
+        <div className="payment-review-heading">
+          <div>
+            <p className="page-eyebrow m-0">Review decision</p>
+            <h2 id="denial-note-heading">Deny {denialTarget ? `${denialTarget.full_name}’s` : "submission"} request</h2>
+          </div>
+          <button aria-label="Close denial dialog" className="payment-review-close" onClick={closeDenialDialog} type="button">×</button>
+        </div>
+        <div className="grid gap-2 px-6 pt-4">
+          <label className="field-label" htmlFor="payment-table-denial-note">Why is this being denied? (optional)</label>
+          <textarea
+            className="field-textarea"
+            id="payment-table-denial-note"
+            maxLength={500}
+            onChange={(event) => setDenialNote(event.currentTarget.value)}
+            placeholder="For example: the receipt is illegible, or the expense is not covered."
+            rows={3}
+            value={denialNote}
+          />
+          <p className="field-hint">The member sees this note with their denied request.</p>
+        </div>
+        <div className="payment-review-actions">
+          <Button variant="secondary" onClick={closeDenialDialog} type="button">Cancel</Button>
+          <Button variant="danger" onClick={confirmDenial} type="button">Deny submission</Button>
         </div>
       </dialog>
     </section>

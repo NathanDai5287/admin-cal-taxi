@@ -16,13 +16,15 @@ export type StatusMutationResult =
 export async function setReimbursementStatus(
   id: string,
   status: string,
+  denialReason?: string,
 ): Promise<StatusMutationResult> {
   await requireAdmin();
 
   const parsed = z.object({
     id: z.uuid(),
     status: z.enum(["approved", "denied"]),
-  }).safeParse({ id, status });
+    denialReason: z.string().trim().max(500).optional(),
+  }).safeParse({ id, status, denialReason });
   if (!parsed.success) {
     return { ok: false, message: "Choose a valid reimbursement status." };
   }
@@ -30,7 +32,10 @@ export async function setReimbursementStatus(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("reimbursements")
-    .update({ status: parsed.data.status })
+    .update({
+      status: parsed.data.status,
+      denial_reason: parsed.data.status === "denied" ? parsed.data.denialReason || null : null,
+    })
     .eq("id", parsed.data.id)
     .eq("reimbursed", false)
     .neq("status", "pending")
@@ -54,9 +59,11 @@ export async function setReimbursementStatus(
 }
 
 export async function updateStatus(formData: FormData) {
+  const denialReason = formData.get("denialReason");
   const result = await setReimbursementStatus(
     String(formData.get("id") ?? ""),
     String(formData.get("status") ?? ""),
+    typeof denialReason === "string" ? denialReason : undefined,
   );
   if (!result.ok) throw new Error(result.message);
 }
