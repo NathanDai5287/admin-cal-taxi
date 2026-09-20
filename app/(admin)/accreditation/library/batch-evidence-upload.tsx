@@ -6,12 +6,11 @@ import { useRouter } from "next/navigation";
 import { BatchUploadQueue, processQueuedDocument, useBatchUploadQueue, type BatchQueueItem } from "@/components/accreditation/batch-upload-queue";
 import { Button } from "@/components/brand/button";
 import { MAX_BATCH_DOCUMENTS } from "@/lib/accreditation/batch";
-import { REPORT_DEFINITIONS } from "@/lib/accreditation/definitions";
 import { createAccreditationBatchItem, processAccreditationBatchItem } from "../actions";
 
 type Option = { id: string; label: string };
 
-export function BatchEvidenceUpload({ cycle, terms }: { cycle: Option | null; terms: Option[] }) {
+export function BatchEvidenceUpload({ cycle, terms, families }: { cycle: Option | null; terms: Option[]; families: Option[] }) {
   const router = useRouter();
   const { items, setItems, updateItem } = useBatchUploadQueue("accreditation");
   const [running, setRunning] = useState(false);
@@ -36,7 +35,7 @@ export function BatchEvidenceUpload({ cycle, terms }: { cycle: Option | null; te
         const item = queue[index];
         updateItem(item.localId, { phase: "uploading", message: "Uploading document" });
         const upload = new FormData();
-        for (const key of ["cycleId", "termId", "kind", "reportKey", "signatureFree"]) {
+        for (const key of ["cycleId", "termId", "kind", "templateFamilyId", "signatureFree"]) {
           const value = form.get(key);
           if (value !== null) upload.set(key, value);
         }
@@ -66,7 +65,7 @@ export function BatchEvidenceUpload({ cycle, terms }: { cycle: Option | null; te
       <label className="field-label">Academic year<input type="hidden" name="cycleId" value={cycle?.id ?? ""} /><span className="field-input flex items-center">{cycle?.label ?? "Create an academic year first"}</span></label>
       <label className="field-label">Term<select className="field-input" name="termId"><option value="">Whole academic year</option>{terms.map((term) => <option key={term.id} value={term.id}>{term.label}</option>)}</select></label>
       <label className="field-label">Source class<select className="field-input" name="kind" defaultValue="chapter_evidence"><option value="official_guideline">Official guideline</option><option value="prior_submission">Prior submission</option><option value="chapter_evidence">Chapter evidence</option><option value="blank_template">Blank template reference</option></select></label>
-      <label className="field-label">Report scope<select className="field-input" name="reportKey"><option value="">Available to all reports</option>{Object.values(REPORT_DEFINITIONS).map((definition) => <option key={definition.key} value={definition.key}>{definition.name}</option>)}</select></label>
+      <label className="field-label">Form scope<select className="field-input" name="templateFamilyId"><option value="">Available to all forms</option>{families.map((family) => <option key={family.id} value={family.id}>{family.label}</option>)}</select></label>
       <label className="field-label md:col-span-2">Documents<input className="file-input mt-1" type="file" name="files" multiple required accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json" /></label>
       <label className="block text-sm md:col-span-2"><input type="checkbox" name="signatureFree" required /> I removed signatures and unnecessary personal information from every selected document.</label>
       {error ? <p className="form-message md:col-span-2" role="alert">{error}</p> : null}
