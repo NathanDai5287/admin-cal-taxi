@@ -80,8 +80,8 @@ export default async function PlanningPage() {
         </div>
       </section>
 
-      <div className="grid gap-5">
-        <Breakdown className="sm:grid-cols-3" title="Income by source" note="Bars fill toward the plan; green means the plan was exceeded">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Breakdown title="Income by source" note="Bars fill toward the plan; green means the plan was exceeded">
           {summary.incomeBreakdown.map((row) => (
             <PlanBarRow
               actual={row.actual}
@@ -94,7 +94,7 @@ export default async function PlanningPage() {
             />
           ))}
         </Breakdown>
-        <Breakdown className="sm:grid-cols-2 lg:grid-cols-3" title="Expenses by category" note="Includes approved reimbursements not yet paid">
+        <Breakdown title="Expenses by category" note="Includes approved reimbursements not yet paid">
           {summary.expenseBreakdown.map((row) => (
             <PlanBarRow
               actual={row.actual}
@@ -131,8 +131,8 @@ function Total({ label, value, planned = false }: { label: string; value: number
   return <article className={`min-w-0 border-r border-rule p-4 last:border-r-0 md:p-5 ${planned ? "bg-brand-light text-brand" : "bg-surface"}`}><span className={`block text-xs font-bold uppercase tracking-[.1em] ${planned ? "text-brand" : "text-muted"}`}>{label}</span><strong className="mt-2 block text-[clamp(20px,3vw,30px)] font-bold tracking-[-.03em] tabular-nums">{formatMoney(value)}</strong></article>;
 }
 
-function Breakdown({ title, note, className = "", children }: { title: string; note: string; className?: string; children: React.ReactNode }) {
-  return <section className="min-w-0 border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className={`plan-grid ${className}`}>{children}</div></section>;
+function Breakdown({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+  return <section className="min-w-0 self-start border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="plan-grid">{children}</div></section>;
 }
 
 function PlanBarRow({ actual, hasPlan, href, kind, label, planned }: { actual: number; hasPlan: boolean; href: string; kind: "income" | "expense"; label: string; planned: number }) {
