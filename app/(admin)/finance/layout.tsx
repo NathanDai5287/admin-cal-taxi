@@ -24,21 +24,20 @@ export default async function FinanceLayout({ children }: { children: React.Reac
     <div data-brand className="min-h-screen">
       <RefreshCurrentRoute />
       <AppNav
-        homeHref="/finance/accounts"
+        homeHref="/finance/planning"
         title="Theta Xi"
         subtitle="Finance"
         prefetchHrefs={[
-          "/finance/accounts",
+          "/finance/planning",
           "/finance/accounts/receivable",
           "/finance/accounts/payable",
           "/finance/accounts/activity",
-          "/finance/planning",
-          "/finance/reports",
         ]}
         tabs={[
-          { href: "/finance/accounts", label: "Accounts" },
           { href: "/finance/planning", label: "Planning" },
-          { href: "/finance/reports", label: "Reports" },
+          { href: "/finance/accounts/receivable", label: "Dues" },
+          { href: "/finance/accounts/payable", label: "Reimbursements" },
+          { href: "/finance/accounts/activity", label: "Transactions" },
         ]}
       />
       <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>

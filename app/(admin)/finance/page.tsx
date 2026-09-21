@@ -1,3 +1,3 @@
 import { redirect } from "next/navigation";
 
-export default function FinancePage() { redirect("/finance/accounts/receivable"); }
+export default function FinancePage() { redirect("/finance/planning"); }
