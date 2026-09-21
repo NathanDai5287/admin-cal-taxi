@@ -54,4 +54,5 @@ test("rush career logos link to distinct company websites", async () => {
   assert.equal(new Set(websites).size, 21);
   assert.match(logoGrid, /href=\{item\.href\}/);
   assert.match(logoGrid, /target="_blank"/);
+  assert.doesNotMatch(logoGrid, /Visit site/);
 });

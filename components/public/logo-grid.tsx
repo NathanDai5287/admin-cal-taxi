@@ -36,12 +36,6 @@ export function LogoGrid({
                 target="_blank"
               >
                 {logo}
-                <span className="logo-grid-link-label">
-                  Visit site
-                  <svg aria-hidden="true" viewBox="0 0 16 16">
-                    <path d="M4 12 12 4M6 4h6v6" />
-                  </svg>
-                </span>
               </a>
             ) : (
               <div className="logo-grid-item">{logo}</div>

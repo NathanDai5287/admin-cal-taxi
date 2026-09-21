@@ -1305,7 +1305,6 @@
 }
 
 .logo-grid-link {
-  padding-bottom: 44px;
   text-decoration: none;
   transition: background-color 180ms ease-out, color 180ms ease-out;
 }
@@ -1329,28 +1328,6 @@
   letter-spacing: 0.14em;
   text-align: center;
   text-transform: uppercase;
-}
-
-.logo-grid .logo-grid-link-label {
-  position: absolute;
-  right: 14px;
-  bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--public-blue);
-  font-size: 12px;
-  letter-spacing: 0.1em;
-}
-
-.logo-grid-link-label svg {
-  width: 13px;
-  height: 13px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: square;
-  stroke-linejoin: miter;
-  stroke-width: 1.5;
 }
 
 @media (max-width: 960px) {
