@@ -15,11 +15,14 @@ import janeStreetLogo from "@/public/site/logos/jane-street.png";
 import jpMorganLogo from "@/public/site/logos/jp-morgan.png";
 import kpmgLogo from "@/public/site/logos/kpmg.png";
 import mechanizeLogo from "@/public/site/logos/mechanize.png";
+import metaLogo from "@/public/site/logos/meta.png";
+import mongodbLogo from "@/public/site/logos/mongodb.png";
 import nvidiaLogo from "@/public/site/logos/nvidia.png";
 import optiverLogo from "@/public/site/logos/optiver.png";
 import oracleLogo from "@/public/site/logos/oracle.png";
 import robinhoodLogo from "@/public/site/logos/robinhood.png";
 import twitchLogo from "@/public/site/logos/twitch.png";
+import uberLogo from "@/public/site/logos/uber.png";
 import vanguardLogo from "@/public/site/logos/vanguard.png";
 import voleonLogo from "@/public/site/logos/voleon.png";
 import { LightboxImage } from "@/components/public/lightbox-image";
@@ -32,6 +35,9 @@ const companies: LogoItem[] = [
   { name: "KPMG", src: kpmgLogo, wordmark: true },
   { name: "Google DeepMind", src: deepmindLogo, wordmark: true },
   { name: "Google Antigravity", src: antigravityLogo },
+  { name: "Meta", src: metaLogo, wordmark: true },
+  { name: "MongoDB", src: mongodbLogo, wordmark: true },
+  { name: "Uber", src: uberLogo, wordmark: true },
   { name: "Vanguard", src: vanguardLogo, wordmark: true },
   { name: "JP Morgan", src: jpMorganLogo, wordmark: true },
   { name: "Voleon", src: voleonLogo, wordmark: true },
