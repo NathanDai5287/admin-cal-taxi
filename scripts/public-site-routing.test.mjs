@@ -32,3 +32,26 @@ test("horizontal navigation cannot scroll vertically", async () => {
   assert.equal(appNav.match(/overflow-x-auto overflow-y-hidden/g)?.length, 2);
   assert.doesNotMatch(appNav, /-mb-px/);
 });
+
+test("rush career logos link to distinct company websites", async () => {
+  const [rushPage, logoGrid] = await Promise.all([
+    readFile(
+      new URL("../app/(public)/public-site/rush/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../components/public/logo-grid.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  const websites = Array.from(
+    rushPage.matchAll(/href: "(https:\/\/[^\"]+)"/g),
+    ([, website]) => website,
+  );
+
+  assert.equal(websites.length, 21);
+  assert.equal(new Set(websites).size, 21);
+  assert.match(logoGrid, /href=\{item\.href\}/);
+  assert.match(logoGrid, /target="_blank"/);
+});
