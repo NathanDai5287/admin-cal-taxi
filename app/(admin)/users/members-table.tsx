@@ -2,7 +2,7 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole, updateDiscordUserId, updatePendingUserName } from "@/app/(admin)/users/actions";
+import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm, updatePendingUserName } from "@/app/(admin)/users/actions";
 import { Button } from "@/components/brand/button";
 import { userLabel } from "@/lib/reimbursements/user-label";
 
@@ -11,15 +11,23 @@ export type MemberRow = {
   fullName: string;
   email: string;
   discordUserId: string;
+  memberSinceTermId: string;
   role: "none" | "member" | "admin";
   hasSignedIn: boolean;
   statusLabel: string;
+};
+
+export type AcademicYearOption = {
+  id: string;
+  label: string;
+  terms: Array<{ id: string; label: string }>;
 };
 
 type OptimisticUpdate =
   | { type: "role"; userId: string; role: MemberRow["role"] }
   | { type: "name"; userId: string; fullName: string }
   | { type: "discord"; userId: string; discordUserId: string }
+  | { type: "academicTerm"; userId: string; memberSinceTermId: string }
   | { type: "remove"; userId: string };
 
 function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[] {
@@ -34,6 +42,11 @@ function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[
   if (update.type === "discord") {
     return members.map((member) =>
       member.id === update.userId ? { ...member, discordUserId: update.discordUserId } : member,
+    );
+  }
+  if (update.type === "academicTerm") {
+    return members.map((member) =>
+      member.id === update.userId ? { ...member, memberSinceTermId: update.memberSinceTermId } : member,
     );
   }
   return members.map((member) =>
@@ -185,7 +198,7 @@ function RemoveButton({ disabled, onRemove }: { disabled?: boolean; onRemove: ()
       className={
         "inline-flex h-8 w-8 items-center justify-center border transition-colors duration-150 cursor-pointer " +
         (armed
-          ? "bg-danger border-danger text-white text-[13px] font-bold"
+          ? "bg-danger border-danger text-white text-xs font-bold"
           : "bg-surface border-rule text-muted hover:text-warn hover:border-warn") +
         (disabled ? " opacity-40 cursor-not-allowed" : "")
       }
@@ -210,9 +223,11 @@ function RemoveButton({ disabled, onRemove }: { disabled?: boolean; onRemove: ()
 export function MembersTable({
   members,
   currentUserId,
+  academicYears,
 }: {
   members: MemberRow[];
   currentUserId: string;
+  academicYears: AcademicYearOption[];
 }) {
   const [optimisticMembers, applyOptimistic] = useOptimistic(members, applyUpdate);
   const [pending, startTransition] = useTransition();
@@ -273,6 +288,21 @@ export function MembersTable({
     });
   }
 
+  function changeAcademicTerm(userId: string, memberSinceTermId: string) {
+    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
+    setMemberPending(userId, true);
+    startTransition(async () => {
+      applyOptimistic({ type: "academicTerm", userId, memberSinceTermId });
+      try {
+        await updateMemberAcademicTerm(userId, memberSinceTermId);
+      } catch {
+        setErrors((current) => new Map(current).set(userId, "Unable to update that academic term. Please try again."));
+      } finally {
+        setMemberPending(userId, false);
+      }
+    });
+  }
+
   function remove(userId: string) {
     setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
     setMemberPending(userId, true);
@@ -300,6 +330,7 @@ export function MembersTable({
             <th>Name</th>
             <th>Email</th>
             <th>Discord ID</th>
+            <th>Member since</th>
             <th>Role</th>
             <th>Status</th>
             <th></th>
@@ -328,6 +359,22 @@ export function MembersTable({
                     member={member}
                     onSave={(discordUserId) => changeDiscordUserId(member.id, discordUserId)}
                   />
+                </td>
+                <td>
+                  <select
+                    aria-label={`Academic term for ${userLabel(member.fullName, member.email)}`}
+                    className="field-input min-w-40"
+                    disabled={memberPending || !academicYears.length}
+                    onChange={(event) => changeAcademicTerm(member.id, event.target.value)}
+                    value={member.memberSinceTermId}
+                  >
+                    <option value="">Not set</option>
+                    {academicYears.map((year) => (
+                      <optgroup key={year.id} label={year.label}>
+                        {year.terms.map((term) => <option key={term.id} value={term.id}>{term.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                 </td>
                 <td>
                   <select

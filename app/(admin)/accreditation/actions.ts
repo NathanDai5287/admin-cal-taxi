@@ -73,22 +73,39 @@ export async function createCycle(formData: FormData) {
     redirect("/accreditation?result=invalid_cycle");
   }
   const supabase = createAccreditationAdminClient();
-  const cycleId = crypto.randomUUID();
-  const cycle = await supabase.from("accreditation_cycles").insert({
+  let cycleId = crypto.randomUUID();
+  let createdYear = true;
+  const cycle = await supabase.from("academic_years").insert({
     id: cycleId,
     label: values.label,
     starts_on: values.fallStart,
     ends_on: values.springEnd,
     created_by: userId,
   });
-  if (cycle.error) redirect("/accreditation?result=cycle_error");
-  const terms = await supabase.from("accreditation_terms").insert([
+  if (cycle.error) {
+    const existing = await supabase.from("academic_years").select("id,academic_terms(id)").eq("label", values.label).maybeSingle();
+    if (!existing.data) redirect("/accreditation?result=cycle_error");
+    if (Array.isArray(existing.data.academic_terms) && existing.data.academic_terms.length >= 2) {
+      redirect("/accreditation?result=cycle_error");
+    }
+    cycleId = String(existing.data.id);
+    createdYear = false;
+    const updated = await supabase.from("academic_years").update({ starts_on: values.fallStart, ends_on: values.springEnd }).eq("id", cycleId);
+    if (updated.error) redirect("/accreditation?result=cycle_error");
+  }
+  const termRows = [
     { cycle_id: cycleId, season: "fall", label: `Fall ${values.label}`, starts_on: values.fallStart, ends_on: values.fallEnd },
     { cycle_id: cycleId, season: "spring", label: `Spring ${values.label}`, starts_on: values.springStart, ends_on: values.springEnd },
-  ]);
+  ];
+  const terms = await supabase.from("academic_terms").upsert(termRows, { onConflict: "cycle_id,season" }).select("id,starts_on,ends_on");
   if (terms.error) {
-    await supabase.from("accreditation_cycles").delete().eq("id", cycleId);
+    if (createdYear) await supabase.from("academic_years").delete().eq("id", cycleId);
     redirect("/accreditation?result=cycle_error");
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const currentTerm = terms.data?.find((term: { id: string; starts_on: string; ends_on: string }) => term.starts_on <= today && term.ends_on >= today);
+  if (currentTerm) {
+    await supabase.from("chapter_financial_settings").update({ academic_term_id: currentTerm.id, updated_by: userId }).eq("id", true);
   }
   revalidatePath("/accreditation", "layout");
   redirect(`/accreditation?cycle=${cycleId}&result=cycle_created`);
@@ -480,13 +497,13 @@ export async function startTemplateSubmission(formData: FormData) {
   const supabase = createAccreditationAdminClient();
   const [family, cycles, activeTemplate] = await Promise.all([
     supabase.from("accreditation_template_families").select("id, name").eq("id", familyId.data).is("archived_at", null).single(),
-    supabase.from("accreditation_cycles").select("id,label,starts_on,ends_on,accreditation_terms(id,label,starts_on,ends_on)").order("starts_on", { ascending: false }),
+    supabase.from("academic_years").select("id,label,starts_on,ends_on,academic_terms(id,label,starts_on,ends_on)").order("starts_on", { ascending: false }),
     supabase.from("accreditation_templates").select("id").eq("template_family_id", familyId.data).eq("is_active", true).single(),
   ]);
   if (family.error || !family.data || cycles.error || !cycles.data?.length || activeTemplate.error || !activeTemplate.data) redirect("/accreditation/templates?result=start_error");
   const today = new Date().toISOString().slice(0, 10);
   const cycle = ((cycles.data as Array<Record<string, unknown>>).find((item) => String(item.starts_on) <= today && String(item.ends_on) >= today) ?? cycles.data[0]) as Record<string, unknown>;
-  const terms = (Array.isArray((cycle as Record<string, unknown>).accreditation_terms) ? (cycle as Record<string, unknown>).accreditation_terms : []) as Array<Record<string, unknown>>;
+  const terms = (Array.isArray((cycle as Record<string, unknown>).academic_terms) ? (cycle as Record<string, unknown>).academic_terms : []) as Array<Record<string, unknown>>;
   const term = (requestedTerm ? terms.find((item) => String(item.id) === requestedTerm) ?? null : terms.find((item) => String(item.starts_on) <= today && String(item.ends_on) >= today) ?? null);
   let existingQuery = supabase.from("accreditation_runs").select("id").eq("template_family_id", familyId.data).eq("cycle_id", cycle.id).neq("status", "approved");
   existingQuery = term ? existingQuery.eq("term_id", term.id) : existingQuery.is("term_id", null);
@@ -659,7 +676,7 @@ export async function createRun(formData: FormData) {
   existingQuery = termId?.success ? existingQuery.eq("term_id", termId.data) : existingQuery.is("term_id", null);
   const existing = await existingQuery.maybeSingle();
   if (existing.data) redirect(reportPath(existing.data.id));
-  const cycle = await supabase.from("accreditation_cycles").select("label").eq("id", cycleId.data).single();
+  const cycle = await supabase.from("academic_years").select("label").eq("id", cycleId.data).single();
   if (cycle.error) redirect("/accreditation?result=invalid_report");
   const inserted = await supabase.from("accreditation_runs").insert({
     report_key: reportKey.data,

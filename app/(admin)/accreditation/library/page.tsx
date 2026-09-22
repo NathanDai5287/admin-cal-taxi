@@ -11,13 +11,13 @@ export default async function EvidenceLibrary({ searchParams }: { searchParams: 
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [cyclesResult, sourcesResult, familiesResult] = await Promise.all([
-    supabase.from("accreditation_cycles").select("*, accreditation_terms(*)").order("starts_on", { ascending: false }),
+    supabase.from("academic_years").select("*, academic_terms(*)").order("starts_on", { ascending: false }),
     supabase.from("accreditation_sources").select("*").order("created_at", { ascending: false }),
     supabase.from("accreditation_template_families").select("id,name").is("archived_at", null).order("name"),
   ]);
   const cycles = cyclesResult.data ?? [];
   const cycle = cycles.find((item: Record<string, unknown>) => item.id === params.cycle) ?? cycles[0] ?? null;
-  const terms = (cycle?.accreditation_terms ?? []) as Array<Record<string, unknown>>;
+  const terms = (cycle?.academic_terms ?? []) as Array<Record<string, unknown>>;
   const sources = (sourcesResult.data ?? []).filter((source: Record<string, unknown>) => source.cycle_id === cycle?.id);
   const families: Array<{ id: string; label: string }> = (familiesResult.data ?? []).map((family: Record<string, unknown>) => ({ id: String(family.id), label: String(family.name) }));
   return (

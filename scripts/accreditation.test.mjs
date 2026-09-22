@@ -15,7 +15,7 @@ test("submission navigation disambiguates term relationships and keeps scripts i
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/inline-script.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(workspace, /accreditation_terms!accreditation_runs_term_cycle_fk/);
+  assert.match(workspace, /academic_terms!accreditation_runs_term_cycle_fk/);
   assert.ok(workspace.indexOf("if (runResult.error)") < workspace.indexOf("if (!runResult.data) notFound()"));
   assert.match(layout, /<InlineScript id="theme-init"/);
   assert.doesNotMatch(layout, /<script\b/);

@@ -167,14 +167,14 @@ function normalizeDraft(value: unknown, definition: ReportDefinition, allowedRef
 export async function buildDraft(runId: string, instruction: string): Promise<DraftBuildResult> {
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs")
-    .select("id, report_key, cycle_id, term_id, status, accreditation_cycles(label)")
+    .select("id, report_key, cycle_id, term_id, status, academic_years(label)")
     .eq("id", runId).single();
   if (runResult.error || !runResult.data) throw new Error("The report workspace could not be loaded.");
   const run = runResult.data as Record<string, unknown>;
   if (run.status === "approved") throw new Error("Approved reports are immutable. Create a new report version instead.");
   const definition = getReportDefinition(String(run.report_key));
   if (!definition) throw new Error("Unknown report definition.");
-  const cycleRelation = run.accreditation_cycles as { label?: string } | Array<{ label?: string }> | null;
+  const cycleRelation = run.academic_years as { label?: string } | Array<{ label?: string }> | null;
   const cycleLabel = Array.isArray(cycleRelation) ? cycleRelation[0]?.label ?? "Academic year" : cycleRelation?.label ?? "Academic year";
   const [retrieval, snapshot, templateResult, storedDefinition] = await Promise.all([
     definition.key === "annual_report" && process.env.ACCREDITATION_GEMINI_REPORTS_ENABLED === "true" ? retrieveEvidence(String(run.cycle_id), run.term_id ? String(run.term_id) : null, definition.key, instruction, definition) : Promise.resolve({ evidence: [] as EvidenceRow[], manifest: [] as Array<Record<string, unknown>> }),

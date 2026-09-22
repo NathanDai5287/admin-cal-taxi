@@ -22,13 +22,21 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const settingsResult = await supabase
     .from("chapter_financial_settings")
-    .select("chapter_name, opening_cash, term_label, term_start, term_end")
+    .select("chapter_name, opening_cash, term_label, term_start, term_end, academic_terms(label, starts_on, ends_on)")
     .eq("id", true)
     .maybeSingle();
 
   if (settingsResult.error) return Response.json({ error: "financial_report_data_unavailable" }, { status: 500 });
   if (!settingsResult.data) return Response.json({ error: "financial_report_settings_unavailable" }, { status: 500 });
-  const settings = settingsResult.data;
+  const academicTerm = Array.isArray(settingsResult.data.academic_terms)
+    ? settingsResult.data.academic_terms[0]
+    : settingsResult.data.academic_terms;
+  const settings = {
+    ...settingsResult.data,
+    term_label: academicTerm?.label ?? settingsResult.data.term_label,
+    term_start: academicTerm?.starts_on ?? settingsResult.data.term_start,
+    term_end: academicTerm?.ends_on ?? settingsResult.data.term_end,
+  };
 
   const [incomeResult, budgetsResult, reimbursementsResult, manualResult, receivablesResult, duesPaymentsResult, liabilitiesResult, hostingPaymentsResult, hostingPlansResult] = await Promise.all([
     loadAllPages((from, to) => supabase

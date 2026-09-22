@@ -35,7 +35,7 @@ export default async function ReportWorkspace({
   const [{ runId }, query] = await Promise.all([params, searchParams]);
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs")
-    .select("*, accreditation_cycles(label), accreditation_terms!accreditation_runs_term_cycle_fk(label)")
+    .select("*, academic_years(label), academic_terms!accreditation_runs_term_cycle_fk(label)")
     .eq("id", runId).maybeSingle();
   if (runResult.error) {
     console.error("Accreditation submission lookup failed", runResult.error);
@@ -72,8 +72,8 @@ export default async function ReportWorkspace({
     const artifactsResult = revisionIds.length ? await supabase.from("accreditation_artifacts").select("id,filename,kind").in("revision_id", revisionIds).order("created_at", { ascending: false }) : { data: [] };
     const artifact = artifactsResult.data?.find((item: Record<string, unknown>) => item.kind === "draft") ?? null;
     const messages = (messagesResult.data ?? []).map((item: Record<string, unknown>) => ({ role: item.role as "user" | "assistant", content: String(item.content) }));
-    const cycleRelation = Array.isArray(run.accreditation_cycles) ? run.accreditation_cycles[0] : run.accreditation_cycles;
-    const termRelation = Array.isArray(run.accreditation_terms) ? run.accreditation_terms[0] : run.accreditation_terms;
+    const cycleRelation = Array.isArray(run.academic_years) ? run.academic_years[0] : run.academic_years;
+    const termRelation = Array.isArray(run.academic_terms) ? run.academic_terms[0] : run.academic_terms;
     return (
       <div className="space-y-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
@@ -111,8 +111,8 @@ export default async function ReportWorkspace({
     key: String(field.key), label: String(field.label ?? field.key), description: String(field.description ?? ""), required: Boolean(field.required), multiline: Boolean(field.multiline),
   })) : definition.fields;
   const missing = displayFields.filter((field) => field.required && !draft?.fields[field.key]?.value);
-  const cycleRelation = Array.isArray(run.accreditation_cycles) ? run.accreditation_cycles[0] : run.accreditation_cycles;
-  const termRelation = Array.isArray(run.accreditation_terms) ? run.accreditation_terms[0] : run.accreditation_terms;
+  const cycleRelation = Array.isArray(run.academic_years) ? run.academic_years[0] : run.academic_years;
+  const termRelation = Array.isArray(run.academic_terms) ? run.academic_terms[0] : run.academic_terms;
 
   return (
     <div className="space-y-7">

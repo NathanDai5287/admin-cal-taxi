@@ -15,12 +15,17 @@ export default async function PlanningPage() {
   await requireAdmin();
   const supabase = createAdminClient();
   const settingsResult = await supabase.from("chapter_financial_settings")
-    .select("term_label, term_start, term_end")
+    .select("term_label, term_start, term_end, academic_terms(label, starts_on, ends_on)")
     .eq("id", true)
     .single();
   if (settingsResult.error) throw new Error(`Unable to load the current term: ${settingsResult.error.message}`);
 
-  const { term_label: termLabel, term_start: termStart, term_end: termEnd } = settingsResult.data;
+  const academicTerm = Array.isArray(settingsResult.data.academic_terms)
+    ? settingsResult.data.academic_terms[0]
+    : settingsResult.data.academic_terms;
+  const termLabel = academicTerm?.label ?? settingsResult.data.term_label;
+  const termStart = academicTerm?.starts_on ?? settingsResult.data.term_start;
+  const termEnd = academicTerm?.ends_on ?? settingsResult.data.term_end;
   const [budgetResult, incomeResult, receivablesResult, duesPaymentsResult, reimbursementsResult, expensesResult, hostingResult, hostingPaymentsResult] = await Promise.all([
     supabase.from("reimbursement_budgets").select("*"),
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("kind, amount, source").gte("budget_date", termStart).lte("budget_date", termEnd).order("id").range(from, to)),

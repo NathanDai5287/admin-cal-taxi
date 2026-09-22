@@ -9,6 +9,69 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      academic_years: {
+        Row: {
+          id: string;
+          label: string;
+          starts_on: string;
+          ends_on: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          label: string;
+          starts_on: string;
+          ends_on: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          label?: string;
+          starts_on?: string;
+          ends_on?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      academic_terms: {
+        Row: {
+          id: string;
+          cycle_id: string;
+          season: "fall" | "spring";
+          label: string;
+          starts_on: string;
+          ends_on: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cycle_id: string;
+          season: "fall" | "spring";
+          label: string;
+          starts_on: string;
+          ends_on: string;
+          created_at?: string;
+        };
+        Update: {
+          cycle_id?: string;
+          season?: "fall" | "spring";
+          label?: string;
+          starts_on?: string;
+          ends_on?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "accreditation_terms_cycle_id_fkey";
+            columns: ["cycle_id"];
+            isOneToOne: false;
+            referencedRelation: "academic_years";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       venue_inquiries: {
         Row: {
           id: string;
@@ -95,6 +158,7 @@ export type Database = {
         Row: {
           id: boolean;
           chapter_name: string;
+          academic_term_id: string;
           term_label: string;
           term_start: string;
           term_end: string;
@@ -105,6 +169,7 @@ export type Database = {
         Insert: {
           id?: boolean;
           chapter_name?: string;
+          academic_term_id: string;
           term_label: string;
           term_start: string;
           term_end: string;
@@ -114,6 +179,7 @@ export type Database = {
         };
         Update: {
           chapter_name?: string;
+          academic_term_id?: string;
           term_label?: string;
           term_start?: string;
           term_end?: string;
@@ -121,7 +187,15 @@ export type Database = {
           updated_by?: string | null;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "chapter_financial_settings_academic_term_id_fkey";
+            columns: ["academic_term_id"];
+            isOneToOne: false;
+            referencedRelation: "academic_terms";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       hosting_finance_orders: {
         Row: {
@@ -291,6 +365,7 @@ export type Database = {
           removed_at: string | null;
           has_signed_in: boolean;
           discord_user_id: string;
+          member_since_term_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -301,6 +376,7 @@ export type Database = {
           removed_at?: string | null;
           has_signed_in?: boolean;
           discord_user_id?: string;
+          member_since_term_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -310,8 +386,17 @@ export type Database = {
           removed_at?: string | null;
           has_signed_in?: boolean;
           discord_user_id?: string;
+          member_since_term_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "profiles_member_since_term_id_fkey";
+            columns: ["member_since_term_id"];
+            isOneToOne: false;
+            referencedRelation: "academic_terms";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       mcp_audit_log: {
         Row: {
@@ -448,7 +533,11 @@ export type Database = {
         Returns: Json;
       };
       admin_invite_email: {
-        Args: { invite_email: string; invite_role: "none" | "member" | "admin" };
+        Args: {
+          invite_email: string;
+          invite_role: "none" | "member" | "admin";
+          invite_member_since_term_id?: string | null;
+        };
         Returns: undefined;
       };
       admin_remove_profile: {
@@ -461,6 +550,10 @@ export type Database = {
       };
       admin_set_profile_discord_id: {
         Args: { new_discord_user_id: string; target_user_id: string };
+        Returns: undefined;
+      };
+      admin_set_profile_academic_term: {
+        Args: { new_academic_term_id: string | null; target_user_id: string };
         Returns: undefined;
       };
       admin_set_profile_role: {

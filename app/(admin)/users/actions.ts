@@ -27,9 +27,14 @@ export async function inviteUser(formData: FormData) {
   await requireAdmin("/");
   const emails = parseInviteEmails(formData.get("email"));
   const role = formData.get("role");
+  const memberSinceTermValue = String(formData.get("memberSinceTermId") ?? "");
+  const memberSinceTermId = memberSinceTermValue || null;
 
   if (!isInviteRole(role)) {
     throw new Error("Invite role must be member or admin.");
+  }
+  if (memberSinceTermId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(memberSinceTermId)) {
+    throw new Error("Choose a valid academic term.");
   }
 
   const supabase = await createClient();
@@ -40,6 +45,7 @@ export async function inviteUser(formData: FormData) {
       supabase.rpc("admin_invite_email", {
         invite_email: email,
         invite_role: role,
+        invite_member_since_term_id: memberSinceTermId,
       }),
     ),
   );
@@ -62,6 +68,30 @@ export async function inviteUser(formData: FormData) {
 
   revalidatePath("/users");
   revalidatePath("/finance/accounts/receivable");
+}
+
+export async function updateMemberAcademicTerm(userId: string, academicTermId: string) {
+  await requireAdmin("/");
+  const normalizedTermId = academicTermId.trim() || null;
+
+  if (!userId) {
+    throw new Error("Missing user.");
+  }
+  if (normalizedTermId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizedTermId)) {
+    throw new Error("Choose a valid academic term.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_profile_academic_term", {
+    target_user_id: userId,
+    new_academic_term_id: normalizedTermId,
+  });
+
+  if (error) {
+    throw new Error("Unable to update the member's academic term. Please try again.");
+  }
+
+  revalidatePath("/users");
 }
 
 export async function setUserRole(userId: string, role: string) {

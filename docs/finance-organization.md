@@ -14,7 +14,7 @@
 
 The Finance home redirects to Accounts. Old dues and reimbursement URLs redirect to their new pages. Submission and authentication URLs remain compatible.
 
-All activity belongs to the current term for now. There is no term selector or editable term calendar. Date filters on Reports are ordinary report filters; full financial exports include all current activity rather than silently filtering against the old term settings.
+All activity belongs to the current academic term. Academic years and their Fall/Spring terms are shared with Accreditation and Members; Finance stores a reference to that calendar instead of maintaining independent dates. Creating an academic year that contains today also makes its matching term the Finance reporting period. Date filters on Reports remain ordinary report filters.
 
 ## Data and rollout
 
@@ -38,7 +38,7 @@ This is a separate feature, not implemented by the financial PDF/CSV/JSON export
 
 The intended feature is an admin-only, versioned snapshot file that can be downloaded, stored with snapshot metadata in the database, and restored. Inventory all website state first: Finance tables, profiles/invites and authentication references, private receipts, Host data/documents and its backend, and Rush data in its separate Redis service. A database-only finance export is not a whole-site snapshot.
 
-Restore should validate the schema version and referenced files, show the concrete changes, create a pre-restore snapshot, and restore records and files together. Decide whether file bytes live in the snapshot file or in storage referenced by the database snapshot record. Restore must suppress external side effects such as Discord messages and invitation emails; never serialize service credentials or live sessions. Term management can be designed with this feature later.
+Restore should validate the schema version and referenced files, show the concrete changes, create a pre-restore snapshot, and restore records and files together. Decide whether file bytes live in the snapshot file or in storage referenced by the database snapshot record. Restore must suppress external side effects such as Discord messages and invitation emails; never serialize service credentials or live sessions. The shared academic calendar and member-term relationships must be included in any whole-site snapshot.
 
 ## Verification
 

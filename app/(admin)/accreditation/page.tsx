@@ -22,7 +22,7 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [cyclesResult, familiesResult, templatesResult, sourcesResult, runsResult] = await Promise.all([
-    supabase.from("accreditation_cycles").select("*, accreditation_terms(*)").order("starts_on", { ascending: false }),
+    supabase.from("academic_years").select("*, academic_terms(*)").order("starts_on", { ascending: false }),
     supabase.from("accreditation_template_families").select("*").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("accreditation_templates").select("template_family_id, format, is_active, analysis_status"),
     supabase.from("accreditation_sources").select("cycle_id, status"),
@@ -34,7 +34,7 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
   const activeTemplates = (templatesResult.data ?? []).filter((template: Record<string, unknown>) => template.is_active);
   const activeByFamily = new Map<string, Record<string, unknown>>(activeTemplates.map((template: Record<string, unknown>) => [String(template.template_family_id), template]));
   const readySources = (sourcesResult.data ?? []).filter((source: Record<string, unknown>) => source.cycle_id === selectedCycle?.id && source.status === "ready").length;
-  const terms: Array<Record<string, unknown>> = ((selectedCycle?.accreditation_terms ?? []) as Array<Record<string, unknown>>).sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
+  const terms: Array<Record<string, unknown>> = ((selectedCycle?.academic_terms ?? []) as Array<Record<string, unknown>>).sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
   const cycleRuns = (runsResult.data ?? []).filter((run: Record<string, unknown>) => run.cycle_id === selectedCycle?.id);
 
   return (
