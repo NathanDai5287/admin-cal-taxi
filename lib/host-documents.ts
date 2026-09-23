@@ -141,6 +141,8 @@ export function buildDepositPayload(
     amount:     f.amount,
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
+    // Forfeiture clause 3c cites the contract's 4a attendance cap.
+    max_guests: effective(d, "maxGuests"),
   };
   if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
   return withTreasurer(body, d);
