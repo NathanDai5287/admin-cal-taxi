@@ -60,7 +60,7 @@ export default function PublicHomePage() {
         <div><dt>Home</dt><dd>Berkeley, CA</dd></div>
       </dl>
 
-      <section className={`chapter-record ${styles.photoSection} ${styles.photoGrid}`} id="chapter" aria-labelledby="chapter-title">
+      <section className={`chapter-record ${styles.photoSection}`} id="chapter" aria-labelledby="chapter-title">
         <div className="chapter-record-intro">
           <h2 id="chapter-title">A chapter built in Berkeley.</h2>
           <p>
@@ -68,20 +68,22 @@ export default function PublicHomePage() {
             chapter traditions, and life beyond the classroom.
           </p>
         </div>
-        <LightboxImage
-          alt="Nu Chapter members working together on an outdoor chapter project"
-          caption="Shared work at the chapter house"
-          className="record-image record-image-work"
-          sizes="(max-width: 760px) 100vw, (max-width: 1624px) 56vw, 896px"
-          src={workImage}
-        />
-        <LightboxImage
-          alt="Two friends together at a UC Berkeley graduation"
-          caption="Berkeley graduation"
-          className="record-image record-image-graduation"
-          sizes="(max-width: 760px) 100vw, (max-width: 1624px) 32vw, 512px"
-          src={graduationImage}
-        />
+        <div className={`chapter-record-photos ${styles.photoGrid}`}>
+          <LightboxImage
+            alt="Nu Chapter members working together on an outdoor chapter project"
+            caption="Shared work at the chapter house"
+            className="record-image record-image-work"
+            sizes="(max-width: 760px) 100vw, (max-width: 1624px) 56vw, 896px"
+            src={workImage}
+          />
+          <LightboxImage
+            alt="Two friends together at a UC Berkeley graduation"
+            caption="Berkeley graduation"
+            className="record-image record-image-graduation"
+            sizes="(max-width: 760px) 100vw, (max-width: 1624px) 32vw, 512px"
+            src={graduationImage}
+          />
+        </div>
         <div className="chapter-invitation">
           <p>Come meet the people who make the chapter.</p>
         </div>
