@@ -10,9 +10,9 @@ import {
   locatorLabel,
 } from "@/lib/accreditation/chat";
 import {
-  askAccreditationChat,
   deleteAccreditationAskChat,
   loadAccreditationAskChat,
+  type AccreditationChatResult,
   type AccreditationAskChatSummary,
   type AccreditationAskChatTurn,
   type AccreditationChatSource,
@@ -27,6 +27,7 @@ type Message = {
   sources?: AccreditationChatSource[];
   policyUsed?: boolean;
   policyDate?: string;
+  streaming?: boolean;
 };
 
 const suggestions = [
@@ -216,38 +217,89 @@ export function PolicyChat({
       form.set("message", content);
       if (chatId) form.set("chatId", chatId);
       submittedAttachments.forEach((file) => form.append("attachments", file));
-      let result: Awaited<ReturnType<typeof askAccreditationChat>>;
+      const streamAnswerId = `${userMessageId}:stream`;
+      let result: AccreditationChatResult | undefined;
+      const appendDelta = (delta: string) => {
+        if (!delta) return;
+        setMessages((current) => {
+          const existing = current.find((message) => message.id === streamAnswerId);
+          if (existing) return current.map((message) => message.id === streamAnswerId ? { ...message, content: message.content + delta } : message);
+          return [...current, { id: streamAnswerId, role: "assistant", content: delta, streaming: true }];
+        });
+      };
       try {
-        result = await askAccreditationChat(form);
-      } catch {
-        setMessages((current) => current.filter((message) => message.id !== userMessageId));
-        setError("The assistant could not answer right now. Please try again.");
+        const response = await fetch("/api/accreditation/ask/stream", { method: "POST", body: form });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(body?.error ?? "The assistant could not answer right now. Please try again.");
+        }
+        if (!response.body) throw new Error("The assistant could not answer right now. Please try again.");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const handleEvent = (frame: string) => {
+          let event = "message";
+          const data: string[] = [];
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("event:")) event = line.slice(6).trim();
+            else if (line.startsWith("data:")) data.push(line.slice(5).trimStart());
+          }
+          if (!data.length) return;
+          const payload = JSON.parse(data.join("\n")) as { text?: string; error?: string } & AccreditationChatResult;
+          if (event === "delta" && typeof payload.text === "string") appendDelta(payload.text);
+          else if (event === "error") throw new Error(payload.error ?? "The assistant could not answer right now. Please try again.");
+          else if (event === "done") result = payload;
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
+          let boundary = buffer.indexOf("\n\n");
+          while (boundary >= 0) {
+            handleEvent(buffer.slice(0, boundary));
+            buffer = buffer.slice(boundary + 2);
+            boundary = buffer.indexOf("\n\n");
+          }
+          if (done) break;
+        }
+        if (buffer.trim()) handleEvent(buffer);
+      } catch (streamError) {
+        setMessages((current) => current.filter((message) => message.id !== userMessageId && message.id !== streamAnswerId));
+        setError(streamError instanceof Error ? streamError.message : "The assistant could not answer right now. Please try again.");
         return;
       }
-      if (result.error || !result.answer || !result.chatId || !result.turnId || !result.turnNumber || !result.updatedAt) {
-        setMessages((current) => current.filter((message) => message.id !== userMessageId));
-        setError(result.error ?? "The assistant did not save its answer. Please try again.");
+      const finalResult = result as AccreditationChatResult | undefined;
+      if (!finalResult || finalResult.error || !finalResult.answer || !finalResult.chatId || !finalResult.turnId || !finalResult.turnNumber || !finalResult.updatedAt) {
+        setMessages((current) => current.filter((message) => message.id !== userMessageId && message.id !== streamAnswerId));
+        setError(finalResult?.error ?? "The assistant did not save its answer. Please try again.");
         return;
       }
 
-      setChatId(result.chatId);
-      setChatTitle(result.chatTitle ?? content.slice(0, 120));
-      setMessages((current) => [...current, {
-        id: `${result.turnId}:answer`,
+      const savedChatId = finalResult.chatId;
+      const savedTitle = finalResult.chatTitle ?? content.slice(0, 120);
+      const savedUpdatedAt = finalResult.updatedAt;
+      setChatId(savedChatId);
+      setChatTitle(savedTitle);
+      const savedAnswer: Message = {
+        id: `${finalResult.turnId}:answer`,
         role: "assistant",
-        content: result.answer!,
-        sources: result.sources,
-        policyUsed: result.policyUsed,
-        policyDate: result.policyDate,
-      }]);
+        content: finalResult.answer,
+        sources: finalResult.sources,
+        policyUsed: finalResult.policyUsed,
+        policyDate: finalResult.policyDate,
+      };
+      setMessages((current) => current.some((message) => message.id === streamAnswerId)
+        ? current.map((message) => message.id === streamAnswerId ? savedAnswer : message)
+        : [...current, savedAnswer]);
       setChats((current) => {
-        const existing = current.find((chat) => chat.id === result.chatId);
+        const existing = current.find((chat) => chat.id === savedChatId);
         const saved = {
-          id: result.chatId!,
-          title: result.chatTitle ?? existing?.title ?? content.slice(0, 120),
-          updatedAt: result.updatedAt!,
+          id: savedChatId,
+          title: finalResult.chatTitle ?? existing?.title ?? savedTitle,
+          updatedAt: savedUpdatedAt,
         };
-        return [saved, ...current.filter((chat) => chat.id !== result.chatId)]
+        return [saved, ...current.filter((chat) => chat.id !== savedChatId)]
           .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
       });
     });
@@ -302,7 +354,7 @@ export function PolicyChat({
               {messages.map((message) => (
                 <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[88%] border px-4 py-3 text-sm leading-6 sm:max-w-[78%] ${message.role === "user" ? "border-brand bg-brand text-white" : "border-rule bg-surface text-ink"}`}>
-                    {message.role === "assistant" ? <AnswerMarkdown answer={message.content} /> : <p className="whitespace-pre-wrap">{message.content}</p>}
+                    {message.role === "assistant" ? <AnswerMarkdown answer={message.content} streaming={message.streaming} /> : <p className="whitespace-pre-wrap">{message.content}</p>}
                     {message.attachmentNames?.length ? <p className="mt-3 border-t border-white/30 pt-2 text-xs text-white/80">Attached: {message.attachmentNames.join(", ")}</p> : null}
                     {message.role === "assistant" && message.policyUsed ? <p className="mt-3 text-xs font-bold uppercase tracking-wide text-muted">Policy and accreditation sources checked{message.policyDate ? ` for ${message.policyDate}` : ""}</p> : null}
                     {message.role === "assistant" ? <CitationList sources={message.sources ?? []} date={message.policyDate} /> : null}

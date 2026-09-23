@@ -22,11 +22,14 @@ export type StructuredGenerationRequest = {
   schema: Record<string, unknown>;
 };
 
+export type StructuredStreamOptions = { signal?: AbortSignal };
+
 export interface LanguageModelProvider {
   readonly name: string;
   readonly model: string;
   readonly fallbackModel?: string;
   generateStructured(request: StructuredGenerationRequest): Promise<unknown>;
+  generateStructuredStream?(request: StructuredGenerationRequest, onTextDelta: (delta: string) => void, options?: StructuredStreamOptions): Promise<unknown>;
 }
 
 export interface EmbeddingProvider {
@@ -78,6 +81,40 @@ class OpenAILanguageModelProvider implements LanguageModelProvider {
       } catch { if (attempt === 1) throw new Error("The model returned malformed output twice. Please retry."); }
     }
     throw new Error("No structured response.");
+  }
+
+  async generateStructuredStream(request: StructuredGenerationRequest, onTextDelta: (delta: string) => void, options: StructuredStreamOptions = {}) {
+    const stream = await this.client.responses.create({
+      model: this.model,
+      store: false,
+      instructions: request.instructions,
+      input: request.input,
+      text: {
+        format: {
+          type: "json_schema",
+          name: request.name,
+          strict: true,
+          schema: request.schema,
+        },
+      },
+      stream: true,
+    }, { signal: options.signal }).catch(aiError);
+    let output = "";
+    for await (const event of stream) {
+      if (event.type === "response.output_text.delta") {
+        output += event.delta;
+        onTextDelta(event.delta);
+      } else if (event.type === "response.failed") {
+        throw new Error(event.response.error?.message ?? "The model could not complete the response.");
+      }
+    }
+    try {
+      const value: unknown = JSON.parse(output);
+      if (!matchesSchema(value, request.schema)) throw new Error("Invalid structure.");
+      return value;
+    } catch {
+      throw new Error("The model returned malformed output. Please retry.");
+    }
   }
 }
 

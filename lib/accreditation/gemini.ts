@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { PDFDocument } from "pdf-lib";
-import type { EmbeddingProvider, LanguageModelProvider, OcrLayoutBlock, OcrProvider, StructuredGenerationRequest } from "./providers";
+import type { EmbeddingProvider, LanguageModelProvider, OcrLayoutBlock, OcrProvider, StructuredGenerationRequest, StructuredStreamOptions } from "./providers";
 import type { ExtractedChunk } from "./types";
 
 export class RetryableAiError extends Error {
@@ -86,6 +86,67 @@ export class GeminiLanguageModelProvider implements LanguageModelProvider {
     } catch (error) {
       if (!(error instanceof RetryableAiError) || !this.fallbackModel) throw error;
       return this.generateWithModel(request, this.fallbackModel, this.retryDelays);
+    }
+  }
+
+  private async generateStreamingWithModel(
+    request: StructuredGenerationRequest,
+    model: string,
+    onTextDelta: (delta: string) => void,
+    options: StructuredStreamOptions,
+  ): Promise<unknown> {
+    const chunks = await this.client.models.generateContentStream({
+      model,
+      contents: request.input,
+      config: {
+        systemInstruction: request.instructions,
+        responseMimeType: "application/json",
+        responseJsonSchema: request.schema,
+        abortSignal: options.signal,
+      },
+    }).catch(aiError);
+    let output = "";
+    try {
+      for await (const chunk of chunks) {
+        const delta = chunk.text ?? "";
+        if (!delta) continue;
+        output += delta;
+        onTextDelta(delta);
+      }
+    } catch (error) {
+      aiError(error);
+    }
+    try {
+      const parsed: unknown = JSON.parse(output);
+      if (!matchesSchema(parsed, request.schema)) throw new Error("Invalid structured response.");
+      return parsed;
+    } catch {
+      throw new Error("The model returned malformed output. Please retry.");
+    }
+  }
+
+  async generateStructuredStream(
+    request: StructuredGenerationRequest,
+    onTextDelta: (delta: string) => void,
+    options: StructuredStreamOptions = {},
+  ): Promise<unknown> {
+    let receivedText = false;
+    const trackOutput = (delta: string) => {
+      receivedText = true;
+      onTextDelta(delta);
+    };
+    try {
+      // Only switch models before any output has been emitted, so partial JSON
+      // from two different responses can never be combined by the caller.
+      return await this.generateStreamingWithModel(
+        request,
+        this.model,
+        trackOutput,
+        options,
+      );
+    } catch (error) {
+      if (!(error instanceof RetryableAiError) || !this.fallbackModel || receivedText) throw error;
+      return this.generateStreamingWithModel(request, this.fallbackModel, trackOutput, options);
     }
   }
 }

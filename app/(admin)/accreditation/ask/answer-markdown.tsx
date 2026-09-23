@@ -12,7 +12,8 @@ const MermaidDiagram = dynamic(() => import("./mermaid-diagram"), {
   loading: () => <p className="px-3 py-2 text-xs text-muted" role="status">Rendering diagram…</p>,
 });
 
-const components: Components = {
+function markdownComponents(streaming: boolean): Components {
+  return {
   a({ href, children }) {
     const safeHref = href ? safeMarkdownHref(href) : "";
     if (!safeHref) return <span>{children}</span>;
@@ -37,13 +38,14 @@ const components: Components = {
   code({ className, children }) {
     const language = /(?:^|\s)language-([\w-]+)/.exec(className ?? "")?.[1]?.toLowerCase();
     const value = String(children).replace(/\n$/, "");
-    if (language === "mermaid") return <MermaidDiagram source={value} />;
+    if (language === "mermaid" && !streaming) return <MermaidDiagram source={value} />;
     if (className) return <code className="block min-w-max rounded-sm bg-canvas px-3 py-2 font-mono text-xs leading-relaxed text-ink">{children}</code>;
     return <code className="rounded-sm bg-canvas px-1 py-0.5 font-mono text-[0.9em] text-ink">{children}</code>;
   },
-};
+  };
+}
 
-export function AnswerMarkdown({ answer }: { answer: string }) {
+export function AnswerMarkdown({ answer, streaming = false }: { answer: string; streaming?: boolean }) {
   return (
     <div className="min-w-0 break-words text-sm leading-6 text-ink [&>*:last-child]:mb-0">
       <ReactMarkdown
@@ -51,7 +53,7 @@ export function AnswerMarkdown({ answer }: { answer: string }) {
         rehypePlugins={[rehypeSanitize]}
         skipHtml
         urlTransform={safeMarkdownHref}
-        components={components}
+        components={markdownComponents(streaming)}
       >
         {answer}
       </ReactMarkdown>
