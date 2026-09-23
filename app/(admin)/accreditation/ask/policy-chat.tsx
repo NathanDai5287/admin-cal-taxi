@@ -17,7 +17,6 @@ type Message = {
   content: string;
   attachmentNames?: string[];
   sources?: AccreditationChatSource[];
-  followUps?: string[];
   policyUsed?: boolean;
   policyDate?: string;
 };
@@ -39,9 +38,9 @@ function SendIcon() {
 function CitationList({ sources, date }: { sources: AccreditationChatSource[]; date?: string }) {
   if (!sources.length) return null;
   return (
-    <section className="mt-4 border-t border-rule pt-3" aria-label="Citations">
-      <p className="text-xs font-bold text-ink">Citations</p>
-      <ol className="mt-2 list-decimal space-y-2 pl-5">
+    <details className="mt-4 border-t border-rule pt-3 text-xs">
+      <summary className="cursor-pointer font-bold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Citations ({sources.length})</summary>
+      <ol className="mt-3 list-decimal space-y-2 pl-5">
         {sources.map((source) => {
           const locators = source.locators.map(locatorLabel).filter(Boolean).join("; ");
           const label = `${source.title}${source.subtitle ? ` · ${source.subtitle}` : ""}`;
@@ -58,7 +57,7 @@ function CitationList({ sources, date }: { sources: AccreditationChatSource[]; d
           );
         })}
       </ol>
-    </section>
+    </details>
   );
 }
 
@@ -131,7 +130,6 @@ export function PolicyChat() {
         role: "assistant",
         content: result.answer!,
         sources: result.sources,
-        followUps: result.followUps,
         policyUsed: result.policyUsed,
         policyDate: result.policyDate,
       }]);
@@ -163,7 +161,6 @@ export function PolicyChat() {
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   {message.attachmentNames?.length ? <p className="mt-3 border-t border-white/30 pt-2 text-xs text-white/80">Attached: {message.attachmentNames.join(", ")}</p> : null}
                   {message.role === "assistant" && message.policyUsed ? <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-muted">Policy and accreditation sources checked{message.policyDate ? ` for ${message.policyDate}` : ""}</p> : null}
-                  {message.role === "assistant" && message.followUps?.length ? <div className="mt-4 flex flex-wrap gap-2">{message.followUps.map((followUp) => <button key={followUp} type="button" onClick={() => { setInput(followUp); textarea.current?.focus(); }} className="border border-rule px-2.5 py-1.5 text-left text-xs text-brand hover:bg-brand-light">{followUp}</button>)}</div> : null}
                   {message.role === "assistant" ? <CitationList sources={message.sources ?? []} date={message.policyDate} /> : null}
                 </div>
               </article>

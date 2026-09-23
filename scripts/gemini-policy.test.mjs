@@ -3,6 +3,7 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { GeminiEmbeddingProvider, GeminiLanguageModelProvider, GeminiOcrProvider, RetryableAiError } from "../lib/accreditation/gemini.ts";
 import { generatePolicyAnswer, resolveQuestionDate, normalizePolicyAnswer, policyInstructions } from "../lib/policy/answers.ts";
+import { buildPolicyToolContext, clockQuestionIntent, describeClock, getPolicyClock } from "../lib/policy/tools.ts";
 
 test("Gemini structured output retries malformed JSON/schema once", async () => {
   for (const invalid of ["not json", '{"count":"wrong"}']) {
@@ -148,4 +149,36 @@ test("event dates from the question are resolved before retrieval and ambiguous 
   assert.deepEqual(await resolveQuestionDate(language, "Social event tomorrow?", "2027-01-02", today), { date: "2027-01-02", ambiguous: false });
   const bad = { generateStructured: async () => ({ event_date: "2026-02-30", date_quote: "next Friday", ambiguous: false }) };
   assert.equal((await resolveQuestionDate(bad, "Event next Friday?", null, today)).ambiguous, true);
+});
+
+test("policy clock uses the configured chapter time zone instead of the UTC calendar date", () => {
+  const clock = getPolicyClock(new Date("2026-09-23T06:30:15Z"), "America/Los_Angeles");
+  assert.deepEqual(clock, { local_date: "2026-09-22", local_time: "23:30:15", weekday: "Tuesday", time_zone: "America/Los_Angeles", utc_offset: "-07:00" });
+  assert.equal(clockQuestionIntent("What's today's date?"), "date");
+  assert.equal(clockQuestionIntent("what day is it right now"), "date");
+  assert.equal(clockQuestionIntent("What policies apply as of today's date?"), null);
+  assert.match(describeClock("date", clock), /Tuesday, September 22, 2026/);
+});
+
+test("trusted policy tools provide exact calendar facts to both grounding passes", async () => {
+  const clock = getPolicyClock(new Date("2026-09-23T19:00:00Z"), "America/Los_Angeles");
+  const trustedRuntime = buildPolicyToolContext("2026-10-02", clock);
+  assert.deepEqual(trustedRuntime.calendar_math, { question_date: "2026-10-02", question_weekday: "Friday", days_from_today: 9, relative_to_today: "9 calendar days from today", weekdays_between_today_and_question_date: 6, weekday_count_note: "Monday-Friday dates strictly between today and the question date; holidays and agency-specific deadlines are not accounted for." });
+  const requests = [];
+  const language = { generateStructured: async (request) => {
+    requests.push(request);
+    return requests.length === 1 ? proposed() : { supported_rules: [0, 1], supported_conflicts: [], conclusion_supported: true, missing_information: [] };
+  } };
+  await generatePolicyAnswer(language, "What applies on October 2?", "2026-10-02", sources, trustedRuntime);
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every((request) => JSON.parse(request.input).trustedRuntime.calendar_math.days_from_today === 9));
+});
+
+test("permit lead-time context keeps today distinct from an event date", () => {
+  const clock = getPolicyClock(new Date("2026-09-23T19:00:00Z"), "America/Los_Angeles");
+  const context = buildPolicyToolContext("2026-10-09", clock);
+  assert.equal(context.current_date_time.local_date, "2026-09-23");
+  assert.equal(context.calendar_math.question_date, "2026-10-09");
+  assert.equal(context.calendar_math.weekdays_between_today_and_question_date, 11);
+  assert.equal(buildPolicyToolContext("2026-10-09", getPolicyClock(new Date("2026-10-09T19:00:00Z"), "America/Los_Angeles")).calendar_math.weekdays_between_today_and_question_date, 0);
 });

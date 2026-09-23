@@ -195,7 +195,12 @@ request per chunk, formats documents as `title: … | text: …`, and uses
 
 `/policy` accepts independent questions from active member/admin profiles. A
 bounded date extraction step handles dates mentioned in questions; the date field
-takes precedence and an unspecified date defaults to the current UTC date.
+takes precedence and an unspecified date defaults to the current date in
+`POLICY_TIME_ZONE` (`America/Los_Angeles` by default). The server supplies Gemini
+with trusted current-date/time, weekday, and exact calendar-distance results; those
+facts may assist date reasoning but never count as policy evidence. Simple requests
+for the current date or time are answered directly by the server and do not spend a
+model request.
 Ambiguous dates require clarification. Each answer uses only policies that are
 published and effective for that date. Citation IDs and exact quotes are checked
 locally, followed by a separate bounded grounding check. This is document guidance,
@@ -207,6 +212,11 @@ their source class and document link so accreditation evidence or prior submissi
 are not silently presented as authoritative policy. Exact passage quotes are checked
 server-side for grounding, while the rendered bibliography appears once at the end
 of the answer and groups all cited passages by their overall source document.
+The chat receives the same server clock and calendar facts as `/policy`. A direct
+date or time question is answered by the server; policy questions receive the
+current chapter date separately from the event date and a count of weekdays
+strictly between them. The weekday count excludes holidays and is not a permit
+eligibility decision.
 
 Policy drafts and accreditation evidence accept batches of up to 20 documents.
 Files are stored first and then embedded sequentially to smooth provider traffic.

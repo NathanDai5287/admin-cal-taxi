@@ -21,7 +21,6 @@ export const chatAnswerSchema = z.object({
     ref: z.string().trim().min(1),
     quote: z.string().trim().min(8).max(1_000),
   })).max(12),
-  follow_ups: z.array(z.string().trim().min(1).max(180)).max(3),
 });
 
 export type ChatHistoryMessage = z.infer<typeof chatHistorySchema>[number];
