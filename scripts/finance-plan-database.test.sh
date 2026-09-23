@@ -55,7 +55,7 @@ insert into public.reimbursements values (
 );
 SQL
 "${finance_psql[@]}" -f "$finance_repo_dir/supabase/migrations/20260922000000_finance_plan_actual.sql"
-"${finance_psql[@]}" -f "$finance_repo_dir/supabase/migrations/20260923000000_hosting_ledger_immutable.sql"
+"${finance_psql[@]}" -f "$finance_repo_dir/supabase/migrations/20261002000000_hosting_ledger_immutable.sql"
 "${finance_psql[@]}" <<'SQL'
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
 select public.record_dues_payment(
