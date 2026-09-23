@@ -881,13 +881,30 @@
 
 .host-intro {
   display: grid;
-  padding: clamp(82px, 10vw, 140px) clamp(24px, 7vw, 112px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(45px, 7vw, 120px);
+  min-height: 714px;
+  max-width: 2160px;
+  margin-inline: auto;
+  padding: 90px clamp(24px, 6vw, 112px) 96px;
   background: var(--public-surface);
   color: var(--public-ink);
 }
 
+.host-intro h1 {
+  font-size: clamp(48px, 5.4vw, 88px);
+  line-height: 0.99;
+  letter-spacing: -0.052em;
+}
+
+.host-intro h1 span {
+  display: block;
+}
+
 .host-intro > div:first-child {
   display: flex;
+  min-width: 0;
   max-width: 760px;
   align-items: flex-start;
   flex-direction: column;
@@ -895,13 +912,35 @@
 }
 
 .host-intro > div > p {
+  max-width: 520px;
   margin: 0;
   color: var(--public-muted);
+  font-size: clamp(16px, 1.25vw, 20px);
 }
 
 .host-intro > div > .public-action {
   width: fit-content;
   margin-top: 0;
+}
+
+@media (min-width: 1750px) {
+  .host-intro { padding-block: 105px; gap: 150px; }
+  .host-intro > div > p { max-width: 640px; }
+}
+
+@media (min-width: 821px) and (max-width: 1120px) {
+  .host-intro { gap: 40px; padding-inline: 40px; }
+}
+
+@media (max-width: 820px) {
+  .host-intro { grid-template-columns: 1fr; gap: 15px; min-height: 0; padding: 60px 32px; }
+  .host-intro h1 { font-size: clamp(52px, 8.5vw, 74px); }
+}
+
+@media (max-width: 480px) {
+  .host-intro { gap: 24px; padding: 45px 24px 40px; }
+  .host-intro h1 { font-size: clamp(42px, 12.8vw, 58px); line-height: 1.02; }
+  .host-intro > div > p { font-size: 15px; }
 }
 
 .public-action-light {

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import type { StaticImageData } from "next/image";
 
 import { HouseMap, houseDirectionsUrl } from "@/components/public/house-map";
+import { HostedClubOrbit, type HostedClub } from "@/components/public/hosted-club-orbit";
 import { LightboxImage } from "@/components/public/lightbox-image";
-import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
 import betaAlphaPsiLogo from "@/public/site/logos/berkeley-beta-alpha-psi.png";
@@ -26,20 +26,20 @@ import webdevLogo from "@/public/site/logos/webdev-at-berkeley.png";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 import { VenueWalkthroughVideo } from "./venue-walkthrough-video";
 
-const clubs: LogoItem[] = [
-  { name: "Gamma Zeta Alpha", src: gammaZetaAlphaLogo, wordmark: true },
-  { name: "BerkeleyTime", src: berkeleytimeLogo },
-  { name: "Codebase", src: codebaseLogo },
-  { name: "WebDev at Berkeley", src: webdevLogo },
-  { name: "DiversaTech", src: diversatechLogo },
-  { name: "PlexTech", src: plextechLogo },
-  { name: "Data Science Society", src: dssLogo },
-  { name: "Theta Tau", src: thetaTauLogo },
+const clubs: HostedClub[] = [
   { name: "UpSync", src: upsyncLogo },
-  { name: "Beta Alpha Psi", src: betaAlphaPsiLogo },
+  { name: "BerkeleyTime", src: berkeleytimeLogo },
+  { name: "Theta Tau", src: thetaTauLogo },
+  { name: "Product Space", src: productSpaceLogo, large: true },
   { name: "Valley Consulting Group", src: valleyConsultingGroupLogo },
-  { name: "Product Space", src: productSpaceLogo },
+  { name: "DiversaTech", src: diversatechLogo },
   { name: "Cal Japan Club", src: calJapanClubLogo },
+  { name: "Beta Alpha Psi", src: betaAlphaPsiLogo },
+  { name: "PlexTech", src: plextechLogo },
+  { name: "Codebase", src: codebaseLogo },
+  { name: "Data Science Society", src: dssLogo },
+  { name: "WebDev at Berkeley", src: webdevLogo },
+  { name: "Gamma Zeta Alpha", src: gammaZetaAlphaLogo, wordmark: true },
 ];
 
 export const metadata: Metadata = {
@@ -61,7 +61,7 @@ export default function HostPage() {
     <main id="main-content" className="public-page host-page">
       <header className="host-intro">
         <div>
-          <h1>A Berkeley house made for gathering.</h1>
+          <h1><span>A Berkeley</span>{" "}<span>house made</span>{" "}<span>for gathering.</span></h1>
           <p>
             Host a mixer, club event, fundraiser, or private gathering in a flexible space near campus.
           </p>
@@ -69,6 +69,7 @@ export default function HostPage() {
             Ask about a date <Arrow />
           </a>
         </div>
+        <HostedClubOrbit clubs={clubs} />
       </header>
 
       <section className="host-spaces" aria-label="Venue spaces">
@@ -161,11 +162,6 @@ export default function HostPage() {
           </a>
         </div>
         <HouseMap />
-      </section>
-
-      <section className="logo-showcase" aria-labelledby="clubs-title">
-        <h2 id="clubs-title">Clubs that have hosted with us.</h2>
-        <LogoGrid items={clubs} variant="clubs" />
       </section>
 
       <section className="host-process" aria-labelledby="host-process-title">
