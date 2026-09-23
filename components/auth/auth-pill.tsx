@@ -218,8 +218,8 @@ export function AuthPill({ memberSite = false, showPolicy = false, session }: Au
           ? `flex min-w-0 items-center justify-end gap-2 ${hasMemberNavigation ? "w-full sm:w-auto" : ""}`
           : "pointer-events-auto flex items-start justify-end gap-2"
         }>
-          <ThemeToggle />
           {hasMemberNavigation ? <MemberNavigation showPolicy={showPolicy} /> : null}
+          <ThemeToggle />
           {session === null ? (
             <>
               <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />
