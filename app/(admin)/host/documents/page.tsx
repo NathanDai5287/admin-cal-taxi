@@ -439,6 +439,7 @@ export default function DocumentsPage() {
         effectiveRentalPrice(data) && `$${Number(effectiveRentalPrice(data)).toLocaleString("en-US")} fee`,
         effective(data, "depositAmount") && `$${Number(effective(data, "depositAmount")).toLocaleString("en-US")} deposit`,
         eventDateReadable,
+        contractSign && "auto-signed",
       ].filter(Boolean).join(" · ") || undefined
     : undefined;
 
@@ -498,6 +499,7 @@ export default function DocumentsPage() {
           busy={!!busy.contract}
           error={errors.contract ?? null}
           success={successes.contract ?? null}
+          defaultOpen
         >
           <ContractPanel sign={contractSign} onSignChange={setContractSign} />
         </DocumentRow>
