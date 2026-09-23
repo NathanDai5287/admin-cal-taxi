@@ -13,6 +13,9 @@ import { roundCents } from "@/lib/host-format";
  * "relationship discount/surcharge" row — the relationship adjustment is
  * already baked into `target`, and individual components scale to match.
  *
+ * The fire permit is a real pass-through fee (a constant $125): it always
+ * prints at its raw amount; the other lines scale to `target` minus it.
+ *
  * If `breakdown` is missing OR `target` is non-positive, returns a single
  * generic line so the user can fill it in manually.
  */
@@ -22,8 +25,9 @@ export function buildLineItems(
   eventDateReadable: string,
 ): LineItem[] {
   // Components in display order. Each is the *raw* (pre-wealth) amount
-  // — that's what the breakdown stores in .base/.alcohol/etc.
-  type Comp = { description: string; raw: number };
+  // — that's what the breakdown stores in .base/.alcohol/etc. `fixed`
+  // marks pass-through fees that never scale or round (the fire permit).
+  type Comp = { description: string; raw: number; fixed?: boolean };
   const components: Comp[] = [];
 
   if (breakdown) {
@@ -39,6 +43,7 @@ export function buildLineItems(
       components.push({
         description: "Fire permit (Required for > 50 guests)",
         raw: breakdown.firePermit,
+        fixed: true,
       });
     }
     if (breakdown.alcohol > 0)
@@ -63,27 +68,43 @@ export function buildLineItems(
     return [{ description: desc, amount: target > 0 ? target.toFixed(2) : "" }];
   }
 
-  // Scale each component to the negotiated total.
-  const scale = target / rawSum;
-  const exact = components.map(c => c.raw * scale);
+  // Fixed fees (the $125 fire permit) print at their raw amount and never
+  // scale or round. The remaining lines scale to the negotiated total
+  // minus the pinned fees.
+  const scalable = components.filter(c => !c.fixed);
+  const pinnedSum = rawSum - scalable.reduce((s, c) => s + c.raw, 0);
+  const poolRawSum = scalable.reduce((s, c) => s + c.raw, 0);
+  const poolAim = target - pinnedSum;
+  // Degenerate case (negotiated total at or below the pinned fees): scale
+  // everything including the permit so the total stays exact.
+  const pinFees = poolRawSum > 0 && poolAim > 0;
+  const pool = pinFees ? scalable : components;
+  const poolSum = pinFees ? poolRawSum : rawSum;
+  const poolTarget = pinFees ? poolAim : target;
+
+  // Scale each pool component to its share of the target.
+  const scale = poolTarget / poolSum;
+  const exact = pool.map(c => c.raw * scale);
 
   // When the negotiated total differs from the raw breakdown, the scaled
   // amounts come out ugly ($1,306.66) — round to multiples of $10 that
   // still sum to the exact total. When no scaling is applied, keep the
-  // exact raw amounts: real fees like the $125 fire permit must not move.
-  let values = Math.abs(target - rawSum) > 0.005
-    ? roundToTens(exact, target)
-    : scaleToCents(components, target, rawSum);
+  // exact raw amounts.
+  let poolValues = Math.abs(poolTarget - poolSum) > 0.005
+    ? roundToTens(exact, poolTarget)
+    : scaleToCents(pool, poolTarget, poolSum);
 
   // A line rounded down to $0.00 reads as a mistake on the invoice — if
   // $10-rounding would zero one out, fall back to exact cents instead.
-  if (values.some(v => v <= 0)) {
-    values = scaleToCents(components, target, rawSum);
+  if (poolValues.some(v => v <= 0)) {
+    poolValues = scaleToCents(pool, poolTarget, poolSum);
   }
 
-  return components.map((c, i) => ({
+  // Reassemble in display order; pinned lines keep their raw amount.
+  const valueOf = new Map(pool.map((c, i) => [c, poolValues[i]]));
+  return components.map(c => ({
     description: c.description,
-    amount: values[i].toFixed(2),
+    amount: (pinFees && c.fixed ? c.raw : valueOf.get(c)!).toFixed(2),
   }));
 }
 

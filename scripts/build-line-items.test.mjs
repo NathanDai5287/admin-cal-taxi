@@ -42,21 +42,31 @@ function breakdown() {
 const sum = items => items.reduce((s, it) => s + parseFloat(it.amount), 0);
 const isTen = v => Math.abs(v % 10) < 1e-9;
 
+const isPermit = it => it.description.startsWith("Fire permit");
+
+test("fire permit stays pinned at its raw $125 when scaling", () => {
+  const items = buildLineItems(breakdown(), 1960, "October 3, 2026");
+  assert.equal(items.find(isPermit).amount, "125.00");
+});
+
 test("scaled items round to multiples of $10 and sum exactly to the target", () => {
   const items = buildLineItems(breakdown(), 1960, "October 3, 2026");
   assert.equal(items.length, 5);
-  for (const it of items) assert.ok(isTen(parseFloat(it.amount)), `not a multiple of 10: ${it.amount}`);
+  // The pinned $125 permit makes the scalable pool aim at 1960 − 125 = 1835,
+  // so one line absorbs the sub-$10 remainder; the rest are round.
+  const nonRound = items.filter(it => !isPermit(it) && !isTen(parseFloat(it.amount)));
+  assert.ok(nonRound.length <= 1, `too many non-round lines: ${JSON.stringify(items)}`);
   assert.equal(sum(items), 1960);
 });
 
 test("no line moves more than $15 from its exact scaled value", () => {
   const bd = breakdown();
-  const raws = [bd.base, bd.capacity, bd.firePermit, bd.date, bd.cleanup];
-  const rawSum = raws.reduce((s, v) => s + v, 0);
-  const target = 1960;
-  const items = buildLineItems(bd, target, "October 3, 2026");
+  const raws = [bd.base, bd.capacity, bd.date, bd.cleanup]; // scalable lines, in order
+  const poolRaw = raws.reduce((s, v) => s + v, 0);
+  const poolAim = 1960 - bd.firePermit;
+  const items = buildLineItems(bd, 1960, "October 3, 2026").filter(it => !isPermit(it));
   items.forEach((it, i) => {
-    const exact = (raws[i] * target) / rawSum;
+    const exact = (raws[i] * poolAim) / poolRaw;
     assert.ok(
       Math.abs(parseFloat(it.amount) - exact) <= 15,
       `${it.description} moved ${Math.abs(parseFloat(it.amount) - exact)} from ${exact}`,
@@ -74,11 +84,16 @@ test("unscaled breakdown passes exact raw amounts through (fire permit stays $12
   );
 });
 
-test("a non-multiple-of-10 target still sums exactly, at most one non-round line", () => {
+test("a non-multiple-of-10 target still sums exactly, at most one non-round scalable line", () => {
   const items = buildLineItems(breakdown(), 1955, "October 3, 2026");
   assert.equal(sum(items), 1955);
-  const nonRound = items.filter(it => !isTen(parseFloat(it.amount)));
+  const nonRound = items.filter(it => !isPermit(it) && !isTen(parseFloat(it.amount)));
   assert.ok(nonRound.length <= 1, `too many non-round lines: ${JSON.stringify(items)}`);
+});
+
+test("negotiated total below the pinned fee falls back to scaling everything", () => {
+  const items = buildLineItems(breakdown(), 100, "October 3, 2026");
+  assert.ok(Math.abs(sum(items) - 100) < 1e-9, `sum ${sum(items)}`);
 });
 
 test("sum is exact across a sweep of negotiated totals", () => {
