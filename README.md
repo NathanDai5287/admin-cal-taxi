@@ -212,6 +212,11 @@ their source class and document link so accreditation evidence or prior submissi
 are not silently presented as authoritative policy. Exact passage quotes are checked
 server-side for grounding, while the rendered bibliography appears once at the end
 of the answer and groups all cited passages by their overall source document.
+Each administrator can reopen and delete saved Ask Policy chats from the history
+list. Saved turns include the question, answer, citations, follow-up prompts, policy
+date and attachment names; uploaded files themselves stay temporary. Only the five
+most recent turns are sent as model conversation context, while the full transcript
+remains available to reopen in the interface.
 The chat receives the same server clock and calendar facts as `/policy`. A direct
 date or time question is answered by the server; policy questions receive the
 current chapter date separately from the event date and a count of weekdays
