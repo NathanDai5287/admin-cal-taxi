@@ -20,20 +20,26 @@ export function cleanClubs(clubs: string[]): string[] {
  * normalize_org_name in the backend's generators/base.py — the backend
  * re-applies it at generation time, so the documents are correct even if
  * this UI normalization is bypassed. Keep the rules in sync.
+ *
+ * Exception: "and" stays lowercase unless it's the first word — multi-org
+ * events are passed around as one pre-joined list ("Alpha, Beta, and
+ * Gamma") and capitalizing the joiner would print "Beta, And Gamma".
  */
 export function normalizeOrgName(name: string): string {
   return name
     .split(/\s+/)
     .filter(Boolean)
-    .map(word =>
-      word
-        .split("-")
-        .map(part =>
-          part.length > 0 && /^\p{Ll}+$/u.test(part)
-            ? part.charAt(0).toUpperCase() + part.slice(1)
-            : part,
-        )
-        .join("-"),
+    .map((word, i) =>
+      word === "and" && i > 0
+        ? word
+        : word
+            .split("-")
+            .map(part =>
+              part.length > 0 && /^\p{Ll}+$/u.test(part)
+                ? part.charAt(0).toUpperCase() + part.slice(1)
+                : part,
+            )
+            .join("-"),
     )
     .join(" ");
 }
