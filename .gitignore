@@ -23,3 +23,9 @@ next-env.d.ts
 
 # Agent worktrees (local scratch, never part of the project)
 .claude/worktrees/
+
+# Local AI-agent tooling (skills, hooks, per-machine settings) — never commit
+.agents/
+.claude/
+.codex/
+.cursor/
