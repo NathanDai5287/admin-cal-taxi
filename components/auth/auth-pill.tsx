@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { MemberNavigation } from "@/components/reimbursements/member-navigation";
 import { SiteHomeIcon } from "@/components/site-home-icon";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { userLabel } from "@/lib/reimbursements/user-label";
@@ -18,6 +19,7 @@ export type AuthPillSession = {
 
 export type AuthPillProps = {
   memberSite?: boolean;
+  showPolicy?: boolean;
   session: AuthPillSession | null;
 };
 
@@ -189,7 +191,8 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
   );
 }
 
-export function AuthPill({ memberSite = false, session }: AuthPillProps) {
+export function AuthPill({ memberSite = false, showPolicy = false, session }: AuthPillProps) {
+  const hasMemberNavigation = memberSite && (session?.role === "member" || session?.role === "admin");
   // Assume One Tap will show until it reports otherwise, so the fallback
   // button doesn't flash before Google's island appears.
   const [oneTapVisible, setOneTapVisible] = useState(true);
@@ -199,7 +202,7 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
     <header
       className={
         memberSite
-          ? "account-controls z-50 border-t-[3px] border-t-brand px-4 py-3"
+          ? "account-controls z-50 border-t-[3px] border-t-brand px-4"
           : "pointer-events-none absolute inset-x-0 top-4 z-50 px-6"
       }
       style={{
@@ -207,15 +210,16 @@ export function AuthPill({ memberSite = false, session }: AuthPillProps) {
       }}
     >
       <div className={memberSite
-        ? "mx-auto flex min-h-[38px] w-full max-w-[1080px] items-center justify-between gap-4"
+        ? "mx-auto flex min-h-[64px] w-full max-w-[1080px] flex-wrap items-center justify-between gap-x-4 sm:flex-nowrap"
         : "pointer-events-none mx-auto flex w-full max-w-[1080px] items-center justify-end gap-3"
       }>
-        {memberSite ? <MemberSiteBrand /> : null}
+        {memberSite ? <div className="py-3"><MemberSiteBrand /></div> : null}
         <div className={memberSite
-          ? "flex items-start justify-end gap-2"
+          ? `flex min-w-0 items-center justify-end gap-2 ${hasMemberNavigation ? "w-full sm:w-auto" : ""}`
           : "pointer-events-auto flex items-start justify-end gap-2"
         }>
           <ThemeToggle />
+          {hasMemberNavigation ? <MemberNavigation showPolicy={showPolicy} /> : null}
           {session === null ? (
             <>
               <GoogleOneTap onVisibilityChange={setOneTapVisible} onError={setOneTapError} />

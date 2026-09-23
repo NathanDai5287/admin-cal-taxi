@@ -24,10 +24,12 @@ export async function ProtectedShell({
         role: session.profile.role,
       }
     : null;
+  const showPolicy = process.env.POLICY_ASSISTANT_ENABLED === "true" &&
+    (session?.profile.role === "admin" || process.env.POLICY_ASSISTANT_MEMBERS_ENABLED === "true");
 
   return (
     <>
-      <AuthPill memberSite={memberSite} session={pillSession} />
+      <AuthPill memberSite={memberSite} session={pillSession} showPolicy={showPolicy} />
       {children}
     </>
   );
