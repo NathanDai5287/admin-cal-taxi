@@ -7,7 +7,7 @@ export const REPORT_DEFINITIONS: Record<ReportKey, ReportDefinition> = {
     name: "Annual Report",
     cadence: "annual",
     description: "Evidence-grounded narrative report for the academic year.",
-    requiredSources: ["official_guideline", "chapter_evidence"],
+    requiredSources: ["evidence"],
     outputFormats: ["docx", "pdf"],
     fields: [
       { key: "executive_summary", label: "Executive summary", description: "Concise overview of the chapter year.", required: true, multiline: true },
@@ -59,4 +59,3 @@ export const REPORT_DEFINITIONS: Record<ReportKey, ReportDefinition> = {
 export function getReportDefinition(key: string) {
   return REPORT_DEFINITIONS[key as ReportKey] ?? null;
 }
-

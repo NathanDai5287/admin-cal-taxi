@@ -39,7 +39,7 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
 
   return (
     <div className="space-y-8">
-      <section><p className="page-eyebrow">Accreditation</p><h1 className="page-title">Submission workspace</h1><p className="page-lede">Save official forms once, complete them through conversation, and archive the reviewed submissions.</p></section>
+      <section><p className="page-eyebrow">Accreditation</p><h1 className="page-title">Submission workspace</h1><p className="page-lede">Save official forms once, complete them through conversation, and archive the reviewed submissions.</p><Link href="/ask-policy" className="mt-3 inline-block text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Open Ask Policy →</Link></section>
       {params.result && RESULT_MESSAGES[params.result] ? <p className="form-message" role="status">{RESULT_MESSAGES[params.result]}</p> : null}
       <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="card"><div className="card-header"><span className="card-title">Academic year</span></div><div className="card-body border-t border-rule">

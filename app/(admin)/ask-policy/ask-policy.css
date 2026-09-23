@@ -1,0 +1,55 @@
+.ask-policy-shell {
+  background: var(--color-page);
+}
+
+[data-brand].ask-policy-shell button,
+[data-brand].ask-policy-shell textarea {
+  border-radius: 999px;
+}
+
+.ask-policy-shell .ask-policy-panel {
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 16px 48px -32px rgba(16, 16, 20, .28);
+}
+
+.ask-policy-shell .ask-policy-composer {
+  border: 1px solid var(--color-rule);
+  border-radius: 24px;
+  background: var(--color-surface);
+}
+
+.ask-policy-shell .ask-policy-composer:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-light);
+}
+
+.ask-policy-shell .ask-policy-scroll {
+  scrollbar-color: var(--color-rule) transparent;
+  scrollbar-width: thin;
+}
+
+.ask-policy-shell .ask-policy-scroll::-webkit-scrollbar { width: 8px; }
+.ask-policy-shell .ask-policy-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--color-rule);
+  background-clip: padding-box;
+}
+
+.ask-policy-shell .ask-policy-scroll::-webkit-scrollbar-track { background: transparent; }
+
+.ask-policy-shell ::selection {
+  background: var(--color-brand-light);
+  color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask-policy-shell *,
+  .ask-policy-shell *::before,
+  .ask-policy-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

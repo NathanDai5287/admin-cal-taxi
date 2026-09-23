@@ -30,6 +30,11 @@ const ADMIN_APPS = [
     label: "Accreditation",
     description: "Evidence, official templates, grounded drafts, and approved archives",
   }] : []),
+  ...(accreditationEnabled() ? [{
+    href: "/ask-policy",
+    label: "Ask Policy",
+    description: "Accreditation questions, source citations, and paths to evidence and document creation",
+  }] : []),
   {
     href: "/users",
     label: "Members & invites",

@@ -12,10 +12,9 @@ export type ReportStatus =
   | "ready_for_review"
   | "approved";
 export type SourceKind =
-  | "official_guideline"
+  | "evidence"
   | "blank_template"
   | "prior_submission"
-  | "chapter_evidence"
   | "app_snapshot";
 export type TemplateFormat = "pdf" | "docx" | "xlsx";
 export type FieldProvenance = "retrieved" | "app_snapshot" | "user_input";

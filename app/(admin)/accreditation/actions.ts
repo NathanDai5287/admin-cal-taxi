@@ -30,7 +30,7 @@ async function requireAccreditationAdmin() {
 
 const uuid = z.string().uuid();
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const sourceKinds = ["official_guideline", "blank_template", "prior_submission", "chapter_evidence"] as const;
+const sourceKinds = ["evidence", "blank_template", "prior_submission"] as const;
 
 function sha256(bytes: Uint8Array) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -56,6 +56,10 @@ function fileMimeType(file: File) {
 
 function reportPath(runId: string, result?: string) {
   return `/accreditation/reports/${runId}${result ? `?result=${encodeURIComponent(result)}` : ""}`;
+}
+
+function evidenceReturnPath(formData: FormData) {
+  return formData.get("returnTo") === "/ask-policy/evidence" ? "/ask-policy/evidence" : "/accreditation/library";
 }
 
 export async function createCycle(formData: FormData) {
@@ -253,6 +257,7 @@ export async function createAccreditationBatchItem(formData: FormData): Promise<
     return { ok: false, message: "Evidence could not be saved." };
   }
   revalidatePath("/accreditation/library");
+  revalidatePath("/ask-policy/evidence");
   return { ok: true, id, message: "Uploaded. Waiting to embed." };
 }
 
@@ -263,9 +268,11 @@ export async function processAccreditationBatchItem(idValue: string): Promise<Ba
   try {
     await processDocument(id.data, false, true);
     revalidatePath("/accreditation/library");
+    revalidatePath("/ask-policy/evidence");
     return { ok: true, retryable: false, message: "Embedding complete." };
   } catch (error) {
     revalidatePath("/accreditation/library");
+    revalidatePath("/ask-policy/evidence");
     const retryable = isRetryableAiError(error);
     return { ok: false, retryable, message: retryable ? "Gemini is rate-limited or overloaded." : "Processing failed. Review the document error." };
   }
@@ -273,15 +280,18 @@ export async function processAccreditationBatchItem(idValue: string): Promise<Ba
 
 export async function reprocessSource(formData: FormData) {
   await requireAccreditationAdmin();
+  const returnPath = evidenceReturnPath(formData);
   const id = uuid.parse(formData.get("sourceId"));
   try {
     await processDocument(id, false, formData.get("signatureFree") === "on");
   } catch {
     revalidatePath("/accreditation/library");
-    redirect("/accreditation/library?result=processing_failed_check_source_error");
+    revalidatePath("/ask-policy/evidence");
+    redirect(`${returnPath}?result=processing_failed_check_source_error`);
   }
   revalidatePath("/accreditation/library");
-  redirect("/accreditation/library?result=reembedded");
+  revalidatePath("/ask-policy/evidence");
+  redirect(`${returnPath}?result=reembedded`);
 }
 
 export async function archiveSource(formData: FormData) {
@@ -290,22 +300,25 @@ export async function archiveSource(formData: FormData) {
   if (!sourceId.success) return;
   await createAccreditationAdminClient().from("accreditation_sources").update({ status: "archived", archived_at: new Date().toISOString() }).eq("id", sourceId.data);
   revalidatePath("/accreditation/library");
+  revalidatePath("/ask-policy/evidence");
 }
 
 export async function deleteSource(formData: FormData) {
   await requireAccreditationAdmin();
+  const returnPath = evidenceReturnPath(formData);
   const sourceId = uuid.safeParse(formData.get("sourceId"));
-  if (!sourceId.success || formData.get("confirmDelete") !== "on") redirect("/accreditation/library?result=confirm_deletion");
+  if (!sourceId.success || formData.get("confirmDelete") !== "on") redirect(`${returnPath}?result=confirm_deletion`);
   const db = createAccreditationAdminClient();
   const source = await db.from("accreditation_sources").select("cycle_id,storage_path").eq("id", sourceId.data).maybeSingle();
-  if (!source.data) redirect("/accreditation/library?result=source_not_found");
+  if (!source.data) redirect(`${returnPath}?result=source_not_found`);
   const removed = await db.from("accreditation_sources").delete().eq("id", sourceId.data).select("id");
   if (removed.error || !removed.data?.length) {
-    redirect(`/accreditation/library?cycle=${source.data.cycle_id}&result=source_is_in_use_archive_instead`);
+    redirect(`${returnPath}?cycle=${source.data.cycle_id}&result=source_is_in_use_archive_instead`);
   }
   const storage = await db.storage.from("accreditation-sources").remove([source.data.storage_path]);
   revalidatePath("/accreditation", "layout");
-  redirect(`/accreditation/library?cycle=${source.data.cycle_id}&result=${storage.error ? "document_and_embeddings_deleted_storage_cleanup_failed" : "document_and_embeddings_deleted"}`);
+  revalidatePath("/ask-policy/evidence");
+  redirect(`${returnPath}?cycle=${source.data.cycle_id}&result=${storage.error ? "document_and_embeddings_deleted_storage_cleanup_failed" : "document_and_embeddings_deleted"}`);
 }
 
 export async function uploadTemplate(formData: FormData) {

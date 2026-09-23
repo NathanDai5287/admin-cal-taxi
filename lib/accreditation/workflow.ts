@@ -247,9 +247,9 @@ export async function buildDraft(runId: string, instruction: string): Promise<Dr
       draft.fields[field.key] = { ...current, value: "", confidence: 0, missingReason: "The proposed text did not include a valid source citation." };
     }
     if (effectiveDefinition.key === "annual_report" && current.value && current.provenance === "retrieved" && field.valueMode !== "narrative" && !field.multiline) {
-      const currentEvidenceRefs = new Set(retrieval.evidence.filter((item) => item.kind === "chapter_evidence").map((item) => item.ref));
+      const currentEvidenceRefs = new Set(retrieval.evidence.filter((item) => item.kind === "evidence").map((item) => item.ref));
       if (!current.citations.some((ref) => currentEvidenceRefs.has(ref))) {
-        draft.fields[field.key] = { ...current, value: "", citations: [], confidence: 0, missingReason: "This narrative needs a citation to current chapter evidence." };
+        draft.fields[field.key] = { ...current, value: "", citations: [], confidence: 0, missingReason: "This narrative needs a citation to current-cycle evidence." };
       }
     }
   }

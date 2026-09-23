@@ -24,6 +24,20 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     alter default privileges in schema public grant all on tables to service_role;
   `);
   for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql", "20260927000000_resumable_document_embeddings.sql", "20260928000000_ai_template_onboarding.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
+  const mergedCycle = randomUUID();
+  const formerGuideline = randomUUID();
+  const formerChapterEvidence = randomUUID();
+  await db.query("insert into accreditation_cycles(id,label,starts_on,ends_on) values($1,'Migration fixture','2026-08-01','2027-06-01')", [mergedCycle]);
+  for (const [id, kind] of [[formerGuideline, "official_guideline"], [formerChapterEvidence, "chapter_evidence"]]) {
+    await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1::uuid,$2::uuid,$3,'ready','Fixture','text/plain',10,$1::text,$1::text)", [id, mergedCycle, kind]);
+  }
+  const evidenceMigration = "20261004000000_unify_accreditation_evidence.sql";
+  await db.exec(await readFile(new URL(`../supabase/migrations/${evidenceMigration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${evidenceMigration}: ${e.message}`); });
+  assert.deepEqual((await db.query("select distinct kind::text as kind from accreditation_sources where cycle_id=$1", [mergedCycle])).rows, [{ kind: "evidence" }]);
+  assert.deepEqual((await db.query("select required_sources from accreditation_report_definitions where report_key='annual_report'")).rows[0].required_sources, ["evidence"]);
+  await assert.rejects(db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1::uuid,$2::uuid,'official_guideline','ready','Fixture','text/plain',10,$1::text,$1::text)", [randomUUID(), mergedCycle]), /constraint/);
+  await db.query("delete from accreditation_sources where cycle_id=$1", [mergedCycle]);
+  await db.query("delete from accreditation_cycles where id=$1", [mergedCycle]);
   const admin = randomUUID(), member = randomUUID(), other = randomUUID(), removed = randomUUID();
   await db.query("insert into profiles values ($1,'admin',null),($2,'member',null),($3,'member',null),($4,'member',now())", [admin, member, other, removed]);
   const profile = "gemini-embedding-2:768:retrieval-v1";
@@ -125,7 +139,7 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     const accepted = [];
     for (const [c,t,r,status,active] of [[cycle,fall,'annual_report','ready',true],[cycle,null,null,'ready',true],[cycle,spring,'annual_report','ready',true],[cycle2,null,'annual_report','ready',true],[cycle,fall,'annual_budget','ready',true],[cycle,fall,'annual_report','failed',true],[cycle,fall,'annual_report','ready',false]]) {
       const id = randomUUID();
-      await db.query("insert into accreditation_sources(id,cycle_id,term_id,report_key,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1::uuid,$2,$3,$4,'chapter_evidence','ready','Evidence','text/plain',10,$1::text,$1::text)", [id,c,t,r]);
+      await db.query("insert into accreditation_sources(id,cycle_id,term_id,report_key,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1::uuid,$2,$3,$4,'evidence','ready','Evidence','text/plain',10,$1::text,$1::text)", [id,c,t,r]);
       await db.query("insert into accreditation_source_chunks(source_id,ordinal,content,embedding,embedding_provider,embedding_model) values($1,0,'evidence','[1,2,3]','openai','legacy')", [id]);
       if (active) await db.query("select commit_document_embeddings($1,false,$2,$3)", [id,profile,JSON.stringify([chunk("Current evidence")])]);
       await db.query("update accreditation_sources set status=$2 where id=$1",[id,status]);
@@ -151,7 +165,7 @@ test("additive migrations, hybrid retrieval, publication and access boundaries i
     await owner();
     const cycle = (await db.query("select id from accreditation_cycles limit 1")).rows[0].id;
     const source = randomUUID();
-    await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path,processing_total) values($1::uuid,$2,'chapter_evidence','processing','Delete me','text/plain',10,$1::text,$1::text,1)", [source, cycle]);
+    await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path,processing_total) values($1::uuid,$2,'evidence','processing','Delete me','text/plain',10,$1::text,$1::text,1)", [source, cycle]);
     await db.query("select checkpoint_document_chunks($1,false,$2)", [source, JSON.stringify([{ ordinal: 0, content: "Disposable evidence", locator: { page: 1 } }])]);
     await db.query("select checkpoint_document_embedding($1,false,$2,0,$3,'gemini','gemini-embedding-2')", [source, profile, vec]);
     await db.query("delete from accreditation_sources where id=$1", [source]);

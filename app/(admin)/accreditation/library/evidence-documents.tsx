@@ -20,11 +20,13 @@ const EvidenceTable = memo(function EvidenceTable({
   families,
   emptyMessage,
   id,
+  basePath,
 }: {
   sources: EvidenceSource[];
   families: Family[];
   emptyMessage: string;
   id: string;
+  basePath: "/accreditation/library" | "/ask-policy/evidence";
 }) {
   const familyNames = new Map(families.map((family) => [family.id, family.label]));
   return (
@@ -48,6 +50,7 @@ const EvidenceTable = memo(function EvidenceTable({
             <td>
               {source.status !== "archived" ? <form action={reprocessSource} className="space-y-2">
                 <input type="hidden" name="sourceId" value={source.id} />
+                <input type="hidden" name="returnTo" value={basePath} />
                 <label className="block text-xs"><input name="signatureFree" type="checkbox" required /> Source and text contain no signatures</label>
                 <button type="submit" className="text-xs font-bold text-brand">Reprocess / re-embed</button>
                 <p className="mt-1 text-xs text-muted">{source.active_embedding_profile ?? "Needs embedding migration"}</p>
@@ -57,6 +60,7 @@ const EvidenceTable = memo(function EvidenceTable({
                 <button className="text-xs font-bold text-muted hover:text-ink" type="submit">Archive</button>
               </form> : null}
               <form action={deleteSource} className="mt-2 space-y-2 border-t border-rule pt-2">
+                <input type="hidden" name="returnTo" value={basePath} />
                 <label className="block text-xs"><input name="confirmDelete" type="checkbox" required /> Permanently delete original and embeddings</label>
                 <Button type="submit" variant="danger" compact>Delete permanently</Button>
               </form>
@@ -75,6 +79,7 @@ export function EvidenceDocuments({
   initialCount,
   families,
   initialError,
+  basePath,
 }: {
   cycleId: string;
   cycleLabel: string;
@@ -82,6 +87,7 @@ export function EvidenceDocuments({
   initialCount: number;
   families: Family[];
   initialError?: string;
+  basePath: "/accreditation/library" | "/ask-policy/evidence";
 }) {
   const searchId = useId();
   const tableId = useId();
@@ -164,7 +170,7 @@ export function EvidenceDocuments({
         </div>
       </div>
       <div className="table-scroll border-t border-rule" aria-busy={searching}>
-        <EvidenceTable id={tableId} sources={sources} families={families} emptyMessage={emptyMessage} />
+        <EvidenceTable id={tableId} sources={sources} families={families} emptyMessage={emptyMessage} basePath={basePath} />
       </div>
     </section>
   );

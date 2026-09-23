@@ -20,7 +20,6 @@ export default async function AccreditationLayout({ children }: { children: Reac
         subtitle="Accreditation"
         tabs={[
           { href: "/accreditation", label: "Dashboard" },
-          { href: "/accreditation/ask", label: "Ask policy" },
           { href: "/accreditation/library", label: "Evidence" },
           { href: "/accreditation/templates", label: "Templates" },
         ]}
