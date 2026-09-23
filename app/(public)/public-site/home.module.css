@@ -1,0 +1,19 @@
+.home {
+  --home-photo-gap: clamp(24px, 2vw, 32px);
+  --home-edge-inset: clamp(24px, 6vw, 92px);
+  --home-content-width: 1440px;
+}
+
+/* All photo sections share one content frame, including on wide screens. */
+.home .photoSection {
+  max-width: none;
+  padding-inline: max(
+    var(--home-edge-inset),
+    calc((100% - var(--home-content-width)) / 2)
+  );
+}
+
+/* Keep paired-photo spacing identical when columns become stacked rows. */
+.home .photoGrid {
+  gap: var(--home-photo-gap);
+}
