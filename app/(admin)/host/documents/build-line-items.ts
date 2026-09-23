@@ -63,18 +63,70 @@ export function buildLineItems(
     return [{ description: desc, amount: target > 0 ? target.toFixed(2) : "" }];
   }
 
-  // Scale each component to the negotiated total. The last line absorbs
-  // any rounding remainder so the sum is exact.
+  // Scale each component to the negotiated total.
   const scale = target / rawSum;
-  const lines: LineItem[] = [];
-  let runningSum = 0;
-  components.forEach((c, i) => {
-    const isLast = i === components.length - 1;
-    const value = isLast
-      ? roundCents(target - runningSum)
-      : roundCents(c.raw * scale);
-    runningSum = roundCents(runningSum + value);
-    lines.push({ description: c.description, amount: value.toFixed(2) });
-  });
-  return lines;
+  const exact = components.map(c => c.raw * scale);
+
+  // When the negotiated total differs from the raw breakdown, the scaled
+  // amounts come out ugly ($1,306.66) — round to multiples of $10 that
+  // still sum to the exact total. When no scaling is applied, keep the
+  // exact raw amounts: real fees like the $125 fire permit must not move.
+  let values = Math.abs(target - rawSum) > 0.005
+    ? roundToTens(exact, target)
+    : scaleToCents(components, target, rawSum);
+
+  // A line rounded down to $0.00 reads as a mistake on the invoice — if
+  // $10-rounding would zero one out, fall back to exact cents instead.
+  if (values.some(v => v <= 0)) {
+    values = scaleToCents(components, target, rawSum);
+  }
+
+  return components.map((c, i) => ({
+    description: c.description,
+    amount: values[i].toFixed(2),
+  }));
+}
+
+/**
+ * Round exact amounts to multiples of $10 while keeping the sum exactly equal
+ * to `target`: floor each to the $10 grid, then hand the remaining $10 chunks
+ * to the lines with the largest fractional remainders (largest-remainder
+ * apportionment). Each line moves by less than $10 from its exact value. If
+ * `target` itself isn't a multiple of $10, the sub-$10 leftover lands on the
+ * largest line so the total stays exact.
+ */
+function roundToTens(exact: number[], target: number): number[] {
+  const tens = exact.map(v => Math.floor(v / 10));
+  let chunksLeft = Math.floor(target / 10) - tens.reduce((s, t) => s + t, 0);
+  const byRemainder = exact
+    .map((v, i) => ({ i, frac: v / 10 - Math.floor(v / 10) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (const { i } of byRemainder) {
+    if (chunksLeft <= 0) break;
+    tens[i] += 1;
+    chunksLeft -= 1;
+  }
+  const values = tens.map(t => t * 10);
+  const leftover = roundCents(target - values.reduce((s, v) => s + v, 0));
+  if (Math.abs(leftover) > 0.005) {
+    let largest = 0;
+    for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
+    values[largest] = roundCents(values[largest] + leftover);
+  }
+  return values;
+}
+
+/**
+ * Proportional scaling rounded to exact cents, with any rounding drift
+ * absorbed by the largest line so the sum matches `target` exactly.
+ */
+function scaleToCents(components: { raw: number }[], target: number, rawSum: number): number[] {
+  const values = components.map(c => roundCents((c.raw * target) / rawSum));
+  const drift = roundCents(target - values.reduce((s, v) => s + v, 0));
+  if (Math.abs(drift) > 0.005) {
+    let largest = 0;
+    for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
+    values[largest] = roundCents(values[largest] + drift);
+  }
+  return values;
 }
