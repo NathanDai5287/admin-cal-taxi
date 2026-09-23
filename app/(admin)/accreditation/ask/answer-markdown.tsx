@@ -25,9 +25,23 @@ function markdownComponents(streaming: boolean): Components {
   h2({ children }) { return <h2 className="mb-2 mt-4 text-base font-bold leading-snug first:mt-0">{children}</h2>; },
   h3({ children }) { return <h3 className="mb-2 mt-4 text-sm font-bold leading-snug first:mt-0">{children}</h3>; },
   p({ children }) { return <p className="mb-3 last:mb-0">{children}</p>; },
-  ul({ children }) { return <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0 marker:text-brand">{children}</ul>; },
+  ul({ className, children }) {
+    const taskList = className?.split(" ").includes("contains-task-list");
+    return <ul className={taskList
+      ? "mb-3 list-none space-y-2 pl-0 last:mb-0"
+      : "mb-3 list-disc space-y-1 pl-5 last:mb-0 marker:text-brand"}>{children}</ul>;
+  },
   ol({ children }) { return <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0 marker:font-semibold marker:text-brand">{children}</ol>; },
-  li({ children }) { return <li className="pl-0.5">{children}</li>; },
+  li({ className, children }) {
+    const taskItem = className?.split(" ").includes("task-list-item");
+    return <li className={taskItem ? "relative list-none pl-6" : "pl-0.5"}>{children}</li>;
+  },
+  input({ type, checked }) {
+    if (type !== "checkbox") return null;
+    return <span role="img" aria-label={checked ? "Completed task" : "Task to do"} className={`absolute left-0 top-[0.32em] inline-flex h-3.5 w-3.5 items-center justify-center border ${checked ? "border-brand bg-brand text-surface" : "border-brand bg-surface"}`}>
+      {checked ? <svg aria-hidden="true" viewBox="0 0 14 14" className="h-3 w-3 fill-none stroke-current" strokeWidth="2"><path d="m2.5 7 3 3 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg> : null}
+    </span>;
+  },
   blockquote({ children }) { return <blockquote className="my-3 border-l border-brand/60 pl-3 text-muted">{children}</blockquote>; },
   hr() { return <hr className="my-4 border-rule" />; },
   table({ children }) { return <div className="mb-3 max-w-full overflow-x-auto last:mb-0"><table className="min-w-full border-collapse text-left text-xs">{children}</table></div>; },

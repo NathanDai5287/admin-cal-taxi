@@ -24,10 +24,12 @@ export default function MermaidDiagram({ source }: { source: string }) {
           startOnLoad: false,
           securityLevel: "strict",
           theme: document.documentElement.dataset.theme === "dark" ? "dark" : "default",
-          flowchart: { htmlLabels: false, useMaxWidth: true },
+          htmlLabels: false,
+          flowchart: { useMaxWidth: true },
           sequence: { useMaxWidth: true },
         });
         const result = await mermaid.render(id, source);
+        if (/<foreignObject\b/i.test(result.svg)) throw new Error("Diagram labels require HTML output");
         const svg = DOMPurify.sanitize(result.svg, {
           USE_PROFILES: { svg: true, svgFilters: true },
           FORBID_TAGS: ["foreignObject", "iframe", "script"],
