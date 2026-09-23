@@ -6,16 +6,22 @@ import { LightboxImage } from "@/components/public/lightbox-image";
 import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
+import betaAlphaPsiLogo from "@/public/site/logos/berkeley-beta-alpha-psi.png";
 import indoorCocktailImage from "@/public/site/venue-indoor-cocktail.jpg";
 import indoorEventImage from "@/public/site/venue-indoor-event.jpg";
 import indoorHallImage from "@/public/site/venue-indoor-hall.jpg";
 import indoorHallPortraitImage from "@/public/site/venue-indoor-hall-portrait.jpg";
 import berkeleytimeLogo from "@/public/site/logos/berkeleytime-clock.png";
+import calJapanClubLogo from "@/public/site/logos/cal-japan-club.png";
 import codebaseLogo from "@/public/site/logos/codebase-wordmark.png";
 import diversatechLogo from "@/public/site/logos/diversatech.png";
 import dssLogo from "@/public/site/logos/data-science-society.png";
 import gammaZetaAlphaLogo from "@/public/site/logos/gamma-zeta-alpha.png";
 import plextechLogo from "@/public/site/logos/plextech.png";
+import productSpaceLogo from "@/public/site/logos/product-space.png";
+import thetaTauLogo from "@/public/site/logos/theta-tau.png";
+import upsyncLogo from "@/public/site/logos/upsync.png";
+import valleyConsultingGroupLogo from "@/public/site/logos/valley-consulting-group.png";
 import webdevLogo from "@/public/site/logos/webdev-at-berkeley.png";
 import { VenueInquiryForm } from "./venue-inquiry-form";
 import { VenueWalkthroughVideo } from "./venue-walkthrough-video";
@@ -28,6 +34,12 @@ const clubs: LogoItem[] = [
   { name: "DiversaTech", src: diversatechLogo },
   { name: "PlexTech", src: plextechLogo },
   { name: "Data Science Society", src: dssLogo },
+  { name: "Theta Tau", src: thetaTauLogo },
+  { name: "UpSync", src: upsyncLogo },
+  { name: "Beta Alpha Psi", src: betaAlphaPsiLogo },
+  { name: "Valley Consulting Group", src: valleyConsultingGroupLogo },
+  { name: "Product Space", src: productSpaceLogo },
+  { name: "Cal Japan Club", src: calJapanClubLogo },
 ];
 
 export const metadata: Metadata = {
