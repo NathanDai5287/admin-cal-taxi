@@ -389,8 +389,8 @@
 .chapter-record-intro {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: 48px;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
   align-items: end;
 }
 
