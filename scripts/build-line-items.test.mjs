@@ -100,6 +100,40 @@ test("negotiated total below the pinned fee falls back to scaling everything", (
   assert.ok(Math.abs(sum(items) - 100) < 1e-9, `sum ${sum(items)}`);
 });
 
+// Small event: 30 guests -> capacity (30-20)*2 = 20, no permit, full cleanup.
+// The capacity fee is much smaller than cleanup, so these tests prove the
+// remainder follows the capacity fee rather than the largest line.
+function smallBreakdown() {
+  return {
+    base: 150,
+    guests: 30,
+    capacityThreshold: 20,
+    capacity: 20,
+    firePermit: 0,
+    alcohol: 0,
+    protection: 0,
+    date: 0,
+    setup: 0,
+    cleanup: 200,
+    cleanupLabel: "Full",
+  };
+}
+
+test("sub-$10 remainder lands on the capacity fee, not the largest line", () => {
+  const items = buildLineItems(smallBreakdown(), 403, "October 3, 2026");
+  // pool: capacity 20 + cleanup 200, aim 253 -> exact 23.00 / 230.00;
+  // the $3 remainder goes to capacity (flex), not cleanup (largest).
+  assert.equal(items.find(it => it.description.startsWith("Capacity fee")).amount, "23.00");
+  assert.equal(items.find(it => it.description.startsWith("Cleanup")).amount, "230.00");
+  assert.equal(sum(items), 403);
+});
+
+test("cents remainder lands on the capacity fee", () => {
+  const items = buildLineItems(smallBreakdown(), 403.5, "October 3, 2026");
+  assert.equal(items.find(it => it.description.startsWith("Capacity fee")).amount, "23.50");
+  assert.ok(Math.abs(sum(items) - 403.5) < 1e-9, `sum ${sum(items)}`);
+});
+
 test("sum is exact across a sweep of negotiated totals", () => {
   for (let target = 1000; target <= 3000; target += 37) {
     const items = buildLineItems(breakdown(), target, "October 3, 2026");

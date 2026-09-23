@@ -15,7 +15,9 @@ import { roundCents } from "@/lib/host-format";
  *
  * The base rental and fire permit are constants in the pricing model
  * ($150 base, $125 permit): they always print at their raw amounts, and
- * the remaining lines scale to `target` minus the pinned fees.
+ * the remaining lines scale to `target` minus the pinned fees. When the
+ * total isn't a round number, the sub-$10 remainder always lands on the
+ * capacity fee.
  *
  * If `breakdown` is missing OR `target` is non-positive, returns a single
  * generic line so the user can fill it in manually.
@@ -27,8 +29,9 @@ export function buildLineItems(
 ): LineItem[] {
   // Components in display order. Each is the *raw* (pre-wealth) amount
   // — that's what the breakdown stores in .base/.alcohol/etc. `fixed`
-  // marks pass-through fees that never scale or round (the fire permit).
-  type Comp = { description: string; raw: number; fixed?: boolean };
+  // marks constants that never scale or round (base rental, fire permit);
+  // `flex` marks the line that absorbs any sub-$10 remainder (capacity fee).
+  type Comp = { description: string; raw: number; fixed?: boolean; flex?: boolean };
   const components: Comp[] = [];
 
   if (breakdown) {
@@ -42,6 +45,7 @@ export function buildLineItems(
       components.push({
         description: `Capacity fee — ${breakdown.guests} guests (${over} over included threshold)`,
         raw: breakdown.capacity,
+        flex: true,
       });
     }
     if (breakdown.firePermit > 0) {
@@ -92,18 +96,24 @@ export function buildLineItems(
   const scale = poolTarget / poolSum;
   const exact = pool.map(c => c.raw * scale);
 
+  // The capacity fee is the designated flexible line: any sub-$10 remainder
+  // (when the negotiated total isn't a round number) always lands there, so
+  // the non-round line is predictable instead of jumping to whatever line
+  // happens to be largest.
+  const flexIdx = pool.findIndex(c => c.flex);
+
   // When the negotiated total differs from the raw breakdown, the scaled
   // amounts come out ugly ($1,306.66) — round to multiples of $10 that
   // still sum to the exact total. When no scaling is applied, keep the
   // exact raw amounts.
   let poolValues = Math.abs(poolTarget - poolSum) > 0.005
-    ? roundToTens(exact, poolTarget)
-    : scaleToCents(pool, poolTarget, poolSum);
+    ? roundToTens(exact, poolTarget, flexIdx)
+    : scaleToCents(pool, poolTarget, poolSum, flexIdx);
 
   // A line rounded down to $0.00 reads as a mistake on the invoice — if
   // $10-rounding would zero one out, fall back to exact cents instead.
   if (poolValues.some(v => v <= 0)) {
-    poolValues = scaleToCents(pool, poolTarget, poolSum);
+    poolValues = scaleToCents(pool, poolTarget, poolSum, flexIdx);
   }
 
   // Reassemble in display order; pinned lines keep their raw amount.
@@ -115,14 +125,25 @@ export function buildLineItems(
 }
 
 /**
+ * Index of the line that absorbs rounding drift: the designated flexible
+ * line (capacity fee) when one exists, else the largest line.
+ */
+function absorberIndex(values: number[], flexIdx: number): number {
+  if (flexIdx >= 0) return flexIdx;
+  let largest = 0;
+  for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
+  return largest;
+}
+
+/**
  * Round exact amounts to multiples of $10 while keeping the sum exactly equal
  * to `target`: floor each to the $10 grid, then hand the remaining $10 chunks
  * to the lines with the largest fractional remainders (largest-remainder
  * apportionment). Each line moves by less than $10 from its exact value. If
  * `target` itself isn't a multiple of $10, the sub-$10 leftover lands on the
- * largest line so the total stays exact.
+ * flexible line (capacity fee) so the total stays exact.
  */
-function roundToTens(exact: number[], target: number): number[] {
+function roundToTens(exact: number[], target: number, flexIdx = -1): number[] {
   const tens = exact.map(v => Math.floor(v / 10));
   let chunksLeft = Math.floor(target / 10) - tens.reduce((s, t) => s + t, 0);
   const byRemainder = exact
@@ -136,24 +157,28 @@ function roundToTens(exact: number[], target: number): number[] {
   const values = tens.map(t => t * 10);
   const leftover = roundCents(target - values.reduce((s, v) => s + v, 0));
   if (Math.abs(leftover) > 0.005) {
-    let largest = 0;
-    for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
-    values[largest] = roundCents(values[largest] + leftover);
+    const i = absorberIndex(values, flexIdx);
+    values[i] = roundCents(values[i] + leftover);
   }
   return values;
 }
 
 /**
  * Proportional scaling rounded to exact cents, with any rounding drift
- * absorbed by the largest line so the sum matches `target` exactly.
+ * absorbed by the flexible line (capacity fee) so the sum matches `target`
+ * exactly.
  */
-function scaleToCents(components: { raw: number }[], target: number, rawSum: number): number[] {
+function scaleToCents(
+  components: { raw: number }[],
+  target: number,
+  rawSum: number,
+  flexIdx = -1,
+): number[] {
   const values = components.map(c => roundCents((c.raw * target) / rawSum));
   const drift = roundCents(target - values.reduce((s, v) => s + v, 0));
   if (Math.abs(drift) > 0.005) {
-    let largest = 0;
-    for (let i = 1; i < values.length; i++) if (values[i] > values[largest]) largest = i;
-    values[largest] = roundCents(values[largest] + drift);
+    const i = absorberIndex(values, flexIdx);
+    values[i] = roundCents(values[i] + drift);
   }
   return values;
 }
