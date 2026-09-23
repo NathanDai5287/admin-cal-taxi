@@ -11,9 +11,14 @@
  * through the server actions in app/host/orders/actions.ts.
  */
 
+import "server-only";
+
 import type { Order, OrderDocument, OrderStatus, OrderSummary } from "./host-orders-types";
 import { revalidateTag } from "next/cache";
 import { backendKey, backendOrigin } from "./host-backend";
+
+/** Don't let a hung archive pin a server component or action forever. */
+const ARCHIVE_TIMEOUT_MS = 30_000;
 
 /** The archive could not be reached, or isn't configured at all. */
 export class OrdersUnavailableError extends Error {}
@@ -74,6 +79,7 @@ async function call<T>(
         "X-Admin-Key": key,
       },
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS),
       ...(method === "GET"
         ? { next: { revalidate: 600, tags: ["host-orders"] } }
         : { cache: "no-store" as const }),

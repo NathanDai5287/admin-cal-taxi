@@ -10,6 +10,8 @@
  * Server-only module.
  */
 
+import "server-only";
+
 export class BackendConfigError extends Error {}
 
 function isLoopback(hostname: string): boolean {
@@ -33,13 +35,16 @@ export function backendOrigin(): string | null {
   try {
     url = new URL(raw);
   } catch {
-    throw new BackendConfigError(`HOST_BACKEND_ORIGIN is not a valid URL: ${raw}`);
+    // Deliberately vague: the raw value can carry userinfo, and this message
+    // can reach the browser via the orders server actions.
+    console.error(`HOST_BACKEND_ORIGIN is not a valid URL: ${raw}`);
+    throw new BackendConfigError("HOST_BACKEND_ORIGIN is not a valid URL.");
   }
   if (url.protocol === "https:") return url.origin;
   if (url.protocol === "http:" && isLoopback(url.hostname)) return url.origin;
+  console.error(`HOST_BACKEND_ORIGIN rejected: ${raw}`);
   throw new BackendConfigError(
-    `HOST_BACKEND_ORIGIN must use https (got ${url.protocol}//${url.host}); ` +
-      "plain http is only allowed for loopback development.",
+    "HOST_BACKEND_ORIGIN must use https; plain http is only allowed for loopback development.",
   );
 }
 

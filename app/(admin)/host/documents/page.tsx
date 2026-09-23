@@ -81,6 +81,7 @@ export default function DocumentsPage() {
   const [depositDueEdited, setDepositDueEdited] = useState(false);
   const [rentalDueEdited, setRentalDueEdited] = useState(false);
   const [creditAmountEdited, setCreditAmountEdited] = useState(false);
+  const [originalInvoiceEdited, setOriginalInvoiceEdited] = useState(false);
 
   // Deposit: amount ← effective(depositAmount), due date ← event date.
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
@@ -113,7 +114,9 @@ export default function DocumentsPage() {
     return breakdown?.total ?? 0;
   }, [data, breakdown]);
   const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
-  const rentalDerivedKey = `${rentalTarget}|${breakdown?.subtotal ?? "x"}|${eventDateReadable}`;
+  // The selections are fingerprinted too: two different selections can share
+  // a subtotal and total while producing different line items.
+  const rentalDerivedKey = `${rentalTarget}|${breakdown?.subtotal ?? "x"}|${eventDateReadable}|${JSON.stringify(data.pricingSelections)}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -137,14 +140,17 @@ export default function DocumentsPage() {
   }, [hydrated, creditAmountEdited, data]);
 
   // Credit memo: original invoice ← last generated deposit invoice number.
-  // Re-runs whenever that number changes (including a deposit invoice
-  // generated in this same session), as long as the user hasn't typed one.
+  // Re-seeds whenever that number changes (including a deposit invoice
+  // regenerated with a new number in this same session), as long as the user
+  // hasn't typed one — an auto-filled value must never point at a superseded
+  // invoice.
   useEffect(() => {
-    if (!hydrated) return;
-    if (data.lastDepositInvoiceNumber) {
-      setCreditMemo(f => (f.originalInvoice ? f : { ...f, originalInvoice: data.lastDepositInvoiceNumber }));
+    if (!hydrated || originalInvoiceEdited) return;
+    const latest = data.lastDepositInvoiceNumber;
+    if (latest) {
+      setCreditMemo(f => (f.originalInvoice === latest ? f : { ...f, originalInvoice: latest }));
     }
-  }, [hydrated, data.lastDepositInvoiceNumber]);
+  }, [hydrated, originalInvoiceEdited, data.lastDepositInvoiceNumber]);
 
   // ── Generation state ──────────────────────────────────────────────────────
 
@@ -156,6 +162,23 @@ export default function DocumentsPage() {
   // the re-render so the UI reflects it.
   const generatedRef = useRef<GeneratedMap>({});
   const [, setRenderTick] = useState(0);
+
+  // Generated documents belong to the event identity (organizations + date)
+  // they were generated from — their payloads bake those in. When the identity
+  // changes on the earlier steps, every document generated under the old one
+  // is void: drop the map so a stale contract/invoice can't be downloaded as
+  // "current", unblock checks can't borrow the old deposit-invoice number,
+  // and Save can't archive old-identity PDFs onto the new event's order.
+  const identityKey = hydrated
+    ? `${cleanClubs(data.clubs).join("\n")}|${data.eventDate}`
+    : "";
+  const identityRef = useRef(identityKey);
+  useEffect(() => {
+    if (identityRef.current === identityKey) return;
+    identityRef.current = identityKey;
+    generatedRef.current = {};
+    setRenderTick(v => v + 1);
+  }, [identityKey]);
 
   function recordGenerated(kind: DocumentKind, doc: Omit<OrderDocument, "id">) {
     generatedRef.current = { ...generatedRef.current, [kind]: doc };
@@ -530,6 +553,7 @@ export default function DocumentsPage() {
             fields={creditMemo}
             onChange={patch => {
               if (patch.amount !== undefined) setCreditAmountEdited(true);
+              if (patch.originalInvoice !== undefined) setOriginalInvoiceEdited(true);
               setCreditMemo(f => ({ ...f, ...patch }));
             }}
             amountHint={creditMemoAmountHint}

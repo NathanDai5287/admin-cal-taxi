@@ -99,6 +99,17 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
     finalPrice = str(snapshot.rentalPrice, "");
     overrides.finalPrice = true;
   }
+  // Pre-overrides snapshots: the resolved rentalPrice was the negotiated
+  // price. Preserve it as a finalPrice override so loading an old archived
+  // order doesn't silently reprice it from the calculator.
+  if (
+    !snapshot.overrides &&
+    !overrides.finalPrice &&
+    str(snapshot.rentalPrice, "").trim() !== ""
+  ) {
+    finalPrice = str(snapshot.rentalPrice, "");
+    overrides.finalPrice = true;
+  }
 
   return {
     clubs: clubsFrom(snapshot.clubs, snapshot.clubName),

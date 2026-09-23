@@ -251,6 +251,15 @@ function migrate(parsed: Record<string, unknown>): SharedState {
   // Mark them manual so nothing visibly changes on this upgrade — each one
   // then shows a "reset to auto" link the user can take when they want it.
   if (!parsed.overrides) {
+    // In that schema the negotiated fee lived in `rentalPrice`; dropping it
+    // would silently reprice the rental from the calculator.
+    if (
+      merged.finalPrice.trim() === "" &&
+      typeof parsed.rentalPrice === "string" &&
+      parsed.rentalPrice.trim() !== ""
+    ) {
+      merged.finalPrice = parsed.rentalPrice;
+    }
     for (const k of OVERRIDE_KEYS) merged.overrides[k] = merged[k] !== "";
   }
 
