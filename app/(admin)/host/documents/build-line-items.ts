@@ -13,8 +13,9 @@ import { roundCents } from "@/lib/host-format";
  * "relationship discount/surcharge" row — the relationship adjustment is
  * already baked into `target`, and individual components scale to match.
  *
- * The fire permit is a real pass-through fee (a constant $125): it always
- * prints at its raw amount; the other lines scale to `target` minus it.
+ * The base rental and fire permit are constants in the pricing model
+ * ($150 base, $125 permit): they always print at their raw amounts, and
+ * the remaining lines scale to `target` minus the pinned fees.
  *
  * If `breakdown` is missing OR `target` is non-positive, returns a single
  * generic line so the user can fill it in manually.
@@ -31,7 +32,11 @@ export function buildLineItems(
   const components: Comp[] = [];
 
   if (breakdown) {
-    components.push({ description: "Base rental — Theta Xi Fraternity House", raw: breakdown.base });
+    components.push({
+      description: "Base rental — Theta Xi Fraternity House",
+      raw: breakdown.base,
+      fixed: true,
+    });
     if (breakdown.capacity > 0) {
       const over = Math.max(0, breakdown.guests - breakdown.capacityThreshold);
       components.push({
@@ -68,9 +73,10 @@ export function buildLineItems(
     return [{ description: desc, amount: target > 0 ? target.toFixed(2) : "" }];
   }
 
-  // Fixed fees (the $125 fire permit) print at their raw amount and never
-  // scale or round. The remaining lines scale to the negotiated total
-  // minus the pinned fees.
+  // Fixed fees (the $150 base rental and $125 fire permit — both constants
+  // in the pricing model) print at their raw amount and never scale or
+  // round. The remaining lines scale to the negotiated total minus the
+  // pinned fees.
   const scalable = components.filter(c => !c.fixed);
   const pinnedSum = rawSum - scalable.reduce((s, c) => s + c.raw, 0);
   const poolRawSum = scalable.reduce((s, c) => s + c.raw, 0);
