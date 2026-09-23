@@ -77,19 +77,24 @@
 }
 
 @layer components {
-  /* Secondary navigation: the main navbar's underline interaction, quieter. */
   [data-brand] .member-tabs {
     display: flex;
-    gap: 1.75rem;
+    height: 64px;
+    overflow-x: auto;
+    overflow-y: hidden;
     margin-bottom: 2rem;
     border-bottom: 1px solid var(--color-rule);
   }
   [data-brand] .member-tabs a {
-    padding: 0 0 0.85rem;
-    margin-bottom: -1px;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    padding: 0 1rem;
     border-bottom: 2px solid transparent;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
     color: var(--color-muted);
     transition: color 150ms, border-color 150ms;
   }
@@ -170,8 +175,6 @@
   [data-brand] .history-row:hover .history-arrow { color: var(--color-brand); transform: translateX(3px); }
   [data-brand] .history-empty { border-block: 1px solid var(--color-rule); padding: 2rem 0; }
   @media (max-width: 700px) {
-    [data-brand] .member-tabs { gap: 1.25rem; }
-    [data-brand] .member-tabs a { font-size: 11px; }
     [data-brand] .history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     [data-brand] .history-summary > div:nth-child(2) { border-right: 0; }
     [data-brand] .history-summary > div:nth-child(-n+2) { border-bottom: 1px solid var(--color-rule); }
