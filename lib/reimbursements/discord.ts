@@ -57,7 +57,7 @@ async function discordRequest(path: string, init: RequestInit = {}) {
   throw new Error("Discord API request exceeded its retry limit.");
 }
 
-export async function sendDiscordDuesAnnouncement(content: string, userIds: string[], requestId?: string) {
+export async function sendDiscordAnnouncement(content: string, userIds: string[], requestId?: string) {
   const channelId = requiredEnvironmentVariable("DISCORD_ANNOUNCEMENT_CHANNEL_ID");
   if (!content.trim() || content.length > 2000) {
     throw new Error("Discord announcements must be between 1 and 2,000 characters.");
@@ -88,6 +88,8 @@ export async function sendDiscordDuesAnnouncement(content: string, userIds: stri
 
   return { messageId: message.id, channelId: message.channel_id };
 }
+
+export const sendDiscordDuesAnnouncement = sendDiscordAnnouncement;
 
 async function addDecisionReactions(channelId: string, messageId: string) {
   for (const emoji of [approvedEmoji, deniedEmoji]) {
