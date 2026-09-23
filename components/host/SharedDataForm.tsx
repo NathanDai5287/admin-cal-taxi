@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/brand/button";
-import { isMultiClub } from "@/lib/host-clubs";
+import { isMultiClub, normalizeOrgName } from "@/lib/host-clubs";
 import { autoValue, effective, hasDiverged } from "@/lib/host-derive";
 import { useSharedData } from "@/lib/host-shared-state";
 
@@ -79,6 +79,12 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
                   placeholder={i === 0 ? "e.g. Pi Sigma Delta" : "e.g. Another Club"}
                   value={hydrated ? club : ""}
                   onChange={e => setClub(i, e.target.value)}
+                  onBlur={e => {
+                    // Tidy casing/whitespace so the printed contract never
+                    // shows an all-lowercase organization name.
+                    const v = normalizeOrgName(e.target.value);
+                    if (v !== e.target.value) setClub(i, v);
+                  }}
                   autoComplete="off"
                 />
                 {clubs.length > 1 && (
