@@ -2,10 +2,6 @@
   background: var(--color-page);
 }
 
-.ask-policy-tabs nav {
-  justify-content: flex-end;
-}
-
 [data-brand].ask-policy-shell button,
 [data-brand].ask-policy-shell textarea {
   border-radius: 999px;
