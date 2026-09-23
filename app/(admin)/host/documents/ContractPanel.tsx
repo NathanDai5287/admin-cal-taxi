@@ -14,10 +14,6 @@ export default function ContractPanel({
 }) {
   return (
     <div>
-      <p className="text-[12.5px] text-muted mb-3 max-w-2xl leading-relaxed">
-        When enabled, the contract is generated with the Theta Xi Executive Board signature
-        and today&rsquo;s date already filled in. The renter&rsquo;s side is left blank.
-      </p>
       <label className="check-row">
         <input
           type="checkbox"
