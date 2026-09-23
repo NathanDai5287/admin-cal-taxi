@@ -26,7 +26,7 @@ export default async function AskPolicyLayout({ children }: { children: React.Re
         </div>
       </header>
       <div className="bg-surface">
-        <div className="mx-auto max-w-[1500px] px-3 sm:px-6">
+        <div className="ask-policy-tabs mx-auto max-w-[1500px] px-3 sm:px-6">
           <AppNav
             variant="section"
             homeHref="/ask-policy"
