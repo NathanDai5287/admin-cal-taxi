@@ -4,6 +4,7 @@ import type { StaticImageData } from "next/image";
 import { HouseMap, houseDirectionsUrl } from "@/components/public/house-map";
 import { HostedClubOrbit, type HostedClub } from "@/components/public/hosted-club-orbit";
 import { LightboxImage } from "@/components/public/lightbox-image";
+import { LogoGrid } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 import backyardPortraitImage from "@/public/site/venue-backyard-portrait.jpg";
 import betaAlphaPsiLogo from "@/public/site/logos/berkeley-beta-alpha-psi.png";
@@ -162,6 +163,11 @@ export default function HostPage() {
           </a>
         </div>
         <HouseMap />
+      </section>
+
+      <section className="logo-showcase" aria-labelledby="clubs-grid-title">
+        <h2 id="clubs-grid-title">Clubs we&apos;ve hosted</h2>
+        <LogoGrid items={clubs} variant="clubs" />
       </section>
 
       <section className="host-process" aria-labelledby="host-process-title">

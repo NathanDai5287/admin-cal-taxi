@@ -5,12 +5,12 @@
   align-self: center;
 }
 
-.fade {
+.stage {
   position: relative;
   height: 460px;
-  overflow: hidden;
+  /* Fade each whole logo by depth, never crop it at the stage's edges. */
+  overflow: visible;
   isolation: isolate;
-  mask-image: radial-gradient(ellipse 65% 66% at 50% 49%, #000 55%, transparent 100%);
 }
 
 .scene {
@@ -99,7 +99,7 @@
 
 @media (min-width: 1750px) {
   .orbit { max-width: 700px; justify-self: end; }
-  .fade { height: 510px; }
+  .stage { height: 510px; }
   .logo img { max-width: 78px; max-height: 78px; }
   .wide img { max-width: 115px; }
   .large img { max-width: 88px; max-height: 88px; }
@@ -118,11 +118,11 @@
 
 @media (max-width: 820px) {
   .orbit { max-width: 660px; justify-self: center; }
-  .fade { height: 415px; }
+  .stage { height: 415px; }
 }
 
 @media (max-width: 480px) {
-  .fade { height: 345px; margin-inline: -12px; }
+  .stage { height: 345px; margin-inline: -12px; }
   .logo { width: 86px; height: 90px; margin: -45px 0 0 -43px; gap: 8px; }
   .image { width: 70px; height: 61px; }
   .logo img { max-width: 46px; max-height: 46px; }

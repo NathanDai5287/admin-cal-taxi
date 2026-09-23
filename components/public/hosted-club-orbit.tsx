@@ -27,13 +27,28 @@ export function HostedClubOrbit({ clubs }: { clubs: HostedClub[] }) {
     let phase = -0.18;
     let width = scene.clientWidth;
     let height = scene.clientHeight;
+    let radius = 0;
     let lastFrame: number | null = null;
     let frameId: number | null = null;
     let inView = true;
 
+    function measure() {
+      if (!scene) return;
+      width = scene.clientWidth;
+      height = scene.clientHeight;
+      const center = scene.getBoundingClientRect().left + width / 2;
+      const room = Math.max(0, Math.min(center, document.documentElement.clientWidth - center) - 12);
+      const halfLogo = Math.max(...logos.map((logo) => logo.offsetWidth)) / 2;
+      const perspective = 900;
+      const depthRadius = Math.min(190, width * 0.27);
+      // Bound the entire logo at every angle, including perspective enlargement
+      // and the extra depth of its corners when it turns up to 30 degrees.
+      const available = Math.max(0, room * (perspective - halfLogo * 0.5) - perspective * halfLogo);
+      const safeRadius = Math.sqrt(Math.max(0, available ** 2 - (room * depthRadius) ** 2)) / perspective;
+      radius = Math.min(width * 0.44, safeRadius);
+    }
+
     function paint() {
-      // Widen only the horizontal radius; preserve the approved height and depth.
-      const radius = width * 0.44;
       const depthRadius = Math.min(190, width * 0.27);
       const rise = height * 0.252;
 
@@ -84,9 +99,8 @@ export function HostedClubOrbit({ clubs }: { clubs: HostedClub[] }) {
       }
     }
 
-    const resize = new ResizeObserver(([entry]) => {
-      width = entry.contentRect.width;
-      height = entry.contentRect.height;
+    const resize = new ResizeObserver(() => {
+      measure();
       paint();
     });
     const visibility = new IntersectionObserver(([entry]) => {
@@ -94,8 +108,10 @@ export function HostedClubOrbit({ clubs }: { clubs: HostedClub[] }) {
       sync();
     });
     resize.observe(scene);
+    resize.observe(document.documentElement);
     visibility.observe(scene);
     document.addEventListener("visibilitychange", sync);
+    measure();
     paint();
     sync();
 
@@ -109,7 +125,7 @@ export function HostedClubOrbit({ clubs }: { clubs: HostedClub[] }) {
 
   return (
     <section className={styles.orbit} aria-labelledby="clubs-title">
-      <div className={styles.fade}>
+      <div className={styles.stage}>
         <div className={styles.scene} ref={sceneRef} aria-hidden="true">
           {clubs.map((club) => (
             <div
@@ -124,7 +140,7 @@ export function HostedClubOrbit({ clubs }: { clubs: HostedClub[] }) {
           ))}
         </div>
         <div className={styles.copy}>
-          <h2 id="clubs-title">Clubs that have<br />hosted with us.</h2>
+          <h2 id="clubs-title">Clubs we&apos;ve hosted</h2>
         </div>
       </div>
       <ul className={styles.accessibleList}>
