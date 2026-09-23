@@ -56,14 +56,22 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
             {clubs.length > 1 ? "Organizations" : "Organization"}
           </label>
           <div className="space-y-2 max-w-xl">
-            {clubs.map((club, i) => (
+            {clubs.map((club, i) => {
+              // The contract numbers only the names that survive cleaning,
+              // so the badge counts non-blank rows, not raw positions —
+              // otherwise a blank middle row makes the labels lie about the
+              // "Club N" each organization will sign as.
+              const contractNumber = club.trim()
+                ? clubs.slice(0, i).filter(c => c.trim()).length + 1
+                : null;
+              return (
               <div key={i} className="flex items-center gap-2">
                 {clubs.length > 1 && (
                   <span
                     className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted w-[46px] shrink-0 text-right"
                     title="How the contract introduces this organization"
                   >
-                    Club {i + 1}
+                    {contractNumber ? `Club ${contractNumber}` : ""}
                   </span>
                 )}
                 <input
@@ -84,7 +92,8 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
                   </Button>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-2 flex items-center gap-4 flex-wrap">
             <Button type="button" variant="text" onClick={addClub}>
