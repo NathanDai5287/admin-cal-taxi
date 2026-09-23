@@ -12,6 +12,7 @@ export const chatHistorySchema = z.array(z.object({
 
 export const chatIntentSchema = z.object({
   needs_policy: z.boolean(),
+  needs_source_catalog: z.boolean(),
   search_query: z.string().trim().max(1_000),
 });
 
@@ -21,7 +22,6 @@ export const chatAnswerSchema = z.object({
     ref: z.string().trim().min(1),
     quote: z.string().trim().min(8).max(1_000),
   })).max(12),
-  follow_ups: z.array(z.string().trim().min(1).max(180)).max(3).optional(),
 });
 
 export type ChatHistoryMessage = z.infer<typeof chatHistorySchema>[number];
@@ -43,6 +43,7 @@ export type DocumentCitation = {
   kind: ChatContext["kind"];
   subtitle: string;
   locators: Record<string, unknown>[];
+  excerpts?: { quote: string; locator: Record<string, unknown> }[];
   sourceId?: string;
 };
 
@@ -84,7 +85,7 @@ export function keepSupportedCitations(citations: ChatCitation[], contexts: Chat
 
 export function groupCitationsByDocument(citations: ChatCitation[], contexts: ChatContext[]): DocumentCitation[] {
   const byRef = new Map(contexts.map((context) => [context.ref, context]));
-  const documents = new Map<string, DocumentCitation & { locatorKeys: Set<string> }>();
+  const documents = new Map<string, DocumentCitation & { locatorKeys: Set<string>; excerptKeys: Set<string> }>();
   for (const citation of citations) {
     const context = byRef.get(citation.ref);
     if (!context) continue;
@@ -92,13 +93,18 @@ export function groupCitationsByDocument(citations: ChatCitation[], contexts: Ch
     const key = context.sourceId ? `${context.kind}:${context.sourceId}` : `${context.kind}:${attachmentRef}:${context.title}`;
     let document = documents.get(key);
     if (!document) {
-      document = { key, title: context.title, kind: context.kind, subtitle: context.subtitle, locators: [], sourceId: context.sourceId, locatorKeys: new Set() };
+      document = { key, title: context.title, kind: context.kind, subtitle: context.subtitle, locators: [], excerpts: [], sourceId: context.sourceId, locatorKeys: new Set(), excerptKeys: new Set() };
       documents.set(key, document);
     }
     const locatorKey = JSON.stringify(context.locator);
     if (!document.locatorKeys.has(locatorKey)) {
       document.locatorKeys.add(locatorKey);
       document.locators.push(context.locator);
+    }
+    const excerptKey = `${JSON.stringify(context.locator)}:${normalize(citation.quote)}`;
+    if (!document.excerptKeys.has(excerptKey)) {
+      document.excerptKeys.add(excerptKey);
+      document.excerpts!.push({ quote: citation.quote, locator: context.locator });
     }
   }
   return [...documents.values()].map((document) => ({
@@ -107,6 +113,7 @@ export function groupCitationsByDocument(citations: ChatCitation[], contexts: Ch
     kind: document.kind,
     subtitle: document.subtitle,
     locators: document.locators,
+    excerpts: document.excerpts,
     sourceId: document.sourceId,
   }));
 }

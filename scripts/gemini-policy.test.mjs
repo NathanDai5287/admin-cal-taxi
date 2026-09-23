@@ -3,7 +3,7 @@ import test from "node:test";
 import { PDFDocument } from "pdf-lib";
 import { GeminiEmbeddingProvider, GeminiLanguageModelProvider, GeminiOcrProvider, RetryableAiError } from "../lib/accreditation/gemini.ts";
 import { generatePolicyAnswer, resolveQuestionDate, normalizePolicyAnswer, policyInstructions } from "../lib/policy/answers.ts";
-import { buildPolicyToolContext, clockQuestionIntent, describeClock, getPolicyClock } from "../lib/policy/tools.ts";
+import { addWeekdays, buildPolicyToolContext, clockQuestionIntent, describeClock, extractWeekdayDeadlineCounts, getPolicyClock } from "../lib/policy/tools.ts";
 
 test("Gemini structured output retries malformed JSON/schema once", async () => {
   for (const invalid of ["not json", '{"count":"wrong"}']) {
@@ -163,7 +163,13 @@ test("policy clock uses the configured chapter time zone instead of the UTC cale
 test("trusted policy tools provide exact calendar facts to both grounding passes", async () => {
   const clock = getPolicyClock(new Date("2026-09-23T19:00:00Z"), "America/Los_Angeles");
   const trustedRuntime = buildPolicyToolContext("2026-10-02", clock);
-  assert.deepEqual(trustedRuntime.calendar_math, { question_date: "2026-10-02", question_weekday: "Friday", days_from_today: 9, relative_to_today: "9 calendar days from today", weekdays_between_today_and_question_date: 6, weekday_count_note: "Monday-Friday dates strictly between today and the question date; holidays and agency-specific deadlines are not accounted for." });
+  assert.deepEqual(trustedRuntime.calendar_math, {
+    question_date: "2026-10-02", question_weekday: "Friday", days_from_today: 9, relative_to_today: "9 calendar days from today",
+    weekdays_between_today_and_question_date: 6,
+    weekday_count_note: "Monday-Friday dates strictly between today and the question date; holidays and agency-specific deadlines are not accounted for.",
+    weekday_deadline_offsets: [],
+    weekday_deadline_offset_note: "Illustrative Monday-Friday offsets counted after today's local date. Holidays, time cutoffs, trigger dates, and agency processing rules are not included; these calculations are not policy evidence and cannot determine permit or approval eligibility.",
+  });
   const requests = [];
   const language = { generateStructured: async (request) => {
     requests.push(request);
@@ -181,4 +187,21 @@ test("permit lead-time context keeps today distinct from an event date", () => {
   assert.equal(context.calendar_math.question_date, "2026-10-09");
   assert.equal(context.calendar_math.weekdays_between_today_and_question_date, 11);
   assert.equal(buildPolicyToolContext("2026-10-09", getPolicyClock(new Date("2026-10-09T19:00:00Z"), "America/Los_Angeles")).calendar_math.weekdays_between_today_and_question_date, 0);
+});
+
+test("weekday-only deadline offsets skip weekends, cap counts, and disclose excluded rules", () => {
+  assert.deepEqual(extractWeekdayDeadlineCounts("within 2 business days, 3 working-day period, five weekdays, 2 business days"), [2, 3, 5]);
+  assert.deepEqual(extractWeekdayDeadlineCounts("1 business day; 2 business days; 3 business days; 4 business days; 5 business days; 6 business days"), [1, 2, 3, 4, 5]);
+  assert.equal(addWeekdays("2026-09-25", 1), "2026-09-28");
+  assert.equal(addWeekdays("2026-09-23", 5), "2026-09-30");
+  assert.throws(() => addWeekdays("2026-09-23", 366), /from 0 to 365/);
+
+  const clock = getPolicyClock(new Date("2026-09-23T19:00:00Z"), "America/Los_Angeles");
+  const runtime = buildPolicyToolContext("2026-10-02", clock, [1, 5, 1]);
+  assert.deepEqual(runtime.calendar_math.weekday_deadline_offsets, [
+    { business_days: 1, date: "2026-09-24", weekday: "Thursday" },
+    { business_days: 5, date: "2026-09-30", weekday: "Wednesday" },
+  ]);
+  assert.match(runtime.calendar_math.weekday_deadline_offset_note, /Holidays/);
+  assert.match(runtime.calendar_math.weekday_deadline_offset_note, /cannot determine permit or approval eligibility/);
 });

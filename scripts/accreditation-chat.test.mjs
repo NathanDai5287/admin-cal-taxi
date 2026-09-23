@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from "remark-gfm";
 
 import {
   groupCitationsByDocument,
@@ -8,6 +13,12 @@ import {
   keepSupportedCitations,
   selectClosestContexts,
 } from "../lib/accreditation/chat.ts";
+import { safeMarkdownHref, isSafeSmallMermaid } from "../lib/accreditation/chat-markdown.ts";
+import {
+  buildSourceCatalogAnswer,
+  isUsableAccreditationCatalogEntry,
+  isUsablePolicyCatalogEntry,
+} from "../lib/accreditation/source-catalog.ts";
 import { processingRetryDelayMs } from "../lib/accreditation/batch.ts";
 
 test("chat attachments accept supported documents and common images", () => {
@@ -54,9 +65,103 @@ test("chat citations are grouped once per document while preserving cited locati
   ], contexts);
   assert.equal(grouped.length, 2);
   assert.deepEqual(grouped[0], {
-    key: "policy:one", title: "Policy", kind: "policy", subtitle: "Authority · v1", sourceId: "one", locators: [{ page: 1 }, { page: 2 }],
+    key: "policy:one", title: "Policy", kind: "policy", subtitle: contexts[0].subtitle, sourceId: "one", locators: [{ page: 1 }, { page: 2 }],
+    excerpts: [
+      { quote: "First clause.", locator: { page: 1 } },
+      { quote: "Second clause.", locator: { page: 2 } },
+    ],
   });
   assert.equal(grouped[1].key, "accreditation:two");
+  assert.deepEqual(grouped[1].excerpts, [{ quote: "Evidence.", locator: { page: 4 } }]);
+});
+
+test("assistant Markdown links allow only HTTPS and same-site paths", () => {
+  assert.equal(safeMarkdownHref("https://example.org/policy"), "https://example.org/policy");
+  assert.equal(safeMarkdownHref("/api/policy/sources/123"), "/api/policy/sources/123");
+  assert.equal(safeMarkdownHref("#details"), "#details");
+  for (const href of ["javascript:alert(1)", "data:text/html,hello", "//example.org", "\\\\example.org", "http://example.org", "mailto:staff@example.org"]) {
+    assert.equal(safeMarkdownHref(href), "", href);
+  }
+});
+
+test("assistant Markdown renders GFM while dropping raw HTML, images, and unsafe links", () => {
+  const html = renderToStaticMarkup(React.createElement(ReactMarkdown, {
+    skipHtml: true,
+    remarkPlugins: [remarkGfm],
+    rehypePlugins: [rehypeSanitize],
+    urlTransform: safeMarkdownHref,
+    components: {
+      a: ({ href, children }) => {
+        const safeHref = href ? safeMarkdownHref(href) : "";
+        return safeHref ? React.createElement("a", { href: safeHref }, children) : React.createElement("span", null, children);
+      },
+      img: () => null,
+    },
+  }, "A direct answer.\n\n| Step | Owner |\n| --- | --- |\n| Review | Officer |\n\n`code`\n\n<script>alert(1)</script><img src=x onerror=alert(2)>\n\n![remote image](https://example.org/image.png)\n\n[unsafe](javascript:alert(3))"));
+  assert.match(html, /<table>/);
+  assert.match(html, /<code>code<\/code>/);
+  assert.match(html, /A direct answer\./);
+  assert.doesNotMatch(html, /<script|<img|onerror|href="javascript:/i);
+  assert.match(html, /unsafe/);
+});
+
+test("Mermaid accepts small flow and sequence diagrams and rejects directives or oversized input", () => {
+  assert.equal(isSafeSmallMermaid("flowchart LR\n  A[Request] --> B[Review]"), true);
+  assert.equal(isSafeSmallMermaid("sequenceDiagram\n  Admin->>Officer: Review\n  Officer-->>Admin: Reply"), true);
+  assert.equal(isSafeSmallMermaid("flowchart LR\n  %%{init: { securityLevel: 'loose' }}%%\n  A --> B"), false);
+  assert.equal(isSafeSmallMermaid("flowchart LR\n  A --> B\n  click B 'javascript:alert(1)'"), false);
+  assert.equal(isSafeSmallMermaid(`flowchart LR\n${"  A --> B\n".repeat(33)}`), false);
+  assert.equal(isSafeSmallMermaid("pie\n  \"A\" : 1"), false);
+});
+
+test("Mermaid parser accepts valid flow and sequence syntax and rejects malformed diagrams", async () => {
+  const domPurify = (await import("dompurify")).default;
+  // Mermaid sanitizes labels during parsing; this parser-only Node test has no DOM.
+  if (typeof domPurify.sanitize !== "function") domPurify.sanitize = (input) => input;
+  const { default: mermaid } = await import("mermaid");
+  mermaid.initialize({ securityLevel: "strict", startOnLoad: false, flowchart: { htmlLabels: false } });
+  await assert.doesNotReject(() => mermaid.parse(["flowchart LR", "  A[Request] --> B[Review]"].join("\n")));
+  await assert.doesNotReject(() => mermaid.parse(["sequenceDiagram", "  Admin->>Officer: Review", "  Officer-->>Admin: Reply"].join("\n")));
+  await assert.rejects(() => mermaid.parse(["flowchart LR", "  A --"].join("\n")));
+});
+
+test("policy catalog eligibility checks publication state and inclusive effective dates", () => {
+  const policy = {
+    id: "p1", title: "Published", authority: "Board", document_type: "policy", version_label: "v2",
+    effective_from: "2026-01-01", effective_until: "2026-12-31", status: "published", processing_state: "ready", active_embedding_profile: "embed-v1",
+  };
+  assert.equal(isUsablePolicyCatalogEntry(policy, "2026-09-23"), true);
+  assert.equal(isUsablePolicyCatalogEntry({ ...policy, effective_from: "2026-10-01" }, "2026-09-23"), false);
+  assert.equal(isUsablePolicyCatalogEntry({ ...policy, effective_until: "2026-09-22" }, "2026-09-23"), false);
+  assert.equal(isUsablePolicyCatalogEntry({ ...policy, status: "draft" }, "2026-09-23"), false);
+  assert.equal(isUsablePolicyCatalogEntry({ ...policy, active_embedding_profile: null }, "2026-09-23"), false);
+});
+
+test("catalog excludes unusable evidence and formats a metadata-only inventory", () => {
+  const source = { id: "a1", original_name: "Annual report.pdf", kind: "prior_submission", report_key: "annual_report", cycle_id: "cycle-id", term_id: null, status: "ready", active_embedding_profile: "embed-v1" };
+  assert.equal(isUsableAccreditationCatalogEntry(source), true);
+  assert.equal(isUsableAccreditationCatalogEntry({ ...source, kind: "blank_template" }), false);
+  assert.equal(isUsableAccreditationCatalogEntry({ ...source, status: "processing" }), false);
+  const answer = buildSourceCatalogAnswer({
+    date: "2026-09-23",
+    policy: [{ id: "p1", title: "Published", authority: "Board", document_type: "policy", version_label: "v2", effective_from: "2026-01-01", effective_until: null, status: "published", processing_state: "ready", active_embedding_profile: "embed-v1" }],
+    accreditation: [source],
+  });
+  assert.match(answer, /metadata only/);
+  assert.match(answer, /\[Published\]\(<\/api\/policy\/sources\/p1\?date=2026-09-23>\)/);
+  assert.match(answer, /\[Annual report\.pdf\]\(<\/api\/accreditation\/sources\/a1>\)/);
+  const policyEntry = (index) => ({
+    id: `p${index}`, title: "Published", authority: "Board", document_type: "policy", version_label: "v2",
+    effective_from: "2026-01-01", effective_until: null, status: "published", processing_state: "ready", active_embedding_profile: "embed-v1",
+  });
+  const expanded = buildSourceCatalogAnswer({
+    date: "2026-09-23",
+    policy: Array.from({ length: 100 }, (_, index) => ({ ...policyEntry(index), title: "Published governance policy with a deliberately long name" })),
+    accreditation: Array.from({ length: 100 }, (_, index) => ({ ...source, id: `a${index}`, original_name: "Annual accreditation report with a deliberately long file name.pdf" })),
+  });
+  assert.ok(expanded.length < 8_000);
+  assert.match(expanded, /Additional policy documents/);
+  assert.match(expanded, /Additional accreditation sources/);
 });
 
 test("batch embedding retries use bounded 10-20 second exponential backoff with jitter", () => {

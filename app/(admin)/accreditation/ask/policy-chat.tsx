@@ -17,6 +17,7 @@ import {
   type AccreditationAskChatTurn,
   type AccreditationChatSource,
 } from "./actions";
+import { AnswerMarkdown } from "./answer-markdown";
 
 type Message = {
   id: string;
@@ -24,7 +25,6 @@ type Message = {
   content: string;
   attachmentNames?: string[];
   sources?: AccreditationChatSource[];
-  followUps?: string[];
   policyUsed?: boolean;
   policyDate?: string;
 };
@@ -61,6 +61,12 @@ function CitationList({ sources, date }: { sources: AccreditationChatSource[]; d
             <li key={source.key} className="text-xs leading-relaxed text-muted">
               {href ? <a className="text-brand underline underline-offset-2" href={href}>{label}</a> : <span className="text-ink">{label}</span>}
               {locators ? <span> · Cited locations: {locators}</span> : null}
+              {source.excerpts?.length ? <ul className="mt-2 space-y-2">
+                {source.excerpts.map((excerpt, index) => <li key={`${source.key}:${index}`} className="border-l border-rule pl-2.5">
+                  <blockquote className="whitespace-pre-wrap text-ink">“{excerpt.quote}”</blockquote>
+                  <span className="mt-1 block text-xs text-muted">{locatorLabel(excerpt.locator)}</span>
+                </li>)}
+              </ul> : null}
             </li>
           );
         })}
@@ -82,7 +88,6 @@ function messagesFromTurns(turns: AccreditationAskChatTurn[]): Message[] {
       role: "assistant" as const,
       content: turn.answer,
       sources: turn.sources,
-      followUps: turn.followUps,
       policyUsed: turn.policyUsed,
       policyDate: turn.policyDate,
     },
@@ -232,7 +237,6 @@ export function PolicyChat({
         role: "assistant",
         content: result.answer!,
         sources: result.sources,
-        followUps: result.followUps,
         policyUsed: result.policyUsed,
         policyDate: result.policyDate,
       }]);
@@ -298,10 +302,9 @@ export function PolicyChat({
               {messages.map((message) => (
                 <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[88%] border px-4 py-3 text-sm leading-6 sm:max-w-[78%] ${message.role === "user" ? "border-brand bg-brand text-white" : "border-rule bg-surface text-ink"}`}>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+                    {message.role === "assistant" ? <AnswerMarkdown answer={message.content} /> : <p className="whitespace-pre-wrap">{message.content}</p>}
                     {message.attachmentNames?.length ? <p className="mt-3 border-t border-white/30 pt-2 text-xs text-white/80">Attached: {message.attachmentNames.join(", ")}</p> : null}
                     {message.role === "assistant" && message.policyUsed ? <p className="mt-3 text-xs font-bold uppercase tracking-wide text-muted">Policy and accreditation sources checked{message.policyDate ? ` for ${message.policyDate}` : ""}</p> : null}
-                    {message.role === "assistant" && message.followUps?.length ? <div className="mt-4 flex flex-wrap gap-2">{message.followUps.map((followUp) => <button key={followUp} type="button" onClick={() => { setInput(followUp); textarea.current?.focus(); }} className="border border-rule px-2.5 py-1.5 text-left text-xs text-brand hover:bg-brand-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{followUp}</button>)}</div> : null}
                     {message.role === "assistant" ? <CitationList sources={message.sources ?? []} date={message.policyDate} /> : null}
                   </div>
                 </article>
@@ -314,7 +317,7 @@ export function PolicyChat({
 
         <div className="border-t border-rule bg-surface p-4 sm:p-5">
           <div className="mx-auto max-w-3xl">
-            {attachments.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="Temporary chat attachments">{attachments.map((file, index) => <span key={`${file.name}:${file.lastModified}`} className="inline-flex items-center gap-2 border border-rule bg-canvas px-2.5 py-1.5 text-xs"><span className="max-w-[220px] truncate">{file.name}</span><button type="button" onClick={() => removeAttachment(index)} disabled={pending || Boolean(busyChatId)} className="font-bold text-muted hover:text-warn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" aria-label={`Remove ${file.name}`}>×</button></span>)}</div> : null}
+            {attachments.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="Temporary chat attachments">{attachments.map((file, index) => <span key={`${file.name}:${file.lastModified}`} className="inline-flex items-center gap-2 border border-rule bg-canvas px-2.5 py-1.5 text-xs"><span className="max-w-[220px] truncate">{file.name}</span><button type="button" onClick={() => removeAttachment(index)} disabled={pending || Boolean(busyChatId)} className="px-0.5 text-xs font-bold text-muted hover:text-warn focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" aria-label={`Remove ${file.name}`}>×</button></span>)}</div> : null}
             {error ? <p role="alert" className="form-message mb-3">{error}</p> : null}
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="flex items-end gap-2 border border-rule bg-surface p-2 focus-within:border-brand">
               <input ref={fileInput} id={inputId} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.xlsx,.txt,.md,.csv,.json" className="sr-only" onChange={(event) => { addAttachments(Array.from(event.target.files ?? [])); event.target.value = ""; }} />

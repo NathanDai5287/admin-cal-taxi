@@ -17,6 +17,8 @@ export type PolicyToolContext = {
     relative_to_today: string;
     weekdays_between_today_and_question_date: number;
     weekday_count_note: string;
+    weekday_deadline_offsets: { business_days: number; date: string; weekday: string }[];
+    weekday_deadline_offset_note: string;
   };
 };
 
@@ -75,6 +77,35 @@ function weekday(date: string) {
   return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "long" }).format(new Date(`${date}T12:00:00Z`));
 }
 
+const numberWords: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+
+export function extractWeekdayDeadlineCounts(text: string, limit = 5) {
+  const counts: number[] = [];
+  const seen = new Set<number>();
+  const pattern = /\b(\d{1,3}|one|two|three|four|five)\s*[- ]?\s*(?:business[ -]?days?|working[ -]?days?|weekdays?)\b/gi;
+  for (const match of text.matchAll(pattern)) {
+    const raw = match[1].toLowerCase();
+    const count = numberWords[raw] ?? Number(raw);
+    if (!Number.isInteger(count) || count < 1 || count > 365 || seen.has(count)) continue;
+    seen.add(count);
+    counts.push(count);
+    if (counts.length >= limit) break;
+  }
+  return counts;
+}
+
+export function addWeekdays(startDate: string, businessDays: number) {
+  if (!Number.isInteger(businessDays) || businessDays < 0 || businessDays > 365) throw new Error("Business-day offsets must be from 0 to 365.");
+  let day = calendarDay(startDate);
+  let remaining = businessDays;
+  while (remaining > 0) {
+    day++;
+    const weekdayNumber = new Date(day * 86_400_000).getUTCDay();
+    if (weekdayNumber !== 0 && weekdayNumber !== 6) remaining--;
+  }
+  return new Date(day * 86_400_000).toISOString().slice(0, 10);
+}
+
 function weekdaysBetweenExclusive(firstDate: string, secondDate: string) {
   const start = Math.min(calendarDay(firstDate), calendarDay(secondDate)) + 1;
   const end = Math.max(calendarDay(firstDate), calendarDay(secondDate));
@@ -88,7 +119,7 @@ function weekdaysBetweenExclusive(firstDate: string, secondDate: string) {
   return count;
 }
 
-export function buildPolicyToolContext(questionDate: string, clock: PolicyClock): PolicyToolContext {
+export function buildPolicyToolContext(questionDate: string, clock: PolicyClock, businessDayCounts: number[] = []): PolicyToolContext {
   const daysFromToday = calendarDay(questionDate) - calendarDay(clock.local_date);
   const relativeToToday = daysFromToday === 0
     ? "today"
@@ -104,6 +135,11 @@ export function buildPolicyToolContext(questionDate: string, clock: PolicyClock)
       relative_to_today: relativeToToday,
       weekdays_between_today_and_question_date: weekdaysBetweenExclusive(clock.local_date, questionDate),
       weekday_count_note: "Monday-Friday dates strictly between today and the question date; holidays and agency-specific deadlines are not accounted for.",
+      weekday_deadline_offsets: [...new Set(businessDayCounts)].filter((count) => Number.isInteger(count) && count > 0 && count <= 365).slice(0, 5).map((business_days) => {
+        const date = addWeekdays(clock.local_date, business_days);
+        return { business_days, date, weekday: weekday(date) };
+      }),
+      weekday_deadline_offset_note: "Illustrative Monday-Friday offsets counted after today's local date. Holidays, time cutoffs, trigger dates, and agency processing rules are not included; these calculations are not policy evidence and cannot determine permit or approval eligibility.",
     },
   };
 }
