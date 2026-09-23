@@ -64,7 +64,7 @@ export default function ContractPage() {
           >
             {isMultiClub(data.clubs) && (
               <span className="block mt-1">
-                {clubs.map((c, i) => `Club ${i + 1}: ${c}`).join(" · ")} — referred to
+                {clubs.map((c, i) => `Organization ${i + 1}: ${c}`).join(" · ")} — referred to
                 together as &ldquo;the Renter&rdquo;.
               </span>
             )}

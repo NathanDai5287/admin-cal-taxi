@@ -12,8 +12,8 @@ import { useSharedData } from "@/lib/host-shared-state";
  * them read-only with a link back here.
  *
  * Multi-organization events: add one row per organization. The contract
- * introduces them as "Club 1", "Club 2", … and refers to them collectively
- * as "the Renter".
+ * introduces them as "Organization 1", "Organization 2", … and refers to
+ * them collectively as "the Renter".
  */
 export default function SharedDataForm({ compact = false }: { compact?: boolean }) {
   const { data, update, hydrated, setDerived, resetDerived } = useSharedData();
@@ -60,7 +60,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
               // The contract numbers only the names that survive cleaning,
               // so the badge counts non-blank rows, not raw positions —
               // otherwise a blank middle row makes the labels lie about the
-              // "Club N" each organization will sign as.
+              // "Organization N" each organization will sign as.
               const contractNumber = club.trim()
                 ? clubs.slice(0, i).filter(c => c.trim()).length + 1
                 : null;
@@ -71,7 +71,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
                     className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted w-[46px] shrink-0 text-right"
                     title="How the contract introduces this organization"
                   >
-                    {contractNumber ? `Club ${contractNumber}` : ""}
+                    {contractNumber ? `Org ${contractNumber}` : ""}
                   </span>
                 )}
                 <input
@@ -108,9 +108,9 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
           </div>
           {multi && (
             <p className="field-hint mt-2">
-              Joint event — the contract introduces each organization as Club&nbsp;1,
-              Club&nbsp;2, … and refers to them together as &ldquo;the Renter&rdquo;. Each
-              organization signs separately.
+              Joint event — the contract introduces each organization as
+              Organization&nbsp;1, Organization&nbsp;2, … and refers to them together as
+              &ldquo;the Renter&rdquo;. Each organization signs separately.
             </p>
           )}
         </div>

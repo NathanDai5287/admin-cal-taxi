@@ -2,8 +2,9 @@
  * Multi-organization helpers for the /host flow.
  *
  * Shared state carries `clubs: string[]` — one entry per organization
- * sharing the event. The backend contract introduces them as "Club 1",
- * "Club 2", … and then refers to them collectively as "the Renter".
+ * sharing the event. The backend contract introduces them as
+ * "Organization 1", "Organization 2", … and then refers to them
+ * collectively as "the Renter".
  */
 
 /** Trimmed, non-empty organization names, in order. */

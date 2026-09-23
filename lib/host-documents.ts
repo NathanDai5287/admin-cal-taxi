@@ -105,8 +105,8 @@ function withTreasurer(
 /**
  * Attach the renting organization(s). `club_name` is the display join
  * ("Alpha and Beta") used by invoices and as a fallback; `club_names` is the
- * structured list the contract uses to introduce "Club 1", "Club 2", … and
- * define "the Renter".
+ * structured list the contract uses to introduce "Organization 1",
+ * "Organization 2", … and define "the Renter".
  */
 function withClubs(
   body: Record<string, unknown>,
