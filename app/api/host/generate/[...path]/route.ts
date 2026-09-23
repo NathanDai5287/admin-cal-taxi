@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { BackendConfigError, backendKey, backendOrigin } from "@/lib/host-backend";
 
 // Browser calls to /api/host/generate/* are proxied to the Flask PDF backend.
 // This used to be a bare next.config rewrite covered by site-wide Basic Auth;
 // with Basic Auth gone it must check the admin role itself.
+//
+// The backend requires the shared admin key on every generate route. The key
+// is added here, server-side — it is never shipped to the browser.
 
 export async function POST(
   request: NextRequest,
@@ -23,15 +27,25 @@ export async function POST(
     return NextResponse.json({ error: "bad_path" }, { status: 400 });
   }
 
-  const origin = process.env.HOST_BACKEND_ORIGIN;
-  if (!origin) {
+  let origin: string | null;
+  try {
+    origin = backendOrigin();
+  } catch (err) {
+    if (err instanceof BackendConfigError) {
+      return NextResponse.json({ error: "backend_misconfigured" }, { status: 500 });
+    }
+    throw err;
+  }
+  const key = backendKey();
+  if (!origin || !key) {
     return NextResponse.json({ error: "backend_not_configured" }, { status: 500 });
   }
 
   const upstream = await fetch(`${origin}/api/generate/${path.join("/")}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Admin-Key": key },
     body: await request.text(),
+    cache: "no-store",
   });
 
   // Pass the PDF (or JSON error) through, preserving the download filename.

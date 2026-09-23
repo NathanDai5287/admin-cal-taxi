@@ -4,6 +4,7 @@ import { Button } from "@/components/brand/button";
 import ContactsForm from "@/components/host/ContactsForm";
 import SharedDataForm from "@/components/host/SharedDataForm";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
+import { cleanClubs } from "@/lib/host-clubs";
 import { useSharedData } from "@/lib/host-shared-state";
 
 export default function HostHome() {
@@ -11,7 +12,7 @@ export default function HostHome() {
 
   // Block forward progression until the renter is identified.
   const ready =
-    hydrated && data.clubName.trim() !== "" && data.eventDate.trim() !== "";
+    hydrated && cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
 
   function handleClear() {
     if (typeof window === "undefined") return;
@@ -38,7 +39,7 @@ export default function HostHome() {
 
       {!ready && hydrated && (
         <p className="text-[12.5px] text-muted -mt-6">
-          Fill in organization and event date to continue.
+          Fill in at least one organization and the event date to continue.
         </p>
       )}
 

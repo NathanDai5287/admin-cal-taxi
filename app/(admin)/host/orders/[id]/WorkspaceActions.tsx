@@ -19,10 +19,10 @@ import { useState } from "react";
 import type { Order } from "@/lib/host-orders-types";
 import {
   EMPTY_STATE,
+  OVERRIDE_KEYS,
   useSharedData,
   type AreaKey,
   type OverrideKey,
-  type PricingBreakdown,
   type PricingSelections,
   type SharedState,
 } from "@/lib/host-shared-state";
@@ -49,9 +49,8 @@ function overridesRecord(
 ): Record<OverrideKey, boolean> {
   if (!v || typeof v !== "object") return fallback;
   const o = v as Record<string, unknown>;
-  const keys: OverrideKey[] = ["finalPrice", "rentalPrice", "depositAmount", "maxGuests"];
   const out = { ...fallback };
-  for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
+  for (const k of OVERRIDE_KEYS) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
   return out;
 }
 function pricingSelectionsFrom(v: unknown, fallback: PricingSelections): PricingSelections {
@@ -65,47 +64,48 @@ function pricingSelectionsFrom(v: unknown, fallback: PricingSelections): Pricing
   return out;
 }
 
-const BREAKDOWN_NUMBER_KEYS: (keyof PricingBreakdown)[] = [
-  "base", "capacity", "firePermit", "alcohol", "protection", "date", "setup", "cleanup",
-  "subtotal", "wealthMult", "postW", "relR", "adj", "total", "contingencyPrice",
-  "suggestedDeposit", "depositRate", "guests", "capacityThreshold", "perGuestRate",
-];
-
-/** Null when the snapshot's breakdown is missing any numeric field the
- *  calculator depends on — same "drop rather than guess" rule the live
- *  workspace applies to a stale localStorage breakdown. */
-function pricingBreakdownFrom(v: unknown): PricingBreakdown | null {
-  if (!v || typeof v !== "object") return null;
-  const o = v as Record<string, unknown>;
-  if (!BREAKDOWN_NUMBER_KEYS.every(k => typeof o[k] === "number")) return null;
-  const num = (k: keyof PricingBreakdown) => o[k] as number;
-  const label = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
-  return {
-    base: num("base"), capacity: num("capacity"), firePermit: num("firePermit"),
-    alcohol: num("alcohol"), protection: num("protection"), date: num("date"),
-    setup: num("setup"), cleanup: num("cleanup"), subtotal: num("subtotal"),
-    wealthMult: num("wealthMult"), wealthLabel: label("wealthLabel"),
-    postW: num("postW"), relR: num("relR"), relLabel: label("relLabel"),
-    adj: num("adj"), total: num("total"), contingencyPrice: num("contingencyPrice"),
-    suggestedDeposit: num("suggestedDeposit"), depositRate: num("depositRate"),
-    alcoholLabel: label("alcoholLabel"), protectionLabel: label("protectionLabel"),
-    dateLabel: label("dateLabel"), setupLabel: label("setupLabel"), cleanupLabel: label("cleanupLabel"),
-    guests: num("guests"), capacityThreshold: num("capacityThreshold"), perGuestRate: num("perGuestRate"),
-  };
+/** Organizations list from a snapshot: `clubs` (current schema), or the
+ *  legacy single `clubName` string wrapped in a list. */
+function clubsFrom(v: unknown, legacyClubName: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((c): c is string => typeof c === "string");
+  }
+  const single = str(legacyClubName, "").trim();
+  return single ? [single] : [];
 }
 
 /** Build a full SharedState from an order snapshot. Every field not present
  *  or wrong-shaped falls back to EMPTY_STATE rather than surfacing undefined
  *  or a malformed value downstream. `currentOrderId` is deliberately left at
- *  its empty default — callers set it explicitly after this returns. */
+ *  its empty default — callers set it explicitly after this returns.
+ *
+ *  The snapshot's `pricingBreakdown` is deliberately NOT loaded: the live
+ *  workspace derives pricing from numGuests + pricingSelections, so a stored
+ *  copy could only disagree with them. (It stays in the archive for the
+ *  order detail page's historical display.) */
 function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState {
+  const overrides = overridesRecord(snapshot.overrides, EMPTY_STATE.overrides);
+
+  // Legacy schema: the contract fee was separately overridable. It isn't
+  // anymore — the negotiated price covers it — so an old rentalPrice
+  // override becomes a finalPrice override of the same value.
+  let finalPrice = str(snapshot.finalPrice, EMPTY_STATE.finalPrice);
+  const legacyOverrides = (snapshot.overrides ?? {}) as Record<string, unknown>;
+  if (
+    legacyOverrides.rentalPrice === true &&
+    !overrides.finalPrice &&
+    str(snapshot.rentalPrice, "").trim() !== ""
+  ) {
+    finalPrice = str(snapshot.rentalPrice, "");
+    overrides.finalPrice = true;
+  }
+
   return {
-    clubName: str(snapshot.clubName, EMPTY_STATE.clubName),
+    clubs: clubsFrom(snapshot.clubs, snapshot.clubName),
     eventDate: str(snapshot.eventDate, EMPTY_STATE.eventDate),
     numGuests: str(snapshot.numGuests, EMPTY_STATE.numGuests),
     startTime: str(snapshot.startTime, EMPTY_STATE.startTime),
     endTime: str(snapshot.endTime, EMPTY_STATE.endTime),
-    rentalPrice: str(snapshot.rentalPrice, EMPTY_STATE.rentalPrice),
     depositAmount: str(snapshot.depositAmount, EMPTY_STATE.depositAmount),
     maxGuests: str(snapshot.maxGuests, EMPTY_STATE.maxGuests),
     monitors: str(snapshot.monitors, EMPTY_STATE.monitors),
@@ -114,10 +114,9 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
     guestList: bool(snapshot.guestList, EMPTY_STATE.guestList),
     soundSystem: bool(snapshot.soundSystem, EMPTY_STATE.soundSystem),
     lightingSystem: bool(snapshot.lightingSystem, EMPTY_STATE.lightingSystem),
-    pricingBreakdown: pricingBreakdownFrom(snapshot.pricingBreakdown),
     pricingSelections: pricingSelectionsFrom(snapshot.pricingSelections, EMPTY_STATE.pricingSelections),
-    finalPrice: str(snapshot.finalPrice, EMPTY_STATE.finalPrice),
-    overrides: overridesRecord(snapshot.overrides, EMPTY_STATE.overrides),
+    finalPrice,
+    overrides,
     lastDepositInvoiceNumber: str(snapshot.lastDepositInvoiceNumber, EMPTY_STATE.lastDepositInvoiceNumber),
     currentOrderId: EMPTY_STATE.currentOrderId,
     treasurerName: str(snapshot.treasurerName, EMPTY_STATE.treasurerName),

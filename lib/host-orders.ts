@@ -13,9 +13,7 @@
 
 import type { Order, OrderDocument, OrderStatus, OrderSummary } from "./host-orders-types";
 import { revalidateTag } from "next/cache";
-
-const ORIGIN = process.env.HOST_BACKEND_ORIGIN;
-const KEY = process.env.HOST_BACKEND_KEY;
+import { backendKey, backendOrigin } from "./host-backend";
 
 /** The archive could not be reached, or isn't configured at all. */
 export class OrdersUnavailableError extends Error {}
@@ -38,14 +36,29 @@ export class OrdersRequestError extends Error {
 
 /** True when the archive is wired up. Pages use this to explain themselves. */
 export function ordersConfigured(): boolean {
-  return Boolean(ORIGIN && KEY);
+  try {
+    return Boolean(backendOrigin() && backendKey());
+  } catch {
+    // A set-but-invalid origin (e.g. plaintext http to a remote host) counts
+    // as unconfigured here; call() surfaces the precise reason.
+    return false;
+  }
 }
 
 async function call<T>(
   path: string,
   init?: { method?: string; body?: unknown },
 ): Promise<T> {
-  if (!ORIGIN || !KEY) {
+  let origin: string | null;
+  try {
+    origin = backendOrigin();
+  } catch (err) {
+    throw new OrdersUnavailableError(
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  const key = backendKey();
+  if (!origin || !key) {
     throw new OrdersUnavailableError(
       "Order archive is not configured — set HOST_BACKEND_ORIGIN and HOST_BACKEND_KEY.",
     );
@@ -54,11 +67,11 @@ async function call<T>(
   let res: Response;
   try {
     const method = init?.method ?? "GET";
-    res = await fetch(`${ORIGIN}/api/orders${path}`, {
+    res = await fetch(`${origin}/api/orders${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
-        "X-Admin-Key": KEY,
+        "X-Admin-Key": key,
       },
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
       ...(method === "GET"

@@ -7,6 +7,17 @@
  * Hydration runs in a useEffect to avoid SSR / first-paint mismatch —
  * forms can read `hydrated` to decide whether to show their controlled
  * inputs yet.
+ *
+ * Step ownership: each field is edited on exactly one step of the flow.
+ *   1. Event Details (/host)          — clubs, eventDate, numGuests,
+ *                                       contacts, maxGuests override
+ *   2. Pricing (/host/pricing)        — pricingSelections, finalPrice
+ *                                       override, depositAmount override
+ *   3. Contract (/host/contract)      — times, monitors, areas, guest list,
+ *                                       amenities
+ *   4. Documents (/host/documents)    — per-document fields (local state)
+ * Later steps show earlier steps' values read-only with a link back, so a
+ * number agreed on step 2 can't be quietly changed on step 3.
  */
 
 import {
@@ -23,6 +34,12 @@ const STORAGE_KEY = "admin.host.shared.v1";
 
 export type AreaKey = "living_room" | "dining_room" | "backyard";
 
+/**
+ * The computed pricing breakdown. Never stored in this state — it is a pure
+ * function of (numGuests, pricingSelections), recomputed live wherever it's
+ * needed (see lib/host-pricing.ts). It IS embedded into order snapshots at
+ * save time, as a historical record for the archive's order detail page.
+ */
 export type PricingBreakdown = {
   base: number;
   capacity: number;
@@ -68,26 +85,31 @@ export type PricingSelections = {
 };
 
 /**
- * Fields that are normally derived from an earlier step. Each has an entry in
- * `SharedState.overrides`; while that flag is false the stored string is
+ * Fields that are normally derived from an earlier input. Each has an entry
+ * in `SharedState.overrides`; while that flag is false the stored string is
  * ignored and the value is recomputed live (see lib/host-derive.ts).
+ *
+ * Each override is edited on the step that owns its source:
+ *   finalPrice    — pricing step (source: the calculator total)
+ *   depositAmount — pricing step (source: the calculator's suggestion)
+ *   maxGuests     — event details step (source: numGuests)
  */
-export type OverrideKey = "finalPrice" | "rentalPrice" | "depositAmount" | "maxGuests";
+export type OverrideKey = "finalPrice" | "depositAmount" | "maxGuests";
 
 export const OVERRIDE_KEYS: OverrideKey[] = [
-  "finalPrice", "rentalPrice", "depositAmount", "maxGuests",
+  "finalPrice", "depositAmount", "maxGuests",
 ];
 
 export type SharedState = {
-  // Identity — shared across every page
-  clubName: string;
+  // Identity — shared across every page. One entry per organization; a
+  // multi-org event lists them all ("Club 1", "Club 2", … on the contract).
+  clubs: string[];
   eventDate: string;
   numGuests: string;
 
   // Contract draft (so /host/contract restores after reload)
   startTime: string;
   endTime: string;
-  rentalPrice: string;
   depositAmount: string;
   maxGuests: string;
   monitors: string;
@@ -98,8 +120,7 @@ export type SharedState = {
   lightingSystem: boolean;
   // (sign is not persisted — always defaults to false on each visit)
 
-  // Pricing — written by /host/pricing, read by /host/invoice
-  pricingBreakdown: PricingBreakdown | null;
+  // Pricing — owned by /host/pricing
   pricingSelections: PricingSelections;
   /** Negotiated total. Only meaningful when overrides.finalPrice is true;
    *  otherwise the calculator total is used. */
@@ -113,7 +134,9 @@ export type SharedState = {
    */
   overrides: Record<OverrideKey, boolean>;
 
-  // Cross-references between invoice tabs
+  // Cross-references between invoice tabs. Cleared automatically when the
+  // event identity (clubs or date) changes — a number minted for one event
+  // must not leak onto another event's credit memo.
   lastDepositInvoiceNumber: string;
 
   /**
@@ -132,13 +155,12 @@ export type SharedState = {
 };
 
 export const EMPTY_STATE: SharedState = {
-  clubName: "",
+  clubs: [],
   eventDate: "",
   numGuests: "",
 
   startTime: "",
   endTime: "",
-  rentalPrice: "",
   depositAmount: "",
   maxGuests: "",
   monitors: "",
@@ -148,14 +170,13 @@ export const EMPTY_STATE: SharedState = {
   soundSystem: false,
   lightingSystem: false,
 
-  pricingBreakdown: null,
   pricingSelections: {
     alcohol: 1, protection: 1, date: 1,
     setup: 0, cleanup: 0, wealth: 1, relationship: 1,
   },
   finalPrice: "",
   overrides: {
-    finalPrice: false, rentalPrice: false, depositAmount: false, maxGuests: false,
+    finalPrice: false, depositAmount: false, maxGuests: false,
   },
 
   lastDepositInvoiceNumber: "",
@@ -184,20 +205,56 @@ export type SharedDataApi = {
 
 const Ctx = createContext<SharedDataApi | null>(null);
 
-/** Required numeric keys on a fully-populated PricingBreakdown. If any are
- *  missing on a stored breakdown, the schema has changed since it was
- *  written and we drop it so the calculator can re-derive a valid one. */
-const BREAKDOWN_REQUIRED_KEYS: (keyof PricingBreakdown)[] = [
-  "base", "capacity", "firePermit", "alcohol", "protection", "date", "setup", "cleanup",
-  "subtotal", "wealthMult", "postW", "relR", "adj", "total", "contingencyPrice",
-  "suggestedDeposit", "depositRate",
-  "guests", "capacityThreshold", "perGuestRate",
-];
+function sameClubs(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
 
-function isValidBreakdown(b: unknown): b is PricingBreakdown {
-  if (!b || typeof b !== "object") return false;
-  const obj = b as Record<string, unknown>;
-  return BREAKDOWN_REQUIRED_KEYS.every(k => typeof obj[k] === "number");
+/**
+ * Migrate a stored state written by an older schema:
+ *  - `clubName: string` → `clubs: string[]` (multi-org support)
+ *  - `overrides.rentalPrice` → `overrides.finalPrice` (the contract fee is
+ *    no longer separately overridable; the negotiated price covers it)
+ *  - `pricingBreakdown` is dropped — now derived live from numGuests +
+ *    pricingSelections, so a stored copy could only be stale.
+ */
+function migrate(parsed: Record<string, unknown>): SharedState {
+  const merged: SharedState = {
+    ...EMPTY_STATE,
+    ...parsed,
+    overrides: { ...EMPTY_STATE.overrides, ...(parsed.overrides ?? {}) },
+  } as SharedState;
+
+  // clubName → clubs
+  if (!Array.isArray(parsed.clubs)) {
+    const legacy = typeof parsed.clubName === "string" ? parsed.clubName.trim() : "";
+    merged.clubs = legacy ? [legacy] : [];
+  } else {
+    merged.clubs = (parsed.clubs as unknown[]).filter(
+      (c): c is string => typeof c === "string",
+    );
+  }
+
+  // overrides.rentalPrice → overrides.finalPrice
+  const legacyOverrides = (parsed.overrides ?? {}) as Record<string, unknown>;
+  if (
+    legacyOverrides.rentalPrice === true &&
+    !merged.overrides.finalPrice &&
+    typeof parsed.rentalPrice === "string" &&
+    parsed.rentalPrice.trim() !== ""
+  ) {
+    merged.finalPrice = parsed.rentalPrice;
+    merged.overrides.finalPrice = true;
+  }
+
+  // Drafts written before overrides existed: every non-empty derived field
+  // was put there by the old copy-once auto-fill, which never refreshed.
+  // Mark them manual so nothing visibly changes on this upgrade — each one
+  // then shows a "reset to auto" link the user can take when they want it.
+  if (!parsed.overrides) {
+    for (const k of OVERRIDE_KEYS) merged.overrides[k] = merged[k] !== "";
+  }
+
+  return merged;
 }
 
 function loadFromStorage(): SharedState | null {
@@ -207,23 +264,7 @@ function loadFromStorage(): SharedState | null {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
       // Merge with defaults so any newly-added fields don't read as undefined
-      const merged: SharedState = {
-        ...EMPTY_STATE,
-        ...parsed,
-        overrides: { ...EMPTY_STATE.overrides, ...(parsed.overrides ?? {}) },
-      };
-      // Drop stale breakdowns whose schema predates current fields.
-      if (merged.pricingBreakdown && !isValidBreakdown(merged.pricingBreakdown)) {
-        merged.pricingBreakdown = null;
-      }
-      // Drafts written before overrides existed: every non-empty derived field
-      // was put there by the old copy-once auto-fill, which never refreshed.
-      // Mark them manual so nothing visibly changes on this upgrade — each one
-      // then shows a "reset to auto" link the user can take when they want it.
-      if (!parsed.overrides) {
-        for (const k of OVERRIDE_KEYS) merged.overrides[k] = merged[k] !== "";
-      }
-      return merged;
+      return migrate(parsed as Record<string, unknown>);
     }
   } catch {
     /* ignore corrupt JSON */
@@ -260,11 +301,34 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
   }, [data]);
 
   const update: Updater = useCallback((key, value) => {
-    setData(d => ({ ...d, [key]: value }));
+    setData(d => {
+      const next = { ...d, [key]: value };
+      // The deposit invoice number belongs to a specific event: changing who
+      // the event is for, or when it is, retires any number minted for it.
+      if (key === "eventDate" && value !== d.eventDate) {
+        next.lastDepositInvoiceNumber = "";
+      }
+      if (key === "clubs" && !sameClubs(value as string[], d.clubs)) {
+        next.lastDepositInvoiceNumber = "";
+      }
+      return next;
+    });
   }, []);
 
   const bulk = useCallback((partial: Partial<SharedState>) => {
-    setData(d => ({ ...d, ...partial }));
+    setData(d => {
+      const next = { ...d, ...partial };
+      const identityChanged =
+        (partial.clubs !== undefined && !sameClubs(partial.clubs, d.clubs)) ||
+        (partial.eventDate !== undefined && partial.eventDate !== d.eventDate);
+      // Same retirement rule as update(), but an explicit value in the same
+      // bulk write wins — loading an order sets identity and its invoice
+      // number together.
+      if (identityChanged && partial.lastDepositInvoiceNumber === undefined) {
+        next.lastDepositInvoiceNumber = "";
+      }
+      return next;
+    });
   }, []);
 
   const clear = useCallback(() => {

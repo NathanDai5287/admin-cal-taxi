@@ -15,7 +15,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
 import { ApiCallError, generatePdf } from "@/lib/host-api";
-import { effective } from "@/lib/host-derive";
+import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
+import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
 import { useSharedData } from "@/lib/host-shared-state";
 import {
@@ -70,84 +71,70 @@ export default function DocumentsPage() {
     refundMethod: "", refundDescription: "", memoNumber: "",
   });
 
-  // ── Seeding (copied from the old /host/invoice tabs) ──────────────────────
+  // ── Seeding ───────────────────────────────────────────────────────────────
+  // Each seeded field tracks its source until the user edits it. A change
+  // upstream (event date moves, deposit renegotiated) re-seeds any field the
+  // user hasn't touched, so a stale copy of an earlier event's values can't
+  // ride along. Once the user types into a field, it's theirs.
+
+  const [depositAmountEdited, setDepositAmountEdited] = useState(false);
+  const [depositDueEdited, setDepositDueEdited] = useState(false);
+  const [rentalDueEdited, setRentalDueEdited] = useState(false);
+  const [creditAmountEdited, setCreditAmountEdited] = useState(false);
 
   // Deposit: amount ← effective(depositAmount), due date ← event date.
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (hydrated && !deposit.amount && initialDepositAmount) {
-        setDeposit(f => (f.amount ? f : { ...f, amount: initialDepositAmount }));
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, initialDepositAmount]);
+    if (!hydrated || depositAmountEdited || !initialDepositAmount) return;
+    setDeposit(f => ({ ...f, amount: initialDepositAmount }));
+  }, [hydrated, depositAmountEdited, initialDepositAmount]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hydrated) return;
-      if (data.eventDate) {
-        setDeposit(f => (f.dueDate ? f : { ...f, dueDate: data.eventDate }));
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [hydrated, data.eventDate]);
+    if (!hydrated || depositDueEdited || !data.eventDate) return;
+    setDeposit(f => ({ ...f, dueDate: data.eventDate }));
+  }, [hydrated, depositDueEdited, data.eventDate]);
 
   // Rental: due date ← event date + 2 days.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hydrated) return;
-      if (data.eventDate) {
-        const computed = addDaysIso(data.eventDate, 2);
-        if (computed) setRental(f => (f.dueDate ? f : { ...f, dueDate: computed }));
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [hydrated, data.eventDate]);
+    if (!hydrated || rentalDueEdited || !data.eventDate) return;
+    const computed = addDaysIso(data.eventDate, 2);
+    if (computed) setRental(f => ({ ...f, dueDate: computed }));
+  }, [hydrated, rentalDueEdited, data.eventDate]);
 
-  // Rental: line items ← buildLineItems(pricingBreakdown, negotiated total).
+  // Rental: line items ← buildLineItems(live breakdown, negotiated total).
+  // The breakdown is computed from the current guests + selections on every
+  // render, so the items can never reflect an earlier pass through pricing.
   // Re-derives whenever the source of truth changes; manual edits within a
   // session survive re-renders since `rental.items` isn't in the dep list.
+  const breakdown = hydrated ? liveBreakdown(data) : null;
   const rentalTarget = useMemo(() => {
     const finalNum = parseFloat(effective(data, "finalPrice"));
     if (Number.isFinite(finalNum) && finalNum > 0) return finalNum;
-    return data.pricingBreakdown?.total ?? 0;
-  }, [data]);
+    return breakdown?.total ?? 0;
+  }, [data, breakdown]);
   const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
-  const rentalDerivedKey = `${rentalTarget}|${data.pricingBreakdown?.subtotal ?? "x"}|${eventDateReadable}`;
+  const rentalDerivedKey = `${rentalTarget}|${breakdown?.subtotal ?? "x"}|${eventDateReadable}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!hydrated) return;
-      setRental(f => ({ ...f, items: buildLineItems(data.pricingBreakdown, rentalTarget, eventDateReadable) }));
+      setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
     }, 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, rentalDerivedKey]);
 
   function resetRentalFromPricing() {
-    setRental(f => ({ ...f, items: buildLineItems(data.pricingBreakdown, rentalTarget, eventDateReadable) }));
+    setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
   }
 
-  // Credit memo: refund amount seeded once (old CreditMemoForm behavior —
-  // freeze at first read so a later pricing change doesn't clobber a manual
-  // adjustment).
-  const [amountSeeded, setAmountSeeded] = useState(false);
+  // Credit memo: refund amount ← the contract's deposit, tracking it until
+  // the user types a different number.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (hydrated && !amountSeeded) {
-        setCreditMemo(f => {
-          if (f.amount) return f;
-          const suggested = effective(data, "depositAmount");
-          return suggested ? { ...f, amount: suggested } : f;
-        });
-        setAmountSeeded(true);
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, amountSeeded]);
+    if (!hydrated || creditAmountEdited) return;
+    const suggested = effective(data, "depositAmount");
+    if (suggested) setCreditMemo(f => ({ ...f, amount: suggested }));
+  }, [hydrated, creditAmountEdited, data]);
 
   // Credit memo: original invoice ← last generated deposit invoice number.
   // Re-runs whenever that number changes (including a deposit invoice
@@ -246,7 +233,7 @@ export default function DocumentsPage() {
       switch (kind) {
         case "contract": {
           payload = buildContractPayload(data, { sign: contractSign });
-          amount = toNum(effective(data, "rentalPrice"));
+          amount = toNum(effectiveRentalPrice(data));
           break;
         }
         case "deposit_invoice": {
@@ -269,7 +256,7 @@ export default function DocumentsPage() {
 
       const { filename } = await generatePdf(DOCUMENT_META[kind].endpoint, payload);
       const number = kind === "contract"
-        ? mintContractNumber(data.clubName, data.eventDate)
+        ? mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate)
         : filename.replace(/\.pdf$/i, "");
 
       const doc: Omit<OrderDocument, "id"> = {
@@ -336,7 +323,22 @@ export default function DocumentsPage() {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   // The archive keys a rental on these two, and rejects a save without them.
-  const canSave = data.clubName.trim() !== "" && data.eventDate.trim() !== "";
+  const canSave = cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
+
+  /**
+   * The historical record stored on the order. Derived values are resolved
+   * here, at save time, so the archive shows what was actually true when the
+   * rental was saved — the live workspace itself stores none of them.
+   */
+  function orderSnapshot(): Record<string, unknown> {
+    return {
+      ...data,
+      pricingBreakdown: liveBreakdown(data),
+      rentalPrice: effectiveRentalPrice(data),
+      depositAmount: effective(data, "depositAmount"),
+      maxGuests: effective(data, "maxGuests"),
+    };
+  }
 
   /**
    * Persist the workspace. Saving is idempotent: it always sends the current
@@ -350,14 +352,15 @@ export default function DocumentsPage() {
     setSaveNotice(null);
     try {
       const documents = generatedDocuments();
+      const clubName = clubsDisplay(data.clubs);
 
       if (!data.currentOrderId) {
         const res = await saveOrderAction({
-          clubName: data.clubName,
+          clubName,
           eventDate: data.eventDate,
-          rentalPrice: toNum(effective(data, "rentalPrice")),
+          rentalPrice: toNum(effectiveRentalPrice(data)),
           depositAmount: toNum(effective(data, "depositAmount")),
-          snapshot: data,
+          snapshot: orderSnapshot(),
           documents,
         });
         if (!res.ok) { setSaveError(res.error); return; }
@@ -373,11 +376,11 @@ export default function DocumentsPage() {
       // Existing order: re-send every document, plus refresh the stored
       // snapshot so pricing/contract edits made since the first save persist.
       const patch = await updateOrderAction(data.currentOrderId, {
-        clubName: data.clubName,
+        clubName,
         eventDate: data.eventDate,
-        rentalPrice: toNum(effective(data, "rentalPrice")),
+        rentalPrice: toNum(effectiveRentalPrice(data)),
         depositAmount: toNum(effective(data, "depositAmount")),
-        snapshot: data,
+        snapshot: orderSnapshot(),
       });
       if (!patch.ok) { setSaveError(patch.error); return; }
 
@@ -399,7 +402,7 @@ export default function DocumentsPage() {
 
   const contractSummary = hydrated
     ? [
-        effective(data, "rentalPrice") && `$${Number(effective(data, "rentalPrice")).toLocaleString("en-US")} fee`,
+        effectiveRentalPrice(data) && `$${Number(effectiveRentalPrice(data)).toLocaleString("en-US")} fee`,
         effective(data, "depositAmount") && `$${Number(effective(data, "depositAmount")).toLocaleString("en-US")} deposit`,
         eventDateReadable,
       ].filter(Boolean).join(" · ") || undefined
@@ -418,17 +421,16 @@ export default function DocumentsPage() {
     ? `$${Number(creditMemo.amount).toLocaleString("en-US")}${creditMemo.refundMethod ? ` · ${creditMemo.refundMethod}` : ""}`
     : undefined;
 
-  const depositAmountHint = data.pricingBreakdown?.suggestedDeposit
-    && typeof data.pricingBreakdown.depositRate === "number"
-    && deposit.amount === String(Math.round(data.pricingBreakdown.suggestedDeposit))
-    ? `Auto-filled at ${Math.round(data.pricingBreakdown.depositRate * 100)}% of total.`
+  const depositAmountHint = breakdown
+    && deposit.amount === String(Math.round(breakdown.suggestedDeposit))
+    ? `Auto-filled at ${Math.round(breakdown.depositRate * 100)}% of total.`
     : undefined;
 
-  const rentalTotalDescription = data.pricingBreakdown
+  const rentalTotalDescription = breakdown
     ? rentalTarget > 0
       ? `Pre-filled from your pricing breakdown, scaled to the negotiated total of $${Math.round(rentalTarget).toLocaleString("en-US")}. Edit any row freely.`
       : "Set the negotiated price on the pricing step to populate line items."
-    : "No pricing breakdown found. Visit the Pricing page first or enter line items manually.";
+    : "No guest count yet. Set one on the Event Details step, or enter line items manually.";
 
   const creditMemoAmountHint = creditMemo.amount && creditMemo.amount === effective(data, "depositAmount")
     ? "Auto-filled from the contract’s deposit amount."
@@ -480,7 +482,11 @@ export default function DocumentsPage() {
         >
           <DepositPanel
             fields={deposit}
-            onChange={patch => setDeposit(f => ({ ...f, ...patch }))}
+            onChange={patch => {
+              if (patch.amount !== undefined) setDepositAmountEdited(true);
+              if (patch.dueDate !== undefined) setDepositDueEdited(true);
+              setDeposit(f => ({ ...f, ...patch }));
+            }}
             amountHint={depositAmountHint}
           />
         </DocumentRow>
@@ -499,7 +505,10 @@ export default function DocumentsPage() {
         >
           <RentalPanel
             fields={rental}
-            onChange={patch => setRental(f => ({ ...f, ...patch }))}
+            onChange={patch => {
+              if (patch.dueDate !== undefined) setRentalDueEdited(true);
+              setRental(f => ({ ...f, ...patch }));
+            }}
             onReset={resetRentalFromPricing}
             totalDescription={rentalTotalDescription}
           />
@@ -519,7 +528,10 @@ export default function DocumentsPage() {
         >
           <CreditMemoPanel
             fields={creditMemo}
-            onChange={patch => setCreditMemo(f => ({ ...f, ...patch }))}
+            onChange={patch => {
+              if (patch.amount !== undefined) setCreditAmountEdited(true);
+              setCreditMemo(f => ({ ...f, ...patch }));
+            }}
             amountHint={creditMemoAmountHint}
             originalInvoiceHint={creditMemoOriginalInvoiceHint}
           />

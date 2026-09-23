@@ -1,8 +1,9 @@
 "use client";
-import { Button } from "@/components/brand/button";
+import { ButtonLink } from "@/components/brand/button";
 
-import { AreaKey, OverrideKey, useSharedData } from "@/lib/host-shared-state";
-import { autoValue, effective, hasDiverged } from "@/lib/host-derive";
+import { AreaKey, useSharedData } from "@/lib/host-shared-state";
+import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
+import { cleanClubs, clubsDisplay, isMultiClub } from "@/lib/host-clubs";
 import { formatDateISO } from "@/lib/host-format";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
 
@@ -15,11 +16,15 @@ const AREAS: { key: AreaKey; label: string; clearedDesc: string }[] = [
 export default function ContractPage() {
   const { hydrated, data, update } = useSharedData();
 
-  // Max guests is derived from the pricing step on every render (see
-  // lib/host-derive.ts) rather than copied in once — so it can't hold a
-  // stale number from an earlier pass through the flow. (Rental fee and
-  // deposit are derived the same way, inside <DerivedField> itself.)
-  const maxGuests = hydrated ? effective(data, "maxGuests") : "";
+  // Values agreed on earlier steps are shown read-only here — the contract
+  // step can't renegotiate the price, swap the organization, or move the
+  // date. Each one links back to the step that owns it.
+  const clubs        = cleanClubs(data.clubs);
+  const clubsText    = clubsDisplay(data.clubs);
+  const rentalPrice  = hydrated ? effectiveRentalPrice(data) : "";
+  const deposit      = hydrated ? effective(data, "depositAmount") : "";
+  const maxGuests    = hydrated ? effective(data, "maxGuests") : "";
+  const depositRate  = liveBreakdown(data)?.depositRate;
 
   function setArea(key: AreaKey, on: boolean) {
     update("areas", { ...data.areas, [key]: on });
@@ -41,8 +46,8 @@ export default function ContractPage() {
         <StepIndicator current="contract" />
         <h1 className="page-title mt-6">Hosting Contract</h1>
         <p className="page-lede">
-          Fill in the event details. Organization, event date, and (when available) rental fee
-          and deposit are auto-filled from the previous steps.
+          Fill in the event logistics. Organization, date, price, and capacity were set on the
+          previous steps and are shown here for reference — follow the links to change them.
         </p>
       </div>
 
@@ -50,17 +55,27 @@ export default function ContractPage() {
       <section className="card">
         <div className="card-header"><span className="card-title">Renter & Event</span></div>
         <div className="card-body grid gap-5 sm:grid-cols-2">
-          <Field label="Organization">
-            <input className="field-input" required placeholder="e.g. Pi Sigma Delta"
-              value={hydrated ? data.clubName : ""} onChange={txt("clubName")} autoComplete="off" />
-          </Field>
-          <Field
-            label="Event Date"
-            hint={eventDateReadable ? `Will print as: ${eventDateReadable}` : undefined}
+          <LockedField
+            label={clubs.length > 1 ? "Organizations" : "Organization"}
+            value={clubsText}
+            href="/host"
+            source="the Event Details step"
+            emptyHint="Set on the Event Details step."
           >
-            <input type="date" className="field-input" required
-              value={hydrated ? data.eventDate : ""} onChange={txt("eventDate")} />
-          </Field>
+            {isMultiClub(data.clubs) && (
+              <span className="block mt-1">
+                {clubs.map((c, i) => `Club ${i + 1}: ${c}`).join(" · ")} — referred to
+                together as &ldquo;the Renter&rdquo;.
+              </span>
+            )}
+          </LockedField>
+          <LockedField
+            label="Event Date"
+            value={eventDateReadable}
+            href="/host"
+            source="the Event Details step"
+            emptyHint="Set on the Event Details step."
+          />
           <Field label="Start Time (24h)">
             <input className="field-input" required pattern="\d{1,2}:\d{2}" placeholder="e.g. 22:00"
               value={hydrated ? data.startTime : ""} onChange={txt("startTime")} autoComplete="off" />
@@ -77,23 +92,23 @@ export default function ContractPage() {
         <section className="card">
           <div className="card-header"><span className="card-title">Fees</span></div>
           <div className="card-body grid gap-5">
-            <DerivedField
+            <LockedField
               label="Rental Fee (USD)"
-              okey="rentalPrice"
-              placeholder="e.g. 1500"
-              source="the negotiated price on the pricing step"
-              emptyHint="Set a negotiated price on the pricing step to auto-fill this."
+              value={rentalPrice}
+              href="/host/pricing"
+              source="the negotiated price on the Pricing step"
+              emptyHint="Set a negotiated price on the Pricing step to fill this."
             />
-            <DerivedField
+            <LockedField
               label="Security Deposit (USD)"
-              okey="depositAmount"
-              placeholder="e.g. 100"
+              value={deposit}
+              href="/host/pricing"
               source={
-                typeof data.pricingBreakdown?.depositRate === "number"
-                  ? `the calculator (${Math.round(data.pricingBreakdown.depositRate * 100)}% of total)`
-                  : "the calculator's suggested deposit"
+                typeof depositRate === "number"
+                  ? `the Pricing step (${Math.round(depositRate * 100)}% of total)`
+                  : "the Pricing step"
               }
-              emptyHint="Set a negotiated price on the pricing step to auto-fill this."
+              emptyHint="Set a negotiated price on the Pricing step to fill this."
             />
           </div>
         </section>
@@ -101,18 +116,19 @@ export default function ContractPage() {
         <section className="card">
           <div className="card-header"><span className="card-title">Capacity & Monitors</span></div>
           <div className="card-body grid gap-5">
-            <DerivedField
+            <LockedField
               label="Maximum Guests"
-              okey="maxGuests"
-              placeholder="e.g. 150"
-              min={1}
-              max={200}
-              source="the guest count on the event details step"
-              emptyHint="Set a guest count on the event details step to auto-fill this."
-              extraHint={parseInt(maxGuests) > 50
-                ? "Over 50 guests triggers a required $125 fire permit fee."
-                : "Up to 50 guests; over 50 requires a $125 fire permit."}
-            />
+              value={maxGuests}
+              href="/host"
+              source="the Event Details step"
+              emptyHint="Set a guest count on the Event Details step to fill this."
+            >
+              {parseInt(maxGuests) > 50 && (
+                <span className="block mt-1">
+                  Over 50 guests triggers a required $125 fire permit fee.
+                </span>
+              )}
+            </LockedField>
             <Field label="Sober Monitors">
               <input className="field-input" type="number" min={0} required
                 placeholder="e.g. 4"
@@ -231,61 +247,40 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /**
- * A numeric field that follows an earlier step until the user types over it.
- *
- * The hint always states the field's actual provenance — tracking, manually
- * set, or diverged from its source — so a number here is never silently stale.
- * Diverged fields get a one-click link back to the live value.
+ * A value owned by an earlier step, shown read-only. The contract step can
+ * look but not touch — changing it means going back to the step where it was
+ * agreed, so the number on the signed PDF always matches what that step shows.
  */
-function DerivedField({
-  label, okey, placeholder, source, emptyHint, extraHint, min = 0, max,
+function LockedField({
+  label, value, href, source, emptyHint, children,
 }: {
   label: string;
-  okey: OverrideKey;
-  placeholder: string;
-  /** Where the automatic value comes from, as a sentence fragment. */
+  value: string;
+  /** Where the value is edited. */
+  href: string;
+  /** Where the value comes from, as a sentence fragment. */
   source: string;
-  /** Shown when there's no automatic value to fall back to. */
+  /** Shown when there's no value yet. */
   emptyHint: string;
-  /** Domain note appended regardless of provenance (e.g. the fire permit rule). */
-  extraHint?: string;
-  min?: number;
-  max?: number;
+  children?: React.ReactNode;
 }) {
-  const { hydrated, data, setDerived, resetDerived } = useSharedData();
-
-  const value    = hydrated ? effective(data, okey) : "";
-  const auto     = autoValue(data, okey);
-  const isManual = data.overrides[okey];
-  const diverged = hasDiverged(data, okey);
-
-  const provenance = !hydrated ? null
-    : diverged && auto ? <>Overridden — auto value is <strong className="text-ink">{auto}</strong>.{" "}</>
-    : isManual         ? <>Set manually.{" "}</>
-    : auto             ? <>Auto-filled from {source}.</>
-    : <>{emptyHint}</>;
+  const { hydrated } = useSharedData();
+  const shown = hydrated ? value : "";
 
   return (
     <div>
       <label className="field-label">{label}</label>
-      <input
-        className="field-input"
-        type="number"
-        min={min}
-        max={max}
-        required
-        placeholder={placeholder}
-        value={value}
-        onChange={e => setDerived(okey, e.target.value)}
-      />
+      <div className="field-input bg-canvas flex items-center justify-between gap-3">
+        <span className={"tabular-nums truncate " + (shown ? "" : "text-muted")}>
+          {shown || "—"}
+        </span>
+        <ButtonLink href={href} variant="text" className="shrink-0">
+          Change
+        </ButtonLink>
+      </div>
       <p className="field-hint">
-        {provenance}
-        {hydrated && isManual && auto && (
-          <Button type="button" variant="text" onClick={() => resetDerived(okey)}>
-            Reset to auto
-          </Button>
-        )}
-        {extraHint && <span className="block">{extraHint}</span>}
+        {shown ? <>Set on {source}.</> : emptyHint}
+        {children}
       </p>
     </div>
   );

@@ -9,7 +9,8 @@
  */
 
 import { formatDateISO } from "./host-format";
-import { effective } from "./host-derive";
+import { effective, effectiveRentalPrice } from "./host-derive";
+import { cleanClubs, clubsDisplay } from "./host-clubs";
 import type { LineItem } from "@/components/host/LineItemList";
 import type { DocumentKind } from "./host-orders-types";
 import type { AreaKey, SharedState } from "./host-shared-state";
@@ -101,6 +102,21 @@ function withTreasurer(
   return body;
 }
 
+/**
+ * Attach the renting organization(s). `club_name` is the display join
+ * ("Alpha and Beta") used by invoices and as a fallback; `club_names` is the
+ * structured list the contract uses to introduce "Club 1", "Club 2", … and
+ * define "the Renter".
+ */
+function withClubs(
+  body: Record<string, unknown>,
+  d: SharedState,
+): Record<string, unknown> {
+  body.club_name = clubsDisplay(d.clubs);
+  body.club_names = cleanClubs(d.clubs);
+  return body;
+}
+
 export function buildContractPayload(
   d: SharedState,
   f: ContractFields,
@@ -112,12 +128,11 @@ export function buildContractPayload(
   // Cleanup tiers went 3 → 2; clamp any stored index from the old range.
   const cleanupIdx = Math.min(Math.max(d.pricingSelections.cleanup, 0), 1);
 
-  return {
-    club_name:  d.clubName,
+  return withClubs({
     date:       formatDateISO(d.eventDate),
     start_time: d.startTime,
     end_time:   d.endTime,
-    price:      effective(d, "rentalPrice"),
+    price:      effectiveRentalPrice(d),
     deposit:    effective(d, "depositAmount"),
     max_guests: effective(d, "maxGuests"),
     monitors:   d.monitors,
@@ -128,22 +143,21 @@ export function buildContractPayload(
     sound_system:    d.soundSystem,
     lighting_system: d.lightingSystem,
     sign: f.sign,
-  };
+  }, d);
 }
 
 export function buildDepositPayload(
   d: SharedState,
   f: DepositFields,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    club_name:  d.clubName,
+  const body: Record<string, unknown> = withClubs({
     event_date: formatDateISO(d.eventDate),
     amount:     f.amount,
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
     // Forfeiture clause 3c cites the contract's 4a attendance cap.
     max_guests: effective(d, "maxGuests"),
-  };
+  }, d);
   if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
   return withTreasurer(body, d);
 }
@@ -152,13 +166,12 @@ export function buildRentalPayload(
   d: SharedState,
   f: RentalFields,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    club_name:  d.clubName,
+  const body: Record<string, unknown> = withClubs({
     event_date: formatDateISO(d.eventDate),
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
     line_items: f.items.map(it => ({ description: it.description, amount: it.amount })),
-  };
+  }, d);
   if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
   return withTreasurer(body, d);
 }
@@ -167,13 +180,12 @@ export function buildCreditMemoPayload(
   d: SharedState,
   f: CreditMemoFields,
 ): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    club_name:        d.clubName,
+  const body: Record<string, unknown> = withClubs({
     event_date:       formatDateISO(d.eventDate),
     amount:           f.amount,
     issue_date:       formatDateISO(f.issueDate),
     original_invoice: f.originalInvoice,
-  };
+  }, d);
   if (f.refundMethod)      body.refund_method      = f.refundMethod;
   if (f.refundDescription) body.refund_description = f.refundDescription;
   if (f.memoNumber)        body.memo_number        = f.memoNumber;
@@ -182,10 +194,34 @@ export function buildCreditMemoPayload(
 
 // ─── Readiness ───────────────────────────────────────────────────────────────
 
+/** "HH:MM" within real clock ranges. */
+function isValidTime(s: string): boolean {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  if (!m) return false;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  return h >= 0 && h <= 23 && min >= 0 && min <= 59;
+}
+
+/** Positive finite number from a user-typed string. */
+function positiveAmount(s: string | undefined): boolean {
+  if (!s) return false;
+  const n = parseFloat(String(s).replace(/[$,\s]/g, ""));
+  return Number.isFinite(n) && n > 0;
+}
+
+/** Non-negative whole number from a user-typed string. */
+function nonNegativeInt(s: string): boolean {
+  const n = parseFloat(s.trim());
+  return Number.isFinite(n) && n >= 0 && Number.isInteger(n);
+}
+
 /**
  * Why a document can't be generated yet, as user-facing field names. Empty
  * array means ready. The documents step turns this into a status pill, so the
- * strings should read naturally after "Missing: ".
+ * strings should read naturally after "Missing: ". Presence alone isn't
+ * enough — a value that would make the backend reject (or worse, print
+ * nonsense on a signed document) is reported here first.
  */
 export function missingFields(
   kind: DocumentKind,
@@ -201,20 +237,20 @@ export function missingFields(
   const need = (ok: unknown, label: string) => { if (!ok) missing.push(label); };
 
   // Every document is addressed to an organization for a dated event.
-  need(d.clubName.trim(), "organization");
+  need(cleanClubs(d.clubs).length > 0, "organization");
   need(d.eventDate.trim(), "event date");
 
   switch (kind) {
     case "contract":
-      need(d.startTime.trim(), "start time");
-      need(d.endTime.trim(), "end time");
-      need(effective(d, "rentalPrice"), "rental fee");
-      need(effective(d, "depositAmount"), "security deposit");
-      need(effective(d, "maxGuests"), "maximum guests");
-      need(d.monitors.trim(), "sober monitors");
+      need(isValidTime(d.startTime), "valid start time");
+      need(isValidTime(d.endTime), "valid end time");
+      need(positiveAmount(effectiveRentalPrice(d)), "a positive rental fee (pricing step)");
+      need(positiveAmount(effective(d, "depositAmount")), "a positive security deposit (pricing step)");
+      need(positiveAmount(effective(d, "maxGuests")), "a positive maximum guests (event details step)");
+      need(nonNegativeInt(d.monitors), "sober monitors");
       break;
     case "deposit_invoice":
-      need(fields.deposit?.amount, "deposit amount");
+      need(positiveAmount(fields.deposit?.amount), "a positive deposit amount");
       need(fields.deposit?.issueDate, "issue date");
       need(fields.deposit?.dueDate, "due date");
       break;
@@ -223,11 +259,18 @@ export function missingFields(
       need(fields.rental?.dueDate, "due date");
       need(fields.rental?.items.length, "line items");
       break;
-    case "credit_memo":
-      need(fields.creditMemo?.amount, "refund amount");
+    case "credit_memo": {
+      need(positiveAmount(fields.creditMemo?.amount), "a positive refund amount");
       need(fields.creditMemo?.issueDate, "issue date");
       need(fields.creditMemo?.originalInvoice, "original deposit invoice number");
+      // Refunding more than the deposit on file is a typo, not generosity.
+      const refund = parseFloat(String(fields.creditMemo?.amount ?? "").replace(/[$,\s]/g, ""));
+      const depositHeld = parseFloat(effective(d, "depositAmount"));
+      if (Number.isFinite(refund) && Number.isFinite(depositHeld) && depositHeld > 0 && refund > depositHeld) {
+        missing.push("refund not exceeding the security deposit");
+      }
       break;
+    }
   }
   return missing;
 }
