@@ -77,15 +77,14 @@
 }
 
 @layer components {
-  [data-brand] .member-tabs {
+  .account-controls .member-tabs {
     display: flex;
+    min-width: 0;
     height: 64px;
     overflow-x: auto;
     overflow-y: hidden;
-    margin-bottom: 2rem;
-    border-bottom: 1px solid var(--color-rule);
   }
-  [data-brand] .member-tabs a {
+  .account-controls .member-tabs a {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
@@ -95,16 +94,20 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.14em;
+    white-space: nowrap;
     color: var(--color-muted);
     transition: color 150ms, border-color 150ms;
   }
-  [data-brand] .member-tabs a:hover { color: var(--color-ink); }
-  [data-brand] .member-tabs a[aria-current="page"] {
+  .account-controls .member-tabs a:hover { color: var(--color-ink); }
+  .account-controls .member-tabs a[aria-current="page"] {
     color: var(--color-brand);
     border-bottom-color: var(--color-brand);
   }
+  .account-controls .member-tabs a:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: -4px;
+  }
   [data-brand] .brand-button:focus-visible,
-  [data-brand] .member-tabs a:focus-visible,
   [data-brand] .history-row:focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 4px;
