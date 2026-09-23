@@ -130,6 +130,7 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
     overrides,
     lastDepositInvoiceNumber: str(snapshot.lastDepositInvoiceNumber, EMPTY_STATE.lastDepositInvoiceNumber),
     currentOrderId: EMPTY_STATE.currentOrderId,
+    loadedOrderIdentity: EMPTY_STATE.loadedOrderIdentity,
     treasurerName: str(snapshot.treasurerName, EMPTY_STATE.treasurerName),
     treasurerContact: str(snapshot.treasurerContact, EMPTY_STATE.treasurerContact),
     presidentName: str(snapshot.presidentName, EMPTY_STATE.presidentName),
@@ -150,7 +151,13 @@ export default function WorkspaceActions({ order }: { order: Order }) {
     if (!ok) return;
     setBusy("load");
     const next = sharedStateFromSnapshot(order.snapshot);
-    bulk({ ...next, currentOrderId: order.id });
+    bulk({
+      ...next,
+      currentOrderId: order.id,
+      // Remember the order's identity so the documents step can warn if the
+      // workspace's organization/date later diverges from it.
+      loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
+    });
     router.push("/host/documents");
   }
 
@@ -166,6 +173,7 @@ export default function WorkspaceActions({ order }: { order: Order }) {
     bulk({
       ...next,
       currentOrderId: "",
+      loadedOrderIdentity: "",
       eventDate: "",
       lastDepositInvoiceNumber: "",
     });

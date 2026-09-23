@@ -7,14 +7,17 @@ export default function DepositPanel({
   fields,
   onChange,
   amountHint,
+  resets,
 }: {
   fields: DepositFields;
   onChange: (patch: Partial<DepositFields>) => void;
   amountHint?: string;
+  /** Per-field reset callbacks; a set callback means the field is pinned. */
+  resets?: { amount?: () => void; dueDate?: () => void };
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
-      <Field label="Deposit Amount (USD)" hint={amountHint}>
+      <Field label="Deposit Amount (USD)" hint={amountHint} onResetAuto={resets?.amount}>
         <input
           className="field-input" type="number" min={0} step="0.01" required
           placeholder="e.g. 100"
@@ -29,7 +32,7 @@ export default function DepositPanel({
           onChange={e => onChange({ issueDate: e.target.value })}
         />
       </Field>
-      <Field label="Due Before">
+      <Field label="Due Before" onResetAuto={resets?.dueDate}>
         <input
           type="date" className="field-input" required
           value={fields.dueDate}

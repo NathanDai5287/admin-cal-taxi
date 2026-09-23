@@ -222,9 +222,18 @@ export type Database = {
           cancelled_at?: string | null;
           updated_at?: string;
         };
+        // Term fields are only writable on a cancelled → confirmed
+        // transition (re-confirmation refreshes them from the order); the
+        // hosting_finance_orders_guard trigger rejects term edits otherwise.
         Update: {
           status?: Database["public"]["Enums"]["hosting_finance_status"];
           cancelled_at?: string | null;
+          organization?: string;
+          event_date?: string;
+          planned_revenue?: number;
+          planned_fire_permit?: number;
+          confirmed_by?: string | null;
+          confirmed_at?: string;
           updated_at?: string;
         };
         Relationships: [];

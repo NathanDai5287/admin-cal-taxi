@@ -101,9 +101,30 @@ export async function confirmHostingContractAction(orderId: string) {
     const existing = await supabase.from("hosting_finance_orders").select("*").eq("order_id", id.data).maybeSingle();
     if (existing.error) return failed(existing.error);
 
+    // Re-confirming a cancelled contract is a fresh confirmation decision:
+    // the terms are re-copied from the order as it stands NOW, so a price
+    // renegotiated while cancelled can't resurrect the old amounts. (The
+    // database guard only allows term changes on this cancelled → confirmed
+    // transition; re-confirming an already-confirmed order whose terms
+    // changed is rejected there.)
     if (existing.data) {
+      const order = await getOrder(id.data);
+      if (!order) return failed(new Error("The hosting order was not found."));
+      const plan = hostingPlanFromOrder(order);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(plan.eventDate) || plan.plannedRevenue <= 0) {
+        return failed(new Error("Add an event date and rental price before confirmation."));
+      }
       const { data, error } = await supabase.from("hosting_finance_orders")
-        .update({ status: "confirmed", cancelled_at: null })
+        .update({
+          status: "confirmed",
+          cancelled_at: null,
+          organization: plan.organization,
+          event_date: plan.eventDate,
+          planned_revenue: plan.plannedRevenue,
+          planned_fire_permit: plan.plannedFirePermit,
+          confirmed_by: userId,
+          confirmed_at: new Date().toISOString(),
+        })
         .eq("order_id", id.data)
         .select("*")
         .single();

@@ -146,6 +146,14 @@ export type SharedState = {
    */
   currentOrderId: string;
 
+  /**
+   * Identity ("clubName|eventDate") of the attached order at the moment it
+   * was loaded or first saved. The documents step compares this against the
+   * live identity to warn before an Update rewrites the order's organization
+   * or date in place. "" when unattached or saved before this field existed.
+   */
+  loadedOrderIdentity: string;
+
   // Officers — rendered on invoices and the credit memo. Optional;
   // empty values fall back to the generic "Theta Xi treasurer" wording.
   treasurerName: string;
@@ -181,6 +189,7 @@ export const EMPTY_STATE: SharedState = {
 
   lastDepositInvoiceNumber: "",
   currentOrderId: "",
+  loadedOrderIdentity: "",
 
   treasurerName: "",
   treasurerContact: "",

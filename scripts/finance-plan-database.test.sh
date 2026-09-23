@@ -55,6 +55,7 @@ insert into public.reimbursements values (
 );
 SQL
 "${finance_psql[@]}" -f "$finance_repo_dir/supabase/migrations/20260922000000_finance_plan_actual.sql"
+"${finance_psql[@]}" -f "$finance_repo_dir/supabase/migrations/20260923000000_hosting_ledger_immutable.sql"
 "${finance_psql[@]}" <<'SQL'
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
 select public.record_dues_payment(
@@ -99,6 +100,19 @@ begin
     );
     raise exception 'duplicate hosting confirmation was accepted';
   exception when unique_violation then
+    null;
+  end;
+end
+$$;
+-- Terms of a confirmed contract are immutable.
+do $$
+begin
+  begin
+    update public.hosting_finance_orders
+    set planned_revenue = 2500
+    where order_id = 'order-1';
+    raise exception 'confirmed contract term edit was accepted';
+  exception when sqlstate '22023' then
     null;
   end;
 end
@@ -148,6 +162,38 @@ begin
   end;
 end
 $$;
+-- Re-confirmation (cancelled → confirmed) may refresh terms from the order.
+update public.hosting_finance_orders
+set status = 'confirmed', cancelled_at = null, planned_revenue = 2200
+where order_id = 'order-1';
+do $$
+begin
+  if (select planned_revenue from public.hosting_finance_orders where order_id = 'order-1') <> 2200 then
+    raise exception 're-confirmation did not refresh terms';
+  end if;
+end
+$$;
+-- Recorded payments are immutable; only the reversal columns may change.
+do $$
+begin
+  begin
+    update public.hosting_finance_payments set amount = 1 where kind = 'revenue';
+    raise exception 'payment amount edit was accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+end
+$$;
+update public.hosting_finance_payments
+set reversed_at = now(), reversal_reason = 'test reversal'
+where kind = 'revenue';
+-- Restore the fixture state the final assertions expect.
+update public.hosting_finance_payments
+set reversed_at = null, reversal_reason = null
+where kind = 'revenue';
+update public.hosting_finance_orders
+set status = 'cancelled', cancelled_at = now()
+where order_id = 'order-1';
 delete from public.chapter_receivables
 where id = '00000000-0000-0000-0000-000000000010';
 do $$

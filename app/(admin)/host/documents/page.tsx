@@ -55,7 +55,7 @@ function toNum(s: string): number | null {
 type GeneratedMap = Partial<Record<DocumentKind, Omit<OrderDocument, "id">>>;
 
 export default function DocumentsPage() {
-  const { hydrated, data, update } = useSharedData();
+  const { hydrated, data, update, bulk } = useSharedData();
 
   // ── Per-document local fields ─────────────────────────────────────────────
   const [contractSign, setContractSign] = useState(false);
@@ -348,6 +348,15 @@ export default function DocumentsPage() {
   // The archive keys a rental on these two, and rejects a save without them.
   const canSave = cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
 
+  // Identity divergence: the workspace was loaded from (or saved as) an
+  // order whose organization/date no longer matches. Updating would rewrite
+  // that order's identity in place — surface it before the click.
+  const identityNow = `${clubsDisplay(data.clubs)}|${data.eventDate}`;
+  const [loadedClub, loadedDate] = data.loadedOrderIdentity.split("|");
+  const identityDrifted = Boolean(
+    data.currentOrderId && data.loadedOrderIdentity && data.loadedOrderIdentity !== identityNow,
+  );
+
   /**
    * The historical record stored on the order. Derived values are resolved
    * here, at save time, so the archive shows what was actually true when the
@@ -387,7 +396,7 @@ export default function DocumentsPage() {
           documents,
         });
         if (!res.ok) { setSaveError(res.error); return; }
-        update("currentOrderId", res.data.id);
+        bulk({ currentOrderId: res.data.id, loadedOrderIdentity: `${clubName}|${data.eventDate}` });
         setSaveNotice(
           documents.length
             ? `Saved as a new order with ${documents.length} document(s).`
@@ -411,6 +420,8 @@ export default function DocumentsPage() {
         const res = await addDocumentAction(data.currentOrderId, doc);
         if (!res.ok) { setSaveError(res.error); return; }
       }
+      // The order now matches the workspace — reset the divergence baseline.
+      bulk({ loadedOrderIdentity: `${clubName}|${data.eventDate}` });
       setSaveNotice(
         documents.length
           ? `Order updated — ${documents.length} document(s) archived.`
@@ -511,6 +522,10 @@ export default function DocumentsPage() {
               setDeposit(f => ({ ...f, ...patch }));
             }}
             amountHint={depositAmountHint}
+            resets={{
+              amount: depositAmountEdited ? () => setDepositAmountEdited(false) : undefined,
+              dueDate: depositDueEdited ? () => setDepositDueEdited(false) : undefined,
+            }}
           />
         </DocumentRow>
 
@@ -534,6 +549,9 @@ export default function DocumentsPage() {
             }}
             onReset={resetRentalFromPricing}
             totalDescription={rentalTotalDescription}
+            resets={{
+              dueDate: rentalDueEdited ? () => setRentalDueEdited(false) : undefined,
+            }}
           />
         </DocumentRow>
 
@@ -558,6 +576,10 @@ export default function DocumentsPage() {
             }}
             amountHint={creditMemoAmountHint}
             originalInvoiceHint={creditMemoOriginalInvoiceHint}
+            resets={{
+              amount: creditAmountEdited ? () => setCreditAmountEdited(false) : undefined,
+              originalInvoice: originalInvoiceEdited ? () => setOriginalInvoiceEdited(false) : undefined,
+            }}
           />
         </DocumentRow>
       </div>
@@ -601,6 +623,14 @@ export default function DocumentsPage() {
               {!canSave && hydrated && (
                 <p className="text-[12px] text-muted mt-1.5">
                   An organization and event date are required before a rental can be archived.
+                </p>
+              )}
+              {identityDrifted && (
+                <p className="text-[12px] text-warn mt-1.5">
+                  This workspace no longer matches the attached order (saved as {loadedClub || "unknown organization"}
+                  {loadedDate ? `, ${formatDateISO(loadedDate) || loadedDate}` : ""}).
+                  Updating will rewrite that order&rsquo;s organization and date in place — to start
+                  a new event from these details instead, use Duplicate on the order page.
                 </p>
               )}
               {saveError && <p className="text-warn text-[13px] mt-1.5">{saveError}</p>}

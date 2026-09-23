@@ -46,6 +46,12 @@ export default function HostingFinancePanel({
   const revenue = financeOrder?.plannedRevenue ?? previewRevenue;
   const firePermit = financeOrder?.plannedFirePermit ?? previewFirePermit;
   const confirmed = financeOrder?.status === "confirmed";
+  // Drift: the archived order was edited after confirmation. The confirmed
+  // values are the ledger of record and stay frozen; this note makes the
+  // disagreement visible instead of silent.
+  const drifted = confirmed && financeOrder
+    && (financeOrder.plannedRevenue !== previewRevenue
+      || financeOrder.plannedFirePermit !== previewFirePermit);
   const activePayments = payments.filter((payment) => !payment.reversedAt);
   const revenuePaid = activePayments.filter((payment) => payment.kind === "revenue").reduce((total, payment) => total + payment.amount, 0);
   const permitPaid = activePayments.filter((payment) => payment.kind === "fire_permit").reduce((total, payment) => total + payment.amount, 0);
@@ -108,6 +114,14 @@ export default function HostingFinancePanel({
           <div className="bg-surface p-4"><span className="field-label">Rental revenue</span><strong className="mt-1 block text-[20px] tabular-nums">{formatMoney(revenue)}</strong></div>
           <div className="bg-surface p-4"><span className="field-label">Fire permit expense</span><strong className="mt-1 block text-[20px] tabular-nums">{formatMoney(firePermit)}</strong></div>
         </div>
+
+        {drifted ? (
+          <p className="border border-rule px-3 py-2 text-[12.5px] text-warn">
+            The order has changed since confirmation — it now reads {formatMoney(previewRevenue)} revenue
+            and {formatMoney(previewFirePermit)} fire permit. The plan keeps the confirmed values
+            above; cancel and re-confirm to move the plan to the new numbers.
+          </p>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-4">
           <p className="text-sm text-muted">

@@ -10,11 +10,14 @@ export default function RentalPanel({
   onChange,
   onReset,
   totalDescription,
+  resets,
 }: {
   fields: RentalFields;
   onChange: (patch: Partial<RentalFields>) => void;
   onReset: () => void;
   totalDescription: string;
+  /** Per-field reset callbacks; a set callback means the field is pinned. */
+  resets?: { dueDate?: () => void };
 }) {
   return (
     <div className="space-y-6">
@@ -26,7 +29,7 @@ export default function RentalPanel({
             onChange={e => onChange({ issueDate: e.target.value })}
           />
         </Field>
-        <Field label="Due Date">
+        <Field label="Due Date" onResetAuto={resets?.dueDate}>
           <input
             type="date" className="field-input" required
             value={fields.dueDate}
