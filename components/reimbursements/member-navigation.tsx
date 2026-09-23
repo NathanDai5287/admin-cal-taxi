@@ -14,8 +14,8 @@ export function MemberNavigation({ showPolicy = false }: { showPolicy?: boolean 
   return (
     <nav aria-label="Reimbursements" className="member-tabs">
       <PrefetchRoutes hrefs={memberRoutes.filter((href) => href !== pathname)} />
-      <Link href="/" prefetch={false} aria-current={!history ? "page" : undefined}>Submit reimbursement</Link>
-      <Link href="/history" prefetch={false} aria-current={history ? "page" : undefined}>My reimbursements</Link>
+      <Link href="/" prefetch={false} aria-current={!history ? "page" : undefined}>Submit</Link>
+      <Link href="/history" prefetch={false} aria-current={history ? "page" : undefined}>My requests</Link>
       {showPolicy ? <Link href="/policy" prefetch={false}>Policy assistant</Link> : null}
     </nav>
   );
