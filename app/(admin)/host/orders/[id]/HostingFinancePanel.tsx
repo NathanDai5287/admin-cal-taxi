@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -45,62 +45,109 @@ export default function HostingFinancePanel({
   });
   const revenue = financeOrder?.plannedRevenue ?? previewRevenue;
   const firePermit = financeOrder?.plannedFirePermit ?? previewFirePermit;
-  const confirmed = financeOrder?.status === "confirmed";
+
+  // Optimistic overrides: the UI flips instantly on click and only rolls back
+  // if the server action fails. Overrides clear once refreshed props arrive.
+  const [statusOverride, setStatusOverride] = useState<FinanceOrder["status"] | null | undefined>(undefined);
+  const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
+  const [reversedIds, setReversedIds] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => { setStatusOverride(undefined); }, [financeOrder?.status]);
+  useEffect(() => { setPendingPayments([]); setReversedIds(new Set()); }, [payments]);
+
+  const status = statusOverride !== undefined ? statusOverride : financeOrder?.status ?? null;
+  const confirmed = status === "confirmed";
+  const displayPayments: (Payment & { pending?: boolean })[] = [
+    ...pendingPayments.map((payment) => ({ ...payment, pending: true })),
+    ...payments.map((payment) => reversedIds.has(payment.id) ? { ...payment, reversedAt: new Date().toISOString() } : payment),
+  ];
   // Drift: the archived order was edited after confirmation. The confirmed
   // values are the ledger of record and stay frozen; this note makes the
   // disagreement visible instead of silent.
   const drifted = confirmed && financeOrder
     && (financeOrder.plannedRevenue !== previewRevenue
       || financeOrder.plannedFirePermit !== previewFirePermit);
-  const activePayments = payments.filter((payment) => !payment.reversedAt);
+  const activePayments = displayPayments.filter((payment) => !payment.reversedAt);
   const revenuePaid = activePayments.filter((payment) => payment.kind === "revenue").reduce((total, payment) => total + payment.amount, 0);
   const permitPaid = activePayments.filter((payment) => payment.kind === "fire_permit").reduce((total, payment) => total + payment.amount, 0);
 
   async function confirmContract() {
     setBusy(true);
     setMessage("");
+    setStatusOverride("confirmed");
     const result = await confirmHostingContractAction(orderId);
+    if (result.ok) {
+      setMessage("Contract confirmed in the finance plan.");
+      router.refresh();
+    } else {
+      setStatusOverride(undefined);
+      setMessage(result.error);
+    }
     setBusy(false);
-    setMessage(result.ok ? "Contract confirmed in the finance plan." : result.error);
-    if (result.ok) router.refresh();
   }
 
   async function cancelContract() {
     if (!window.confirm("Cancel this contract and remove its planned values? Recorded payments will remain.")) return;
     setBusy(true);
     setMessage("");
+    setStatusOverride("cancelled");
     const result = await cancelHostingContractAction(orderId);
+    if (result.ok) {
+      setMessage("Contract cancelled. Recorded payments remain in actual totals.");
+      router.refresh();
+    } else {
+      setStatusOverride(undefined);
+      setMessage(result.error);
+    }
     setBusy(false);
-    setMessage(result.ok ? "Contract cancelled. Recorded payments remain in actual totals." : result.error);
-    if (result.ok) router.refresh();
   }
 
   async function recordPayment(kind: Payment["kind"], formData: FormData) {
     setBusy(true);
     setMessage("");
-    const result = await recordHostingPaymentAction({
-      orderId,
+    const optimistic: Payment = {
+      id: `pending-${crypto.randomUUID()}`,
       kind,
       amount: Number(formData.get("amount")),
       paidDate: String(formData.get("paidDate")),
+      reversedAt: null,
+    };
+    setPendingPayments((current) => [optimistic, ...current]);
+    const result = await recordHostingPaymentAction({
+      orderId,
+      kind,
+      amount: optimistic.amount,
+      paidDate: optimistic.paidDate,
       requestId: requestIds[kind],
     });
-    setBusy(false);
-    setMessage(result.ok ? "Payment recorded." : result.error);
     if (result.ok) {
+      setMessage("Payment recorded.");
       setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
       router.refresh();
+    } else {
+      setPendingPayments((current) => current.filter((payment) => payment.id !== optimistic.id));
+      setMessage(result.error);
     }
+    setBusy(false);
   }
 
   async function reversePayment(paymentId: string) {
     if (!window.confirm("Reverse this payment record?")) return;
     setBusy(true);
     setMessage("");
+    setReversedIds((current) => new Set(current).add(paymentId));
     const result = await reverseHostingPaymentAction(paymentId);
+    if (result.ok) {
+      setMessage("Payment reversed.");
+      router.refresh();
+    } else {
+      setReversedIds((current) => {
+        const next = new Set(current);
+        next.delete(paymentId);
+        return next;
+      });
+      setMessage(result.error);
+    }
     setBusy(false);
-    setMessage(result.ok ? "Payment reversed." : result.error);
-    if (result.ok) router.refresh();
   }
 
   return (
@@ -112,7 +159,7 @@ export default function HostingFinancePanel({
             <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button>
           ) : (
             <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
-              {financeOrder ? "Restore contract" : "Confirm contract"}
+              {status === "cancelled" ? "Restore contract" : "Confirm contract"}
             </Button>
           )}
         </div>
@@ -137,7 +184,7 @@ export default function HostingFinancePanel({
 
         {confirmed ? null : (
           <p className="text-sm text-muted">
-            {financeOrder ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
+            {status === "cancelled" ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
           </p>
         )}
 
@@ -147,17 +194,17 @@ export default function HostingFinancePanel({
             {firePermit > 0 ? <PaymentForm busy={busy} defaultAmount={Math.max(firePermit - permitPaid, 0)} idPrefix="fire-permit" label="Record fire-permit payment" onSubmit={(data) => recordPayment("fire_permit", data)} paid={permitPaid} today={today} /> : <p className="text-sm text-muted">This contract has no fire-permit expense.</p>}
           </div>
         ) : null}
-        {payments.length ? (
+        {displayPayments.length ? (
           <div className="table-scroll border-t border-rule pt-4">
             <table className="data-table">
               <thead><tr><th>Date</th><th>Payment</th><th>Amount</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>{payments.map((payment) => (
+              <tbody>{displayPayments.map((payment) => (
                 <tr key={payment.id}>
                   <td>{new Date(`${payment.paidDate}T12:00:00`).toLocaleDateString("en-US")}</td>
                   <td>{payment.kind === "revenue" ? "Hosting revenue" : "Fire permit"}</td>
                   <td className="amount">{formatMoney(payment.amount)}</td>
-                  <td>{payment.reversedAt ? "Reversed" : "Recorded"}</td>
-                  <td className="text-right">{payment.reversedAt ? null : <Button compact disabled={busy} onClick={() => reversePayment(payment.id)} type="button" variant="text">Reverse</Button>}</td>
+                  <td>{payment.reversedAt ? "Reversed" : payment.pending ? "Recording…" : "Recorded"}</td>
+                  <td className="text-right">{payment.reversedAt || payment.pending ? null : <Button compact disabled={busy} onClick={() => reversePayment(payment.id)} type="button" variant="text">Reverse</Button>}</td>
                 </tr>
               ))}</tbody>
             </table>
