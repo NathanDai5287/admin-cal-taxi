@@ -1152,6 +1152,10 @@
   [data-brand] .payment-group-methods strong {
     @apply text-[13px] break-words;
   }
+  :root[data-theme="dark"] [data-brand] .payment-group-summary strong,
+  :root[data-theme="dark"] [data-brand] .payment-group-methods strong {
+    color: var(--color-ink);
+  }
   [data-brand] .payment-method-warning {
     @apply m-0 mt-2 text-[12px] font-semibold text-caution;
   }
