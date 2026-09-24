@@ -108,10 +108,16 @@ export default function HostingFinancePanel({
       <div className="card-header">
         <span className="card-title" id="hosting-finance-title">Plan and payments</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
-            {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
-          </Button>
-          {confirmed ? <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button> : null}
+          {confirmed ? (
+            <>
+              <span className="badge badge-approved">Contract confirmed</span>
+              <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button>
+            </>
+          ) : (
+            <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
+              {financeOrder ? "Restore contract" : "Confirm contract"}
+            </Button>
+          )}
         </div>
       </div>
       <div className="card-body grid gap-5">
