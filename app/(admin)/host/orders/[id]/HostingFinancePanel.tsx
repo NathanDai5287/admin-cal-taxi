@@ -107,7 +107,6 @@ export default function HostingFinancePanel({
     <section className="card" aria-labelledby="hosting-finance-title">
       <div className="card-header">
         <span className="card-title" id="hosting-finance-title">Plan and payments</span>
-        <span className="card-subtitle">Confirm the contract before these values enter Finance Planning.</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
             {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
