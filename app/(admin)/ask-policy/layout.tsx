@@ -25,7 +25,7 @@ export default async function AskPolicyLayout({ children }: { children: React.Re
           { href: "/ask-policy/evidence", label: "Add evidence" },
         ]}
       />
-      <main className="mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-6">{children}</main>
+      <main className="ask-policy-main mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-6">{children}</main>
     </div>
   );
 }

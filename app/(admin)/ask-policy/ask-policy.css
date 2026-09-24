@@ -2,6 +2,10 @@
   background: var(--color-page);
 }
 
+.ask-policy-shell .ask-policy-main:has(.ask-policy-panel) {
+  max-width: none;
+}
+
 [data-brand].ask-policy-shell button,
 [data-brand].ask-policy-shell textarea {
   border-radius: 999px;

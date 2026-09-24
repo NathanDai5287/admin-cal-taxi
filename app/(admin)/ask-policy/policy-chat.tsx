@@ -306,7 +306,7 @@ export function PolicyChat({
   }
 
   return (
-    <section className="ask-policy-panel grid h-[calc(100dvh-198px)] min-h-[620px] grid-rows-[144px_minmax(0,1fr)] overflow-hidden md:h-[calc(100dvh-187px)] md:grid-cols-[240px_minmax(0,1fr)] md:grid-rows-1 lg:grid-cols-[270px_minmax(0,1fr)]" aria-label="Ask Policy chat">
+    <section className="ask-policy-panel grid h-[calc(100dvh-100px)] grid-rows-[144px_minmax(0,1fr)] overflow-hidden sm:h-[calc(100dvh-116px)] md:grid-cols-[240px_minmax(0,1fr)] md:grid-rows-1 lg:grid-cols-[270px_minmax(0,1fr)]" aria-label="Ask Policy chat">
       <aside className="flex min-h-0 flex-col border-b border-rule/70 bg-canvas/50 md:border-b-0 md:border-r md:border-rule/70" aria-label="Saved chats">
         <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
           <h2 className="text-sm font-semibold text-ink">Your chats</h2>
@@ -337,9 +337,9 @@ export function PolicyChat({
           {chatId ? <button type="button" onClick={() => deleteChat(chatId)} disabled={pending || Boolean(busyChatId)} className="shrink-0 px-3 py-1.5 text-xs font-medium text-muted hover:bg-warn-light hover:text-warn disabled:opacity-40">Delete chat</button> : null}
         </div>
 
-        <div className="ask-policy-scroll min-h-0 flex-1 overflow-y-auto bg-surface px-4 py-7 sm:px-8 sm:py-9" aria-live="polite" aria-busy={Boolean(busyChatId)}>
+        <div className="ask-policy-scroll flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface px-4 py-7 sm:px-8 sm:py-9" aria-live="polite" aria-busy={Boolean(busyChatId)}>
           {!messages.length ? (
-            <div className="mx-auto flex min-h-[350px] max-w-2xl flex-col items-center justify-center text-center">
+            <div className="mx-auto my-auto flex min-h-[350px] max-w-3xl flex-col items-center justify-center text-center">
               {busyChatId ? <p className="text-sm text-muted">Loading chat…</p> : <>
                 <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-brand-light text-xl font-semibold text-brand" aria-hidden="true">A</div>
                 <h2 className="mt-6 text-2xl font-semibold tracking-tight text-ink">What are you working on?</h2>
@@ -350,7 +350,7 @@ export function PolicyChat({
               </>}
             </div>
           ) : (
-            <div className="mx-auto max-w-3xl space-y-8">
+            <div className="mx-auto max-w-4xl space-y-8">
               {messages.map((message) => (
                 <article key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                   {message.role === "assistant" ? <span className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-light text-xs font-semibold text-brand" aria-hidden="true">A</span> : null}
@@ -369,7 +369,7 @@ export function PolicyChat({
         </div>
 
         <div className="bg-surface px-4 pb-5 pt-3 sm:px-8 sm:pb-6">
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto max-w-4xl">
             {attachments.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="Temporary chat attachments">{attachments.map((file, index) => <span key={`${file.name}:${file.lastModified}`} className="inline-flex items-center gap-2 rounded-full bg-brand-light px-3 py-1.5 text-xs text-brand"><span className="max-w-[220px] truncate">{file.name}</span><button type="button" onClick={() => removeAttachment(index)} disabled={pending || Boolean(busyChatId)} className="px-1 text-xs font-bold hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" aria-label={`Remove ${file.name}`}>×</button></span>)}</div> : null}
             {error ? <p role="alert" className="form-message mb-3">{error}</p> : null}
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="ask-policy-composer flex items-end gap-2 p-2">
