@@ -39,48 +39,42 @@ export default function ContractSnapshot({ snapshot }: { snapshot: Record<string
     <section className="card">
       <div className="card-header">
         <span className="card-title">Contract Terms Snapshot</span>
-        <span className="card-subtitle">As agreed when this order was saved.</span>
       </div>
-      <div className="card-body space-y-5">
+      <div className="card-body space-y-6">
         {!hasAnything ? (
           <p className="text-[13px] text-muted">No contract terms were saved with this order.</p>
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <SnapshotField label="Start time"      value={startTime} />
-              <SnapshotField label="End time"        value={endTime} />
-              <SnapshotField label="Max guests"      value={maxGuests} />
-              <SnapshotField label="Sober monitors"  value={monitors} />
+            <div className="grid gap-px border border-rule bg-rule sm:grid-cols-4">
+              <SnapshotStat label="Start time"     value={formatTime(startTime)} />
+              <SnapshotStat label="End time"       value={formatTime(endTime)} />
+              <SnapshotStat label="Max guests"     value={maxGuests} />
+              <SnapshotStat label="Sober monitors" value={monitors} />
             </div>
 
             <div>
-              <p className="field-label">Allowed Areas</p>
+              <p className="field-label mb-2.5">Allowed areas</p>
               {selectedAreas.length === 0 ? (
                 <p className="text-[13px] text-muted">None selected.</p>
               ) : (
-                <ul className="text-[13px] text-ink space-y-1">
+                <div className="flex flex-wrap gap-2">
                   {selectedAreas.map(k => (
-                    <li key={k}>
+                    <span key={k} className="inline-flex items-center gap-2 border border-rule bg-canvas px-3 py-1.5 text-[12.5px] font-semibold text-ink">
                       {AREA_LABELS[k]}
-                      {cleared[k] && (
-                        <span className="text-muted"> — cleared by Theta Xi beforehand</span>
-                      )}
-                    </li>
+                      {cleared[k] && <span className="badge badge-verified">Cleared by Theta Xi</span>}
+                    </span>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-x-8 gap-y-2 text-[13px]">
-              <span className={guestList ? "text-ink" : "text-muted"}>
-                {guestList ? "✓" : "—"}&nbsp; Guest list required
-              </span>
-              <span className={soundSystem ? "text-ink" : "text-muted"}>
-                {soundSystem ? "✓" : "—"}&nbsp; Sound system
-              </span>
-              <span className={lightingSystem ? "text-ink" : "text-muted"}>
-                {lightingSystem ? "✓" : "—"}&nbsp; Lighting system
-              </span>
+            <div className="border-t border-rule pt-5">
+              <p className="field-label mb-2.5">Requirements &amp; add-ons</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <FeatureRow label="Guest list"      enabled={guestList}      enabledText="Required" enabledVariant="badge-verified" />
+                <FeatureRow label="Sound system"    enabled={soundSystem}    enabledText="Included" enabledVariant="badge-approved" />
+                <FeatureRow label="Lighting system" enabled={lightingSystem} enabledText="Included" enabledVariant="badge-approved" />
+              </div>
             </div>
           </>
         )}
@@ -89,11 +83,39 @@ export default function ContractSnapshot({ snapshot }: { snapshot: Record<string
   );
 }
 
-function SnapshotField({ label, value }: { label: string; value: string | null }) {
+/** "19:00" → "7:00 PM"; passes through anything unexpected. */
+function formatTime(value: string | null): string | null {
+  if (!value) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!m) return value;
+  const h = parseInt(m[1], 10);
+  if (h > 23) return value;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 === 0 ? 12 : h % 12;
+  return `${hour}:${m[2]} ${period}`;
+}
+
+function SnapshotStat({ label, value }: { label: string; value: string | null }) {
   return (
-    <div>
+    <div className="bg-surface px-4 py-3.5">
       <p className="field-label">{label}</p>
-      <p className="text-[13.5px] text-ink tabular-nums">{value ?? "—"}</p>
+      <p className="mt-1.5 text-[17px] font-semibold text-ink tabular-nums">{value ?? "—"}</p>
+    </div>
+  );
+}
+
+function FeatureRow({ label, enabled, enabledText, enabledVariant }: {
+  label: string;
+  enabled: boolean;
+  enabledText: string;
+  enabledVariant: "badge-approved" | "badge-verified";
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border border-rule px-3.5 py-2.5">
+      <span className="text-[12.5px] font-semibold text-ink">{label}</span>
+      {enabled
+        ? <span className={`badge ${enabledVariant}`}>{enabledText}</span>
+        : <span className="badge border-rule text-muted">None</span>}
     </div>
   );
 }
