@@ -129,10 +129,7 @@ export default async function OrderDetailPage({
         </div>
       </div>
 
-      <section>
-        <h2 className="card-title mb-3">Documents</h2>
-        <OrderDocuments order={order} />
-      </section>
+      <OrderDocuments order={order} />
 
       <section className="card">
         <div className="card-header">
