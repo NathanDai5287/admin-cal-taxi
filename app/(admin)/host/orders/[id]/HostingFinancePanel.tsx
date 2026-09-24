@@ -124,13 +124,17 @@ export default function HostingFinancePanel({
         ) : null}
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-4">
-          <p className="text-sm text-muted">
-            {confirmed ? "Confirmed values are fixed from this order snapshot." : financeOrder ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
-          </p>
-          <Button disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
-            {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
-          </Button>
-          {confirmed ? <Button disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button> : null}
+          {confirmed ? null : (
+            <p className="text-sm text-muted">
+              {financeOrder ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
+              {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
+            </Button>
+            {confirmed ? <Button disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button> : null}
+          </div>
         </div>
 
         {confirmed ? (
