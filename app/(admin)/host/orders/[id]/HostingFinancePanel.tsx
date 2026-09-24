@@ -189,9 +189,9 @@ export default function HostingFinancePanel({
         )}
 
         {confirmed ? (
-          <div className="grid gap-4 border-t border-rule pt-5 lg:grid-cols-2">
-            <PaymentForm busy={busy} defaultAmount={Math.max(revenue - revenuePaid, 0)} idPrefix="hosting-revenue" label="Record hosting payment" onSubmit={(data) => recordPayment("revenue", data)} paid={revenuePaid} today={today} />
-            {firePermit > 0 ? <PaymentForm busy={busy} defaultAmount={Math.max(firePermit - permitPaid, 0)} idPrefix="fire-permit" label="Record fire-permit payment" onSubmit={(data) => recordPayment("fire_permit", data)} paid={permitPaid} today={today} /> : <p className="text-sm text-muted">This contract has no fire-permit expense.</p>}
+          <div className="grid gap-6 border-t border-rule pt-5 lg:grid-cols-2">
+            <PaymentForm busy={busy} defaultAmount={Math.max(revenue - revenuePaid, 0)} idPrefix="hosting-revenue" label="Hosting payment" onSubmit={(data) => recordPayment("revenue", data)} paid={revenuePaid} today={today} total={revenue} />
+            {firePermit > 0 ? <PaymentForm busy={busy} defaultAmount={Math.max(firePermit - permitPaid, 0)} idPrefix="fire-permit" label="Fire-permit payment" onSubmit={(data) => recordPayment("fire_permit", data)} paid={permitPaid} today={today} total={firePermit} /> : <p className="text-sm text-muted">This contract has no fire-permit expense.</p>}
           </div>
         ) : null}
         {displayPayments.length ? (
@@ -216,7 +216,7 @@ export default function HostingFinancePanel({
   );
 }
 
-function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, today }: {
+function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, today, total }: {
   busy: boolean;
   defaultAmount: number;
   idPrefix: string;
@@ -224,15 +224,28 @@ function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, tod
   onSubmit: (formData: FormData) => void;
   paid: number;
   today: string;
+  total: number;
 }) {
+  const percent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+  const paidInFull = total > 0 && paid >= total;
   return (
-    <form action={onSubmit} className="grid gap-3">
-      <div><span className="card-title">{label}</span><p className="mt-1 text-[12px] text-muted">Recorded: {formatMoney(paid)}</p></div>
-      <div className="grid grid-cols-2 gap-3">
+    <form action={onSubmit} className="grid content-start gap-4">
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="card-title">{label}</span>
+          <span className={`text-[12px] tabular-nums ${paidInFull ? "font-bold text-ok" : "text-muted"}`}>
+            {paidInFull ? "Paid in full · " : ""}{formatMoney(paid)} of {formatMoney(total)}
+          </span>
+        </div>
+        <div aria-hidden="true" className="mt-2 h-1.5 w-full bg-canvas">
+          <div className={`h-full transition-[width] ${paidInFull ? "bg-ok" : "bg-brand"}`} style={{ width: `${percent}%` }} />
+        </div>
+      </div>
+      <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <div className="field"><label className="field-label" htmlFor={`${idPrefix}-date`}>Date</label><input className="field-input" defaultValue={today} id={`${idPrefix}-date`} name="paidDate" type="date" required /></div>
         <div className="field"><label className="field-label" htmlFor={`${idPrefix}-amount`}>Amount</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={defaultAmount || ""} id={`${idPrefix}-amount`} min="0.01" name="amount" step="0.01" type="number" required /></div></div>
+        <Button disabled={busy} type="submit" variant="secondary">Record</Button>
       </div>
-      <Button disabled={busy} type="submit" variant="secondary">Record payment</Button>
     </form>
   );
 }
