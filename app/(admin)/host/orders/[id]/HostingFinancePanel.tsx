@@ -109,10 +109,7 @@ export default function HostingFinancePanel({
         <span className="card-title" id="hosting-finance-title">Plan and payments</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {confirmed ? (
-            <>
-              <span className="badge badge-approved">Contract confirmed</span>
-              <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button>
-            </>
+            <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button>
           ) : (
             <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
               {financeOrder ? "Restore contract" : "Confirm contract"}
@@ -121,9 +118,13 @@ export default function HostingFinancePanel({
         </div>
       </div>
       <div className="card-body grid gap-5">
-        <div className="grid gap-px bg-rule sm:grid-cols-2">
-          <div className="bg-surface p-4"><span className="field-label">Rental revenue</span><strong className="mt-1 block text-[20px] tabular-nums">{formatMoney(revenue)}</strong></div>
-          <div className="bg-surface p-4"><span className="field-label">Fire permit expense</span><strong className="mt-1 block text-[20px] tabular-nums">{formatMoney(firePermit)}</strong></div>
+        <div className="border border-rule bg-surface px-5 py-4">
+          <span className="field-label">Rental revenue</span>
+          <strong className="mt-1 block text-[28px] leading-tight tabular-nums">{formatMoney(revenue)}</strong>
+          <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-rule pt-3">
+            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Fire permit expense</span>
+            <span className="text-[15px] font-semibold tabular-nums text-muted">{formatMoney(firePermit)}</span>
+          </div>
         </div>
 
         {drifted ? (
