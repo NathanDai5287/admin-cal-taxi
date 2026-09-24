@@ -86,7 +86,7 @@ export default function HostingFinancePanel({
   }
 
   async function cancelContract() {
-    if (!window.confirm("Cancel this contract and remove its planned values? Recorded payments will remain.")) return;
+    if (!window.confirm("Remove this contract from budgeting? Its planned values will leave Finance Planning. Recorded payments will remain.")) return;
     setBusy(true);
     setMessage("");
     setStatusOverride("cancelled");
@@ -156,11 +156,9 @@ export default function HostingFinancePanel({
         <span className="card-title" id="hosting-finance-title">Plan and payments</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {confirmed ? (
-            <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button>
+            <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Remove from budgeting</Button>
           ) : (
-            <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
-              {status === "cancelled" ? "Restore contract" : "Confirm contract"}
-            </Button>
+            <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">Apply to budget</Button>
           )}
         </div>
       </div>
