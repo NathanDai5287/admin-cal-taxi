@@ -108,6 +108,12 @@ export default function HostingFinancePanel({
       <div className="card-header">
         <span className="card-title" id="hosting-finance-title">Plan and payments</span>
         <span className="card-subtitle">Confirm the contract before these values enter Finance Planning.</span>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
+            {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
+          </Button>
+          {confirmed ? <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button> : null}
+        </div>
       </div>
       <div className="card-body grid gap-5">
         <div className="grid gap-px bg-rule sm:grid-cols-2">
@@ -123,19 +129,11 @@ export default function HostingFinancePanel({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-rule pt-4">
-          {confirmed ? null : (
-            <p className="text-sm text-muted">
-              {financeOrder ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">
-              {confirmed ? "Contract confirmed" : financeOrder ? "Restore contract" : "Confirm contract"}
-            </Button>
-            {confirmed ? <Button disabled={busy} onClick={cancelContract} type="button" variant="danger">Cancel contract</Button> : null}
-          </div>
-        </div>
+        {confirmed ? null : (
+          <p className="text-sm text-muted">
+            {financeOrder ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
+          </p>
+        )}
 
         {confirmed ? (
           <div className="grid gap-4 border-t border-rule pt-5 lg:grid-cols-2">
