@@ -17,6 +17,8 @@ import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { findVisibleTemplateTags, inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
 import { analyzeTemplateWithAi, mappingFromAnalysis } from "@/lib/accreditation/template-ai";
 import { resolveTemplateChat, TEMPLATE_CHAT_MAX_HISTORY, TEMPLATE_CHAT_MAX_MESSAGE, type TemplateChatMessage } from "@/lib/accreditation/template-chat";
+import { loadTemplateDraftContext } from "@/lib/accreditation/template-context";
+import type { TemplateChatResult } from "@/lib/accreditation/template-drafting";
 import { getAccreditationProviders } from "@/lib/accreditation/providers";
 import { extractSource } from "@/lib/accreditation/extract";
 import { REPORT_KEYS, type ReportDraft, type SourceKind, type TemplateAnalysis, type TemplateMapping } from "@/lib/accreditation/types";
@@ -253,8 +255,12 @@ export async function createAccreditationBatchItem(formData: FormData): Promise<
     created_by: userId,
   });
   if (inserted.error) {
+    console.error("Accreditation evidence record insert failed", inserted.error);
     await db.storage.from("accreditation-sources").remove([storagePath]);
-    return { ok: false, message: "Evidence could not be saved." };
+    const details = serviceErrorText(inserted.error);
+    return { ok: false, message: /PGRST204|schema cache|invalid input value for enum accreditation_source_kind/i.test(details)
+      ? "The evidence database is out of date. Apply pending accreditation migrations, then retry."
+      : "Evidence could not be saved. Retry the upload or contact an administrator." };
   }
   revalidatePath("/accreditation/library");
   revalidatePath("/ask-policy/evidence");
@@ -548,6 +554,8 @@ function parseTemplateAnalysis(value: unknown): TemplateAnalysis | null {
     fields: analysis.fields.filter((field): field is TemplateAnalysis["fields"][number] => Boolean(field && typeof field.key === "string" && typeof field.label === "string" && typeof field.valueMode === "string")),
     warnings: Array.isArray(analysis.warnings) ? analysis.warnings.filter((item): item is string => typeof item === "string") : [],
     model: typeof analysis.model === "string" ? analysis.model : "unknown",
+    templateText: typeof analysis.templateText === "string" ? analysis.templateText : undefined,
+    exampleText: typeof analysis.exampleText === "string" ? analysis.exampleText : undefined,
   };
 }
 
@@ -557,32 +565,38 @@ export async function sendTemplateMessage(formData: FormData) {
   const message = z.string().trim().min(1).max(TEMPLATE_CHAT_MAX_MESSAGE).safeParse(formData.get("message"));
   if (!runId.success || !message.success) return { error: "Enter a message up to 4,000 characters." };
   const supabase = createAccreditationAdminClient();
-  const run = await supabase.from("accreditation_runs").select("id,template_family_id,template_id,status").eq("id", runId.data).single();
+  const run = await supabase.from("accreditation_runs").select("id,template_family_id,template_id,cycle_id,term_id,status").eq("id", runId.data).single();
   if (run.error || !run.data?.template_family_id || run.data.status === "approved") return { error: "This submission is no longer editable." };
-  let templateQuery = supabase.from("accreditation_templates").select("id,analysis,template_family_id");
+  let templateQuery = supabase.from("accreditation_templates").select("id,analysis,template_family_id,original_name,mime_type,storage_path,example_storage_path,example_original_name");
   templateQuery = run.data.template_id
     ? templateQuery.eq("id", run.data.template_id)
     : templateQuery.eq("template_family_id", run.data.template_family_id).eq("is_active", true);
   const [template, family, messages, state] = await Promise.all([
     templateQuery.maybeSingle(),
     supabase.from("accreditation_template_families").select("name,description,guidance").eq("id", run.data.template_family_id).single(),
-    supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId.data).order("created_at", { ascending: true }).limit(TEMPLATE_CHAT_MAX_HISTORY),
+    supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId.data).order("created_at", { ascending: false }).limit(TEMPLATE_CHAT_MAX_HISTORY),
     supabase.from("accreditation_run_working_state").select("draft").eq("run_id", runId.data).maybeSingle(),
   ]);
   const analysis = parseTemplateAnalysis(template.data?.analysis);
   if (template.error || !template.data || !analysis || family.error || !family.data) return { error: "The active template is not ready for chat." };
   if (messages.error || state.error) return { error: "The saved conversation could not be loaded. Try again." };
-  const history = (messages.data ?? []).filter((item: Record<string, unknown>): item is TemplateChatMessage => (item.role === "user" || item.role === "assistant") && typeof item.content === "string");
+  const history = (messages.data ?? []).reverse().filter((item: Record<string, unknown>): item is TemplateChatMessage => (item.role === "user" || item.role === "assistant") && typeof item.content === "string");
   try {
-    const result = await resolveTemplateChat({ analysis, guidance: family.data.guidance ?? "", history, draft: state.data?.draft as { fields: Record<string, import("@/lib/accreditation/types").DraftField> } | undefined, message: message.data });
+    const context = await loadTemplateDraftContext(run.data, { ...template.data, analysis }, message.data);
+    const result = await resolveTemplateChat({ analysis, guidance: family.data.guidance ?? "", history, draft: state.data?.draft as ReportDraft | undefined, message: message.data, context });
     const userInsert = await supabase.from("accreditation_run_messages").insert({ run_id: runId.data, role: "user", content: message.data, created_by: userId });
     if (userInsert.error) return { error: "The message could not be saved. Try again." };
     const assistantInsert = await supabase.from("accreditation_run_messages").insert({ run_id: runId.data, role: "assistant", content: result.answer, field_updates: result.updates, created_by: userId });
     if (assistantInsert.error) return { error: "The assistant response could not be saved. Try again." };
-    await supabase.from("accreditation_run_working_state").upsert({ run_id: runId.data, draft: result.draft, readiness: { ready: result.ready, missing: result.missing }, updated_by: userId, updated_at: new Date().toISOString() });
-    await supabase.from("accreditation_runs").update({ status: result.ready ? "collecting" : "needs_input" }).eq("id", runId.data).neq("status", "approved");
+    const saved = await supabase.from("accreditation_run_working_state").upsert({ run_id: runId.data, draft: result.draft,
+      readiness: { ready: result.ready, missing: result.missing, warnings: result.warnings, sources: result.sources, ruleChecks: result.ruleChecks, model: result.model,
+        policyDate: context.policyDate, academicYear: context.academicYear, term: context.term },
+      updated_by: userId, updated_at: new Date().toISOString() });
+    if (saved.error) return { error: "The draft could not be saved. Please retry your message." };
+    const statusUpdate = await supabase.from("accreditation_runs").update({ status: result.ready ? "collecting" : "needs_input" }).eq("id", runId.data).neq("status", "approved");
+    if (statusUpdate.error) return { error: "The draft was saved, but its status could not be updated. Reload and try again." };
     revalidatePath(reportPath(runId.data));
-    return { answer: result.answer, draft: result.draft, missing: result.missing, ready: result.ready };
+    return { answer: result.answer, draft: result.draft, missing: result.missing, ready: result.ready, warnings: result.warnings, sources: result.sources, ruleChecks: result.ruleChecks };
   } catch (error) {
     console.error("Template chat failed", error);
     return { error: error instanceof Error ? error.message : "The assistant could not respond right now." };
@@ -620,8 +634,9 @@ export async function generateTemplateSubmission(formData: FormData) {
   ]);
   const analysis = parseTemplateAnalysis(templateResult.data?.analysis);
   const draft = stateResult.data?.draft as ReportDraft | undefined;
+  const readiness = stateResult.data?.readiness as Partial<TemplateChatResult> | undefined;
   const missing = analysis?.fields.filter((field) => field.required && field.target && !draft?.fields?.[field.key]?.value).map((field) => field.label) ?? [];
-  if (templateResult.error || familyResult.error || stateResult.error || !templateResult.data || !familyResult.data || !analysis || !draft || missing.length) redirect(reportPath(runId.data, "needs_input"));
+  if (templateResult.error || familyResult.error || stateResult.error || !templateResult.data || !familyResult.data || !analysis || !draft || missing.length || !readiness?.ready || readiness.missing?.length) redirect(reportPath(runId.data, "needs_input"));
   await supabase.from("accreditation_runs").update({ status: "drafting" }).eq("id", runId.data).neq("status", "approved");
   try {
     const stored = await supabase.storage.from("accreditation-templates").download(templateResult.data.storage_path);
@@ -636,10 +651,10 @@ export async function generateTemplateSubmission(formData: FormData) {
       revision_number: revisionNumber,
       user_instruction: "Generated from conversational template completion.",
       draft,
-      app_snapshot: {},
-      source_manifest: [],
-      validation: [],
-      provider_config: { mode: "dynamic_template", model: analysis.model },
+      app_snapshot: { draftingContext: stateResult.data.readiness },
+      source_manifest: readiness.sources ?? [],
+      validation: (readiness.warnings ?? []).map((message) => ({ level: "warning", message })),
+      provider_config: { mode: "dynamic_template", model: readiness.model ?? analysis.model },
       template_id: templateResult.data.id,
       created_by: userId,
     });

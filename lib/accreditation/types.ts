@@ -17,7 +17,7 @@ export type SourceKind =
   | "prior_submission"
   | "app_snapshot";
 export type TemplateFormat = "pdf" | "docx" | "xlsx";
-export type FieldProvenance = "retrieved" | "app_snapshot" | "user_input";
+export type FieldProvenance = "retrieved" | "app_snapshot" | "user_input" | "generated";
 
 export type DynamicFieldValueMode = "exact" | "narrative" | "signature" | "date" | "checkbox" | "choice";
 
@@ -112,6 +112,9 @@ export type TemplateAnalysis = {
   fields: TemplateAnalysisField[];
   warnings: string[];
   model: string;
+  /** Extracted once during upload; older templates are read when drafting. */
+  templateText?: string;
+  exampleText?: string;
 };
 
 export type TemplateFamily = {

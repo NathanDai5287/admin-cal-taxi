@@ -190,6 +190,8 @@ export async function analyzeTemplateWithAi({
     fields,
     warnings: Array.isArray(raw.warnings) ? raw.warnings.filter((item): item is string => typeof item === "string") : [],
     model: provider.model,
+    templateText: templateText.slice(0, 120_000),
+    exampleText: exampleText?.slice(0, 120_000),
   };
 }
 

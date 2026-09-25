@@ -5,6 +5,7 @@ import { Button } from "@/components/brand/button";
 import { getReportDefinition } from "@/lib/accreditation/definitions";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import type { ReportDraft, TemplateAnalysis } from "@/lib/accreditation/types";
+import type { TemplateChatResult } from "@/lib/accreditation/template-drafting";
 import { approveReport, createSuccessorRun, generateDraft } from "../../actions";
 import { TemplateSubmissionChat } from "./template-submission-chat";
 
@@ -53,7 +54,7 @@ export default async function ReportWorkspace({
       supabase.from("accreditation_template_families").select("id,name,description").eq("id", run.template_family_id).maybeSingle(),
       templateQuery.maybeSingle(),
       supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId).in("role", ["user", "assistant"]).order("created_at", { ascending: true }),
-      supabase.from("accreditation_run_working_state").select("draft,readiness").eq("run_id", runId).maybeSingle(),
+      supabase.from("accreditation_run_working_state").select("draft,readiness,updated_at").eq("run_id", runId).maybeSingle(),
       supabase.from("accreditation_revisions").select("id").eq("run_id", runId).order("revision_number", { ascending: false }).limit(10),
     ]);
     const relatedError = familyResult.error ?? templateResult.error ?? messagesResult.error ?? stateResult.error ?? revisionsResult.error;
@@ -66,6 +67,7 @@ export default async function ReportWorkspace({
     if (!family || !template) notFound();
     const analysis = template.analysis as TemplateAnalysis;
     const state = stateResult.data;
+    const review = state?.readiness as Partial<TemplateChatResult> | null;
     const draft = (state?.draft as ReportDraft | null) ?? { fields: {} };
     const missing = Array.isArray((state?.readiness as Record<string, unknown> | null)?.missing) ? (state?.readiness as { missing: string[] }).missing : analysis.fields.filter((field) => field.required && field.target && !draft.fields[field.key]?.value).map((field) => field.label);
     const revisionIds = (revisionsResult.data ?? []).map((item: Record<string, unknown>) => String(item.id));
@@ -86,7 +88,7 @@ export default async function ReportWorkspace({
           <span className={`badge mt-8 ${run.status === "ready_for_review" || run.status === "approved" ? "badge-approved" : "badge-pending"}`}>{label(String(run.status))}</span>
         </div>
         {query.result && RESULT_MESSAGES[query.result] ? <p className={`form-message ${query.result === "draft_ready" ? "success" : ""}`} role="status">{RESULT_MESSAGES[query.result]}</p> : null}
-        <TemplateSubmissionChat runId={runId} initialMessages={messages} initialDraft={draft} initialMissing={missing} initialReady={Boolean((state?.readiness as Record<string, unknown> | null)?.ready) && !missing.length} status={String(run.status)} draftArtifact={artifact ? { id: String(artifact.id), filename: String(artifact.filename) } : null} />
+        <TemplateSubmissionChat key={`${runId}:${state?.updated_at ?? "new"}`} runId={runId} initialMessages={messages} initialDraft={draft} initialMissing={missing} initialReady={Boolean(review?.ready) && !missing.length} initialReview={{ warnings: review?.warnings ?? [], sources: review?.sources ?? [], ruleChecks: review?.ruleChecks ?? [] }} fieldLabels={Object.fromEntries(analysis.fields.map((field) => [field.key, field.label]))} status={String(run.status)} draftArtifact={artifact ? { id: String(artifact.id), filename: String(artifact.filename) } : null} />
       </div>
     );
   }

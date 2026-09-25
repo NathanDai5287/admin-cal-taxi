@@ -50,7 +50,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
       <section>
         <p className="page-eyebrow">Accreditation forms</p>
         <h1 className="page-title">Template library</h1>
-        <p className="page-lede">Save each official form once. When you need a submission, tell the assistant what belongs in it and download the completed file.</p>
+        <p className="page-lede">Save each official form once. Generate a fresh draft using chapter guidance and prior submissions, adjust the details, and download the completed file.</p>
       </section>
 
       {params.result && RESULT_MESSAGES[params.result] ? <p className={`form-message ${["template_ready", "template_uploaded", "template_confirmed"].includes(params.result) ? "success" : ""}`} role="status">{RESULT_MESSAGES[params.result]}</p> : null}
@@ -65,7 +65,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
               <summary className="cursor-pointer text-sm font-bold text-brand">Optional guidance</summary>
               <div className="mt-3 form-stack">
                 <label className="field-label">What should the assistant know?<textarea className="field-textarea min-h-24" name="guidance" placeholder="Terminology, ordinary defaults, or how this form is used." /></label>
-                <label className="field-label">Completed example<input className="file-input mt-1" type="file" name="example" accept=".pdf,.docx,.xlsx" /><span className="field-hint">Used as style context only. It is never treated as current proof.</span></label>
+                <label className="field-label">Completed example<input className="file-input mt-1" type="file" name="example" accept=".pdf,.docx,.xlsx" /><span className="field-hint">Used for structure, tone, and comparison when creating a different version for this year.</span></label>
               </div>
             </details>
             <Button type="submit">Save template</Button>

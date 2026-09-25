@@ -288,6 +288,21 @@ retain their original citations for audit, but source download checks run again.
 
 ### Verification
 
+Conversational template drafting uses
+`supabase/migrations/20261005000000_template_drafting_context.sql`. Apply it after
+the shared academic calendar and unified evidence migrations. It retrieves
+published requirements, form-scoped evidence, and earlier-year submissions while
+preserving their different source roles. Without the migration or available
+embeddings, drafting still works from the template and completed example, with a
+visible library-review note.
+
+Admins can request a new version without supplying activities or themes. The
+assistant proposes activities and ordinary schedule logistics, preserves supplied
+facts, and flags missing guidance without blocking a downloadable draft. Identities,
+signatures, attestations, and approvals require explicit admin input. Generated
+details and source references are retained in the working state and revision.
+Use **Generate updated form** after a correction to create a fresh download.
+
 Run `npm run test:accreditation`, `npm run test:policy`, `npm run lint`, and
 `npm run build`. Policy tests mock Gemini and execute both migrations in disposable
 PGlite PostgreSQL with pgvector; they do not mutate the configured Supabase database.
