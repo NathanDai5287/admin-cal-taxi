@@ -1,9 +1,14 @@
 "use client";
 
-import { useRef, useState, type MouseEvent, type PointerEvent } from "react";
+import { useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEvent } from "react";
 
 import { ReviewDecisionButtons } from "@/components/reimbursements/review-decision-buttons";
 import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+import {
+  getPayableNavigationPreview,
+  getServerPayableNavigationPreview,
+  subscribeToPayableNavigationPreview,
+} from "@/components/reimbursements/payable-navigation-preview";
 
 const ZOOM_SCALE = 2.5;
 
@@ -13,6 +18,7 @@ type ReceiptImageProps = {
   fullSrc: string;
   paymentMethod: string;
   processingComplete: boolean;
+  reimbursementId: string;
   reimbursementStatus: ReimbursementStatus;
   src: string;
   submittedTotal: string;
@@ -26,12 +32,21 @@ export function ReceiptImage({
   fullSrc,
   paymentMethod,
   processingComplete,
+  reimbursementId,
   reimbursementStatus,
   src,
   submittedTotal,
   tabscannerTotal,
   totalsMatch,
 }: ReceiptImageProps) {
+  const cachedPreview = useSyncExternalStore(
+    subscribeToPayableNavigationPreview,
+    getPayableNavigationPreview,
+    getServerPayableNavigationPreview,
+  );
+  const previewSrc = cachedPreview?.id === reimbursementId
+    ? cachedPreview.receiptUrl ?? src
+    : src;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const enlargedImageRef = useRef<HTMLImageElement>(null);
   const dragRef = useRef<{
@@ -167,7 +182,7 @@ export function ReceiptImage({
       >
         {/* Receipt URLs are short-lived Supabase URLs and cannot be configured as a stable Next image host. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img alt={alt} className="receipt-preview" src={src} fetchPriority="high" decoding="async" />
+        <img alt={alt} className="receipt-preview" src={previewSrc} fetchPriority="high" decoding="async" />
         <span>Click to enlarge</span>
       </button>
 

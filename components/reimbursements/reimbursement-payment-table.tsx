@@ -16,6 +16,7 @@ import {
   type ReimbursementStatus,
 } from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
+import { setPayableNavigationPreview } from "@/components/reimbursements/payable-navigation-preview";
 
 export type PaymentTableRow = {
   user_id: string | null;
@@ -66,11 +67,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const [activePreview, setActivePreview] = useState<PaymentTableRow | null>(null);
   const tableBodyRef = useRef<HTMLTableSectionElement>(null);
   const warmedPreviewImages = useRef(new Map<string, HTMLImageElement>());
-  const detailPrefetchTimer = useRef<number | null>(null);
-
-  useEffect(() => () => {
-    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
-  }, []);
 
   useEffect(() => {
     const body = tableBodyRef.current;
@@ -106,18 +102,22 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
   function showPreview(row: PaymentTableRow, keyboard = false) {
     if (!keyboard && !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
     setActivePreview(row);
-    detailPrefetchTimer.current = window.setTimeout(() => {
-      router.prefetch(`/finance/accounts/payable/${row.id}`);
-      detailPrefetchTimer.current = null;
-    }, 500);
+    rememberNavigationPreview(row);
   }
 
   function hidePreview() {
-    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
-    detailPrefetchTimer.current = null;
     if (!window.matchMedia("(min-width: 1320px)").matches) setActivePreview(null);
+  }
+
+  function rememberNavigationPreview(row: PaymentTableRow) {
+    setPayableNavigationPreview({
+      id: row.id,
+      name: row.full_name,
+      expense: row.merchant || formatCategory(row.category),
+      amount: formatMoney(row.amount),
+      receiptUrl: row.receipt_preview_url,
+    });
   }
 
   useEffect(() => {
@@ -488,7 +488,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                       aria-label={`Review submission from ${item.full_name}`}
                       className="submission-link"
                       href={detailHref}
-                      prefetch={false}
+                      onClick={() => rememberNavigationPreview(item)}
                     >
                       {item.full_name}
                     </Link>

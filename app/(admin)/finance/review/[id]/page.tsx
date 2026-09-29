@@ -2,10 +2,13 @@ import { requireAdmin } from "@/lib/reimbursements/auth";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { EditableCategory } from "@/components/reimbursements/editable-category";
 import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
+import { PayableReceiptPlaceholder } from "@/components/reimbursements/payable-receipt-placeholder";
+import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
 import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -24,6 +27,51 @@ function formatDate(value: string | null, includeTime = false) {
   }).format(new Date(value));
 }
 
+async function SignedReceipt({
+  id,
+  receiptPath,
+  fullName,
+  comparisonMessage,
+  paymentMethod,
+  processingComplete,
+  reimbursementStatus,
+  submittedTotal,
+  tabscannerTotal,
+  totalsMatch,
+}: {
+  id: string;
+  receiptPath: string;
+  fullName: string;
+  comparisonMessage: string;
+  paymentMethod: string;
+  processingComplete: boolean;
+  reimbursementStatus: ReimbursementStatus;
+  submittedTotal: string;
+  tabscannerTotal: string;
+  totalsMatch: boolean;
+}) {
+  const previewUrls = await getReceiptPreviewUrls([receiptPath]);
+  const fullSrc = `/api/reimbursements/receipts/${id}/original`;
+
+  return (
+    <div className="receipt-image-wrap border-t border-rule">
+      <ReceiptImage
+        alt={`Receipt submitted by ${fullName}`}
+        comparisonMessage={comparisonMessage}
+        paymentMethod={paymentMethod}
+        processingComplete={processingComplete}
+        reimbursementId={id}
+        reimbursementStatus={reimbursementStatus}
+        src={previewUrls.get(receiptPath) ?? fullSrc}
+        fullSrc={fullSrc}
+        submittedTotal={submittedTotal}
+        tabscannerTotal={tabscannerTotal}
+        totalsMatch={totalsMatch}
+      />
+    </div>
+  );
+}
+
 export default async function SubmissionReviewPage({
   params,
 }: {
@@ -39,10 +87,6 @@ export default async function SubmissionReviewPage({
 
   if (!reimbursement) notFound();
 
-  const [receipt, previewUrls] = await Promise.all([
-    supabase.storage.from("receipts").createSignedUrl(reimbursement.receipt_path, 1_200),
-    getReceiptPreviewUrls([reimbursement.receipt_path]),
-  ]);
   const requestedCents = Math.round(Number(reimbursement.amount) * 100);
   const receiptCents = reimbursement.receipt_total === null
     ? null
@@ -106,24 +150,20 @@ export default async function SubmissionReviewPage({
         <aside className="receipt-sidebar">
           <section className="card">
             <div className="card-header"><span className="card-title">Submitted receipt</span></div>
-            <div className="receipt-image-wrap border-t border-rule">
-              {receipt.data?.signedUrl
-                ? (
-                  <ReceiptImage
-                    alt={`Receipt submitted by ${reimbursement.full_name}`}
-                    comparisonMessage={comparisonMessage}
-                    paymentMethod={reimbursement.payment_method}
-                    processingComplete={processingComplete && !reimbursement.reimbursed}
-                    reimbursementStatus={reimbursement.status}
-                    src={previewUrls.get(reimbursement.receipt_path) ?? receipt.data.signedUrl}
-                    fullSrc={receipt.data.signedUrl}
-                    submittedTotal={submittedTotal}
-                    tabscannerTotal={tabscannerTotal}
-                    totalsMatch={totalsMatch}
-                  />
-                )
-                : <div className="empty-state">Receipt image is unavailable.</div>}
-            </div>
+            <Suspense fallback={<PayableReceiptPlaceholder id={reimbursement.id} />}>
+              <SignedReceipt
+                id={reimbursement.id}
+                receiptPath={reimbursement.receipt_path}
+                fullName={reimbursement.full_name}
+                comparisonMessage={comparisonMessage}
+                paymentMethod={reimbursement.payment_method}
+                processingComplete={processingComplete && !reimbursement.reimbursed}
+                reimbursementStatus={reimbursement.status}
+                submittedTotal={submittedTotal}
+                tabscannerTotal={tabscannerTotal}
+                totalsMatch={totalsMatch}
+              />
+            </Suspense>
           </section>
 
           <section aria-labelledby="amount-comparison-heading" className="card">
