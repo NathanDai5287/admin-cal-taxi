@@ -1,9 +1,21 @@
+import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+
 type PayableNavigationPreview = {
   id: string;
   name: string;
-  expense: string;
   amount: string;
   receiptUrl: string | null;
+  category: string;
+  description: string;
+  merchant: string | null;
+  paymentMethod: string;
+  receiptDate: string | null;
+  submittedAt: string;
+  tabscannerTotal: string;
+  totalsMatch: boolean;
+  comparisonMessage: string;
+  reimbursed: boolean;
+  status: ReimbursementStatus;
 };
 
 let currentPreview: PayableNavigationPreview | null = null;

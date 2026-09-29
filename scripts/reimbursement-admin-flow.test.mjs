@@ -5,7 +5,7 @@ import test from "node:test";
 const readSource = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("the payable page shows every reimbursement without payment filters", async () => {
-  const source = await readSource("../app/(admin)/finance/accounts/payable/page.tsx");
+  const source = await readSource("../app/(admin)/finance/accounts/payable/(list)/page.tsx");
 
   assert.doesNotMatch(source, /searchParams|Needs payment|Paid history/);
   assert.doesNotMatch(source, /\.eq\("status"|\.eq\("reimbursed"/);

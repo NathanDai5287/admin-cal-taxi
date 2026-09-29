@@ -22,10 +22,13 @@ export type PaymentTableRow = {
   user_id: string | null;
   amount: number;
   category: string;
+  description: string;
+  failure_reason: string | null;
   full_name: string;
   id: string;
   merchant: string | null;
   payment_method: string;
+  receipt_date: string | null;
   receipt_preview_url: string | null;
   receipt_total: number | null;
   reimbursed: boolean;
@@ -111,12 +114,30 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   }
 
   function rememberNavigationPreview(row: PaymentTableRow) {
+    const totalsMatch = row.receipt_total !== null
+      && amountInCents(row.amount) === amountInCents(row.receipt_total);
     setPayableNavigationPreview({
       id: row.id,
       name: row.full_name,
-      expense: row.merchant || formatCategory(row.category),
       amount: formatMoney(row.amount),
       receiptUrl: row.receipt_preview_url,
+      category: row.category,
+      description: row.description,
+      merchant: row.merchant,
+      paymentMethod: row.payment_method,
+      receiptDate: row.receipt_date,
+      submittedAt: row.submitted_at,
+      tabscannerTotal: row.receipt_total === null ? "—" : formatMoney(row.receipt_total),
+      totalsMatch,
+      reimbursed: row.reimbursed,
+      status: row.status,
+      comparisonMessage: totalsMatch
+        ? "The submitted and scanned totals match."
+        : row.status === "pending"
+          ? "Tabscanner is still processing this receipt."
+          : row.status === "processing_failed"
+            ? `Automatic verification failed${row.failure_reason ? `: ${row.failure_reason}` : "."}`
+            : "The totals differ and need manual review.",
     });
   }
 

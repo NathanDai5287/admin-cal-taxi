@@ -10,22 +10,13 @@ import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { PayableReceiptPlaceholder } from "@/components/reimbursements/payable-receipt-placeholder";
 import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
 import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
-import { formatMoney } from "@/lib/reimbursements/format";
+import { formatMoney, formatReimbursementDate } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls";
 import { RefreshWhile } from "@/components/navigation/refresh-while";
 
 export const metadata: Metadata = { title: "Review submission" };
 export const dynamic = "force-dynamic";
-
-function formatDate(value: string | null, includeTime = false) {
-  if (!value) return "Not detected";
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    ...(includeTime ? { timeStyle: "short" as const } : {}),
-    timeZone: includeTime ? undefined : "UTC",
-  }).format(new Date(value));
-}
 
 async function SignedReceipt({
   id,
@@ -112,7 +103,7 @@ export default async function SubmissionReviewPage({
         <div>
           <p className="page-eyebrow">Submission review</p>
           <h1 className="page-title">{reimbursement.full_name}</h1>
-          <p className="page-lede">Submitted {formatDate(reimbursement.submitted_at, true)}</p>
+          <p className="page-lede">Submitted {formatReimbursementDate(reimbursement.submitted_at, true)}</p>
         </div>
         <Link className="back-link" href="/finance/accounts/payable">← All reimbursements</Link>
       </div>
@@ -128,7 +119,7 @@ export default async function SubmissionReviewPage({
               <div><dt>Requested amount</dt><dd className="amount">{formatMoney(reimbursement.amount)}</dd></div>
               <div><dt>Tabscanner total</dt><dd className="amount">{tabscannerTotal}</dd></div>
               <div><dt>Category</dt><dd><EditableCategory category={reimbursement.category} id={reimbursement.id} /></dd></div>
-              <div><dt>Receipt date</dt><dd>{formatDate(reimbursement.receipt_date)}</dd></div>
+              <div><dt>Receipt date</dt><dd>{formatReimbursementDate(reimbursement.receipt_date)}</dd></div>
               <div className="detail-wide"><dt>Expense</dt><dd><EditableMerchant id={reimbursement.id} merchant={reimbursement.merchant} /></dd></div>
               <div className="detail-wide"><dt>Description</dt><dd>{reimbursement.description}</dd></div>
               <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{reimbursement.payment_method}</dd></div>

@@ -62,6 +62,15 @@ export function formatMoney(value: number | string) {
   }).format(Number(value));
 }
 
+export function formatReimbursementDate(value: string | null, includeTime = false) {
+  if (!value) return "Not detected";
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    ...(includeTime ? { timeStyle: "short" as const } : {}),
+    timeZone: includeTime ? "America/Los_Angeles" : "UTC",
+  }).format(new Date(value));
+}
+
 export function formatStatus(value: string) {
   return value.replaceAll("_", " ");
 }

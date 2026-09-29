@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { SiteHomeIcon } from "@/components/site-home-icon";
 import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
@@ -21,11 +22,27 @@ type AppNavProps = {
   // exclusively in the global top-right account control.
   action?: React.ReactNode;
   prefetchHrefs?: readonly string[];
+  prefetchTabContent?: boolean;
 };
 
-export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchHrefs, variant = "app" }: AppNavProps) {
+export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchHrefs, prefetchTabContent = false, variant = "app" }: AppNavProps) {
   const pathname = usePathname();
   const routesToWarm = prefetchHrefs ?? tabs.map((tab) => tab.href);
+  const [warmFullTabs, setWarmFullTabs] = useState(false);
+
+  useEffect(() => {
+    if (!prefetchTabContent) return;
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(() => setWarmFullTabs(true), { timeout: 1_500 });
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+    const handle = window.setTimeout(() => setWarmFullTabs(true), 0);
+    return () => window.clearTimeout(handle);
+  }, [prefetchTabContent]);
 
   // The longest matching tab wins, so /finance/reports lights up
   // "Reports" rather than both "Review" and "Reports".
@@ -36,11 +53,11 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
   if (variant === "section") {
     return (
       <nav aria-label={title} className="flex overflow-x-auto overflow-y-hidden border-b border-rule">
-        <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
+        {!prefetchTabContent && <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />}
         {tabs.map((tab) => <Link
           key={tab.href}
           href={tab.href}
-          prefetch={false}
+          prefetch={prefetchTabContent && tab.href !== pathname ? (warmFullTabs ? true : null) : false}
           aria-current={tab.href === activeHref ? "page" : undefined}
           className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-bold outline-none transition-colors focus-visible:bg-subtle ${tab.href === activeHref ? "border-brand text-brand" : "border-transparent text-muted hover:border-rule hover:text-ink"}`}
         >{tab.label}</Link>)}
@@ -50,7 +67,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
 
   return (
     <header className="border-b border-rule bg-surface">
-      <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />
+      {!prefetchTabContent && <PrefetchRoutes hrefs={routesToWarm.filter((href) => href !== pathname)} />}
       {/* Thin brand-blue band at the very top — echoes the 1.2pt brand rule
           under the PDF letterhead. */}
       <div className="h-[3px] bg-brand" />
@@ -73,7 +90,7 @@ export function AppNav({ homeHref, title, subtitle, tabs = [], action, prefetchH
               <Link
                 key={tab.href}
                 href={tab.href}
-                prefetch={false}
+                prefetch={prefetchTabContent && tab.href !== pathname ? (warmFullTabs ? true : null) : false}
                 aria-current={tab.href === activeHref ? "page" : undefined}
                 className={
                   "shrink-0 px-4 inline-flex items-center text-[12px] font-bold uppercase tracking-[0.14em] " +
