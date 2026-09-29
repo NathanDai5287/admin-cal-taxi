@@ -9,7 +9,8 @@ test("the payable page shows every reimbursement without payment filters", async
 
   assert.doesNotMatch(source, /searchParams|Needs payment|Paid history/);
   assert.doesNotMatch(source, /\.eq\("status"|\.eq\("reimbursed"/);
-  assert.match(source, /<ReimbursementPaymentTable rows=\{rows\}/);
+  assert.match(source, /const paymentRows = rows\.map/);
+  assert.match(source, /<ReimbursementPaymentTable rows=\{paymentRows\}/);
 });
 
 test("the combined table keeps review and payout controls", async () => {

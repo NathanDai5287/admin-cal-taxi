@@ -15,7 +15,6 @@ import {
   InlineStatusSelect,
   type ReimbursementStatus,
 } from "@/components/reimbursements/inline-status-select";
-import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 
 export type PaymentTableRow = {
@@ -26,6 +25,7 @@ export type PaymentTableRow = {
   id: string;
   merchant: string | null;
   payment_method: string;
+  receipt_preview_url: string | null;
   receipt_total: number | null;
   reimbursed: boolean;
   status: ReimbursementStatus;
@@ -63,12 +63,85 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const [mutationError, setMutationError] = useState("");
   const [rowOverrides, setRowOverrides] = useState<Map<string, Partial<PaymentTableRow>>>(() => new Map());
   const [pendingFields, setPendingFields] = useState<Set<string>>(() => new Set());
+  const [activePreview, setActivePreview] = useState<PaymentTableRow | null>(null);
+  const tableBodyRef = useRef<HTMLTableSectionElement>(null);
+  const warmedPreviewImages = useRef(new Map<string, HTMLImageElement>());
+  const detailPrefetchTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
+  }, []);
+
+  useEffect(() => {
+    const body = tableBodyRef.current;
+    if (!body) return;
+    const liveUrls = new Set(rows.flatMap((row) => row.receipt_preview_url ? [row.receipt_preview_url] : []));
+    for (const url of warmedPreviewImages.current.keys()) {
+      if (!liveUrls.has(url)) warmedPreviewImages.current.delete(url);
+    }
+    const warm = (url: string | null) => {
+      if (!url || warmedPreviewImages.current.has(url)) return;
+      const image = new window.Image();
+      image.decoding = "async";
+      image.fetchPriority = "low";
+      warmedPreviewImages.current.set(url, image);
+      image.onerror = () => warmedPreviewImages.current.delete(url);
+      image.src = url;
+      void image.decode().catch(() => {});
+    };
+
+    // The rows most likely to be scanned are ready as soon as hydration finishes.
+    rows.slice(0, 8).forEach((row) => warm(row.receipt_preview_url));
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const index = Number((entry.target as HTMLElement).dataset.previewIndex);
+        warm(rows[index]?.receipt_preview_url ?? null);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "300px 0px" });
+    body.querySelectorAll("tr[data-preview-index]").forEach((row) => observer.observe(row));
+    return () => observer.disconnect();
+  }, [rows]);
+
+  function showPreview(row: PaymentTableRow, keyboard = false) {
+    if (!keyboard && !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
+    setActivePreview(row);
+    detailPrefetchTimer.current = window.setTimeout(() => {
+      router.prefetch(`/finance/accounts/payable/${row.id}`);
+      detailPrefetchTimer.current = null;
+    }, 500);
+  }
+
+  function hidePreview() {
+    if (detailPrefetchTimer.current !== null) window.clearTimeout(detailPrefetchTimer.current);
+    detailPrefetchTimer.current = null;
+    if (!window.matchMedia("(min-width: 1320px)").matches) setActivePreview(null);
+  }
 
   useEffect(() => {
     if (!rows.some((row) => row.status === "pending")) return;
     const interval = window.setInterval(() => router.refresh(), 5_000);
     return () => window.clearInterval(interval);
   }, [router, rows]);
+
+  useEffect(() => {
+    // Signed previews last 20 minutes and the server reuses them for up to 15.
+    // A four-minute check also covers a page opened just before cache expiry.
+    let lastRefresh = Date.now();
+    const refreshStalePreviews = () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastRefresh < 4 * 60_000) return;
+      lastRefresh = Date.now();
+      router.refresh();
+    };
+    const interval = window.setInterval(refreshStalePreviews, 60_000);
+    document.addEventListener("visibilitychange", refreshStalePreviews);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshStalePreviews);
+    };
+  }, [router]);
 
   const optimisticRows = useMemo(() => rows.map((serverRow) => {
     const override = rowOverrides.get(serverRow.id);
@@ -336,8 +409,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   }
 
   return (
-    <section className="card">
-      <PrefetchRoutes hrefs={rows.map((row) => `/finance/accounts/payable/${row.id}`)} />
+    <div className="payable-workspace">
+    <section className="card payable-table-card">
       <div className="card-header justify-between gap-4 flex-wrap">
         <span className="card-title">All reimbursements</span>
         <div
@@ -376,15 +449,25 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   />
                 </label>
               </th>
-              <th>Member</th><th>Expense</th><th>Requested</th><th>Receipt total</th><th>Status</th><th>Paid</th>
+              <th>Member</th><th>Expense</th><th>Amount</th><th>Status</th><th>Paid</th>
             </tr>
           </thead>
-          <tbody>
-            {optimisticRows.map((item) => {
+          <tbody ref={tableBodyRef}>
+            {optimisticRows.map((item, index) => {
               const eligible = item.status === "approved" && !item.reimbursed;
               const detailHref = `/finance/accounts/payable/${item.id}`;
               return (
-                <tr className="submission-row" key={item.id}>
+                <tr
+                  className="submission-row"
+                  data-preview-index={index}
+                  key={item.id}
+                  onBlurCapture={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) hidePreview();
+                  }}
+                  onFocusCapture={() => showPreview(item, true)}
+                  onMouseEnter={() => showPreview(item)}
+                  onMouseLeave={hidePreview}
+                >
                   <td>
                     <label className="inline-action checkbox-cell">
                     <input
@@ -405,15 +488,28 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                       aria-label={`Review submission from ${item.full_name}`}
                       className="submission-link"
                       href={detailHref}
-                      onMouseEnter={() => router.prefetch(detailHref)}
+                      prefetch={false}
                     >
                       {item.full_name}
                     </Link>
                     <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
                   </td>
                   <td>{item.merchant || formatCategory(item.category)}</td>
-                  <td className="amount">{formatMoney(item.amount)}</td>
-                  <td className="amount">{item.receipt_total === null ? "—" : formatMoney(item.receipt_total)}</td>
+                  <td className="amount">
+                    <span className="amount-check">
+                      {formatMoney(item.amount)}
+                      <span
+                        aria-label={item.receipt_total === null
+                          ? "Tabscanner amount not available"
+                          : Math.round(Number(item.amount) * 100) === Math.round(Number(item.receipt_total) * 100)
+                            ? `Matches Tabscanner total ${formatMoney(item.receipt_total)}`
+                            : `Differs from Tabscanner total ${formatMoney(item.receipt_total)}`}
+                        className={`amount-check-dot ${item.receipt_total === null ? "is-unknown" : Math.round(Number(item.amount) * 100) === Math.round(Number(item.receipt_total) * 100) ? "is-match" : "is-different"}`}
+                        role="img"
+                        title={item.receipt_total === null ? "Tabscanner total unavailable" : `Tabscanner: ${formatMoney(item.receipt_total)}`}
+                      />
+                    </span>
+                  </td>
                   <td>
                     <div className="inline-action">
                       <InlineStatusSelect
@@ -534,5 +630,32 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         </div>
       </dialog>
     </section>
+    <aside
+      aria-label="Receipt preview"
+      className={`payable-receipt-rail${activePreview ? " is-active" : ""}`}
+    >
+      <div className="payable-receipt-rail-heading">
+        <span>Receipt preview</span>
+        {activePreview && <strong>{activePreview.full_name}</strong>}
+      </div>
+      {activePreview ? (
+        activePreview.receipt_preview_url ? (
+          // Signed Supabase URLs are temporary and should be fetched directly.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            alt={`Receipt submitted by ${activePreview.full_name}`}
+            decoding="async"
+            src={activePreview.receipt_preview_url}
+          />
+        ) : <div className="payable-receipt-unavailable">Receipt preview unavailable</div>
+      ) : <div className="payable-receipt-empty">Hover or focus a row to see its receipt.</div>}
+      {activePreview && (
+        <div className="payable-receipt-rail-footer">
+          <span>{activePreview.merchant || formatCategory(activePreview.category)}</span>
+          <strong>{formatMoney(activePreview.amount)}</strong>
+        </div>
+      )}
+    </aside>
+    </div>
   );
 }

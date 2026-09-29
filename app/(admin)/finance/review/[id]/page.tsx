@@ -9,6 +9,7 @@ import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls";
 import { RefreshWhile } from "@/components/navigation/refresh-while";
 
 export const metadata: Metadata = { title: "Review submission" };
@@ -38,9 +39,10 @@ export default async function SubmissionReviewPage({
 
   if (!reimbursement) notFound();
 
-  const { data: receipt } = await supabase.storage
-    .from("receipts")
-    .createSignedUrl(reimbursement.receipt_path, 1_200);
+  const [receipt, previewUrls] = await Promise.all([
+    supabase.storage.from("receipts").createSignedUrl(reimbursement.receipt_path, 1_200),
+    getReceiptPreviewUrls([reimbursement.receipt_path]),
+  ]);
   const requestedCents = Math.round(Number(reimbursement.amount) * 100);
   const receiptCents = reimbursement.receipt_total === null
     ? null
@@ -105,7 +107,7 @@ export default async function SubmissionReviewPage({
           <section className="card">
             <div className="card-header"><span className="card-title">Submitted receipt</span></div>
             <div className="receipt-image-wrap border-t border-rule">
-              {receipt?.signedUrl
+              {receipt.data?.signedUrl
                 ? (
                   <ReceiptImage
                     alt={`Receipt submitted by ${reimbursement.full_name}`}
@@ -113,7 +115,8 @@ export default async function SubmissionReviewPage({
                     paymentMethod={reimbursement.payment_method}
                     processingComplete={processingComplete && !reimbursement.reimbursed}
                     reimbursementStatus={reimbursement.status}
-                    src={receipt.signedUrl}
+                    src={previewUrls.get(reimbursement.receipt_path) ?? receipt.data.signedUrl}
+                    fullSrc={receipt.data.signedUrl}
                     submittedTotal={submittedTotal}
                     tabscannerTotal={tabscannerTotal}
                     totalsMatch={totalsMatch}

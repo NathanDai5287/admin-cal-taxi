@@ -10,6 +10,7 @@ const ZOOM_SCALE = 2.5;
 type ReceiptImageProps = {
   alt: string;
   comparisonMessage: string;
+  fullSrc: string;
   paymentMethod: string;
   processingComplete: boolean;
   reimbursementStatus: ReimbursementStatus;
@@ -22,6 +23,7 @@ type ReceiptImageProps = {
 export function ReceiptImage({
   alt,
   comparisonMessage,
+  fullSrc,
   paymentMethod,
   processingComplete,
   reimbursementStatus,
@@ -43,6 +45,7 @@ export function ReceiptImage({
   const [isZoomed, setIsZoomed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   function resetZoom() {
     dragRef.current = null;
@@ -53,6 +56,7 @@ export function ReceiptImage({
 
   function closeDialog() {
     resetZoom();
+    setDialogOpen(false);
     dialogRef.current?.close();
   }
 
@@ -155,19 +159,25 @@ export function ReceiptImage({
       <button
         aria-label="Enlarge receipt image"
         className="receipt-preview-button"
-        onClick={() => dialogRef.current?.showModal()}
+        onClick={() => {
+          setDialogOpen(true);
+          dialogRef.current?.showModal();
+        }}
         type="button"
       >
         {/* Receipt URLs are short-lived Supabase URLs and cannot be configured as a stable Next image host. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img alt={alt} className="receipt-preview" src={src} />
+        <img alt={alt} className="receipt-preview" src={src} fetchPriority="high" decoding="async" />
         <span>Click to enlarge</span>
       </button>
 
       <dialog
         aria-label="Enlarged receipt"
         className="receipt-dialog"
-        onClose={resetZoom}
+        onClose={() => {
+          resetZoom();
+          setDialogOpen(false);
+        }}
         onClick={(event) => {
           if (event.target === event.currentTarget) closeDialog();
         }}
@@ -198,18 +208,18 @@ export function ReceiptImage({
               type="button"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {dialogOpen && <img
                 alt={alt}
                 className="receipt-dialog-image"
                 ref={enlargedImageRef}
-                src={src}
+                src={fullSrc}
                 draggable={false}
                 style={{
                   transform: isZoomed
                     ? `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${ZOOM_SCALE})`
                     : undefined,
                 }}
-              />
+              />}
             </button>
           </div>
 

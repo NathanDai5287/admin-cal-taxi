@@ -436,6 +436,15 @@
   [data-brand] .amount {
     @apply tabular-nums font-bold;
   }
+  [data-brand] .amount-check {
+    @apply inline-flex items-center gap-2 whitespace-nowrap;
+  }
+  [data-brand] .amount-check-dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+  [data-brand] .amount-check-dot.is-match { background: var(--color-ok); }
+  [data-brand] .amount-check-dot.is-different { background: var(--color-caution); }
+  [data-brand] .amount-check-dot.is-unknown { background: var(--color-muted); }
 
   /* ── Dues tracker ── */
   [data-brand] .dues-notification-note {
@@ -670,6 +679,80 @@
   }
   [data-brand] .submission-row:hover {
     background: color-mix(in srgb, var(--color-brand-light) 45%, transparent);
+  }
+  [data-brand] .payable-page > :not(.payable-workspace) {
+    max-width: 1032px;
+  }
+  [data-brand] .payable-workspace {
+    @apply grid gap-5 items-start;
+    grid-template-columns: 1032px minmax(220px, 300px);
+  }
+  [data-brand] .payable-table-card {
+    min-width: 0;
+  }
+  [data-brand] .payable-receipt-rail {
+    position: sticky;
+    top: 16px;
+    width: 100%;
+    height: min(560px, calc(100vh - 32px));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-rule);
+  }
+  [data-brand] .payable-receipt-rail-heading,
+  [data-brand] .payable-receipt-rail-footer {
+    @apply flex items-center justify-between gap-3 px-4 py-3;
+  }
+  [data-brand] .payable-receipt-rail-heading {
+    @apply border-b border-rule;
+  }
+  [data-brand] .payable-receipt-rail-heading span {
+    @apply text-[10px] font-bold uppercase tracking-[0.10em] text-muted;
+  }
+  [data-brand] .payable-receipt-rail-heading strong,
+  [data-brand] .payable-receipt-rail-footer strong {
+    @apply text-[12px] text-ink;
+  }
+  [data-brand] .payable-receipt-rail img {
+    @apply block w-full h-full object-contain bg-canvas;
+  }
+  [data-brand] .payable-receipt-unavailable {
+    @apply grid place-items-center bg-canvas text-[12px] text-muted;
+  }
+  [data-brand] .payable-receipt-empty {
+    @apply grid place-items-center px-5 text-center text-[12px] leading-relaxed text-muted bg-canvas;
+  }
+  [data-brand] .payable-receipt-rail-footer {
+    @apply border-t border-rule text-[12px] text-muted;
+  }
+  [data-brand] .payable-receipt-rail-footer span {
+    @apply truncate;
+  }
+  @media (min-width: 1320px) {
+    [data-brand] .finance-main:has(.payable-page) {
+      max-width: 1400px;
+    }
+  }
+  @media (max-width: 1319px) {
+    [data-brand] .payable-workspace {
+      display: block;
+    }
+    [data-brand] .payable-receipt-rail {
+      --preview-top: clamp(16px, 24vh, 240px);
+      position: fixed;
+      z-index: 30;
+      top: var(--preview-top);
+      right: 16px;
+      width: min(320px, calc(100vw - 32px));
+      height: min(440px, calc(100vh - var(--preview-top) - 16px));
+      pointer-events: none;
+      box-shadow: 0 14px 38px rgba(16, 16, 20, .16);
+    }
+    [data-brand] .payable-receipt-rail:not(.is-active) {
+      display: none;
+    }
   }
   [data-brand] .submission-link {
     @apply text-brand font-bold;

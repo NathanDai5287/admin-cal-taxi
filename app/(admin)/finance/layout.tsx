@@ -40,7 +40,7 @@ export default async function FinanceLayout({ children }: { children: React.Reac
           { href: "/finance/accounts/activity", label: "Transactions" },
         ]}
       />
-      <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>
+      <main className="finance-main max-w-[1080px] mx-auto px-6 py-8">{children}</main>
     </div>
   );
 }
