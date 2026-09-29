@@ -15,6 +15,8 @@ import type { LineItem } from "@/components/host/LineItemList";
 import type { DocumentKind } from "./host-orders-types";
 import type { AreaKey, SharedState } from "./host-shared-state";
 
+const MINIMUM_CONTRACT_GUESTS = 200;
+
 export const AREAS: { key: AreaKey; label: string; clearedDesc: string }[] = [
   { key: "living_room", label: "Living Room", clearedDesc: "the couches, tables, and carpet" },
   { key: "dining_room", label: "Dining Room", clearedDesc: "the dining table and chairs" },
@@ -134,7 +136,7 @@ export function buildContractPayload(
     end_time:   d.endTime,
     price:      effectiveRentalPrice(d),
     deposit:    effective(d, "depositAmount"),
-    max_guests: effective(d, "maxGuests"),
+    max_guests: String(Math.max(MINIMUM_CONTRACT_GUESTS, Number(d.numGuests))),
     monitors:   d.monitors,
     cleanup_tier: cleanupIdx === 1 ? "full" : "basic",
     areas:      selectedAreas,
@@ -156,7 +158,7 @@ export function buildDepositPayload(
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
     // Forfeiture clause 3c cites the contract's 4a attendance cap.
-    max_guests: effective(d, "maxGuests"),
+    max_guests: String(Math.max(MINIMUM_CONTRACT_GUESTS, Number(d.numGuests))),
   }, d);
   if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
   return withTreasurer(body, d);

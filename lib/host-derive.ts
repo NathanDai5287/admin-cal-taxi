@@ -53,6 +53,7 @@ export function autoValue(d: SharedState, key: OverrideKey): string {
 
 /** The value to display and submit: the user's if they took control, else live. */
 export function effective(d: SharedState, key: OverrideKey): string {
+  if (key === "maxGuests") return d.numGuests;
   return d.overrides[key] ? d[key] : AUTO[key](d);
 }
 

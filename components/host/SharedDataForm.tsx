@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/brand/button";
 import { isMultiClub, normalizeOrgName } from "@/lib/host-clubs";
-import { autoValue, effective, hasDiverged } from "@/lib/host-derive";
 import { useSharedData } from "@/lib/host-shared-state";
 
 /**
@@ -16,7 +15,7 @@ import { useSharedData } from "@/lib/host-shared-state";
  * them collectively as "the Renter".
  */
 export default function SharedDataForm({ compact = false }: { compact?: boolean }) {
-  const { data, update, hydrated, setDerived, resetDerived } = useSharedData();
+  const { data, update, hydrated } = useSharedData();
 
   // Always render at least one row, even before anything has been entered.
   const clubs = data.clubs.length > 0 ? data.clubs : [""];
@@ -33,11 +32,6 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
   function removeClub(i: number) {
     update("clubs", clubs.filter((_, j) => j !== i));
   }
-
-  const maxGuestsShown    = hydrated ? effective(data, "maxGuests") : "";
-  const maxGuestsAuto     = autoValue(data, "maxGuests");
-  const maxGuestsManual   = data.overrides.maxGuests;
-  const maxGuestsDiverged = hasDiverged(data, "maxGuests");
 
   return (
     <section className="card">
@@ -116,7 +110,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
         </div>
 
         {/* ── Date + guests ── */}
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="field-label" htmlFor="shared-date">Event Date</label>
             <input
@@ -128,7 +122,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
             />
           </div>
           <div>
-            <label className="field-label" htmlFor="shared-guests">Estimated Guests</label>
+            <label className="field-label" htmlFor="shared-guests">Maximum Guests</label>
             <input
               id="shared-guests"
               type="number"
@@ -140,42 +134,9 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
               onChange={e => update("numGuests", e.target.value)}
               autoComplete="off"
             />
-          </div>
-          <div>
-            <label className="field-label" htmlFor="shared-max-guests">Maximum Guests</label>
-            <input
-              id="shared-max-guests"
-              type="number"
-              min={1}
-              max={500}
-              className="field-input"
-              placeholder={maxGuestsAuto || "e.g. 150"}
-              value={maxGuestsShown}
-              onChange={e => setDerived("maxGuests", e.target.value)}
-              autoComplete="off"
-            />
-            <p className="field-hint">
-              {maxGuestsDiverged && maxGuestsAuto ? (
-                <>
-                  Overridden — the estimate is {maxGuestsAuto}.{" "}
-                  <Button type="button" variant="text" onClick={() => resetDerived("maxGuests")}>
-                    Reset
-                  </Button>
-                </>
-              ) : maxGuestsManual ? (
-                <>
-                  Set manually.{" "}
-                  <Button type="button" variant="text" onClick={() => resetDerived("maxGuests")}>
-                    Reset to estimate
-                  </Button>
-                </>
-              ) : (
-                "Tracks the estimated guest count unless you set a different contractual cap."
-              )}
-              {parseInt(maxGuestsShown) > 50 && (
-                <span className="block">Over 50 guests triggers a required $125 fire permit fee.</span>
-              )}
-            </p>
+            {parseInt(data.numGuests, 10) > 50 && (
+              <p className="field-hint">Over 50 guests triggers a required $125 fire permit fee.</p>
+            )}
           </div>
         </div>
       </div>
