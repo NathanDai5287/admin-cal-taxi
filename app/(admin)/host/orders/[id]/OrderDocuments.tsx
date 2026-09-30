@@ -6,7 +6,7 @@ import DocumentRow from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { ApiCallError, generatePdf } from "@/lib/host-api";
 import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
-import { addDaysIso, formatDateISO } from "@/lib/host-format";
+import { formatDateISO } from "@/lib/host-format";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
 import ContractPanel from "../../documents/ContractPanel";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
@@ -16,15 +16,6 @@ import WorkspaceActions from "./WorkspaceActions";
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
   const matches = documents.filter(d => d.kind === kind);
   return matches.length ? matches.reduce((a, b) => a.generatedAt >= b.generatedAt ? a : b) : null;
-}
-
-function savedDate(value: unknown): string {
-  if (typeof value !== "string") return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const match = /^(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})$/.exec(value);
-  if (!match) return "";
-  const month = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].indexOf(match[1]) + 1;
-  return `${match[3]}-${String(month).padStart(2, "0")}-${match[2].padStart(2, "0")}`;
 }
 
 function field(value: unknown): string {
@@ -122,8 +113,7 @@ export default function OrderDocuments({ order }: { order: Order }) {
     setDownloadAllBusy(false);
   }
 
-  const depositDueDate = savedDate(docs.deposit_invoice?.payload.due_date) || addDaysIso(order.eventDate, -7);
-  const rentalDueDate = savedDate(docs.rental_invoice?.payload.due_date) || addDaysIso(order.eventDate, 2);
+  const contract = docs.contract?.payload;
 
   return (
     <DocumentsSection
@@ -139,11 +129,8 @@ export default function OrderDocuments({ order }: { order: Order }) {
       </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}
-        depositDueDate={depositDueDate}
-        depositAmount={String(docs.deposit_invoice?.amount ?? order.depositAmount ?? "")}
-        rentalDueDate={rentalDueDate}
-        rentalAmount={docs.rental_invoice?.amount ?? order.rentalPrice ?? 0}
-        refundAmount={docs.credit_memo?.amount ?? undefined}
+        depositAmount={String(contract?.deposit ?? order.depositAmount ?? "")}
+        rentalAmount={Number(contract?.price ?? order.rentalPrice ?? 0)}
       />}
     >
       {DOCUMENT_ORDER.map((kind, index) => {

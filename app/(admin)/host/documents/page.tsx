@@ -566,11 +566,8 @@ export default function DocumentsPage() {
         paymentMessage={
           <PaymentMessagePanel
             eventDate={hydrated ? data.eventDate : ""}
-            depositDueDate={deposit.dueDate}
-            depositAmount={deposit.amount}
-            rentalDueDate={rental.dueDate}
-            rentalAmount={rentalTotal}
-            refundAmount={creditMemo.amount ? Number(creditMemo.amount) : undefined}
+            depositAmount={hydrated ? effective(data, "depositAmount") : ""}
+            rentalAmount={hydrated ? Number(effectiveRentalPrice(data)) : 0}
           />
         }
       >

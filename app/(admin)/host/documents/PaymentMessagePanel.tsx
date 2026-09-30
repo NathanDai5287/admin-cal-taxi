@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
+import { addDaysIso } from "@/lib/host-format";
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
@@ -19,40 +20,30 @@ const money = new Intl.NumberFormat("en-US", {
 
 type Props = {
   eventDate: string;
-  depositDueDate: string;
   depositAmount: string;
-  rentalDueDate: string;
   rentalAmount: number;
-  refundAmount?: number;
 };
 
 function paymentMessage({
   eventDate,
-  depositDueDate,
   depositAmount,
-  rentalDueDate,
   rentalAmount,
-  refundAmount,
 }: Props): string | null {
   const deposit = Number(depositAmount);
-  if (!eventDate || !depositDueDate || !rentalDueDate ||
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ||
       !Number.isFinite(deposit) || deposit <= 0 ||
       !Number.isFinite(rentalAmount) || rentalAmount <= 0) return null;
 
-  const datedEvents = [
-    { date: depositDueDate, detail: `${money.format(deposit)} security deposit due.` },
-    { date: eventDate, detail: "Event at Theta Xi Fraternity House." },
-    { date: rentalDueDate, detail: `${money.format(rentalAmount)} rental fee due.` },
-  ].sort((a, b) => a.date.localeCompare(b.date));
-  const refund = Number.isFinite(refundAmount) && (refundAmount ?? 0) >= 0
-    ? refundAmount as number
-    : deposit;
+  const depositDueDate = addDaysIso(eventDate, -7);
+  const rentalDueDate = addDaysIso(eventDate, 2);
 
   return [
     `Payment schedule for the ${shortDate(eventDate)} event:`,
     "",
-    ...datedEvents.map(({ date, detail }) => `${shortDate(date)}: ${detail}`),
-    `After the event and receipt of the full rental fee: ${money.format(refund)} security deposit refunded, subject to the hosting contract.`,
+    `${shortDate(depositDueDate)}: ${money.format(deposit)} security deposit due, 7 days before the event.`,
+    `${shortDate(eventDate)}: Event at Theta Xi Fraternity House.`,
+    `${shortDate(rentalDueDate)}: ${money.format(rentalAmount)} full rental fee due, within 2 days after the event.`,
+    `Upon receipt of the full rental fee: The ${money.format(deposit)} security deposit is returned, subject to the hosting contract.`,
     "",
     "Zelle: calthetaxi@gmail.com",
   ].join("\n");
@@ -81,7 +72,7 @@ export default function PaymentMessagePanel(props: Props) {
       <div className="px-5 pt-5 pb-3">
         <div>
           <h2 className="card-title" id="payment-message-title">Payment Message</h2>
-          <p className="card-subtitle">Uses the invoice amounts and due dates above. Review before sending.</p>
+          <p className="card-subtitle">Uses the contract amounts and payment deadlines. Review before sending.</p>
         </div>
       </div>
       <div className="px-5 pb-5 space-y-4">
@@ -99,7 +90,7 @@ export default function PaymentMessagePanel(props: Props) {
           </>
         ) : (
           <p className="text-sm text-muted">
-            Enter the event date and the deposit and rental invoice amounts and due dates to prepare this message.
+            Enter the event date and contract deposit and rental amounts to prepare this message.
           </p>
         )}
       </div>
