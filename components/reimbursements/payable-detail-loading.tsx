@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
+import { Button } from "@/components/brand/button";
 import { PayableReceiptPlaceholder } from "@/components/reimbursements/payable-receipt-placeholder";
 import {
   getPayableNavigationPreview,
@@ -38,24 +39,15 @@ export function PayableDetailLoading() {
               <span className="card-title">Submission details</span>
               {selected && <span className={`badge badge-${selected.status}`}>{formatStatus(selected.status)}</span>}
             </div>
-            {selected ? (
-              <dl className="detail-list border-t border-rule">
-                <div><dt>Requested amount</dt><dd className="amount">{selected.amount}</dd></div>
-                <div><dt>Tabscanner total</dt><dd className="amount">{selected.tabscannerTotal}</dd></div>
-                <div><dt>Category</dt><dd>{formatCategory(selected.category)}</dd></div>
-                <div><dt>Receipt date</dt><dd>{formatReimbursementDate(selected.receiptDate)}</dd></div>
-                <div className="detail-wide"><dt>Expense</dt><dd>{selected.merchant || "Not detected"}</dd></div>
-                <div className="detail-wide"><dt>Description</dt><dd>{selected.description}</dd></div>
-                <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{selected.paymentMethod}</dd></div>
-              </dl>
-            ) : (
-              <div aria-hidden="true" className="card-body grid gap-4">
-                <span className="loading-block block h-[30px] w-[55%]" />
-                <span className="loading-block block h-[22px] w-[75%]" />
-                <span className="loading-block block h-[22px] w-[62%]" />
-                <span className="loading-block block h-[22px] w-[85%]" />
-              </div>
-            )}
+            <dl className="detail-list border-t border-rule">
+              <div><dt>Requested amount</dt><dd className="amount">{selected?.amount ?? <span aria-hidden="true" className="loading-block block h-5 w-20" />}</dd></div>
+              <div><dt>Tabscanner total</dt><dd className="amount">{selected?.tabscannerTotal ?? <span aria-hidden="true" className="loading-block block h-5 w-20" />}</dd></div>
+              <div><dt>Category</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span>{selected ? formatCategory(selected.category) : <span aria-hidden="true" className="loading-block block h-4 w-28" />}</span><Button disabled variant="text" type="button">Change</Button></span></dd></div>
+              <div><dt>Receipt date</dt><dd>{selected ? formatReimbursementDate(selected.receiptDate) : <span aria-hidden="true" className="loading-block block h-4 w-24" />}</dd></div>
+              <div className="detail-wide"><dt>Expense</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span>{selected ? (selected.merchant?.trim() ? selected.merchant : "Not detected") : <span aria-hidden="true" className="loading-block block h-4 w-44" />}</span><Button disabled variant="text" type="button">Rename</Button></span></dd></div>
+              <div className="detail-wide"><dt>Description</dt><dd>{selected?.description ?? <span aria-hidden="true" className="loading-block block h-4 w-56" />}</dd></div>
+              <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{selected?.paymentMethod ?? <span aria-hidden="true" className="loading-block block h-4 w-48" />}</dd></div>
+            </dl>
           </section>
           {selected && (
             <section className="card">
