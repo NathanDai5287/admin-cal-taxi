@@ -83,7 +83,7 @@ export default function DocumentsPage() {
   const [creditAmountEdited, setCreditAmountEdited] = useState(false);
   const [originalInvoiceEdited, setOriginalInvoiceEdited] = useState(false);
 
-  // Deposit: amount ← effective(depositAmount), due date ← event date.
+  // Deposit: amount ← effective(depositAmount), due date ← event date minus 7 days.
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
   useEffect(() => {
     if (!hydrated || depositAmountEdited || !initialDepositAmount) return;
@@ -92,7 +92,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!hydrated || depositDueEdited || !data.eventDate) return;
-    setDeposit(f => ({ ...f, dueDate: data.eventDate }));
+    setDeposit(f => ({ ...f, dueDate: addDaysIso(data.eventDate, -7) }));
   }, [hydrated, depositDueEdited, data.eventDate]);
 
   // Rental: due date ← event date + 2 days.
