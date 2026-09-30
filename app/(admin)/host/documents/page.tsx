@@ -40,6 +40,7 @@ import ContractPanel from "./ContractPanel";
 import DepositPanel from "./DepositPanel";
 import RentalPanel from "./RentalPanel";
 import CreditMemoPanel from "./CreditMemoPanel";
+import PaymentMessagePanel from "./PaymentMessagePanel";
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message
@@ -585,6 +586,15 @@ export default function DocumentsPage() {
           />
         </DocumentRow>
       </div>
+
+      <PaymentMessagePanel
+        clubName={hydrated ? clubsDisplay(data.clubs) : ""}
+        eventDate={hydrated ? data.eventDate : ""}
+        depositDueDate={deposit.dueDate}
+        depositAmount={deposit.amount}
+        rentalDueDate={rental.dueDate}
+        rentalAmount={rentalTotal}
+      />
 
       {/* ── Download All + Save to Orders ── */}
       <section className="card">
