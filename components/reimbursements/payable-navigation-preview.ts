@@ -1,28 +1,10 @@
-import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+import type { PayableDetailData } from "@/lib/reimbursements/payable-detail-data";
 
-type PayableNavigationPreview = {
-  id: string;
-  name: string;
-  amount: string;
-  receiptUrl: string | null;
-  category: string;
-  description: string;
-  merchant: string | null;
-  paymentMethod: string;
-  receiptDate: string | null;
-  submittedAt: string;
-  tabscannerTotal: string;
-  totalsMatch: boolean;
-  comparisonMessage: string;
-  reimbursed: boolean;
-  status: ReimbursementStatus;
-};
-
-let currentPreview: PayableNavigationPreview | null = null;
+let currentPreview: PayableDetailData | null = null;
 const listeners = new Set<() => void>();
 let expirationTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function setPayableNavigationPreview(preview: PayableNavigationPreview) {
+export function setPayableNavigationPreview(preview: PayableDetailData) {
   currentPreview = preview;
   if (expirationTimer) clearTimeout(expirationTimer);
   expirationTimer = setTimeout(() => {

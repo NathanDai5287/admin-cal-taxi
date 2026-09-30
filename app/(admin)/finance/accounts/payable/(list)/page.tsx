@@ -12,7 +12,7 @@ export default async function PayablePage() {
   await requireAdmin();
   const supabase = createAdminClient();
   const { data, error } = await loadAllPages((from, to) => supabase.from("reimbursements")
-    .select("id, user_id, full_name, amount, category, status, merchant, description, receipt_date, receipt_path, receipt_total, failure_reason, payment_method, reimbursed, submitted_at, updated_at")
+    .select("id, user_id, full_name, amount, category, status, merchant, description, receipt_date, receipt_path, receipt_total, failure_reason, denial_reason, payment_method, reimbursed, submitted_at, updated_at")
     .order("submitted_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
   if (error) throw new Error(`Unable to load payables: ${error.message}`);
   const rows = data ?? [];

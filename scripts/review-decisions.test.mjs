@@ -102,17 +102,24 @@ test("the review action validates and stores the denial note", async () => {
 });
 
 test("denial prompts and member-facing reason stay wired", async () => {
-  const [buttons, paymentTable, reviewPage, memberPage] = await Promise.all([
+  const [buttons, paymentTable, reviewPage, detailData, detailView, detailLoading, memberPage] = await Promise.all([
     readFile(new URL("../components/reimbursements/review-decision-buttons.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/reimbursements/reimbursement-payment-table.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/finance/review/[id]/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/reimbursements/payable-detail-data.ts", import.meta.url), "utf8"),
+    readFile(new URL("../components/reimbursements/payable-detail-view.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/reimbursements/payable-detail-loading.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/submit/history/[id]/page.tsx", import.meta.url), "utf8"),
   ]);
 
   for (const source of [buttons, paymentTable]) {
     assert.match(source, /Why is this being denied\? \(optional\)/);
   }
-  assert.match(reviewPage, /initialDenialReason=\{reimbursement\.denial_reason \?\? ""\}/);
+  assert.match(reviewPage, /denial_reason/);
+  assert.match(detailData, /denialReason: row\.denial_reason \?\? ""/);
+  assert.match(detailView, /initialDenialReason=\{detail\.denialReason\}/);
+  assert.match(reviewPage, /<PayableDetailView detail=\{detail\}/);
+  assert.match(detailLoading, /<PayableDetailView detail=\{selected\}/);
   assert.match(memberPage, /denial_reason/);
   assert.match(memberPage, /Reason for denial/);
 });

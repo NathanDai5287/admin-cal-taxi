@@ -5,13 +5,13 @@ import { useParams } from "next/navigation";
 import { useSyncExternalStore } from "react";
 
 import { Button } from "@/components/brand/button";
+import { PayableDetailView } from "@/components/reimbursements/payable-detail-view";
 import { PayableReceiptPlaceholder } from "@/components/reimbursements/payable-receipt-placeholder";
 import {
   getPayableNavigationPreview,
   getServerPayableNavigationPreview,
   subscribeToPayableNavigationPreview,
 } from "@/components/reimbursements/payable-navigation-preview";
-import { formatCategory, formatReimbursementDate, formatStatus } from "@/lib/reimbursements/format";
 
 export function PayableDetailLoading() {
   const { id } = useParams<{ id: string }>();
@@ -22,66 +22,37 @@ export function PayableDetailLoading() {
   );
   const selected = preview?.id === id ? preview : null;
 
+  if (selected) return <PayableDetailView detail={selected} />;
+
   return (
     <div aria-label="Loading reimbursement details" aria-busy="true">
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
         <div>
           <p className="page-eyebrow">Submission review</p>
-          <h1 className="page-title">{selected?.name ?? "Loading reimbursement…"}</h1>
-          {selected && <p className="page-lede">Submitted {formatReimbursementDate(selected.submittedAt, true)}</p>}
+          <h1 className="page-title">Loading reimbursement…</h1>
         </div>
         <Link className="back-link" href="/finance/accounts/payable">← All reimbursements</Link>
       </div>
       <div className="review-grid">
         <div className="review-details">
           <section aria-label="Loading submission details" className="card">
-            <div className="card-header justify-between">
-              <span className="card-title">Submission details</span>
-              {selected && <span className={`badge badge-${selected.status}`}>{formatStatus(selected.status)}</span>}
-            </div>
+            <div className="card-header"><span className="card-title">Submission details</span></div>
             <dl className="detail-list border-t border-rule">
-              <div><dt>Requested amount</dt><dd className="amount">{selected?.amount ?? <span aria-hidden="true" className="loading-block block h-5 w-20" />}</dd></div>
-              <div><dt>Tabscanner total</dt><dd className="amount">{selected?.tabscannerTotal ?? <span aria-hidden="true" className="loading-block block h-5 w-20" />}</dd></div>
-              <div><dt>Category</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span>{selected ? formatCategory(selected.category) : <span aria-hidden="true" className="loading-block block h-4 w-28" />}</span><Button disabled variant="text" type="button">Change</Button></span></dd></div>
-              <div><dt>Receipt date</dt><dd>{selected ? formatReimbursementDate(selected.receiptDate) : <span aria-hidden="true" className="loading-block block h-4 w-24" />}</dd></div>
-              <div className="detail-wide"><dt>Expense</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span>{selected ? (selected.merchant?.trim() ? selected.merchant : "Not detected") : <span aria-hidden="true" className="loading-block block h-4 w-44" />}</span><Button disabled variant="text" type="button">Rename</Button></span></dd></div>
-              <div className="detail-wide"><dt>Description</dt><dd>{selected?.description ?? <span aria-hidden="true" className="loading-block block h-4 w-56" />}</dd></div>
-              <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{selected?.paymentMethod ?? <span aria-hidden="true" className="loading-block block h-4 w-48" />}</dd></div>
+              <div><dt>Requested amount</dt><dd className="amount"><span aria-hidden="true" className="loading-block block h-5 w-20" /></dd></div>
+              <div><dt>Tabscanner total</dt><dd className="amount"><span aria-hidden="true" className="loading-block block h-5 w-20" /></dd></div>
+              <div><dt>Category</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span aria-hidden="true" className="loading-block block h-4 w-28" /><Button disabled variant="text" type="button">Change</Button></span></dd></div>
+              <div><dt>Receipt date</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-24" /></dd></div>
+              <div className="detail-wide"><dt>Expense</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span aria-hidden="true" className="loading-block block h-4 w-44" /><Button disabled variant="text" type="button">Rename</Button></span></dd></div>
+              <div className="detail-wide"><dt>Description</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-56" /></dd></div>
+              <div className="detail-wide"><dt>Zelle phone number or email</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-48" /></dd></div>
             </dl>
           </section>
-          {selected && (
-            <section className="card">
-              <div className="card-header"><span className="card-title">Review decision</span></div>
-              <div className="review-actions border-t border-rule">
-                <p>{selected.reimbursed ? "This reimbursement has been paid. Correct the payment in Accounts before changing the decision." : "Review the details and receipt image before making a decision."}</p>
-                <span aria-hidden="true" className="loading-block block h-9 w-44" />
-              </div>
-            </section>
-          )}
         </div>
         <aside className="receipt-sidebar">
           <section className="card">
             <div className="card-header"><span className="card-title">Submitted receipt</span></div>
             <PayableReceiptPlaceholder id={id} />
           </section>
-          {selected && (
-            <section aria-labelledby="loading-amount-comparison-heading" className="card">
-              <div className="totals-card-heading">
-                <span className="card-title" id="loading-amount-comparison-heading">Total comparison</span>
-                <span className={`badge ${selected.totalsMatch ? "badge-approved" : "badge-pending"}`}>
-                  {selected.totalsMatch ? "Match" : "Review"}
-                </span>
-              </div>
-              <div className="totals-card-values">
-                <div><span>Submitted total</span><strong>{selected.amount}</strong></div>
-                <span aria-hidden="true" className="verification-symbol">{selected.totalsMatch ? "=" : "≠"}</span>
-                <div><span>Tabscanner total</span><strong>{selected.tabscannerTotal}</strong></div>
-              </div>
-              <p className={`totals-card-note ${selected.totalsMatch ? "verification-match" : "verification-review"}`}>
-                {selected.comparisonMessage}
-              </p>
-            </section>
-          )}
         </aside>
       </div>
     </div>

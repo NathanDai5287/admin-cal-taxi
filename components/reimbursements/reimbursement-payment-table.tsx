@@ -17,12 +17,14 @@ import {
 } from "@/components/reimbursements/inline-status-select";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 import { setPayableNavigationPreview } from "@/components/reimbursements/payable-navigation-preview";
+import { payableDetailData } from "@/lib/reimbursements/payable-detail-data";
 
 export type PaymentTableRow = {
   user_id: string | null;
   amount: number;
   category: string;
   description: string;
+  denial_reason: string | null;
   failure_reason: string | null;
   full_name: string;
   id: string;
@@ -114,31 +116,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   }
 
   function rememberNavigationPreview(row: PaymentTableRow) {
-    const totalsMatch = row.receipt_total !== null
-      && amountInCents(row.amount) === amountInCents(row.receipt_total);
-    setPayableNavigationPreview({
-      id: row.id,
-      name: row.full_name,
-      amount: formatMoney(row.amount),
-      receiptUrl: row.receipt_preview_url,
-      category: row.category,
-      description: row.description,
-      merchant: row.merchant,
-      paymentMethod: row.payment_method,
-      receiptDate: row.receipt_date,
-      submittedAt: row.submitted_at,
-      tabscannerTotal: row.receipt_total === null ? "—" : formatMoney(row.receipt_total),
-      totalsMatch,
-      reimbursed: row.reimbursed,
-      status: row.status,
-      comparisonMessage: totalsMatch
-        ? "The submitted and scanned totals match."
-        : row.status === "pending"
-          ? "Tabscanner is still processing this receipt."
-          : row.status === "processing_failed"
-            ? `Automatic verification failed${row.failure_reason ? `: ${row.failure_reason}` : "."}`
-            : "The totals differ and need manual review.",
-    });
+    setPayableNavigationPreview(payableDetailData(row, row.receipt_preview_url));
   }
 
   useEffect(() => {
@@ -205,14 +183,16 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus, denialReason?: string) {
     const key = `${row.id}:status`;
     const previousStatus = row.status;
+    const previousDenialReason = row.denial_reason;
+    const nextDenialReason = status === "denied" ? denialReason?.trim() || null : null;
     setMutationError("");
-    patchRow(row.id, { status });
+    patchRow(row.id, { status, denial_reason: nextDenialReason });
     setFieldPending(key, true);
 
     try {
       const result = await setReimbursementStatus(row.id, status, denialReason);
       if (!result.ok) {
-        patchRow(row.id, { status: previousStatus });
+        patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
         setMutationError(result.message);
         return;
       }
@@ -220,7 +200,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       patchRow(row.id, result.row);
       router.refresh();
     } catch (error) {
-      patchRow(row.id, { status: previousStatus });
+      patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
       setMutationError(error instanceof Error ? error.message : "Unable to change the status.");
     } finally {
       setFieldPending(key, false);
