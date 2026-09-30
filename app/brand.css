@@ -544,6 +544,7 @@
   [data-brand] .dues-select { @apply h-4 w-4 shrink-0 cursor-pointer accent-brand disabled:cursor-not-allowed; }
   [data-brand] .dues-person h3 { @apply truncate text-[14px] font-bold text-ink; }
   [data-brand] .dues-person p { @apply mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted; }
+  [data-brand] .dues-person .dues-note { @apply block whitespace-pre-wrap break-words text-[13px] leading-snug text-ink; }
   [data-brand] .dues-overdue-label { @apply font-bold uppercase tracking-[0.08em] text-warn; }
   [data-brand] .dues-paid-label { @apply font-bold uppercase tracking-[0.08em] text-ok; }
   [data-brand] .dues-discord-linked { @apply font-bold uppercase tracking-[0.08em] text-brand; }

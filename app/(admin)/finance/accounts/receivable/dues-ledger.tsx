@@ -312,6 +312,7 @@ export function DuesLedger({
                 />}
                 <div className="min-w-0">
                   <h3>{row.memberName}</h3>
+                  {row.notes.trim() ? <p className="dues-note">{row.notes}</p> : null}
                   {!row.memberId && <p>Account link needed.</p>}
                   <p>
                     Due {formatDate(row.dueDate)}
