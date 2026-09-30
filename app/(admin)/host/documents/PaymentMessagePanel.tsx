@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
-import { formatDateISO } from "@/lib/host-format";
+
+const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+
+function shortDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return iso;
+  const month = shortMonths[Number(match[2]) - 1];
+  return month ? `${month} ${Number(match[3])}, ${match[1]}` : iso;
+}
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -10,7 +18,6 @@ const money = new Intl.NumberFormat("en-US", {
 });
 
 type Props = {
-  clubName: string;
   eventDate: string;
   depositDueDate: string;
   depositAmount: string;
@@ -19,7 +26,6 @@ type Props = {
 };
 
 function paymentMessage({
-  clubName,
   eventDate,
   depositDueDate,
   depositAmount,
@@ -27,7 +33,7 @@ function paymentMessage({
   rentalAmount,
 }: Props): string | null {
   const deposit = Number(depositAmount);
-  if (!clubName || !eventDate || !depositDueDate || !rentalDueDate ||
+  if (!eventDate || !depositDueDate || !rentalDueDate ||
       !Number.isFinite(deposit) || deposit <= 0 ||
       !Number.isFinite(rentalAmount) || rentalAmount <= 0) return null;
 
@@ -38,17 +44,12 @@ function paymentMessage({
   ].sort((a, b) => a.date.localeCompare(b.date));
 
   return [
-    "Hello,",
+    `Payment schedule for the ${shortDate(eventDate)} event:`,
     "",
-    `For the ${clubName} event at Theta Xi on ${formatDateISO(eventDate)}, here is the payment schedule:`,
+    ...datedEvents.map(({ date, detail }) => `${shortDate(date)}: ${detail}`),
+    `After the event and receipt of the full rental fee: ${money.format(deposit)} security deposit refunded, subject to the hosting contract.`,
     "",
-    ...datedEvents.map(({ date, detail }) => `${formatDateISO(date)} — ${detail}`),
-    `After the event and receipt of the full rental fee — ${money.format(deposit)} security deposit refunded, subject to the hosting contract.`,
-    "",
-    "Please send payments by Zelle to calthetaxi@gmail.com.",
-    "",
-    "Thank you,",
-    "Theta Xi Fraternity",
+    "Zelle: calthetaxi@gmail.com",
   ].join("\n");
 }
 
@@ -81,14 +82,7 @@ export default function PaymentMessagePanel(props: Props) {
       <div className="card-body space-y-4">
         {message ? (
           <>
-            <label className="sr-only" htmlFor="hosting-payment-message">Payment message to send</label>
-            <textarea
-              id="hosting-payment-message"
-              className="field-input w-full resize-y leading-relaxed"
-              rows={13}
-              readOnly
-              value={message}
-            />
+            <div className="border border-rule bg-canvas px-4 py-3 text-sm leading-relaxed text-ink whitespace-pre-wrap break-words select-text">{message}</div>
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="secondary" onClick={copyMessage}>
                 {copied ? "Copied" : "Copy Message"}

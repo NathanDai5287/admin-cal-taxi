@@ -480,13 +480,56 @@ export default function DocumentsPage() {
     <div className="space-y-10">
       <div>
         <StepIndicator current="documents" />
-        <h1 className="page-title mt-6">Documents</h1>
-        <p className="page-lede">
-          Generate the four rental documents from here. Organization, event date, pricing, and
-          contract terms are pulled from the earlier steps — tab-specific fields appear inside
-          each row.
-        </p>
+        <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <h1 className="page-title">Documents</h1>
+          {data.currentOrderId && (
+            <p className="text-[12.5px] text-muted">
+              Order: <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text">{data.currentOrderId}</ButtonLink>
+            </p>
+          )}
+        </div>
       </div>
+
+      <section className="card" aria-label="Document actions">
+        <div className="card-body space-y-3 pt-5">
+          <div className="flex flex-nowrap items-center gap-3">
+            <Button
+              type="button"
+              onClick={downloadAll}
+              disabled={downloadAllBusy}
+              variant="secondary"
+              compact
+              className="min-w-0 flex-1 sm:flex-none"
+            >
+              {downloadAllBusy ? "Downloading…" : "Download All"}
+            </Button>
+            <Button
+              type="button"
+              onClick={saveToOrders}
+              disabled={saveBusy || !hydrated || !canSave}
+              variant="primary"
+              compact
+              className="min-w-0 flex-1 sm:flex-none"
+            >
+              {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
+            </Button>
+          </div>
+          {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
+          {!canSave && hydrated && (
+            <p className="text-[12px] text-muted">Add an organization and event date before saving this order.</p>
+          )}
+          {identityDrifted && (
+            <p className="text-[12px] text-warn">
+              This workspace no longer matches the attached order (saved as {loadedClub || "unknown organization"}
+              {loadedDate ? `, ${formatDateISO(loadedDate) || loadedDate}` : ""}).
+              Updating will rewrite that order&rsquo;s organization and date in place. To start
+              a new event from these details, use Duplicate on the order page.
+            </p>
+          )}
+          {saveError && <p className="text-warn text-[13px]">{saveError}</p>}
+          {saveNotice && !saveError && <p className="text-ok text-[13px]">{saveNotice}</p>}
+        </div>
+      </section>
 
       <div className="space-y-4">
         <DocumentRow
@@ -588,77 +631,12 @@ export default function DocumentsPage() {
       </div>
 
       <PaymentMessagePanel
-        clubName={hydrated ? clubsDisplay(data.clubs) : ""}
         eventDate={hydrated ? data.eventDate : ""}
         depositDueDate={deposit.dueDate}
         depositAmount={deposit.amount}
         rentalDueDate={rental.dueDate}
         rentalAmount={rentalTotal}
       />
-
-      {/* ── Download All + Save to Orders ── */}
-      <section className="card">
-        <div className="card-header">
-          <span className="card-title">Finish Up</span>
-          <span className="card-subtitle">Download everything at once, then archive the rental.</span>
-        </div>
-        <div className="card-body space-y-5">
-          <div className="flex items-center gap-4 flex-wrap">
-            <Button
-              type="button"
-              onClick={downloadAll}
-              disabled={downloadAllBusy}
-              variant="secondary"
-            >
-              {downloadAllBusy ? "Downloading…" : "Download All"}
-            </Button>
-            {downloadAllReport && (
-              <p className="text-[12.5px] text-muted">{downloadAllReport}</p>
-            )}
-          </div>
-
-          <div className="border-t border-rule pt-5 flex items-start justify-between gap-6 flex-wrap">
-            <div className="max-w-md">
-              {data.currentOrderId ? (
-                <p className="text-[12.5px] text-ink">
-                  Attached to order{" "}
-                  <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text">
-                    {data.currentOrderId}
-                  </ButtonLink>.
-                </p>
-              ) : (
-                <p className="text-[12.5px] text-muted">
-                  Not yet saved to the order archive. Saving is separate from generating —
-                  nothing is archived until you click this.
-                </p>
-              )}
-              {!canSave && hydrated && (
-                <p className="text-[12px] text-muted mt-1.5">
-                  An organization and event date are required before a rental can be archived.
-                </p>
-              )}
-              {identityDrifted && (
-                <p className="text-[12px] text-warn mt-1.5">
-                  This workspace no longer matches the attached order (saved as {loadedClub || "unknown organization"}
-                  {loadedDate ? `, ${formatDateISO(loadedDate) || loadedDate}` : ""}).
-                  Updating will rewrite that order&rsquo;s organization and date in place — to start
-                  a new event from these details instead, use Duplicate on the order page.
-                </p>
-              )}
-              {saveError && <p className="text-warn text-[13px] mt-1.5">{saveError}</p>}
-              {saveNotice && !saveError && <p className="text-ok text-[13px] mt-1.5">{saveNotice}</p>}
-            </div>
-            <Button
-              type="button"
-              onClick={saveToOrders}
-              disabled={saveBusy || !hydrated || !canSave}
-              variant="primary"
-            >
-              {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
-            </Button>
-          </div>
-        </div>
-      </section>
 
       <StepNav current="documents" />
     </div>
