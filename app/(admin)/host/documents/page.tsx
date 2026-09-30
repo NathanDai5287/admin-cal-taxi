@@ -13,6 +13,7 @@ import { Button, ButtonLink } from "@/components/brand/button";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
+import DocumentsSection from "@/components/host/DocumentsSection";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
 import { ApiCallError, generatePdf } from "@/lib/host-api";
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
@@ -246,7 +247,10 @@ export default function DocumentsPage() {
     return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
   }
 
-  async function generateDoc(kind: DocumentKind): Promise<boolean> {
+  async function generateDoc(
+    kind: DocumentKind,
+    batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string },
+  ): Promise<boolean> {
     setErrors(e => ({ ...e, [kind]: null }));
     setSuccesses(s => ({ ...s, [kind]: null }));
     setBusy(b => ({ ...b, [kind]: true }));
@@ -261,7 +265,10 @@ export default function DocumentsPage() {
           break;
         }
         case "deposit_invoice": {
-          payload = buildDepositPayload(data, deposit);
+          payload = buildDepositPayload(data, {
+            ...deposit,
+            invoiceNumber: batch?.depositInvoiceNumber ?? deposit.invoiceNumber,
+          });
           amount = toNum(deposit.amount);
           break;
         }
@@ -271,7 +278,10 @@ export default function DocumentsPage() {
           break;
         }
         case "credit_memo": {
-          const fields: CreditMemoFields = { ...creditMemo, originalInvoice: resolvedOriginalInvoice() };
+          const fields: CreditMemoFields = {
+            ...creditMemo,
+            originalInvoice: batch?.memoOriginalInvoice ?? resolvedOriginalInvoice(),
+          };
           payload = buildCreditMemoPayload(data, fields);
           amount = toNum(fields.amount);
           break;
@@ -319,18 +329,41 @@ export default function DocumentsPage() {
     const failed: string[] = [];
     let succeeded = 0;
 
-    // Sequential — each generation triggers a real browser download, and
-    // firing them concurrently races the download prompts against each other.
+    // Give the deposit invoice and credit memo the same number before starting
+    // requests, since the memo can no longer wait for the deposit response.
+    const depositStatus = statusFor("deposit_invoice");
+    const canGenerateDeposit = depositStatus.kind === "ready" || depositStatus.kind === "generated";
+    const depositInvoiceNumber = canGenerateDeposit
+      ? deposit.invoiceNumber.trim()
+        || generatedRef.current.deposit_invoice?.number
+        || data.lastDepositInvoiceNumber
+        || mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate).replace(/^CTR-/, "DEP-")
+      : "";
+    const memoOriginalInvoice = creditMemo.originalInvoice.trim() || depositInvoiceNumber;
+    const ready: DocumentKind[] = [];
     for (const kind of DOCUMENT_ORDER) {
-      const status = statusFor(kind);
-      if (status.kind === "blocked" || status.kind === "waiting") {
+      const status = kind === "credit_memo" && memoOriginalInvoice
+        ? missingFields(kind, data, {
+            ...fieldsFor(),
+            creditMemo: { ...creditMemo, originalInvoice: memoOriginalInvoice },
+          })
+        : null;
+      const rowStatus = status ? (status.length ? { kind: "blocked" } : { kind: "ready" }) : statusFor(kind);
+      if (rowStatus.kind === "blocked" || rowStatus.kind === "waiting") {
         skipped.push(DOCUMENT_META[kind].label);
         continue;
       }
-      const ok = await generateDoc(kind);
+      ready.push(kind);
+    }
+    const results = await Promise.all(ready.map(kind => generateDoc(kind, {
+      depositInvoiceNumber,
+      memoOriginalInvoice: memoOriginalInvoice || undefined,
+    })));
+    ready.forEach((kind, index) => {
+      const ok = results[index];
       if (ok) succeeded += 1;
       else failed.push(DOCUMENT_META[kind].label);
-    }
+    });
 
     setDownloadAllBusy(false);
     const parts: string[] = [];
@@ -482,16 +515,11 @@ export default function DocumentsPage() {
         <StepIndicator current="documents" />
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <h1 className="page-title">Documents</h1>
-          {data.currentOrderId && (
-            <p className="text-[12.5px] text-muted">
-              Order: <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text">{data.currentOrderId}</ButtonLink>
-            </p>
-          )}
         </div>
       </div>
 
-      <section className="card" aria-label="Rental documents">
-        <div className="border-b border-rule px-5 py-4 space-y-3">
+      <DocumentsSection
+        actions={<>
           <div className="flex flex-nowrap items-center gap-3">
             <Button
               type="button"
@@ -513,6 +541,12 @@ export default function DocumentsPage() {
             >
               {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
             </Button>
+            {data.currentOrderId && (
+              <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text" className="ml-auto whitespace-nowrap">
+                <span className="hidden md:inline">Order: {data.currentOrderId}</span>
+                <span className="md:hidden">Order</span>
+              </ButtonLink>
+            )}
           </div>
           {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
           {!canSave && hydrated && (
@@ -528,8 +562,18 @@ export default function DocumentsPage() {
           )}
           {saveError && <p className="text-warn text-[13px]">{saveError}</p>}
           {saveNotice && !saveError && <p className="text-ok text-[13px]">{saveNotice}</p>}
-        </div>
-        <div className="divide-y divide-rule">
+        </>}
+        paymentMessage={
+          <PaymentMessagePanel
+            eventDate={hydrated ? data.eventDate : ""}
+            depositDueDate={deposit.dueDate}
+            depositAmount={deposit.amount}
+            rentalDueDate={rental.dueDate}
+            rentalAmount={rentalTotal}
+            refundAmount={creditMemo.amount ? Number(creditMemo.amount) : undefined}
+          />
+        }
+      >
         <DocumentRow
           index={1}
           kind="contract"
@@ -543,6 +587,7 @@ export default function DocumentsPage() {
           success={successes.contract ?? null}
           defaultOpen
           grouped
+          inlineFields
         >
           <ContractPanel sign={contractSign} onSignChange={setContractSign} />
         </DocumentRow>
@@ -630,16 +675,7 @@ export default function DocumentsPage() {
             }}
           />
         </DocumentRow>
-        </div>
-
-        <PaymentMessagePanel
-          eventDate={hydrated ? data.eventDate : ""}
-          depositDueDate={deposit.dueDate}
-          depositAmount={deposit.amount}
-          rentalDueDate={rental.dueDate}
-          rentalAmount={rentalTotal}
-        />
-      </section>
+      </DocumentsSection>
 
       <StepNav current="documents" />
     </div>

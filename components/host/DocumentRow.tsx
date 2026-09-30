@@ -19,6 +19,7 @@ export type RowState =
   | { kind: "generated"; number: string; detail?: string }
   /** Everything needed is present. */
   | { kind: "ready" }
+  | { kind: "unavailable" }
   /** Required fields are still empty. */
   | { kind: "blocked"; missing: string[] }
   /** Another document has to exist first (e.g. the memo needs the deposit №). */
@@ -30,6 +31,8 @@ function StatusPill({ state }: { state: RowState }) {
       ? [`Generated · ${state.number}`, "bg-ok-light text-ok border-ok/30"]
       : state.kind === "ready"
       ? ["Ready", "bg-brand-light text-brand border-brand/30"]
+      : state.kind === "unavailable"
+      ? ["Not generated", "bg-canvas text-muted border-rule"]
       : state.kind === "waiting"
       ? ["Waiting", "bg-canvas text-muted border-rule"]
       : [`Missing: ${state.missing.join(", ")}`, "bg-warn-light text-warn border-warn/30"];
@@ -61,6 +64,9 @@ export default function DocumentRow({
   children,
   defaultOpen = false,
   grouped = false,
+  inlineFields = false,
+  fieldsLabel = "Edit fields",
+  downloadVariant,
 }: {
   /** 1-based position, shown as the step number. */
   index: number;
@@ -81,11 +87,15 @@ export default function DocumentRow({
   defaultOpen?: boolean;
   /** Use the enclosing document section's border and row dividers. */
   grouped?: boolean;
+  /** Keep a short field, such as the contract signature option, inside the row. */
+  inlineFields?: boolean;
+  fieldsLabel?: string;
+  downloadVariant?: "primary" | "secondary";
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
-  const canDownload = state.kind !== "blocked" && state.kind !== "waiting" && !busy;
+  const canDownload = state.kind !== "blocked" && state.kind !== "waiting" && state.kind !== "unavailable" && !busy;
   const isDone = state.kind === "generated";
 
   return (
@@ -116,6 +126,9 @@ export default function DocumentRow({
           {state.kind === "waiting" && (
             <p className="text-[12px] text-muted mt-1.5">{state.reason}</p>
           )}
+          {children && inlineFields && open && (
+            <div id={panelId} className="mt-4">{children}</div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -127,14 +140,14 @@ export default function DocumentRow({
               aria-expanded={open}
               aria-controls={panelId}
             >
-              {open ? "Hide fields" : "Edit fields"}
+              {open ? "Hide fields" : fieldsLabel}
             </Button>
           )}
           <Button
             type="button"
             onClick={onDownload}
             disabled={!canDownload}
-            variant={isDone ? "secondary" : "primary"}
+            variant={downloadVariant ?? (isDone ? "secondary" : "primary")}
           >
             {busy
               ? "Generating…"
@@ -150,7 +163,7 @@ export default function DocumentRow({
         </div>
       )}
 
-      {children && open && (
+      {children && open && !inlineFields && (
         <div id={panelId} className="border-t border-rule px-5 py-5 bg-canvas/40">
           {children}
         </div>

@@ -138,7 +138,17 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
   };
 }
 
-export default function WorkspaceActions({ order }: { order: Order }) {
+export default function WorkspaceActions({
+  order,
+  loadLabel = "Load into Workspace",
+  showDuplicate = true,
+  compact = false,
+}: {
+  order: Order;
+  loadLabel?: string;
+  showDuplicate?: boolean;
+  compact?: boolean;
+}) {
   const { bulk } = useSharedData();
   const router = useRouter();
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
@@ -187,19 +197,20 @@ export default function WorkspaceActions({ order }: { order: Order }) {
       <Button
         type="button"
         variant="primary"
+        compact={compact}
         disabled={busy !== null}
         onClick={loadIntoWorkspace}
       >
-        {busy === "load" ? "Loading…" : "Load into Workspace"}
+        {busy === "load" ? "Loading…" : loadLabel}
       </Button>
-      <Button
+      {showDuplicate && <Button
         type="button"
         variant="secondary"
         disabled={busy !== null}
         onClick={duplicateAsNewEvent}
       >
         {busy === "duplicate" ? "Duplicating…" : "Duplicate as New Event"}
-      </Button>
+      </Button>}
     </>
   );
 }

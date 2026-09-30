@@ -23,6 +23,7 @@ type Props = {
   depositAmount: string;
   rentalDueDate: string;
   rentalAmount: number;
+  refundAmount?: number;
 };
 
 function paymentMessage({
@@ -31,6 +32,7 @@ function paymentMessage({
   depositAmount,
   rentalDueDate,
   rentalAmount,
+  refundAmount,
 }: Props): string | null {
   const deposit = Number(depositAmount);
   if (!eventDate || !depositDueDate || !rentalDueDate ||
@@ -42,12 +44,15 @@ function paymentMessage({
     { date: eventDate, detail: "Event at Theta Xi Fraternity House." },
     { date: rentalDueDate, detail: `${money.format(rentalAmount)} rental fee due.` },
   ].sort((a, b) => a.date.localeCompare(b.date));
+  const refund = Number.isFinite(refundAmount) && (refundAmount ?? 0) >= 0
+    ? refundAmount as number
+    : deposit;
 
   return [
     `Payment schedule for the ${shortDate(eventDate)} event:`,
     "",
     ...datedEvents.map(({ date, detail }) => `${shortDate(date)}: ${detail}`),
-    `After the event and receipt of the full rental fee: ${money.format(deposit)} security deposit refunded, subject to the hosting contract.`,
+    `After the event and receipt of the full rental fee: ${money.format(refund)} security deposit refunded, subject to the hosting contract.`,
     "",
     "Zelle: calthetaxi@gmail.com",
   ].join("\n");

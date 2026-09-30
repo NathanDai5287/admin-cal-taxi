@@ -8,9 +8,11 @@
 export default function ContractPanel({
   sign,
   onSignChange,
+  readOnly = false,
 }: {
   sign: boolean;
   onSignChange: (value: boolean) => void;
+  readOnly?: boolean;
 }) {
   return (
     <div>
@@ -18,9 +20,10 @@ export default function ContractPanel({
         <input
           type="checkbox"
           checked={sign}
+          disabled={readOnly}
           onChange={e => onSignChange(e.target.checked)}
         />
-        <span className="text-[14px]">Auto-sign Theta Xi side with today&rsquo;s date</span>
+        <span className="text-[14px]">{readOnly ? (sign ? "Theta Xi side was auto-signed" : "Theta Xi side was not auto-signed") : <>Auto-sign Theta Xi side with today&rsquo;s date</>}</span>
       </label>
     </div>
   );
