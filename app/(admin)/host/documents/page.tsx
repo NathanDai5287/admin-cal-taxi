@@ -477,7 +477,7 @@ export default function DocumentsPage() {
     : "Generate a deposit invoice first to auto-fill this.";
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
       <div>
         <StepIndicator current="documents" />
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
@@ -490,8 +490,8 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      <section className="card" aria-label="Document actions">
-        <div className="card-body space-y-3 pt-5">
+      <section className="card" aria-label="Rental documents">
+        <div className="border-b border-rule px-5 py-4 space-y-3">
           <div className="flex flex-nowrap items-center gap-3">
             <Button
               type="button"
@@ -529,9 +529,7 @@ export default function DocumentsPage() {
           {saveError && <p className="text-warn text-[13px]">{saveError}</p>}
           {saveNotice && !saveError && <p className="text-ok text-[13px]">{saveNotice}</p>}
         </div>
-      </section>
-
-      <div className="space-y-4">
+        <div className="divide-y divide-rule">
         <DocumentRow
           index={1}
           kind="contract"
@@ -544,6 +542,7 @@ export default function DocumentsPage() {
           error={errors.contract ?? null}
           success={successes.contract ?? null}
           defaultOpen
+          grouped
         >
           <ContractPanel sign={contractSign} onSignChange={setContractSign} />
         </DocumentRow>
@@ -559,6 +558,7 @@ export default function DocumentsPage() {
           busy={!!busy.deposit_invoice}
           error={errors.deposit_invoice ?? null}
           success={successes.deposit_invoice ?? null}
+          grouped
         >
           <DepositPanel
             fields={deposit}
@@ -586,6 +586,7 @@ export default function DocumentsPage() {
           busy={!!busy.rental_invoice}
           error={errors.rental_invoice ?? null}
           success={successes.rental_invoice ?? null}
+          grouped
         >
           <RentalPanel
             fields={rental}
@@ -612,6 +613,7 @@ export default function DocumentsPage() {
           busy={!!busy.credit_memo}
           error={errors.credit_memo ?? null}
           success={successes.credit_memo ?? null}
+          grouped
         >
           <CreditMemoPanel
             fields={creditMemo}
@@ -628,15 +630,16 @@ export default function DocumentsPage() {
             }}
           />
         </DocumentRow>
-      </div>
+        </div>
 
-      <PaymentMessagePanel
-        eventDate={hydrated ? data.eventDate : ""}
-        depositDueDate={deposit.dueDate}
-        depositAmount={deposit.amount}
-        rentalDueDate={rental.dueDate}
-        rentalAmount={rentalTotal}
-      />
+        <PaymentMessagePanel
+          eventDate={hydrated ? data.eventDate : ""}
+          depositDueDate={deposit.dueDate}
+          depositAmount={deposit.amount}
+          rentalDueDate={rental.dueDate}
+          rentalAmount={rentalTotal}
+        />
+      </section>
 
       <StepNav current="documents" />
     </div>

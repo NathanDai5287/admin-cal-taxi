@@ -60,6 +60,7 @@ export default function DocumentRow({
   success,
   children,
   defaultOpen = false,
+  grouped = false,
 }: {
   /** 1-based position, shown as the step number. */
   index: number;
@@ -78,6 +79,8 @@ export default function DocumentRow({
   /** This document's own fields; omit for a download-only row. */
   children?: React.ReactNode;
   defaultOpen?: boolean;
+  /** Use the enclosing document section's border and row dividers. */
+  grouped?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
@@ -86,7 +89,7 @@ export default function DocumentRow({
   const isDone = state.kind === "generated";
 
   return (
-    <section className="card-plain" data-document-kind={kind}>
+    <section className={grouped ? "bg-surface" : "card-plain"} data-document-kind={kind}>
       <div className="flex items-start gap-4 px-5 py-4 flex-wrap sm:flex-nowrap">
         <span
           className={

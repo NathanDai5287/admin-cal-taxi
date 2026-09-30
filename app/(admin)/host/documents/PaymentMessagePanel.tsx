@@ -72,14 +72,14 @@ export default function PaymentMessagePanel(props: Props) {
   }
 
   return (
-    <section className="card" aria-labelledby="payment-message-title">
-      <div className="card-header">
+    <section className="border-t border-rule" aria-labelledby="payment-message-title">
+      <div className="px-5 pt-5 pb-3">
         <div>
           <h2 className="card-title" id="payment-message-title">Payment Message</h2>
           <p className="card-subtitle">Uses the invoice amounts and due dates above. Review before sending.</p>
         </div>
       </div>
-      <div className="card-body space-y-4">
+      <div className="px-5 pb-5 space-y-4">
         {message ? (
           <>
             <div className="border border-rule bg-canvas px-4 py-3 text-sm leading-relaxed text-ink whitespace-pre-wrap break-words select-text">{message}</div>
