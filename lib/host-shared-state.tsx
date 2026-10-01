@@ -29,6 +29,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { effective } from "./host-derive";
 
 const STORAGE_KEY = "admin.host.shared.v1";
 
@@ -234,8 +235,20 @@ function sameClubs(a: string[], b: string[]): boolean {
 
 function sameDraft(a: SharedState, b: SharedState): boolean {
   return (Object.keys(EMPTY_STATE) as (keyof SharedState)[])
-    .filter(key => !["currentOrderId", "loadedOrderIdentity", "orderCreateRequestKey"].includes(key))
-    .every(key => JSON.stringify(a[key]) === JSON.stringify(b[key]));
+    .filter(key => !["currentOrderId", "loadedOrderIdentity", "orderCreateRequestKey", "overrides"].includes(key))
+    // Archived signing forms resolve derived values into explicit strings.
+    // Compare the values that were approved, regardless of that representation.
+    .every(key => {
+      if (!OVERRIDE_KEYS.includes(key as OverrideKey)) {
+        return JSON.stringify(a[key]) === JSON.stringify(b[key]);
+      }
+      const left = effective(a, key as OverrideKey);
+      const right = effective(b, key as OverrideKey);
+      return left === right || (
+        left.trim() !== "" && right.trim() !== "" &&
+        Number.isFinite(Number(left)) && Number(left) === Number(right)
+      );
+    });
 }
 
 /**
