@@ -6,7 +6,8 @@ import { cleanClubs, normalizeOrgName } from "@/lib/host-clubs";
 import type { SharedState, ContractSigner } from "@/lib/host-shared-state";
 import type { SigningRevision } from "@/lib/host-signing";
 import { buildContractPayload } from "@/lib/host-documents";
-import { createSigningLinksAction, listSigningAction, prepareSigningAction, reconcileSigningAction, syncSigningAction } from "./signing-actions";
+import ContractPanel from "./ContractPanel";
+import { createSigningLinksAction, listSigningAction, markSigningLinkSentAction, prepareSigningAction, reconcileSigningAction, syncSigningAction } from "./signing-actions";
 
 function validate(data: SharedState): string | null {
   const clubs = [...new Set(cleanClubs(data.clubs).map(normalizeOrgName))];
@@ -35,11 +36,12 @@ function validate(data: SharedState): string | null {
   return null;
 }
 
-export default function SigningPanel({ data, update, orderId, saveOrder }: {
+export default function SigningPanel({ data, update, orderId, saveOrder, showPresignControl = false }: {
   data: SharedState;
   update: <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
   orderId: string;
   saveOrder: () => Promise<string | null>;
+  showPresignControl?: boolean;
 }) {
   const [revisions, setRevisions] = useState<SigningRevision[]>([]);
   const [preview, setPreview] = useState<SigningRevision | null>(null);
@@ -133,7 +135,17 @@ export default function SigningPanel({ data, update, orderId, saveOrder }: {
     await copy(`${window.location.origin}/host/signing/copy#${token}`, id);
   }
 
+  async function markSent(revision: SigningRevision, email: string, sent: boolean) {
+    setBusy(true); setError("");
+    try {
+      const updated = await markSigningLinkSentAction(revision.order_id, revision.id, email, sent);
+      setRevisions(old => old.map(row => row.id === updated.id ? updated : row));
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not update link delivery"); }
+    finally { setBusy(false); }
+  }
+
   return <div className="space-y-5 border-t border-border px-5 py-6 sm:px-8">
+    {showPresignControl && <ContractPanel sign={data.contractPresign} onSignChange={value => update("contractPresign", value)} />}
     <div>
       <h3 className="text-[15px] font-semibold">Contract signers</h3>
       <p className="text-[13px] text-muted">One or more representatives for each club. Every person signs the same contract on their own execution page.</p>
@@ -172,9 +184,10 @@ export default function SigningPanel({ data, update, orderId, saveOrder }: {
         {(["created", "creating", "creation_uncertain"].includes(revision.state)) && <Button type="button" variant="secondary" compact disabled={busy} onClick={() => recover(revision)}>Check and resume request</Button>}
       </div>
       {revision.recipients.map(person => <div key={person.email} className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-[13px]">
-        <span><strong>{person.name}</strong> · {person.email} · {person.status === "SIGNED" ? "Signed" : revision.state === "cancelled" ? "Link cancelled" : revision.state === "failed" ? "Request failed" : "Awaiting signature"}</span>
+        <span><strong>{person.name}</strong> · {person.email} · {person.status === "SIGNED" ? "Signed" : revision.state === "cancelled" ? "Link cancelled" : revision.state === "failed" ? "Request failed" : "Awaiting signature"}{person.sentAt ? " · Link marked sent" : ""}</span>
         <span className="flex flex-wrap gap-2">
           {revision.state === "awaiting_signatures" && person.status !== "SIGNED" && <Button type="button" variant="secondary" compact onClick={() => copy(person.link, `sign-${person.email}`)}>{copied === `sign-${person.email}` ? "Copied" : "Copy signing link"}</Button>}
+          {revision.state === "awaiting_signatures" && person.status !== "SIGNED" && <Button type="button" variant="secondary" compact disabled={busy} onClick={() => markSent(revision, person.email, !person.sentAt)}>{person.sentAt ? "Undo sent" : "Mark sent"}</Button>}
           {person.copyToken && <Button type="button" variant="secondary" compact onClick={() => copyFinal(person.copyToken!, `copy-${person.email}`)}>{copied === `copy-${person.email}` ? "Copied" : "Copy completed-copy link"}</Button>}
         </span>
       </div>)}

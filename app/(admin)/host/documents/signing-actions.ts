@@ -1,7 +1,7 @@
 "use server";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
-import { createSigningLinks, listSigning, prepareSigning, reconcileSigning, syncSigning } from "@/lib/host-signing";
+import { createSigningLinks, listSigning, markSigningLinkSent, prepareSigning, reconcileSigning, syncSigning } from "@/lib/host-signing";
 
 async function admin() { await requireAdmin("/"); }
 
@@ -28,4 +28,9 @@ export async function syncSigningAction(orderId: string, revisionId: string) {
 export async function reconcileSigningAction(orderId: string, revisionId: string) {
   await admin();
   return reconcileSigning(orderId, revisionId);
+}
+
+export async function markSigningLinkSentAction(orderId: string, revisionId: string, email: string, sent: boolean) {
+  await admin();
+  return markSigningLinkSent(orderId, revisionId, email, sent);
 }

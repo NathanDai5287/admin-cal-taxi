@@ -159,7 +159,7 @@ export default function OrderDocuments({ order }: { order: Order }) {
             : <SavedFields doc={doc} />)}
         </DocumentRow>;
       })}
-      <OrderSigning orderId={order.id} />
+      <OrderSigning order={order} />
     </DocumentsSection>
   );
 }

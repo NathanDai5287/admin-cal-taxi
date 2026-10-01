@@ -9,6 +9,7 @@ export type SigningPerson = {
   status: string;
   link: string;
   copyToken?: string;
+  sentAt?: string | null;
 };
 
 export type SigningRevision = {
@@ -75,6 +76,13 @@ export async function syncSigning(orderId: string, revisionId: string) {
 export async function reconcileSigning(orderId: string, revisionId: string) {
   const result = await call<{ revision: SigningRevision }>(`${base(orderId)}/${encodeURIComponent(revisionId)}/reconcile`, {
     method: "POST", body: {},
+  });
+  return result.revision;
+}
+
+export async function markSigningLinkSent(orderId: string, revisionId: string, email: string, sent: boolean) {
+  const result = await call<{ revision: SigningRevision }>(`${base(orderId)}/${encodeURIComponent(revisionId)}/link-delivery`, {
+    method: "POST", body: { email, sent },
   });
   return result.revision;
 }

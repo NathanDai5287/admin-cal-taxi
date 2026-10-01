@@ -1,13 +1,13 @@
 # Hosting contract signing
 
-This branch integrates the `/host` documents step with self-hosted Documenso Community Edition v2.19.0. It depends on the companion Flask/Typst changes in `theta-xi-rental-contract` and must be deployed only after that backend and Documenso are ready. No live service is changed by this branch alone.
+The `/host` documents and order pages integrate with self-hosted Documenso Community Edition v2.19.0 and the companion Flask/Typst generator. A controlled live test deployment was installed on Minmus on Sep 30, 2026. Its SMTP sink does not relay mail; use controlled addresses until production email, backups, and capacity are approved.
 
 ## Administrator workflow
 
 1. Enter event and contract terms in the existing host steps. On Documents, enter each club representative's full name, email and club. Every club needs one or more representatives. Keep **Auto-sign Theta Xi** checked to use the generator's existing chapter signature, or leave it unchecked and enter the chapter representative's name and email.
 2. Select **Preview contract for signing**. The app saves the order automatically with an idempotent order creation key, renders a revision, stores its exact PDF, and shows it in the page. Each signer has a dedicated printed execution page. The generator reads actual PDF box positions after rendering, so page count and wrapped names do not depend on sample PDF coordinates.
-3. Select **Create signing links** only after reviewing the PDF. The server sends the stored bytes to one Documenso envelope, sets distribution to `NONE`, signing order to `PARALLEL`, and assigns a required signature, name and date field to each recipient. It returns a private URL per person. The UI has **Copy signing link** and **Copy completed-copy link** actions. Copying is never labeled as sending.
-4. The Documents page and order detail show each person's signing status and `N of M signed`. Refresh checks Documenso's current state. Once all recipients sign, the app downloads and stores the exact signed PDF and audit PDF before showing **Signed**. The order page offers those files and the original; existing unsigned archives are not described as signed.
+3. Select **Create signing links** only after reviewing the PDF. The server sends the stored bytes to one Documenso envelope, sets distribution to `NONE`, signing order to `PARALLEL`, and assigns a required signature, name and date field to each recipient. It returns a private URL per person. The UI has **Copy signing link**, **Mark sent**, and **Copy completed-copy link** actions. Copying does not mark a link sent; **Mark sent** records the administrator's acknowledgement and can be undone.
+4. The Documents page and order detail use the same signer preparation and progress section. They show each person's link delivery acknowledgement and signing status, plus `N of M signed`. Refresh checks Documenso's current state. Once all recipients sign, the app downloads and stores the exact signed PDF and audit PDF before showing **Signed**. The order page offers those files and the original; existing unsigned archives are not described as signed.
 
 ## Recipient workflow
 
@@ -27,7 +27,7 @@ The administrator sends the personal Documenso URL through a chosen channel. A r
 
 Configure a Documenso webhook pointing to `https://admin.cal.taxi/api/host/signing/webhook` for document signed/completed/cancelled events. Notifications only trigger a backend refresh: the backend confirms the envelope ID, external revision ID and recipient list by fetching from Documenso. Duplicate or delayed notifications cannot mark a different order signed. The page also refreshes on load, so a missed webhook is recoverable. Never put the API token, webhook secret, recipient URLs or completed-copy tokens in public environment variables or logs.
 
-Documenso installation, certificate, DNS/tunnel, email, storage and backup instructions are in `deploy/documenso/README.md` of the companion generator repository. Minmus currently has a separate Flask service on loopback port 5000; the prepared Documenso compose binds loopback port 3005 and needs a new `sign.cal.taxi` Cloudflare tunnel route. Its DNS and live service changes still need review and deployment.
+Documenso installation, certificate, DNS/tunnel, email, storage and backup instructions are in `deploy/documenso/README.md` of the companion generator repository. Minmus runs Flask on loopback port 5000, Documenso on loopback port 3005, and a dedicated Cloudflare tunnel for `sign.cal.taxi`.
 
 ## Revisions and finances
 
@@ -39,4 +39,4 @@ Signing does not invoke the financial confirmation action, change payment fields
 
 The Python suite tests field ownership, multiple club signers, chapter presigning on/off, immutable PDF upload, retries, partial/final status, duplicate sync, cancellation, and unchanged order finance fields. A controlled local Documenso v2.19.0 run exercised the actual create/distribute API, all three signers in parallel, account-free desktop and phone signing, typed and drawn signatures, automatic date field, final confirmation, signed/audit downloads, no recipient emails, completed-copy retrieval through the Next route, and cancellation rejection of old field submissions. The original downloaded from Documenso matched the preview's SHA-256 exactly.
 
-The production `sign.cal.taxi` deployment and live webhook delivery have **not** been tested. Do not send real signing links until the server configuration and controlled staging checks are applied. A locally self-signed PDF certificate may show an untrusted certificate warning in PDF readers; this integration makes no universal trust or legal compliance claim.
+The live `sign.cal.taxi` site and Documenso API have passed health/authentication checks; an end-to-end contract on that live instance and webhook delivery still need a controlled-address test. The live SMTP sink deliberately retains all mail locally, so no real recipient email will be delivered. Set up production SMTP, encrypted off-host backups, and additional disk capacity before sending real signing links. The self-signed PDF certificate may show an untrusted certificate warning in PDF readers; this integration makes no universal trust or legal compliance claim.
