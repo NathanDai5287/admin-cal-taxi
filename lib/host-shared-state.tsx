@@ -218,6 +218,8 @@ export type SharedDataApi = {
   update: Updater;
   bulk: (partial: Partial<SharedState>) => void;
   clear: () => void;
+  /** Retire only this order's draft after a successful final save or approval. */
+  finishOrder: (orderId: string, savedDraft?: SharedState) => void;
   /** Set a derived field and mark it user-owned, detaching it from its source. */
   setDerived: (key: OverrideKey, value: string) => void;
   /** Re-attach a derived field to its source, discarding the manual value. */
@@ -228,6 +230,12 @@ const Ctx = createContext<SharedDataApi | null>(null);
 
 function sameClubs(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function sameDraft(a: SharedState, b: SharedState): boolean {
+  return (Object.keys(EMPTY_STATE) as (keyof SharedState)[])
+    .filter(key => !["currentOrderId", "loadedOrderIdentity", "orderCreateRequestKey"].includes(key))
+    .every(key => JSON.stringify(a[key]) === JSON.stringify(b[key]));
 }
 
 /**
@@ -325,7 +333,9 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
 
   // Persist on every change after hydration
   useEffect(() => {
-    if (!persistEnabled.current) return;
+    // clear/finishOrder remove the key synchronously. Do not recreate an empty
+    // draft, or remove a different draft another browser tab is working on.
+    if (!persistEnabled.current || data === EMPTY_STATE) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -337,8 +347,19 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
   // workspace in sync before it can prepare a revision with old recipients.
   useEffect(() => {
     function onStorage(event: StorageEvent) {
-      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      if (event.key !== STORAGE_KEY) return;
       try {
+        if (!event.newValue) {
+          if (!event.oldValue) return;
+          const removed = migrate(JSON.parse(event.oldValue) as Record<string, unknown>);
+          setData(current => {
+            if (current.currentOrderId !== removed.currentOrderId) return current;
+            // A newer edit in this tab has not been finalized. Keep it and
+            // persist it again instead of letting an older save erase it.
+            return sameDraft(current, removed) ? EMPTY_STATE : { ...current };
+          });
+          return;
+        }
         const next = migrate(JSON.parse(event.newValue) as Record<string, unknown>);
         setData(current => current.currentOrderId && current.currentOrderId === next.currentOrderId && JSON.stringify(current) !== JSON.stringify(next) ? next : current);
       } catch { /* ignore corrupt or unrelated storage writes */ }
@@ -390,6 +411,18 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
     setData(EMPTY_STATE);
   }, []);
 
+  const finishOrder = useCallback((orderId: string, savedDraft?: SharedState) => {
+    if (!orderId) return;
+    const matches = (draft: SharedState) => savedDraft
+      ? sameDraft(draft, savedDraft) && (draft.currentOrderId === orderId || draft.currentOrderId === savedDraft.currentOrderId)
+      : draft.currentOrderId === orderId;
+    const stored = loadFromStorage();
+    if (stored && matches(stored)) {
+      try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* storage may be unavailable */ }
+    }
+    setData(current => matches(current) ? EMPTY_STATE : current);
+  }, []);
+
   const setDerived = useCallback((key: OverrideKey, value: string) => {
     setData(d => ({ ...d, [key]: value, overrides: { ...d.overrides, [key]: true } }));
   }, []);
@@ -399,8 +432,8 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const api = useMemo<SharedDataApi>(
-    () => ({ hydrated, data, update, bulk, clear, setDerived, resetDerived }),
-    [hydrated, data, update, bulk, clear, setDerived, resetDerived],
+    () => ({ hydrated, data, update, bulk, clear, finishOrder, setDerived, resetDerived }),
+    [hydrated, data, update, bulk, clear, finishOrder, setDerived, resetDerived],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

@@ -24,7 +24,7 @@ function signingDraft(order: Order): SharedState {
 
 export default function OrderSigning({ order }: { order: Order }) {
   const [data, setData] = useState<SharedState>(() => signingDraft(order));
-  const { data: workspace, bulk } = useSharedData();
+  const { data: workspace, bulk, finishOrder } = useSharedData();
   const [stale, setStale] = useState(false);
   const savedSnapshot = useRef(JSON.stringify(order.snapshot));
 
@@ -72,5 +72,5 @@ export default function OrderSigning({ order }: { order: Order }) {
     <button type="button" className="mt-3 text-[13px] underline" onClick={() => window.location.reload()}>Reload order</button>
   </div>;
 
-  return <SigningPanel data={data} update={update} orderId={order.id} saveOrder={saveOrder} showPresignControl beforeSigningAction={checkFresh} />;
+  return <SigningPanel data={data} update={update} orderId={order.id} saveOrder={saveOrder} showPresignControl beforeSigningAction={checkFresh} onFinalized={id => finishOrder(id, data)} />;
 }

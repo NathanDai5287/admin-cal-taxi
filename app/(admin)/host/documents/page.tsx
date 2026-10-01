@@ -12,6 +12,7 @@ import { Button, ButtonLink } from "@/components/brand/button";
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
@@ -58,7 +59,8 @@ function toNum(s: string): number | null {
 type GeneratedMap = Partial<Record<DocumentKind, Omit<OrderDocument, "id">>>;
 
 export default function DocumentsPage() {
-  const { hydrated, data, update, bulk } = useSharedData();
+  const { hydrated, data, update, bulk, finishOrder } = useSharedData();
+  const router = useRouter();
 
   // ── Per-document local fields ─────────────────────────────────────────────
   const contractSign = data.contractPresign;
@@ -477,6 +479,16 @@ export default function DocumentsPage() {
     }
   }
 
+  function finishWorkspace(orderId: string) {
+    finishOrder(orderId, data);
+    router.push(`/host/orders/${orderId}`);
+  }
+
+  async function saveAndFinish() {
+    const savedId = await saveToOrders();
+    if (savedId) finishWorkspace(savedId);
+  }
+
   // ── Row summaries ─────────────────────────────────────────────────────────
 
   const contractSummary = hydrated
@@ -544,7 +556,7 @@ export default function DocumentsPage() {
             </Button>
             <Button
               type="button"
-              onClick={() => { void saveToOrders(); }}
+              onClick={() => { void saveAndFinish(); }}
               disabled={saveBusy || !hydrated || !canSave}
               variant="primary"
               compact
@@ -599,7 +611,7 @@ export default function DocumentsPage() {
         >
           <ContractPanel sign={contractSign} onSignChange={value => update("contractPresign", value)} />
         </DocumentRow>
-        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} />
+        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} onFinalized={finishWorkspace} />
 
         <DocumentRow
           index={2}

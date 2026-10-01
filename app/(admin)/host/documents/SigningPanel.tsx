@@ -36,13 +36,14 @@ function validate(data: SharedState): string | null {
   return null;
 }
 
-export default function SigningPanel({ data, update, orderId, saveOrder, showPresignControl = false, beforeSigningAction }: {
+export default function SigningPanel({ data, update, orderId, saveOrder, showPresignControl = false, beforeSigningAction, onFinalized }: {
   data: SharedState;
   update: <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
   orderId: string;
   saveOrder: () => Promise<string | null>;
   showPresignControl?: boolean;
   beforeSigningAction?: () => Promise<void>;
+  onFinalized?: (orderId: string) => void;
 }) {
   const [revisions, setRevisions] = useState<SigningRevision[]>([]);
   const [preview, setPreview] = useState<SigningRevision | null>(null);
@@ -130,6 +131,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
       const revised = await createSigningLinksAction(preview.order_id, preview.id, preview.original_sha256);
       setPreview(revised);
       setRevisions(old => [revised, ...old.filter(r => r.id !== revised.id)]);
+      onFinalized?.(revised.order_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create signing links");
     } finally { setBusy(false); }
@@ -151,6 +153,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
         ? await createSigningLinksAction(revision.order_id, revision.id, revision.original_sha256)
         : await reconcileSigningAction(revision.order_id, revision.id);
       setRevisions(old => old.map(r => r.id === updated.id ? updated : r));
+      if (["awaiting_signatures", "preparing_completed_copy", "signed"].includes(updated.state)) onFinalized?.(updated.order_id);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not recover signing request"); }
     finally { setBusy(false); }
   }
