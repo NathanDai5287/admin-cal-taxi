@@ -36,12 +36,13 @@ function validate(data: SharedState): string | null {
   return null;
 }
 
-export default function SigningPanel({ data, update, orderId, saveOrder, showPresignControl = false }: {
+export default function SigningPanel({ data, update, orderId, saveOrder, showPresignControl = false, beforeSigningAction }: {
   data: SharedState;
   update: <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
   orderId: string;
   saveOrder: () => Promise<string | null>;
   showPresignControl?: boolean;
+  beforeSigningAction?: () => Promise<void>;
 }) {
   const [revisions, setRevisions] = useState<SigningRevision[]>([]);
   const [preview, setPreview] = useState<SigningRevision | null>(null);
@@ -56,15 +57,17 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
   useEffect(() => {
     if (!orderId) return;
     let active = true;
-    listSigningAction(orderId).then(async rows => {
+    function reload() { listSigningAction(orderId).then(async rows => {
       if (!active) return;
       if (rows[0]?.state === "awaiting_signatures" || rows[0]?.state === "preparing_completed_copy") {
         const latest = await syncSigningAction(orderId, rows[0].id).catch(() => rows[0]);
         rows[0] = latest;
       }
       if (active) setRevisions(rows);
-    }).catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load signing status"); });
-    return () => { active = false; };
+    }).catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load signing status"); }); }
+    reload();
+    window.addEventListener("focus", reload);
+    return () => { active = false; window.removeEventListener("focus", reload); };
   }, [orderId]);
 
   function changeSigner(id: string, patch: Partial<ContractSigner>) {
@@ -75,6 +78,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
     if (invalid) { setError(invalid); return; }
     setBusy(true); setError("");
     try {
+      await beforeSigningAction?.();
       const currentRevisions = orderId ? await listSigningAction(orderId) : [];
       const activeContract = currentRevisions.some(row => ["awaiting_signatures", "preparing_completed_copy", "signed"].includes(row.state));
       const savedId = orderId && activeContract ? orderId : await saveOrder();
@@ -98,6 +102,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
     if (!preview || previewPayload !== currentPayload) { setError("Contract details changed. Preview the new PDF before creating links."); return; }
     setBusy(true); setError("");
     try {
+      await beforeSigningAction?.();
       const revised = await createSigningLinksAction(preview.order_id, preview.id, preview.original_sha256);
       setPreview(revised);
       setRevisions(old => [revised, ...old.filter(r => r.id !== revised.id)]);
@@ -127,8 +132,18 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
   }
 
   async function copy(link: string, id: string) {
-    try { await navigator.clipboard.writeText(link); setCopied(id); }
-    catch { setError("Clipboard access failed. Open the link and copy it manually."); }
+    try {
+      if (id.startsWith("sign-")) {
+        const current = await listSigningAction(orderId);
+        const person = current[0]?.recipients.find(recipient => `sign-${recipient.email}` === id);
+        if (current[0]?.state !== "awaiting_signatures" || person?.link !== link || person.status === "SIGNED") {
+          setRevisions(current);
+          throw new Error("This signing link is no longer active. Refresh the order before copying.");
+        }
+      }
+      await navigator.clipboard.writeText(link); setCopied(id);
+    }
+    catch (err) { setError(err instanceof Error ? err.message : "Clipboard access failed. Open the link and copy it manually."); }
   }
 
   async function copyFinal(token: string, id: string) {

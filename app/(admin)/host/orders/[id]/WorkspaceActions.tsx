@@ -83,7 +83,7 @@ function clubsFrom(v: unknown, legacyClubName: unknown): string[] {
  *  workspace derives pricing from numGuests + pricingSelections, so a stored
  *  copy could only disagree with them. (It stays in the archive for the
  *  order detail page's historical display.) */
-function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState {
+export function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState {
   const overrides = overridesRecord(snapshot.overrides, EMPTY_STATE.overrides);
 
   // Legacy schema: the contract fee was separately overridable. It isn't

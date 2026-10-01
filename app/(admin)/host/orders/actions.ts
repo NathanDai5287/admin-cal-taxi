@@ -81,6 +81,16 @@ export async function updateOrderAction(
   }
 }
 
+export async function getOrderAction(orderId: string): Promise<ActionResult<Order>> {
+  await requireAdmin("/");
+  try {
+    const order = await getOrder(orderId);
+    return order ? { ok: true, data: order } : failed(new Error("Order not found."));
+  } catch (err) {
+    return failed(err);
+  }
+}
+
 export async function setOrderStatusAction(
   orderId: string,
   statusOverride: OrderStatus | null,

@@ -333,6 +333,20 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
     }
   }, [data]);
 
+  // An order may be edited in another tab. Keep an attached Documents
+  // workspace in sync before it can prepare a revision with old recipients.
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      try {
+        const next = migrate(JSON.parse(event.newValue) as Record<string, unknown>);
+        setData(current => current.currentOrderId && current.currentOrderId === next.currentOrderId && JSON.stringify(current) !== JSON.stringify(next) ? next : current);
+      } catch { /* ignore corrupt or unrelated storage writes */ }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const update: Updater = useCallback((key, value) => {
     setData(d => {
       const next = { ...d, [key]: value };
