@@ -52,9 +52,9 @@ export async function listSigning(orderId: string) {
   return result.revisions;
 }
 
-export async function prepareSigning(orderId: string, payload: Record<string, unknown>, requestKey: string) {
+export async function prepareSigning(orderId: string, payload: Record<string, unknown>, requestKey: string, expectedLatestRevisionId: string) {
   const result = await call<{ revision: SigningRevision }>(`${base(orderId)}/prepare`, {
-    method: "POST", body: { payload, requestKey },
+    method: "POST", body: { payload, requestKey, expectedLatestRevisionId },
   });
   return result.revision;
 }

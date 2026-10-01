@@ -10,9 +10,9 @@ export async function listSigningAction(orderId: string) {
   return listSigning(orderId);
 }
 
-export async function prepareSigningAction(orderId: string, payload: Record<string, unknown>, requestKey: string) {
+export async function prepareSigningAction(orderId: string, payload: Record<string, unknown>, requestKey: string, expectedLatestRevisionId: string) {
   await admin();
-  return prepareSigning(orderId, payload, requestKey);
+  return prepareSigning(orderId, payload, requestKey, expectedLatestRevisionId);
 }
 
 export async function createSigningLinksAction(orderId: string, revisionId: string, hash: string) {

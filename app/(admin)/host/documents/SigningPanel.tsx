@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/brand/button";
 import { cleanClubs, normalizeOrgName } from "@/lib/host-clubs";
 import type { SharedState, ContractSigner } from "@/lib/host-shared-state";
@@ -50,6 +50,8 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+  const [historyChanged, setHistoryChanged] = useState(false);
+  const latestSeen = useRef<string | undefined>(undefined);
   const clubs = [...new Set(cleanClubs(data.clubs).map(normalizeOrgName))];
   const currentPayload = useMemo(() => JSON.stringify(buildContractPayload(data, { sign: data.contractPresign })), [data]);
   const invalid = validate(data);
@@ -57,13 +59,19 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
   useEffect(() => {
     if (!orderId) return;
     let active = true;
+    latestSeen.current = undefined;
     function reload() { listSigningAction(orderId).then(async rows => {
       if (!active) return;
       if (rows[0]?.state === "awaiting_signatures" || rows[0]?.state === "preparing_completed_copy") {
         const latest = await syncSigningAction(orderId, rows[0].id).catch(() => rows[0]);
         rows[0] = latest;
       }
-      if (active) setRevisions(rows);
+      if (active) {
+        const latestId = rows[0]?.id ?? "";
+        if (latestSeen.current === undefined) { latestSeen.current = latestId; setHistoryChanged(false); }
+        else if (latestSeen.current !== latestId) setHistoryChanged(true);
+        setRevisions(rows);
+      }
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load signing status"); }); }
     reload();
     window.addEventListener("focus", reload);
@@ -80,17 +88,26 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
     try {
       await beforeSigningAction?.();
       const currentRevisions = orderId ? await listSigningAction(orderId) : [];
+      const latestId = currentRevisions[0]?.id ?? "";
+      if (orderId && (latestSeen.current === undefined || historyChanged || latestSeen.current !== latestId)) {
+        setHistoryChanged(true);
+        setRevisions(currentRevisions);
+        throw new Error("Signing history changed elsewhere. Reload this order before preparing another contract.");
+      }
+      if (currentRevisions[0]?.state === "awaiting_signatures" &&
+          !window.confirm("A signing request is awaiting signatures. Preparing a changed contract will cancel its outstanding links. Continue?")) return;
       const activeContract = currentRevisions.some(row => ["awaiting_signatures", "preparing_completed_copy", "signed"].includes(row.state));
       const savedId = orderId && activeContract ? orderId : await saveOrder();
       if (!savedId) throw new Error("Save the order before preparing signing.");
       const payload = buildContractPayload(data, { sign: data.contractPresign });
       const key = crypto.randomUUID();
-      const revision = await prepareSigningAction(savedId, payload, key);
+      const revision = await prepareSigningAction(savedId, payload, key, latestId);
       if (orderId && revision.state === "preview") {
         const updatedOrderId = await saveOrder();
         if (!updatedOrderId) throw new Error("The preview was stored, but the order update failed. Retry saving before creating links.");
       }
       setPreview(revision);
+      latestSeen.current = revision.id;
       setPreviewPayload(JSON.stringify(payload));
       setRevisions(old => [revision, ...old.filter(r => r.id !== revision.id)]);
     } catch (err) {
@@ -181,8 +198,9 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
       <label className="text-[12px] text-muted">Theta Xi representative email<input className="field-input mt-1 w-full" type="email" value={data.chapterSignerEmail} onChange={e => update("chapterSignerEmail", e.target.value)} /></label>
     </div>}
     <div className="flex flex-wrap items-center gap-3">
-      <Button type="button" variant="secondary" compact disabled={busy || !!invalid} onClick={prepare}>{busy ? "Working…" : "Preview contract for signing"}</Button>
+      <Button type="button" variant="secondary" compact disabled={busy || !!invalid || historyChanged} onClick={prepare}>{busy ? "Working…" : "Preview contract for signing"}</Button>
       {invalid && <span className="text-[12px] text-muted">{invalid}</span>}
+      {historyChanged && <span className="text-[12px] text-warn">Signing history changed elsewhere. Reload the page before preparing a revision.</span>}
     </div>
     {preview && <div className="space-y-3 rounded-sm border border-border p-4">
       <p className="text-[13px] font-semibold">Revision {preview.revision}: review the exact PDF that will be uploaded.</p>
