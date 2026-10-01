@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/brand/button";
 
-/** Delete, with a confirmation — there is no undo once minmus drops the row. */
+/** Remove the order; the backend retires links and retains signing records. */
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -14,7 +14,7 @@ export default function DeleteOrderButton({ orderId }: { orderId: string }) {
 
   async function onDelete() {
     const ok = window.confirm(
-      "Delete this order permanently? Its documents and pricing snapshot cannot be recovered.",
+      "Delete this order? Its pricing snapshot and unsigned document entries will no longer be available. Outstanding signing links will be cancelled. Contract signing records and their stored PDFs will be retained.",
     );
     if (!ok) return;
     setBusy(true);
