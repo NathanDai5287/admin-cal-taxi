@@ -17,6 +17,8 @@ import { notFound } from "next/navigation";
 import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
 import { formatDateISO } from "@/lib/host-format";
+import { listSigning } from "@/lib/host-signing";
+import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { fmtUSD } from "../order-format";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -83,6 +85,14 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
+  let signingContract: StoredContractDownload | null = null;
+  let signingLookupFailed = false;
+  try {
+    signingContract = contractDownload(await listSigning(order.id));
+  } catch {
+    signingLookupFailed = true;
+  }
+
   const status = deriveStatus(order);
   const ledger = computeLedger(order.documents);
   const planPreview = hostingPlanFromOrder(order);
@@ -129,7 +139,7 @@ export default async function OrderDetailPage({
         </div>
       </div>
 
-      <OrderDocuments order={order} />
+      <OrderDocuments key={order.id} order={order} signingContract={signingContract} signingLookupFailed={signingLookupFailed} />
 
       <section className="card">
         <div className="card-header">

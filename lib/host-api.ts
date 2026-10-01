@@ -29,7 +29,15 @@ export async function generatePdf(path: string, body: unknown): Promise<{ filena
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  return downloadResponse(res);
+}
 
+/** Download an exact stored signing file without regenerating its contents. */
+export async function downloadStoredPdf(path: string): Promise<{ filename: string }> {
+  return downloadResponse(await fetch(path, { cache: "no-store" }));
+}
+
+async function downloadResponse(res: Response): Promise<{ filename: string }> {
   if (!res.ok) {
     let payload: ApiError;
     try {
@@ -38,6 +46,10 @@ export async function generatePdf(path: string, body: unknown): Promise<{ filena
       payload = { error: "request_failed", detail: `${res.status} ${res.statusText}` };
     }
     throw new ApiCallError(res.status, payload);
+  }
+
+  if (!res.headers.get("content-type")?.includes("application/pdf")) {
+    throw new Error("The download did not return a PDF. Refresh the page and sign in again if needed.");
   }
 
   const blob = await res.blob();

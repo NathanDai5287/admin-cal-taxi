@@ -2,17 +2,55 @@
 
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
-import DocumentRow from "@/components/host/DocumentRow";
+import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
-import { ApiCallError, generatePdf } from "@/lib/host-api";
-import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
-import { formatDateISO } from "@/lib/host-format";
+import { ApiCallError, downloadStoredPdf, generatePdf } from "@/lib/host-api";
+import { DOCUMENT_META, DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from "@/lib/host-documents";
+import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
+import { liveBreakdown } from "@/lib/host-derive";
+import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
 import ContractPanel from "../../documents/ContractPanel";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
-import WorkspaceActions from "./WorkspaceActions";
+import WorkspaceActions, { sharedStateFromSnapshot } from "./WorkspaceActions";
 import OrderSigning from "./OrderSigning";
+import { buildLineItems } from "../../documents/build-line-items";
+import { listSigningAction } from "../../documents/signing-actions";
+
+/** Missing unsigned PDFs use this order's details, never the Create workspace. */
+function defaultDocuments(order: Order, depositNumber?: string) {
+  const saved = sharedStateFromSnapshot(order.snapshot);
+  const data = {
+    ...saved,
+    clubs: saved.clubs.length ? saved.clubs : [order.clubName],
+    eventDate: order.eventDate,
+    finalPrice: String(order.rentalPrice ?? ""),
+    depositAmount: String(order.depositAmount ?? ""),
+    overrides: { ...saved.overrides, finalPrice: true, depositAmount: true },
+  };
+  const issueDate = todayIso();
+  const originalInvoice = depositNumber || saved.lastDepositInvoiceNumber || "";
+  const invoiceNumber = originalInvoice || mintContractNumber(order.clubName, order.eventDate).replace(/^CTR-/, "DEP-");
+  const fields = {
+    contract: { sign: saved.contractPresign },
+    deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
+    rental: { items: buildLineItems(liveBreakdown(data), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
+    creditMemo: { amount: data.depositAmount, issueDate, originalInvoice, refundMethod: "", refundDescription: "", memoNumber: "" },
+  };
+  const payloads = {
+    contract: buildContractPayload(data, fields.contract),
+    deposit_invoice: buildDepositPayload(data, fields.deposit),
+    rental_invoice: buildRentalPayload(data, fields.rental),
+    credit_memo: buildCreditMemoPayload(data, fields.creditMemo),
+  };
+  const missing = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind,
+    kind === "rental_invoice" && (!Number.isFinite(order.rentalPrice) || (order.rentalPrice ?? 0) <= 0)
+      ? ["a positive rental fee"]
+      : missingFields(kind, data, fields),
+  ])) as Record<DocumentKind, string[]>;
+  return { payloads, missing };
+}
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
   const matches = documents.filter(d => d.kind === kind);
@@ -67,20 +105,52 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message : err instanceof Error ? err.message : "request failed";
 }
 
-export default function OrderDocuments({ order }: { order: Order }) {
+export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false }: {
+  order: Order;
+  signingContract?: StoredContractDownload | null;
+  signingLookupFailed?: boolean;
+}) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
+  const [generatedDepositNumber, setGeneratedDepositNumber] = useState("");
+  const defaults = defaultDocuments(order, docs.deposit_invoice?.number ?? generatedDepositNumber);
+  const [storedContract, setStoredContract] = useState(signingContract);
   const [busy, setBusy] = useState<Partial<Record<DocumentKind, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<DocumentKind, string>>>({});
   const [downloadAllBusy, setDownloadAllBusy] = useState(false);
   const [downloadAllReport, setDownloadAllReport] = useState<string | null>(null);
 
+  function stateFor(kind: DocumentKind): RowState {
+    if (kind === "contract") {
+      if (signingLookupFailed) return { kind: "waiting", reason: "Could not verify stored contracts. Reload before downloading." };
+      if (storedContract) return { kind: "generated", number: `${storedContract.state.replaceAll("_", " ")} · revision ${storedContract.revision}` };
+    }
+    const doc = docs[kind];
+    if (doc) return { kind: "generated", number: doc.number };
+    const missing = defaults.missing[kind];
+    return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
+  }
+
   async function download(kind: DocumentKind): Promise<boolean> {
     const doc = docs[kind];
-    if (!doc) return false;
+    const state = stateFor(kind);
+    if (state.kind === "blocked" || state.kind === "waiting") return false;
     setBusy(previous => ({ ...previous, [kind]: true }));
     setErrors(previous => ({ ...previous, [kind]: "" }));
     try {
-      await generatePdf(DOCUMENT_META[kind].endpoint, doc.payload);
+      if (kind === "contract") {
+        // Signing may have completed or changed since this page was loaded.
+        const current = contractDownload(await listSigningAction(order.id));
+        if (!current && storedContract) throw new Error("Signing history changed. Reload this order before downloading its contract.");
+        setStoredContract(current);
+        if (current) {
+          await downloadStoredPdf(`/api/host/signing/files/${encodeURIComponent(order.id)}/${encodeURIComponent(current.revisionId)}/${current.kind}`);
+        } else {
+          await generatePdf(DOCUMENT_META[kind].endpoint, doc?.payload ?? defaults.payloads[kind]);
+        }
+      } else {
+        const { filename } = await generatePdf(DOCUMENT_META[kind].endpoint, doc?.payload ?? defaults.payloads[kind]);
+        if (kind === "deposit_invoice") setGeneratedDepositNumber(filename.replace(/\.pdf$/i, ""));
+      }
       return true;
     } catch (err) {
       setErrors(previous => ({ ...previous, [kind]: errorMessage(err) }));
@@ -97,7 +167,8 @@ export default function OrderDocuments({ order }: { order: Order }) {
     const failed: string[] = [];
     const missing: string[] = [];
     const available = DOCUMENT_ORDER.filter(kind => {
-      if (docs[kind]) return true;
+      const state = stateFor(kind);
+      if (state.kind === "generated" || state.kind === "ready") return true;
       missing.push(DOCUMENT_META[kind].label);
       return false;
     });
@@ -108,19 +179,19 @@ export default function OrderDocuments({ order }: { order: Order }) {
     });
     setDownloadAllReport([
       succeeded ? `${succeeded} downloaded` : "",
-      missing.length ? `not generated: ${missing.join(", ")}` : "",
+      missing.length ? `not ready: ${missing.join(", ")}` : "",
       failed.length ? `failed: ${failed.join(", ")}` : "",
     ].filter(Boolean).join(" · ") || "Nothing to download.");
     setDownloadAllBusy(false);
   }
 
-  const contract = docs.contract?.payload;
+  const contract = docs.contract?.payload ?? defaults.payloads.contract;
 
   return (
     <DocumentsSection
       actions={<>
         <div className="flex flex-nowrap items-center gap-3">
-          <Button type="button" onClick={downloadAll} disabled={downloadAllBusy || !order.documents.length} variant="secondary" compact className="min-w-0 flex-1 sm:flex-none">
+          <Button type="button" onClick={downloadAll} disabled={downloadAllBusy} variant="secondary" compact className="min-w-0 flex-1 sm:flex-none">
             {downloadAllBusy ? "Downloading…" : "Download All"}
           </Button>
           <WorkspaceActions order={order} loadLabel="Update Order" showDuplicate={false} compact />
@@ -142,24 +213,31 @@ export default function OrderDocuments({ order }: { order: Order }) {
           kind={kind}
           label={DOCUMENT_META[kind].label}
           subtitle={DOCUMENT_META[kind].subtitle}
-          state={doc ? { kind: "generated", number: doc.number } : { kind: "unavailable" }}
-          summary={rowSummary(kind, doc, order)}
+          state={stateFor(kind)}
+          summary={kind === "contract" && storedContract
+            ? `${storedContract.kind === "completed" ? "Exact completed PDF" : "Exact stored original"} · revision ${storedContract.revision}`
+            : rowSummary(kind, doc, order) ?? (kind === "contract"
+            ? `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`
+            : kind === "credit_memo" ? fmtUSD(order.depositAmount ?? 0)
+            : `${fmtUSD(kind === "deposit_invoice" ? order.depositAmount ?? 0 : order.rentalPrice ?? 0)} · due ${formatDateISO(addDaysIso(order.eventDate, kind === "deposit_invoice" ? -7 : 2))}`)}
           onDownload={() => { void download(kind); }}
           busy={!!busy[kind]}
           error={errors[kind]}
           downloadLabel="Download PDF"
           downloadVariant="primary"
-          fieldsLabel="View fields"
+          fieldsLabel={kind === "contract" && storedContract ? "About this contract" : "View fields"}
           defaultOpen={kind === "contract" && !!doc}
           inlineFields={kind === "contract"}
           grouped
         >
-          {doc && (kind === "contract"
-            ? <ContractPanel sign={doc.payload.sign === true} onSignChange={() => {}} readOnly />
-            : <SavedFields doc={doc} />)}
+          {kind === "contract"
+            ? storedContract
+              ? <p className="text-[13px] text-muted">Review the stored PDF for revision {storedContract.revision}&rsquo;s approved terms and signatures.</p>
+              : <ContractPanel sign={contract.sign === true} onSignChange={() => {}} readOnly />
+            : doc ? <SavedFields doc={doc} /> : <p className="text-[13px] text-muted">Generated from this order’s saved details. Load the order to customize invoice fields.</p>}
         </DocumentRow>;
       })}
-      <OrderSigning order={order} />
+      <OrderSigning key={order.id} order={order} />
     </DocumentsSection>
   );
 }
