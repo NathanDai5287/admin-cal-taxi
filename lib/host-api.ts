@@ -4,6 +4,7 @@
  */
 
 export type ApiError = { error: string; detail?: string };
+export type PdfFile = { filename: string; blob: Blob };
 
 export class ApiCallError extends Error {
   status: number;
@@ -24,20 +25,29 @@ export class ApiCallError extends Error {
  * server (suitable for surfacing in form-level error UI).
  */
 export async function generatePdf(path: string, body: unknown): Promise<{ filename: string }> {
+  return downloadPdf(await fetchGeneratedPdf(path, body));
+}
+
+/** Fetch first so related PDFs can be validated together before downloading. */
+export async function fetchGeneratedPdf(path: string, body: unknown): Promise<PdfFile> {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return downloadResponse(res);
+  return readPdfResponse(res);
 }
 
 /** Download an exact stored signing file without regenerating its contents. */
 export async function downloadStoredPdf(path: string): Promise<{ filename: string }> {
-  return downloadResponse(await fetch(path, { cache: "no-store" }));
+  return downloadPdf(await fetchStoredPdf(path));
 }
 
-async function downloadResponse(res: Response): Promise<{ filename: string }> {
+export async function fetchStoredPdf(path: string): Promise<PdfFile> {
+  return readPdfResponse(await fetch(path, { cache: "no-store" }));
+}
+
+async function readPdfResponse(res: Response): Promise<PdfFile> {
   if (!res.ok) {
     let payload: ApiError;
     try {
@@ -54,7 +64,10 @@ async function downloadResponse(res: Response): Promise<{ filename: string }> {
 
   const blob = await res.blob();
   const filename = parseFilename(res.headers.get("content-disposition")) || "document.pdf";
+  return { filename, blob };
+}
 
+export function downloadPdf({ filename, blob }: PdfFile): { filename: string } {
   // Trigger download
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

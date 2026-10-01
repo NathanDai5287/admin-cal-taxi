@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
-import { ApiCallError, generatePdf } from "@/lib/host-api";
+import { ApiCallError, downloadPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
 import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
@@ -86,7 +86,6 @@ export default function DocumentsPage() {
   const [depositDueEdited, setDepositDueEdited] = useState(false);
   const [rentalDueEdited, setRentalDueEdited] = useState(false);
   const [creditAmountEdited, setCreditAmountEdited] = useState(false);
-  const [originalInvoiceEdited, setOriginalInvoiceEdited] = useState(false);
 
   // Deposit: amount ← effective(depositAmount), due date ← event date minus 7 days.
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
@@ -144,19 +143,6 @@ export default function DocumentsPage() {
     if (suggested) setCreditMemo(f => ({ ...f, amount: suggested }));
   }, [hydrated, creditAmountEdited, data]);
 
-  // Credit memo: original invoice ← last generated deposit invoice number.
-  // Re-seeds whenever that number changes (including a deposit invoice
-  // regenerated with a new number in this same session), as long as the user
-  // hasn't typed one — an auto-filled value must never point at a superseded
-  // invoice.
-  useEffect(() => {
-    if (!hydrated || originalInvoiceEdited) return;
-    const latest = data.lastDepositInvoiceNumber;
-    if (latest) {
-      setCreditMemo(f => (f.originalInvoice === latest ? f : { ...f, originalInvoice: latest }));
-    }
-  }, [hydrated, originalInvoiceEdited, data.lastDepositInvoiceNumber]);
-
   // ── Generation state ──────────────────────────────────────────────────────
 
   // `generatedRef` is the read-fresh source of truth for the "has this kind
@@ -213,10 +199,9 @@ export default function DocumentsPage() {
    *  above hasn't re-rendered yet. */
   function resolvedOriginalInvoice(): string {
     return (
-      creditMemo.originalInvoice.trim()
-      || data.lastDepositInvoiceNumber
+      data.lastDepositInvoiceNumber
       || generatedRef.current.deposit_invoice?.number
-      || ""
+      || mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate).replace(/^CTR-/, "DEP-")
     );
   }
 
@@ -233,26 +218,13 @@ export default function DocumentsPage() {
     const gen = generated[kind];
     if (gen) return { kind: "generated", number: gen.number };
 
-    if (kind === "credit_memo") {
-      const hasDepositNumber =
-        creditMemo.originalInvoice.trim() !== ""
-        || Boolean(data.lastDepositInvoiceNumber)
-        || Boolean(generatedRef.current.deposit_invoice);
-      if (!hasDepositNumber) {
-        return {
-          kind: "waiting",
-          reason: "Generate the security deposit invoice first — its invoice number is needed here. Or type one in manually below.",
-        };
-      }
-    }
-
     const missing = missingFields(kind, data, fieldsFor());
     return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
   }
 
   async function generateDoc(
     kind: DocumentKind,
-    batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string },
+    batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string; requests?: Map<DocumentKind, Promise<PdfFile>> },
   ): Promise<boolean> {
     setErrors(e => ({ ...e, [kind]: null }));
     setSuccesses(s => ({ ...s, [kind]: null }));
@@ -291,7 +263,28 @@ export default function DocumentsPage() {
         }
       }
 
-      const { filename } = await generatePdf(DOCUMENT_META[kind].endpoint, payload);
+      const requests = batch?.requests ?? new Map<DocumentKind, Promise<PdfFile>>();
+      function requestPdf(requestKind: DocumentKind, requestPayload: Record<string, unknown>) {
+        let pending = requests.get(requestKind);
+        if (!pending) {
+          pending = fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, requestPayload);
+          requests.set(requestKind, pending);
+        }
+        return pending;
+      }
+      const originalInvoice = String(payload.original_invoice ?? "");
+      const depositPayload = buildDepositPayload(data, { ...deposit, invoiceNumber: originalInvoice });
+      const needsDeposit = kind === "credit_memo";
+      const [file, referencedDeposit] = await Promise.all([
+        requestPdf(kind, payload),
+        needsDeposit ? requestPdf("deposit_invoice", depositPayload) : Promise.resolve(null),
+      ]);
+      if (referencedDeposit) {
+        const number = referencedDeposit.filename.replace(/\.pdf$/i, "");
+        recordGenerated("deposit_invoice", { kind: "deposit_invoice", number, filename: referencedDeposit.filename, amount: toNum(deposit.amount), generatedAt: new Date().toISOString(), payload: depositPayload });
+        update("lastDepositInvoiceNumber", number);
+      }
+      const { filename } = downloadPdf(file);
       const number = kind === "contract"
         ? mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate)
         : filename.replace(/\.pdf$/i, "");
@@ -342,7 +335,7 @@ export default function DocumentsPage() {
         || data.lastDepositInvoiceNumber
         || mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate).replace(/^CTR-/, "DEP-")
       : "";
-    const memoOriginalInvoice = creditMemo.originalInvoice.trim() || depositInvoiceNumber;
+    const memoOriginalInvoice = depositInvoiceNumber || resolvedOriginalInvoice();
     const ready: DocumentKind[] = [];
     for (const kind of DOCUMENT_ORDER) {
       const status = kind === "credit_memo" && memoOriginalInvoice
@@ -358,9 +351,11 @@ export default function DocumentsPage() {
       }
       ready.push(kind);
     }
+    const requests = new Map<DocumentKind, Promise<PdfFile>>();
     const results = await Promise.all(ready.map(kind => generateDoc(kind, {
       depositInvoiceNumber,
       memoOriginalInvoice: memoOriginalInvoice || undefined,
+      requests,
     })));
     ready.forEach((kind, index) => {
       const ok = results[index];
@@ -528,10 +523,6 @@ export default function DocumentsPage() {
     ? "Auto-filled from the contract’s deposit amount."
     : undefined;
 
-  const creditMemoOriginalInvoiceHint = data.lastDepositInvoiceNumber
-    ? `Auto-filled from your last generated deposit invoice (${data.lastDepositInvoiceNumber}).`
-    : "Generate a deposit invoice first to auto-fill this.";
-
   return (
     <div className="space-y-8">
       <div>
@@ -685,14 +676,11 @@ export default function DocumentsPage() {
             fields={creditMemo}
             onChange={patch => {
               if (patch.amount !== undefined) setCreditAmountEdited(true);
-              if (patch.originalInvoice !== undefined) setOriginalInvoiceEdited(true);
               setCreditMemo(f => ({ ...f, ...patch }));
             }}
             amountHint={creditMemoAmountHint}
-            originalInvoiceHint={creditMemoOriginalInvoiceHint}
             resets={{
               amount: creditAmountEdited ? () => setCreditAmountEdited(false) : undefined,
-              originalInvoice: originalInvoiceEdited ? () => setOriginalInvoiceEdited(false) : undefined,
             }}
           />
         </DocumentRow>

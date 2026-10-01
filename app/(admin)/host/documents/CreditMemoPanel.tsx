@@ -7,15 +7,13 @@ export default function CreditMemoPanel({
   fields,
   onChange,
   amountHint,
-  originalInvoiceHint,
   resets,
 }: {
   fields: CreditMemoFields;
   onChange: (patch: Partial<CreditMemoFields>) => void;
   amountHint?: string;
-  originalInvoiceHint?: string;
   /** Per-field reset callbacks; a set callback means the field is pinned. */
-  resets?: { amount?: () => void; originalInvoice?: () => void };
+  resets?: { amount?: () => void };
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
@@ -34,13 +32,6 @@ export default function CreditMemoPanel({
           onChange={e => onChange({ issueDate: e.target.value })}
         />
       </Field>
-      <Field label="Original Deposit Invoice" hint={originalInvoiceHint} onResetAuto={resets?.originalInvoice}>
-        <input
-          className="field-input" required placeholder="e.g. DEP-2026-0315-PISIGM"
-          value={fields.originalInvoice}
-          onChange={e => onChange({ originalInvoice: e.target.value })}
-        />
-      </Field>
       <Field label="Refund Method">
         <input
           className="field-input"
@@ -55,13 +46,6 @@ export default function CreditMemoPanel({
           placeholder="auto: Refund of security deposit for the event on …"
           value={fields.refundDescription}
           onChange={e => onChange({ refundDescription: e.target.value })}
-        />
-      </Field>
-      <Field label="Memo Number" hint="Optional. Leave blank to auto-generate.">
-        <input
-          className="field-input" placeholder="auto: CM-YYYY-MMDD-XXXXXX"
-          value={fields.memoNumber}
-          onChange={e => onChange({ memoNumber: e.target.value })}
         />
       </Field>
     </div>

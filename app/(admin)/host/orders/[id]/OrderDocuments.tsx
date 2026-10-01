@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/brand/button";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
-import { ApiCallError, downloadStoredPdf, generatePdf } from "@/lib/host-api";
+import { ApiCallError, downloadPdf, fetchStoredPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { DOCUMENT_META, DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from "@/lib/host-documents";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
 import { liveBreakdown } from "@/lib/host-derive";
@@ -30,13 +30,12 @@ function defaultDocuments(order: Order, depositNumber?: string) {
     overrides: { ...saved.overrides, finalPrice: true, depositAmount: true },
   };
   const issueDate = todayIso();
-  const originalInvoice = depositNumber || saved.lastDepositInvoiceNumber || "";
-  const invoiceNumber = originalInvoice || mintContractNumber(order.clubName, order.eventDate).replace(/^CTR-/, "DEP-");
+  const invoiceNumber = depositNumber || saved.lastDepositInvoiceNumber || mintContractNumber(data.clubs[0] ?? "partner", order.eventDate).replace(/^CTR-/, "DEP-");
   const fields = {
     contract: { sign: saved.contractPresign },
     deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
     rental: { items: buildLineItems(liveBreakdown(data), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
-    creditMemo: { amount: data.depositAmount, issueDate, originalInvoice, refundMethod: "", refundDescription: "", memoNumber: "" },
+    creditMemo: { amount: data.depositAmount, issueDate, originalInvoice: invoiceNumber, refundMethod: "", refundDescription: "", memoNumber: "" },
   };
   const payloads = {
     contract: buildContractPayload(data, fields.contract),
@@ -111,8 +110,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
   signingLookupFailed?: boolean;
 }) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
-  const [generatedDepositNumber, setGeneratedDepositNumber] = useState("");
-  const defaults = defaultDocuments(order, docs.deposit_invoice?.number ?? generatedDepositNumber);
+  const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
   const [storedContract, setStoredContract] = useState(signingContract);
   const [busy, setBusy] = useState<Partial<Record<DocumentKind, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<DocumentKind, string>>>({});
@@ -130,27 +128,37 @@ export default function OrderDocuments({ order, signingContract = null, signingL
     return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
   }
 
-  async function download(kind: DocumentKind): Promise<boolean> {
+  async function download(kind: DocumentKind, requests = new Map<DocumentKind, Promise<PdfFile>>()): Promise<boolean> {
     const doc = docs[kind];
     const state = stateFor(kind);
     if (state.kind === "blocked" || state.kind === "waiting") return false;
     setBusy(previous => ({ ...previous, [kind]: true }));
     setErrors(previous => ({ ...previous, [kind]: "" }));
     try {
-      if (kind === "contract") {
-        // Signing may have completed or changed since this page was loaded.
-        const current = contractDownload(await listSigningAction(order.id));
-        if (!current && storedContract) throw new Error("Signing history changed. Reload this order before downloading its contract.");
-        setStoredContract(current);
-        if (current) {
-          await downloadStoredPdf(`/api/host/signing/files/${encodeURIComponent(order.id)}/${encodeURIComponent(current.revisionId)}/${current.kind}`);
-        } else {
-          await generatePdf(DOCUMENT_META[kind].endpoint, doc?.payload ?? defaults.payloads[kind]);
-        }
-      } else {
-        const { filename } = await generatePdf(DOCUMENT_META[kind].endpoint, doc?.payload ?? defaults.payloads[kind]);
-        if (kind === "deposit_invoice") setGeneratedDepositNumber(filename.replace(/\.pdf$/i, ""));
+      async function requestPdf(requestKind: DocumentKind): Promise<PdfFile> {
+        const cached = requests.get(requestKind);
+        if (cached) return cached;
+        const pending = (async () => {
+          if (requestKind !== "contract") return fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, docs[requestKind]?.payload ?? defaults.payloads[requestKind]);
+          // Signing may have completed or changed since this page was loaded.
+          const current = contractDownload(await listSigningAction(order.id));
+          if (!current && storedContract) throw new Error("Signing history changed. Reload this order before downloading its contract.");
+          setStoredContract(current);
+          if (current) {
+            return fetchStoredPdf(`/api/host/signing/files/${encodeURIComponent(order.id)}/${encodeURIComponent(current.revisionId)}/${current.kind}`);
+          }
+          return fetchGeneratedPdf(DOCUMENT_META.contract.endpoint, docs.contract?.payload ?? defaults.payloads.contract);
+        })();
+        requests.set(requestKind, pending);
+        return pending;
       }
+      // Prepare the referenced invoice automatically, sharing its request with
+      // Download All. The memo is downloaded only if both PDFs succeed.
+      const [file] = await Promise.all([
+        requestPdf(kind),
+        kind === "credit_memo" && !doc && !docs.deposit_invoice ? requestPdf("deposit_invoice") : Promise.resolve(),
+      ]);
+      downloadPdf(file);
       return true;
     } catch (err) {
       setErrors(previous => ({ ...previous, [kind]: errorMessage(err) }));
@@ -172,7 +180,8 @@ export default function OrderDocuments({ order, signingContract = null, signingL
       missing.push(DOCUMENT_META[kind].label);
       return false;
     });
-    const results = await Promise.all(available.map(download));
+    const requests = new Map<DocumentKind, Promise<PdfFile>>();
+    const results = await Promise.all(available.map(kind => download(kind, requests)));
     available.forEach((kind, index) => {
       if (results[index]) succeeded += 1;
       else failed.push(DOCUMENT_META[kind].label);
