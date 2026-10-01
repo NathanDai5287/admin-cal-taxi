@@ -42,6 +42,7 @@ import DepositPanel from "./DepositPanel";
 import RentalPanel from "./RentalPanel";
 import CreditMemoPanel from "./CreditMemoPanel";
 import PaymentMessagePanel from "./PaymentMessagePanel";
+import SigningPanel from "./SigningPanel";
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message
@@ -60,7 +61,7 @@ export default function DocumentsPage() {
   const { hydrated, data, update, bulk } = useSharedData();
 
   // ── Per-document local fields ─────────────────────────────────────────────
-  const [contractSign, setContractSign] = useState(false);
+  const contractSign = data.contractPresign;
 
   const [deposit, setDeposit] = useState<DepositFields>({
     amount: "", issueDate: todayIso(), dueDate: "", invoiceNumber: "",
@@ -378,6 +379,8 @@ export default function DocumentsPage() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const createRequestKeyRef = useRef("");
+  useEffect(() => { createRequestKeyRef.current = data.orderCreateRequestKey; }, [data.orderCreateRequestKey, identityKey]);
 
   // The archive keys a rental on these two, and rejects a save without them.
   const canSave = cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
@@ -412,16 +415,20 @@ export default function DocumentsPage() {
    * holds — so pressing this twice, or after regenerating a PDF, converges
    * rather than piling up duplicates.
    */
-  async function saveToOrders() {
+  async function saveToOrders(skipContract = false): Promise<string | null> {
     setSaveBusy(true);
     setSaveError(null);
     setSaveNotice(null);
     try {
-      const documents = generatedDocuments();
+      const documents = generatedDocuments().filter(doc => !skipContract || doc.kind !== "contract");
       const clubName = clubsDisplay(data.clubs);
 
       if (!data.currentOrderId) {
+        const requestKey = data.orderCreateRequestKey || createRequestKeyRef.current || crypto.randomUUID();
+        createRequestKeyRef.current = requestKey;
+        if (!data.orderCreateRequestKey) update("orderCreateRequestKey", requestKey);
         const res = await saveOrderAction({
+          requestKey,
           clubName,
           eventDate: data.eventDate,
           rentalPrice: toNum(effectiveRentalPrice(data)),
@@ -429,14 +436,14 @@ export default function DocumentsPage() {
           snapshot: orderSnapshot(),
           documents,
         });
-        if (!res.ok) { setSaveError(res.error); return; }
+        if (!res.ok) { setSaveError(res.error); return null; }
         bulk({ currentOrderId: res.data.id, loadedOrderIdentity: `${clubName}|${data.eventDate}` });
         setSaveNotice(
           documents.length
             ? `Saved as a new order with ${documents.length} document(s).`
             : "Saved as a new order. Generate documents and save again to attach them.",
         );
-        return;
+        return res.data.id;
       }
 
       // Existing order: re-send every document, plus refresh the stored
@@ -448,11 +455,11 @@ export default function DocumentsPage() {
         depositAmount: toNum(effective(data, "depositAmount")),
         snapshot: orderSnapshot(),
       });
-      if (!patch.ok) { setSaveError(patch.error); return; }
+      if (!patch.ok) { setSaveError(patch.error); return null; }
 
       for (const doc of documents) {
         const res = await addDocumentAction(data.currentOrderId, doc);
-        if (!res.ok) { setSaveError(res.error); return; }
+        if (!res.ok) { setSaveError(res.error); return null; }
       }
       // The order now matches the workspace — reset the divergence baseline.
       bulk({ loadedOrderIdentity: `${clubName}|${data.eventDate}` });
@@ -461,6 +468,10 @@ export default function DocumentsPage() {
           ? `Order updated — ${documents.length} document(s) archived.`
           : "Order updated.",
       );
+      return data.currentOrderId;
+    } catch (err) {
+      setSaveError(errorMessage(err));
+      return null;
     } finally {
       setSaveBusy(false);
     }
@@ -533,7 +544,7 @@ export default function DocumentsPage() {
             </Button>
             <Button
               type="button"
-              onClick={saveToOrders}
+              onClick={() => { void saveToOrders(); }}
               disabled={saveBusy || !hydrated || !canSave}
               variant="primary"
               compact
@@ -586,8 +597,9 @@ export default function DocumentsPage() {
           grouped
           inlineFields
         >
-          <ContractPanel sign={contractSign} onSignChange={setContractSign} />
+          <ContractPanel sign={contractSign} onSignChange={value => update("contractPresign", value)} />
         </DocumentRow>
+        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} />
 
         <DocumentRow
           index={2}

@@ -10,7 +10,7 @@
 
 import { formatDateISO } from "./host-format";
 import { effective, effectiveRentalPrice } from "./host-derive";
-import { cleanClubs, clubsDisplay } from "./host-clubs";
+import { cleanClubs, clubsDisplay, normalizeOrgName } from "./host-clubs";
 import type { LineItem } from "@/components/host/LineItemList";
 import type { DocumentKind } from "./host-orders-types";
 import type { AreaKey, SharedState } from "./host-shared-state";
@@ -145,6 +145,12 @@ export function buildContractPayload(
     sound_system:    d.soundSystem,
     lighting_system: d.lightingSystem,
     sign: f.sign,
+    ...(d.contractSigners.length > 0 ? {
+      signers: [
+        ...d.contractSigners.map(s => ({ fullName: s.fullName.trim(), email: s.email.trim(), club: normalizeOrgName(s.club), role: "club" })),
+        ...(!f.sign ? [{ fullName: d.chapterSignerName.trim(), email: d.chapterSignerEmail.trim(), club: "Theta Xi Fraternity", role: "chapter" }] : []),
+      ],
+    } : {}),
   }, d);
 }
 

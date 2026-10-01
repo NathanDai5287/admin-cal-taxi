@@ -34,6 +34,8 @@ const STORAGE_KEY = "admin.host.shared.v1";
 
 export type AreaKey = "living_room" | "dining_room" | "backyard";
 
+export type ContractSigner = { id: string; fullName: string; email: string; club: string };
+
 /**
  * The computed pricing breakdown. Never stored in this state — it is a pure
  * function of (numGuests, pricingSelections), recomputed live wherever it's
@@ -104,6 +106,10 @@ export type SharedState = {
   // Identity — shared across every page. One entry per organization; a
   // multi-org event lists them all ("Club 1", "Club 2", … on the contract).
   clubs: string[];
+  contractSigners: ContractSigner[];
+  chapterSignerName: string;
+  chapterSignerEmail: string;
+  contractPresign: boolean;
   eventDate: string;
   numGuests: string;
 
@@ -118,7 +124,7 @@ export type SharedState = {
   guestList: boolean;
   soundSystem: boolean;
   lightingSystem: boolean;
-  // (sign is not persisted — always defaults to false on each visit)
+  // Contract signer details and the chapter presigning choice are persisted.
 
   // Pricing — owned by /host/pricing
   pricingSelections: PricingSelections;
@@ -145,6 +151,7 @@ export type SharedState = {
    * an order back in; documents generated afterwards attach to it.
    */
   currentOrderId: string;
+  orderCreateRequestKey: string;
 
   /**
    * Identity ("clubName|eventDate") of the attached order at the moment it
@@ -164,6 +171,10 @@ export type SharedState = {
 
 export const EMPTY_STATE: SharedState = {
   clubs: [],
+  contractSigners: [],
+  chapterSignerName: "",
+  chapterSignerEmail: "",
+  contractPresign: false,
   eventDate: "",
   numGuests: "",
 
@@ -189,6 +200,7 @@ export const EMPTY_STATE: SharedState = {
 
   lastDepositInvoiceNumber: "",
   currentOrderId: "",
+  orderCreateRequestKey: "",
   loadedOrderIdentity: "",
 
   treasurerName: "",
@@ -242,6 +254,9 @@ function migrate(parsed: Record<string, unknown>): SharedState {
       (c): c is string => typeof c === "string",
     );
   }
+  merged.contractSigners = Array.isArray(parsed.contractSigners)
+    ? (parsed.contractSigners as ContractSigner[]).filter(s => s && typeof s.id === "string" && typeof s.fullName === "string" && typeof s.email === "string" && typeof s.club === "string")
+    : [];
 
   // overrides.rentalPrice → overrides.finalPrice
   const legacyOverrides = (parsed.overrides ?? {}) as Record<string, unknown>;
@@ -325,9 +340,11 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
       // the event is for, or when it is, retires any number minted for it.
       if (key === "eventDate" && value !== d.eventDate) {
         next.lastDepositInvoiceNumber = "";
+        if (!d.currentOrderId) next.orderCreateRequestKey = "";
       }
       if (key === "clubs" && !sameClubs(value as string[], d.clubs)) {
         next.lastDepositInvoiceNumber = "";
+        if (!d.currentOrderId) next.orderCreateRequestKey = "";
       }
       return next;
     });
@@ -344,6 +361,9 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
       // number together.
       if (identityChanged && partial.lastDepositInvoiceNumber === undefined) {
         next.lastDepositInvoiceNumber = "";
+      }
+      if (identityChanged && !d.currentOrderId && partial.orderCreateRequestKey === undefined) {
+        next.orderCreateRequestKey = "";
       }
       return next;
     });

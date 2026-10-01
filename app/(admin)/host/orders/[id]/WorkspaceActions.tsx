@@ -113,6 +113,12 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
 
   return {
     clubs: clubsFrom(snapshot.clubs, snapshot.clubName),
+    contractSigners: Array.isArray(snapshot.contractSigners)
+      ? snapshot.contractSigners.filter((s): s is SharedState["contractSigners"][number] => Boolean(s && typeof s === "object" && typeof (s as { id?: unknown }).id === "string" && typeof (s as { fullName?: unknown }).fullName === "string" && typeof (s as { email?: unknown }).email === "string" && typeof (s as { club?: unknown }).club === "string"))
+      : [],
+    chapterSignerName: str(snapshot.chapterSignerName, ""),
+    chapterSignerEmail: str(snapshot.chapterSignerEmail, ""),
+    contractPresign: bool(snapshot.contractPresign, false),
     eventDate: str(snapshot.eventDate, EMPTY_STATE.eventDate),
     numGuests: str(snapshot.numGuests, EMPTY_STATE.numGuests),
     startTime: str(snapshot.startTime, EMPTY_STATE.startTime),
@@ -130,6 +136,7 @@ function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState
     overrides,
     lastDepositInvoiceNumber: str(snapshot.lastDepositInvoiceNumber, EMPTY_STATE.lastDepositInvoiceNumber),
     currentOrderId: EMPTY_STATE.currentOrderId,
+    orderCreateRequestKey: EMPTY_STATE.orderCreateRequestKey,
     loadedOrderIdentity: EMPTY_STATE.loadedOrderIdentity,
     treasurerName: str(snapshot.treasurerName, EMPTY_STATE.treasurerName),
     treasurerContact: str(snapshot.treasurerContact, EMPTY_STATE.treasurerContact),
@@ -153,6 +160,15 @@ export default function WorkspaceActions({
   const router = useRouter();
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
 
+  function stateFromOrder(): SharedState {
+    const next = sharedStateFromSnapshot(order.snapshot);
+    if (order.snapshot.contractPresign === undefined) {
+      const contract = order.documents.find(document => document.kind === "contract");
+      next.contractPresign = contract?.payload.sign === true;
+    }
+    return next;
+  }
+
   function loadIntoWorkspace() {
     const ok = window.confirm(
       "Load this order into the workspace? This replaces whatever is currently in " +
@@ -160,7 +176,7 @@ export default function WorkspaceActions({
     );
     if (!ok) return;
     setBusy("load");
-    const next = sharedStateFromSnapshot(order.snapshot);
+    const next = stateFromOrder();
     bulk({
       ...next,
       currentOrderId: order.id,
@@ -179,7 +195,7 @@ export default function WorkspaceActions({
     );
     if (!ok) return;
     setBusy("duplicate");
-    const next = sharedStateFromSnapshot(order.snapshot);
+    const next = stateFromOrder();
     bulk({
       ...next,
       currentOrderId: "",

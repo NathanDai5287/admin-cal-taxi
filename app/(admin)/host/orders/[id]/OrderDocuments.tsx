@@ -12,6 +12,7 @@ import ContractPanel from "../../documents/ContractPanel";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
 import WorkspaceActions from "./WorkspaceActions";
+import OrderSigning from "./OrderSigning";
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
   const matches = documents.filter(d => d.kind === kind);
@@ -158,6 +159,7 @@ export default function OrderDocuments({ order }: { order: Order }) {
             : <SavedFields doc={doc} />)}
         </DocumentRow>;
       })}
+      <OrderSigning orderId={order.id} />
     </DocumentsSection>
   );
 }

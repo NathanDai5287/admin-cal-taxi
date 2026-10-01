@@ -125,6 +125,7 @@ export async function getOrder(id: string): Promise<Order | null> {
 
 /** Fields a caller supplies when first saving an order. */
 export type NewOrder = {
+  requestKey?: string;
   clubName: string;
   eventDate: string;
   rentalPrice: number | null;
