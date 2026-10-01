@@ -20,6 +20,8 @@ import { ApiCallError, downloadPdf, fetchGeneratedPdf, type PdfFile } from "@/li
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
 import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
+import { orderSnapshot as snapshotFor } from "@/lib/host-order-snapshot";
+import { draftOrderVersion, setDraftOrderVersion } from "@/lib/host-draft-storage";
 import { useSharedData } from "@/lib/host-shared-state";
 import {
   DOCUMENT_META,
@@ -59,7 +61,7 @@ function toNum(s: string): number | null {
 type GeneratedMap = Partial<Record<DocumentKind, Omit<OrderDocument, "id">>>;
 
 export default function DocumentsPage() {
-  const { hydrated, data, update, bulk, finishOrder } = useSharedData();
+  const { hydrated, draftId, isCurrent, data, update, bulk, finishOrder } = useSharedData();
   const router = useRouter();
 
   // ── Per-document local fields ─────────────────────────────────────────────
@@ -152,6 +154,7 @@ export default function DocumentsPage() {
   // stale until the next render; the ref never is. `renderTick` just forces
   // the re-render so the UI reflects it.
   const generatedRef = useRef<GeneratedMap>({});
+  const generatedInput = useRef("");
   const [, setRenderTick] = useState(0);
 
   // Generated documents belong to the event identity (organizations + date)
@@ -161,7 +164,7 @@ export default function DocumentsPage() {
   // "current", unblock checks can't borrow the old deposit-invoice number,
   // and Save can't archive old-identity PDFs onto the new event's order.
   const identityKey = hydrated
-    ? `${cleanClubs(data.clubs).join("\n")}|${data.eventDate}`
+    ? JSON.stringify({ data: snapshotFor(data), deposit, rental, creditMemo })
     : "";
   const identityRef = useRef(identityKey);
   useEffect(() => {
@@ -172,10 +175,13 @@ export default function DocumentsPage() {
   }, [identityKey]);
 
   function recordGenerated(kind: DocumentKind, doc: Omit<OrderDocument, "id">) {
+    generatedInput.current = currentInputs.current;
     generatedRef.current = { ...generatedRef.current, [kind]: doc };
     setRenderTick(v => v + 1);
   }
 
+  const currentInputs = useRef("");
+  currentInputs.current = JSON.stringify({ data: snapshotFor(data), deposit, rental, creditMemo });
   const generated = generatedRef.current;
 
   /**
@@ -185,8 +191,10 @@ export default function DocumentsPage() {
    * two documents of one kind would double-count in the order's ledger.
    */
   function generatedDocuments(): Omit<OrderDocument, "id">[] {
+    if (generatedInput.current !== currentInputs.current) return [];
+    const approved = JSON.stringify(snapshotFor(data));
     return DOCUMENT_ORDER.map(k => generatedRef.current[k]).filter(
-      (d): d is Omit<OrderDocument, "id"> => Boolean(d),
+      (d): d is Omit<OrderDocument, "id"> => Boolean(d && JSON.stringify(d.sourceSnapshot) === approved),
     );
   }
 
@@ -226,6 +234,9 @@ export default function DocumentsPage() {
     kind: DocumentKind,
     batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string; requests?: Map<DocumentKind, Promise<PdfFile>> },
   ): Promise<boolean> {
+    const approved = data;
+    const sourceSnapshot = snapshotFor(approved);
+    const inputVersion = JSON.stringify({ data: sourceSnapshot, deposit, rental, creditMemo });
     setErrors(e => ({ ...e, [kind]: null }));
     setSuccesses(s => ({ ...s, [kind]: null }));
     setBusy(b => ({ ...b, [kind]: true }));
@@ -267,7 +278,7 @@ export default function DocumentsPage() {
       function requestPdf(requestKind: DocumentKind, requestPayload: Record<string, unknown>) {
         let pending = requests.get(requestKind);
         if (!pending) {
-          pending = fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, requestPayload);
+          pending = fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, { ...requestPayload, _document_source: sourceSnapshot });
           requests.set(requestKind, pending);
         }
         return pending;
@@ -279,9 +290,10 @@ export default function DocumentsPage() {
         requestPdf(kind, payload),
         needsDeposit ? requestPdf("deposit_invoice", depositPayload) : Promise.resolve(null),
       ]);
+      if (!isCurrent(approved) || currentInputs.current !== inputVersion) throw new Error("Event or document details changed during generation. Generate the PDF again.");
       if (referencedDeposit) {
         const number = referencedDeposit.filename.replace(/\.pdf$/i, "");
-        recordGenerated("deposit_invoice", { kind: "deposit_invoice", number, filename: referencedDeposit.filename, amount: toNum(deposit.amount), generatedAt: new Date().toISOString(), payload: depositPayload });
+        recordGenerated("deposit_invoice", { kind: "deposit_invoice", number, filename: referencedDeposit.filename, amount: toNum(deposit.amount), generatedAt: new Date().toISOString(), payload: depositPayload, sourceSnapshot, generationReceipt: referencedDeposit.generationReceipt });
         update("lastDepositInvoiceNumber", number);
       }
       const { filename } = downloadPdf(file);
@@ -292,7 +304,7 @@ export default function DocumentsPage() {
       const doc: Omit<OrderDocument, "id"> = {
         kind, number, filename, amount,
         generatedAt: new Date().toISOString(),
-        payload,
+        payload, sourceSnapshot, generationReceipt: file.generationReceipt,
       };
 
       recordGenerated(kind, doc);
@@ -396,16 +408,6 @@ export default function DocumentsPage() {
    * here, at save time, so the archive shows what was actually true when the
    * rental was saved — the live workspace itself stores none of them.
    */
-  function orderSnapshot(): Record<string, unknown> {
-    return {
-      ...data,
-      pricingBreakdown: liveBreakdown(data),
-      rentalPrice: effectiveRentalPrice(data),
-      depositAmount: effective(data, "depositAmount"),
-      maxGuests: effective(data, "maxGuests"),
-    };
-  }
-
   /**
    * Persist the workspace. Saving is idempotent: it always sends the current
    * document set, and the archive replaces any same-kind document it already
@@ -430,10 +432,12 @@ export default function DocumentsPage() {
           eventDate: data.eventDate,
           rentalPrice: toNum(effectiveRentalPrice(data)),
           depositAmount: toNum(effective(data, "depositAmount")),
-          snapshot: orderSnapshot(),
+          snapshot: snapshotFor(data),
           documents,
         });
         if (!res.ok) { setSaveError(res.error); return null; }
+        if (!isCurrent(data)) throw new Error("This draft changed while saving. Its saved order is available in Orders; review before continuing.");
+        setDraftOrderVersion(draftId, res.data.updatedAt);
         bulk({ currentOrderId: res.data.id, orderDraftIntent: "preview", loadedOrderIdentity: `${clubName}|${data.eventDate}` });
         setSaveNotice(
           documents.length
@@ -446,17 +450,22 @@ export default function DocumentsPage() {
       // Existing order: re-send every document, plus refresh the stored
       // snapshot so pricing/contract edits made since the first save persist.
       const patch = await updateOrderAction(data.currentOrderId, {
+        expectedUpdatedAt: draftOrderVersion(draftId),
         clubName,
         eventDate: data.eventDate,
         rentalPrice: toNum(effectiveRentalPrice(data)),
         depositAmount: toNum(effective(data, "depositAmount")),
-        snapshot: orderSnapshot(),
+        snapshot: snapshotFor(data),
       });
       if (!patch.ok) { setSaveError(patch.error); return null; }
+      setDraftOrderVersion(draftId, patch.data.updatedAt);
+      if (!isCurrent(data)) throw new Error("This draft changed while saving. Review before continuing.");
 
       for (const doc of documents) {
-        const res = await addDocumentAction(data.currentOrderId, doc);
+        const res = await addDocumentAction(data.currentOrderId, { ...doc, expectedUpdatedAt: draftOrderVersion(draftId) });
         if (!res.ok) { setSaveError(res.error); return null; }
+        setDraftOrderVersion(draftId, res.data.updatedAt);
+        if (!isCurrent(data)) throw new Error("This draft changed while saving. Review before continuing.");
       }
       // The order now matches the workspace — reset the divergence baseline.
       bulk({ loadedOrderIdentity: `${clubName}|${data.eventDate}` });
@@ -475,6 +484,7 @@ export default function DocumentsPage() {
   }
 
   function finishWorkspace(orderId: string) {
+    if (!isCurrent(data)) return;
     finishOrder(orderId, data);
     router.push(`/host/orders/${orderId}`);
   }
@@ -602,7 +612,7 @@ export default function DocumentsPage() {
         >
           <ContractPanel sign={contractSign} onSignChange={value => update("contractPresign", value)} />
         </DocumentRow>
-        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} onFinalized={finishWorkspace} />
+        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={finishWorkspace} />
 
         <DocumentRow
           index={2}

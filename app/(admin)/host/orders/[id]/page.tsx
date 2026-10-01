@@ -110,7 +110,7 @@ export default async function OrderDetailPage({
   }).format(new Date());
 
   return (
-    <div className="space-y-10">
+    <div key={order.id} className="space-y-10">
       <div className="space-y-5">
         <BackLink />
 
@@ -176,7 +176,7 @@ export default async function OrderDetailPage({
         today={today}
       />
 
-      <PricingSnapshot snapshot={order.snapshot} />
+      <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
       <ContractSnapshot snapshot={order.snapshot} />
 
       <OrderNotes orderId={order.id} initialNotes={order.notes} />

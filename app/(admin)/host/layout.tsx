@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import Nav from "@/components/host/Nav";
-import { SharedDataProvider } from "@/lib/host-shared-state";
+import { HostWorkspaceBoundary } from "@/lib/host-shared-state";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export default async function HostLayout({
 
   return (
     <div data-brand>
-      <SharedDataProvider>
+      <HostWorkspaceBoundary>
         <Nav />
         <main className="max-w-[1080px] mx-auto px-6 py-8">
           {session.profile.role === "admin" ? (
@@ -33,7 +33,7 @@ export default async function HostLayout({
             <AccessDenied showSubmitLink={session.profile.role === "member"} />
           )}
         </main>
-      </SharedDataProvider>
+      </HostWorkspaceBoundary>
     </div>
   );
 }

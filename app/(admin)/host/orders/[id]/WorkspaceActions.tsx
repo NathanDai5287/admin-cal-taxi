@@ -14,137 +14,18 @@ import { Button } from "@/components/brand/button";
  * field-by-field instead of corrupting the whole workspace.
  */
 
+import { beginDraft } from "@/lib/host-draft-storage";
+import { sharedStateFromSnapshot } from "@/lib/host-state-model";
+export { sharedStateFromSnapshot } from "@/lib/host-state-model";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Order } from "@/lib/host-orders-types";
 import {
-  EMPTY_STATE,
-  OVERRIDE_KEYS,
-  useSharedData,
-  type AreaKey,
-  type OverrideKey,
-  type PricingSelections,
   type SharedState,
 } from "@/lib/host-shared-state";
 
 // ─── Defensive snapshot → SharedState ───────────────────────────────────────
-
-function str(v: unknown, fallback: string): string {
-  return typeof v === "string" ? v : fallback;
-}
-function bool(v: unknown, fallback: boolean): boolean {
-  return typeof v === "boolean" ? v : fallback;
-}
-function areaRecord(v: unknown, fallback: Record<AreaKey, boolean>): Record<AreaKey, boolean> {
-  if (!v || typeof v !== "object") return fallback;
-  const o = v as Record<string, unknown>;
-  const keys: AreaKey[] = ["living_room", "dining_room", "backyard"];
-  const out = { ...fallback };
-  for (const k of keys) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
-  return out;
-}
-function overridesRecord(
-  v: unknown,
-  fallback: Record<OverrideKey, boolean>,
-): Record<OverrideKey, boolean> {
-  if (!v || typeof v !== "object") return fallback;
-  const o = v as Record<string, unknown>;
-  const out = { ...fallback };
-  for (const k of OVERRIDE_KEYS) if (typeof o[k] === "boolean") out[k] = o[k] as boolean;
-  return out;
-}
-function pricingSelectionsFrom(v: unknown, fallback: PricingSelections): PricingSelections {
-  if (!v || typeof v !== "object") return fallback;
-  const o = v as Record<string, unknown>;
-  const keys: (keyof PricingSelections)[] = [
-    "alcohol", "protection", "date", "setup", "cleanup", "wealth", "relationship",
-  ];
-  const out = { ...fallback };
-  for (const k of keys) if (typeof o[k] === "number") out[k] = o[k] as number;
-  return out;
-}
-
-/** Organizations list from a snapshot: `clubs` (current schema), or the
- *  legacy single `clubName` string wrapped in a list. */
-function clubsFrom(v: unknown, legacyClubName: unknown): string[] {
-  if (Array.isArray(v)) {
-    return v.filter((c): c is string => typeof c === "string");
-  }
-  const single = str(legacyClubName, "").trim();
-  return single ? [single] : [];
-}
-
-/** Build a full SharedState from an order snapshot. Every field not present
- *  or wrong-shaped falls back to EMPTY_STATE rather than surfacing undefined
- *  or a malformed value downstream. `currentOrderId` is deliberately left at
- *  its empty default — callers set it explicitly after this returns.
- *
- *  The snapshot's `pricingBreakdown` is deliberately NOT loaded: the live
- *  workspace derives pricing from numGuests + pricingSelections, so a stored
- *  copy could only disagree with them. (It stays in the archive for the
- *  order detail page's historical display.) */
-export function sharedStateFromSnapshot(snapshot: Record<string, unknown>): SharedState {
-  const overrides = overridesRecord(snapshot.overrides, EMPTY_STATE.overrides);
-
-  // Legacy schema: the contract fee was separately overridable. It isn't
-  // anymore — the negotiated price covers it — so an old rentalPrice
-  // override becomes a finalPrice override of the same value.
-  let finalPrice = str(snapshot.finalPrice, EMPTY_STATE.finalPrice);
-  const legacyOverrides = (snapshot.overrides ?? {}) as Record<string, unknown>;
-  if (
-    legacyOverrides.rentalPrice === true &&
-    !overrides.finalPrice &&
-    str(snapshot.rentalPrice, "").trim() !== ""
-  ) {
-    finalPrice = str(snapshot.rentalPrice, "");
-    overrides.finalPrice = true;
-  }
-  // Pre-overrides snapshots: the resolved rentalPrice was the negotiated
-  // price. Preserve it as a finalPrice override so loading an old archived
-  // order doesn't silently reprice it from the calculator.
-  if (
-    !snapshot.overrides &&
-    !overrides.finalPrice &&
-    str(snapshot.rentalPrice, "").trim() !== ""
-  ) {
-    finalPrice = str(snapshot.rentalPrice, "");
-    overrides.finalPrice = true;
-  }
-
-  return {
-    clubs: clubsFrom(snapshot.clubs, snapshot.clubName),
-    contractSigners: Array.isArray(snapshot.contractSigners)
-      ? snapshot.contractSigners.filter((s): s is SharedState["contractSigners"][number] => Boolean(s && typeof s === "object" && typeof (s as { id?: unknown }).id === "string" && typeof (s as { fullName?: unknown }).fullName === "string" && typeof (s as { email?: unknown }).email === "string" && typeof (s as { club?: unknown }).club === "string"))
-      : [],
-    chapterSignerName: str(snapshot.chapterSignerName, ""),
-    chapterSignerEmail: str(snapshot.chapterSignerEmail, ""),
-    contractPresign: bool(snapshot.contractPresign, false),
-    eventDate: str(snapshot.eventDate, EMPTY_STATE.eventDate),
-    numGuests: str(snapshot.numGuests, EMPTY_STATE.numGuests),
-    startTime: str(snapshot.startTime, EMPTY_STATE.startTime),
-    endTime: str(snapshot.endTime, EMPTY_STATE.endTime),
-    depositAmount: str(snapshot.depositAmount, EMPTY_STATE.depositAmount),
-    maxGuests: str(snapshot.maxGuests, EMPTY_STATE.maxGuests),
-    monitors: str(snapshot.monitors, EMPTY_STATE.monitors),
-    areas: areaRecord(snapshot.areas, EMPTY_STATE.areas),
-    cleared: areaRecord(snapshot.cleared, EMPTY_STATE.cleared),
-    guestList: bool(snapshot.guestList, EMPTY_STATE.guestList),
-    soundSystem: bool(snapshot.soundSystem, EMPTY_STATE.soundSystem),
-    lightingSystem: bool(snapshot.lightingSystem, EMPTY_STATE.lightingSystem),
-    pricingSelections: pricingSelectionsFrom(snapshot.pricingSelections, EMPTY_STATE.pricingSelections),
-    finalPrice,
-    overrides,
-    lastDepositInvoiceNumber: str(snapshot.lastDepositInvoiceNumber, EMPTY_STATE.lastDepositInvoiceNumber),
-    currentOrderId: EMPTY_STATE.currentOrderId,
-    orderDraftIntent: EMPTY_STATE.orderDraftIntent,
-    orderCreateRequestKey: EMPTY_STATE.orderCreateRequestKey,
-    loadedOrderIdentity: EMPTY_STATE.loadedOrderIdentity,
-    treasurerName: str(snapshot.treasurerName, EMPTY_STATE.treasurerName),
-    treasurerContact: str(snapshot.treasurerContact, EMPTY_STATE.treasurerContact),
-    presidentName: str(snapshot.presidentName, EMPTY_STATE.presidentName),
-    presidentContact: str(snapshot.presidentContact, EMPTY_STATE.presidentContact),
-  };
-}
 
 export default function WorkspaceActions({
   order,
@@ -157,12 +38,16 @@ export default function WorkspaceActions({
   showDuplicate?: boolean;
   compact?: boolean;
 }) {
-  const { bulk } = useSharedData();
   const router = useRouter();
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
 
   function stateFromOrder(): SharedState {
     const next = sharedStateFromSnapshot(order.snapshot);
+    next.documentContextId = next.documentContextId || order.id;
+    next.eventDate = order.eventDate;
+    next.finalPrice = String(order.rentalPrice ?? "");
+    next.depositAmount = String(order.depositAmount ?? "");
+    next.overrides = { ...next.overrides, finalPrice: true, depositAmount: true };
     if (order.snapshot.contractPresign === undefined) {
       const contract = order.documents.find(document => document.kind === "contract");
       next.contractPresign = contract?.payload.sign === true;
@@ -178,14 +63,14 @@ export default function WorkspaceActions({
     if (!ok) return;
     setBusy("load");
     const next = stateFromOrder();
-    bulk({
+    beginDraft({
       ...next,
       currentOrderId: order.id,
       orderDraftIntent: "edit",
       // Remember the order's identity so the documents step can warn if the
       // workspace's organization/date later diverges from it.
       loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
-    });
+    }, order.updatedAt);
     router.push("/host/documents");
   }
 
@@ -198,11 +83,14 @@ export default function WorkspaceActions({
     if (!ok) return;
     setBusy("duplicate");
     const next = stateFromOrder();
-    bulk({
+    beginDraft({
       ...next,
       currentOrderId: "",
       orderDraftIntent: "",
       loadedOrderIdentity: "",
+      contractSigners: [],
+      chapterSignerName: "",
+      chapterSignerEmail: "",
       eventDate: "",
       lastDepositInvoiceNumber: "",
     });

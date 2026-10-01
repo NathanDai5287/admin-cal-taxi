@@ -115,7 +115,7 @@ export async function listOrders(): Promise<OrderSummary[]> {
 /** The order, or null when it doesn't exist — so pages can call `notFound()`. */
 export async function getOrder(id: string): Promise<Order | null> {
   try {
-    const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`);
+    const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`, { fresh: true });
     return order;
   } catch (err) {
     if (err instanceof OrdersRequestError && err.status === 404) return null;
@@ -152,6 +152,7 @@ export async function createOrder(input: NewOrder): Promise<Order> {
 }
 
 export type OrderPatch = Partial<{
+  expectedUpdatedAt: string;
   clubName: string;
   eventDate: string;
   rentalPrice: number | null;

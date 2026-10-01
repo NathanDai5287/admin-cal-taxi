@@ -6,11 +6,10 @@ import { Button } from "@/components/brand/button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { deleteOrderAction } from "../actions";
-import { useSharedData } from "@/lib/host-shared-state";
+import { retireOrderDrafts } from "@/lib/host-draft-storage";
 
 export default function DeleteOrderButton({ orderId }: { orderId: string }) {
   const router = useRouter();
-  const { finishOrder } = useSharedData();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +22,7 @@ export default function DeleteOrderButton({ orderId }: { orderId: string }) {
     setError(null);
     const result = await deleteOrderAction(orderId);
     if (result.ok) {
-      finishOrder(orderId);
+      retireOrderDrafts(orderId);
       router.push("/host/orders");
       return;
     }

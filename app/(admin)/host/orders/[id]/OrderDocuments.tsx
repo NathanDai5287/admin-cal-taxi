@@ -7,7 +7,7 @@ import DocumentsSection from "@/components/host/DocumentsSection";
 import { ApiCallError, downloadPdf, fetchStoredPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { DOCUMENT_META, DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from "@/lib/host-documents";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
-import { liveBreakdown } from "@/lib/host-derive";
+import { savedPricing } from "@/lib/host-saved-pricing";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
 import ContractPanel from "../../documents/ContractPanel";
@@ -34,7 +34,7 @@ function defaultDocuments(order: Order, depositNumber?: string) {
   const fields = {
     contract: { sign: saved.contractPresign },
     deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
-    rental: { items: buildLineItems(liveBreakdown(data), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
+    rental: { items: buildLineItems(savedPricing(order.snapshot.pricingBreakdown), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
     creditMemo: { amount: data.depositAmount, issueDate, originalInvoice: invoiceNumber, refundMethod: "", refundDescription: "", memoNumber: "" },
   };
   const payloads = {
@@ -52,7 +52,7 @@ function defaultDocuments(order: Order, depositNumber?: string) {
 }
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
-  const matches = documents.filter(d => d.kind === kind);
+  const matches = documents.filter(d => d.kind === kind && !d.stale && d.sourceSnapshot);
   return matches.length ? matches.reduce((a, b) => a.generatedAt >= b.generatedAt ? a : b) : null;
 }
 
@@ -194,7 +194,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
     setDownloadAllBusy(false);
   }
 
-  const contract = docs.contract?.payload ?? defaults.payloads.contract;
+  const contract = defaults.payloads.contract;
 
   return (
     <DocumentsSection
@@ -210,8 +210,8 @@ export default function OrderDocuments({ order, signingContract = null, signingL
       </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}
-        depositAmount={String(contract?.deposit ?? order.depositAmount ?? "")}
-        rentalAmount={Number(contract?.price ?? order.rentalPrice ?? 0)}
+        depositAmount={String(order.depositAmount ?? "")}
+        rentalAmount={Number(order.rentalPrice ?? 0)}
       />}
     >
       {DOCUMENT_ORDER.map((kind, index) => {

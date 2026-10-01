@@ -57,6 +57,13 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
   const clubs = [...new Set(cleanClubs(data.clubs).map(normalizeOrgName))];
   const currentPayload = useMemo(() => JSON.stringify(buildContractPayload(data, { sign: data.contractPresign })), [data]);
   const invalid = validate(data);
+  const activePayload = useRef(currentPayload);
+  useEffect(() => { activePayload.current = currentPayload; }, [currentPayload]);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  function assertActive(expected: string) {
+    if (!mounted.current || activePayload.current !== expected) throw new Error("Contract details changed while processing. Review and preview again.");
+  }
 
   useEffect(() => {
     if (!orderId) return;
@@ -92,9 +99,11 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
 
   async function prepare() {
     if (invalid) { setError(invalid); return; }
+    const approvedPayload = currentPayload;
     setBusy(true); setError("");
     try {
       await beforeSigningAction?.();
+      assertActive(approvedPayload);
       const currentRevisions = orderId ? await listSigningAction(orderId) : [];
       const latestId = currentRevisions[0]?.id ?? "";
       if (orderId && (latestSeen.current === undefined || historyChanged || latestSeen.current !== latestId)) {
@@ -109,11 +118,14 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
       if (!savedId) throw new Error("Save the order before preparing signing.");
       const payload = buildContractPayload(data, { sign: data.contractPresign });
       const key = crypto.randomUUID();
+      assertActive(approvedPayload);
       const revision = await prepareSigningAction(savedId, payload, key, latestId);
+      assertActive(approvedPayload);
       if (orderId && revision.state === "preview") {
         const updatedOrderId = await saveOrder();
         if (!updatedOrderId) throw new Error("The preview was stored, but the order update failed. Retry saving before creating links.");
       }
+      assertActive(approvedPayload);
       setPreview(revision);
       latestSeen.current = revision.id;
       setPreviewPayload(JSON.stringify(payload));
@@ -125,10 +137,13 @@ export default function SigningPanel({ data, update, orderId, saveOrder, showPre
 
   async function create() {
     if (!preview || previewPayload !== currentPayload) { setError("Contract details changed. Preview the new PDF before creating links."); return; }
+    const approvedPayload = currentPayload;
     setBusy(true); setError("");
     try {
       await beforeSigningAction?.();
+      assertActive(approvedPayload);
       const revised = await createSigningLinksAction(preview.order_id, preview.id, preview.original_sha256);
+      assertActive(approvedPayload);
       setPreview(revised);
       setRevisions(old => [revised, ...old.filter(r => r.id !== revised.id)]);
       onFinalized?.(revised.order_id);

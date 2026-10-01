@@ -23,6 +23,11 @@ export const DOCUMENT_KINDS: DocumentKind[] = [
 /** One issued PDF, recorded at the moment it was generated. */
 export type OrderDocument = {
   id: string;
+  /** Immutable document owner and approved inputs, verified by the archive. */
+  expectedUpdatedAt?: string;
+  generationReceipt?: string;
+  sourceSnapshot?: Record<string, unknown>;
+  stale?: boolean;
   kind: DocumentKind;
   /**
    * Invoice or memo number (e.g. "DEP-2026-0505-PISIGM"). The backend derives

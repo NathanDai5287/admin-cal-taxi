@@ -4,7 +4,7 @@
  */
 
 export type ApiError = { error: string; detail?: string };
-export type PdfFile = { filename: string; blob: Blob };
+export type PdfFile = { filename: string; blob: Blob; generationReceipt?: string };
 
 export class ApiCallError extends Error {
   status: number;
@@ -64,7 +64,7 @@ async function readPdfResponse(res: Response): Promise<PdfFile> {
 
   const blob = await res.blob();
   const filename = parseFilename(res.headers.get("content-disposition")) || "document.pdf";
-  return { filename, blob };
+  return { filename, blob, generationReceipt: res.headers.get("x-document-receipt") ?? undefined };
 }
 
 export function downloadPdf({ filename, blob }: PdfFile): { filename: string } {
