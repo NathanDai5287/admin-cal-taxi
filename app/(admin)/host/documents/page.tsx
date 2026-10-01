@@ -439,7 +439,7 @@ export default function DocumentsPage() {
           documents,
         });
         if (!res.ok) { setSaveError(res.error); return null; }
-        bulk({ currentOrderId: res.data.id, loadedOrderIdentity: `${clubName}|${data.eventDate}` });
+        bulk({ currentOrderId: res.data.id, orderDraftIntent: "preview", loadedOrderIdentity: `${clubName}|${data.eventDate}` });
         setSaveNotice(
           documents.length
             ? `Saved as a new order with ${documents.length} document(s).`

@@ -136,6 +136,7 @@ export function sharedStateFromSnapshot(snapshot: Record<string, unknown>): Shar
     overrides,
     lastDepositInvoiceNumber: str(snapshot.lastDepositInvoiceNumber, EMPTY_STATE.lastDepositInvoiceNumber),
     currentOrderId: EMPTY_STATE.currentOrderId,
+    orderDraftIntent: EMPTY_STATE.orderDraftIntent,
     orderCreateRequestKey: EMPTY_STATE.orderCreateRequestKey,
     loadedOrderIdentity: EMPTY_STATE.loadedOrderIdentity,
     treasurerName: str(snapshot.treasurerName, EMPTY_STATE.treasurerName),
@@ -180,6 +181,7 @@ export default function WorkspaceActions({
     bulk({
       ...next,
       currentOrderId: order.id,
+      orderDraftIntent: "edit",
       // Remember the order's identity so the documents step can warn if the
       // workspace's organization/date later diverges from it.
       loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
@@ -199,6 +201,7 @@ export default function WorkspaceActions({
     bulk({
       ...next,
       currentOrderId: "",
+      orderDraftIntent: "",
       loadedOrderIdentity: "",
       eventDate: "",
       lastDepositInvoiceNumber: "",

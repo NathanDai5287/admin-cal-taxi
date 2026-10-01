@@ -153,6 +153,8 @@ export type SharedState = {
    */
   currentOrderId: string;
   orderCreateRequestKey: string;
+  /** Only explicit order editing or an unfinished signing preview may restore an attachment. */
+  orderDraftIntent: "" | "edit" | "preview";
 
   /**
    * Identity ("clubName|eventDate") of the attached order at the moment it
@@ -202,6 +204,7 @@ export const EMPTY_STATE: SharedState = {
   lastDepositInvoiceNumber: "",
   currentOrderId: "",
   orderCreateRequestKey: "",
+  orderDraftIntent: "",
   loadedOrderIdentity: "",
 
   treasurerName: "",
@@ -235,7 +238,7 @@ function sameClubs(a: string[], b: string[]): boolean {
 
 function sameDraft(a: SharedState, b: SharedState): boolean {
   return (Object.keys(EMPTY_STATE) as (keyof SharedState)[])
-    .filter(key => !["currentOrderId", "loadedOrderIdentity", "orderCreateRequestKey", "overrides"].includes(key))
+    .filter(key => !["currentOrderId", "loadedOrderIdentity", "orderCreateRequestKey", "orderDraftIntent", "overrides"].includes(key))
     // Archived signing forms resolve derived values into explicit strings.
     // Compare the values that were approved, regardless of that representation.
     .every(key => {
@@ -265,6 +268,16 @@ function migrate(parsed: Record<string, unknown>): SharedState {
     ...parsed,
     overrides: { ...EMPTY_STATE.overrides, ...(parsed.overrides ?? {}) },
   } as SharedState;
+
+  // Older browsers retained saved orders as the default Create workspace.
+  // Keep any new event edits, but never restore that ambiguous attachment.
+  if (merged.currentOrderId && parsed.orderDraftIntent !== "edit" && parsed.orderDraftIntent !== "preview") {
+    merged.currentOrderId = "";
+    merged.loadedOrderIdentity = "";
+    merged.orderCreateRequestKey = "";
+    merged.lastDepositInvoiceNumber = "";
+    merged.orderDraftIntent = "";
+  }
 
   // clubName → clubs
   if (!Array.isArray(parsed.clubs)) {
