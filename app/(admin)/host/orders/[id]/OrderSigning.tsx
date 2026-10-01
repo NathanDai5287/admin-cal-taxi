@@ -67,7 +67,7 @@ export default function OrderSigning({ order }: { order: Order }) {
     return order.id;
   }
 
-  if (stale) return <div className="border-t border-border px-5 py-6 sm:px-8">
+  if (stale) return <div className="bg-canvas/40 px-5 py-5">
     <p className="text-[13px] text-warn">This order changed elsewhere. Reload the page to review its latest terms and signing links.</p>
     <button type="button" className="mt-3 text-[13px] underline" onClick={() => window.location.reload()}>Reload order</button>
   </div>;
