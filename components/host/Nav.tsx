@@ -12,6 +12,7 @@ export default function Nav() {
       homeHref="/host"
       title="Theta Xi"
       subtitle="Rental Tools"
+      prefetchTabContent
       tabs={tabs}
     />
   );

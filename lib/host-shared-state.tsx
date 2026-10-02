@@ -33,7 +33,7 @@ import { effective } from "./host-derive";
 
 export * from "./host-state-model";
 import { EMPTY_STATE, OVERRIDE_KEYS, type SharedState, type OverrideKey } from "./host-state-model";
-import { activeDraft, draftKey, readDraft, retireDraft, beginDraft, draftOrderVersion } from "./host-draft-storage";
+import { activeDraft, draftKey, readDraft, retireDraft, beginDraft, draftOrderVersion, HOST_DRAFT_SELECTED_EVENT } from "./host-draft-storage";
 import { usePathname } from "next/navigation";
 
 type Updater = <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
@@ -79,10 +79,24 @@ function sameDraft(a: SharedState, b: SharedState): boolean {
 export function HostWorkspaceBoundary({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const creating = ["/host", "/host/pricing", "/host/contract", "/host/documents", "/host/invoice"].includes(pathname);
-  return creating ? <SharedDataProvider>{children}</SharedDataProvider> : children;
+  return <SharedDataProvider renderWithoutScope={!creating}>{children}</SharedDataProvider>;
 }
 
-export function SharedDataProvider({ children }: { children: React.ReactNode }) {
+function DraftLoading() {
+  return (
+    <div aria-busy="true" aria-label="Opening saved rental draft" className="space-y-6">
+      <div className="loading-block h-4 w-48" />
+      <div className="loading-block h-9 w-64 max-w-full" />
+      <section className="card p-6 space-y-5">
+        <div className="loading-block h-5 w-36" />
+        <div className="loading-block h-10 w-full max-w-xl" />
+        <div className="loading-block h-10 w-full max-w-xl" />
+      </section>
+    </div>
+  );
+}
+
+export function SharedDataProvider({ children, renderWithoutScope = false }: { children: React.ReactNode; renderWithoutScope?: boolean }) {
   const [scope, setScope] = useState<{ id: string; data: SharedState } | null>(null);
   const switchScope = useRef<(id: string) => void>(() => {});
   useEffect(() => {
@@ -106,11 +120,16 @@ export function SharedDataProvider({ children }: { children: React.ReactNode }) 
         await new Promise<void>(resolve => { release = resolve; if (disposed) resolve(); });
       });
     }
-    switchScope.current = id => { release?.(); void claim(id); };
-    const timer = setTimeout(() => { void claim(activeDraft()); }, 0);
-    return () => { disposed = true; clearTimeout(timer); release?.(); };
+    switchScope.current = id => { setScope(null); release?.(); void claim(id); };
+    const onDraftSelected = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      if (typeof id === "string" && id) switchScope.current(id);
+    };
+    window.addEventListener(HOST_DRAFT_SELECTED_EVENT, onDraftSelected);
+    void claim(activeDraft());
+    return () => { disposed = true; window.removeEventListener(HOST_DRAFT_SELECTED_EVENT, onDraftSelected); release?.(); };
   }, []);
-  if (!scope) return null;
+  if (!scope) return renderWithoutScope ? children : <DraftLoading />;
   return <DraftProvider key={scope.id} id={scope.id} initial={scope.data} replace={next => switchScope.current(next.id)}>{children}</DraftProvider>;
 }
 
@@ -154,7 +173,9 @@ function DraftProvider({ id, initial, replace, children }: {
     if (!savedDraft && current.current.currentOrderId !== orderId) return;
     retired.current = true;
     retireDraft(id);
-  }, [id]);
+    const nextId = beginDraft(structuredClone(EMPTY_STATE));
+    replace({ id: nextId, data: readDraft(nextId)! });
+  }, [id, replace]);
   const setDerived = useCallback((key: OverrideKey, value: string) => {
     if (!alive.current || retired.current) return;
     setData(previous => ({ ...previous, [key]: value, overrides: { ...previous.overrides, [key]: true } }));

@@ -95,7 +95,7 @@ export function StepNav({
   return (
     <nav className="flex items-center justify-between gap-4 border-t border-rule pt-6 mt-2 flex-wrap">
       {prev ? (
-        <ButtonLink href={prev.href} variant="secondary">
+        <ButtonLink href={prev.href} prefetch={true} variant="secondary">
           ← {prev.label}
         </ButtonLink>
       ) : <span />}
@@ -109,7 +109,7 @@ export function StepNav({
             {nextLabel ?? `Continue to ${next.label}`} →
           </Button>
         ) : (
-          <ButtonLink href={next.href} variant="primary">
+          <ButtonLink href={next.href} prefetch={true} variant="primary">
             {nextLabel ?? `Continue to ${next.label}`} →
           </ButtonLink>
         )

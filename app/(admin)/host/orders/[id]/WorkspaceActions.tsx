@@ -14,7 +14,7 @@ import { Button } from "@/components/brand/button";
  * field-by-field instead of corrupting the whole workspace.
  */
 
-import { beginDraft } from "@/lib/host-draft-storage";
+import { beginDraft, notifyDraftSelected } from "@/lib/host-draft-storage";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 export { sharedStateFromSnapshot } from "@/lib/host-state-model";
 
@@ -63,7 +63,7 @@ export default function WorkspaceActions({
     if (!ok) return;
     setBusy("load");
     const next = stateFromOrder();
-    beginDraft({
+    const draftId = beginDraft({
       ...next,
       currentOrderId: order.id,
       orderDraftIntent: "edit",
@@ -71,6 +71,7 @@ export default function WorkspaceActions({
       // workspace's organization/date later diverges from it.
       loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
     }, order.updatedAt);
+    notifyDraftSelected(draftId);
     router.push("/host/documents");
   }
 
@@ -83,7 +84,7 @@ export default function WorkspaceActions({
     if (!ok) return;
     setBusy("duplicate");
     const next = stateFromOrder();
-    beginDraft({
+    const draftId = beginDraft({
       ...next,
       currentOrderId: "",
       orderDraftIntent: "",
@@ -94,6 +95,7 @@ export default function WorkspaceActions({
       eventDate: "",
       lastDepositInvoiceNumber: "",
     });
+    notifyDraftSelected(draftId);
     // Back to step 1, not the documents step: the event date was deliberately
     // cleared, and every document is blocked until a new one is entered.
     router.push("/host");

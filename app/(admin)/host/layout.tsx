@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import Nav from "@/components/host/Nav";
+import { HostRouteRefresh } from "@/components/host/HostRouteRefresh";
 import { HostWorkspaceBoundary } from "@/lib/host-shared-state";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
@@ -24,6 +25,7 @@ export default async function HostLayout({
 
   return (
     <div data-brand>
+      <HostRouteRefresh />
       <HostWorkspaceBoundary>
         <Nav />
         <main className="max-w-[1080px] mx-auto px-6 py-8">

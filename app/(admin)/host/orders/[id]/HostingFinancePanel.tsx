@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -47,12 +47,11 @@ export default function HostingFinancePanel({
   const firePermit = financeOrder?.plannedFirePermit ?? previewFirePermit;
 
   // Optimistic overrides: the UI flips instantly on click and only rolls back
-  // if the server action fails. Overrides clear once refreshed props arrive.
+  // if the server action fails. The parent remounts this panel when refreshed
+  // finance data changes, clearing these local overrides before paint.
   const [statusOverride, setStatusOverride] = useState<FinanceOrder["status"] | null | undefined>(undefined);
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
   const [reversedIds, setReversedIds] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => { setStatusOverride(undefined); }, [financeOrder?.status]);
-  useEffect(() => { setPendingPayments([]); setReversedIds(new Set()); }, [payments]);
 
   const status = statusOverride !== undefined ? statusOverride : financeOrder?.status ?? null;
   const confirmed = status === "confirmed";

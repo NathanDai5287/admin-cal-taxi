@@ -11,7 +11,7 @@ import { Button, ButtonLink } from "@/components/brand/button";
  * and records it in this page's local state for the session.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
@@ -66,17 +66,31 @@ export default function DocumentsPage() {
 
   // ── Per-document local fields ─────────────────────────────────────────────
   const contractSign = data.contractPresign;
+  const breakdown = hydrated ? liveBreakdown(data) : null;
+  const rentalTarget = (() => {
+    const finalNum = parseFloat(effective(data, "finalPrice"));
+    return Number.isFinite(finalNum) && finalNum > 0 ? finalNum : breakdown?.total ?? 0;
+  })();
+  const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
 
-  const [deposit, setDeposit] = useState<DepositFields>({
-    amount: "", issueDate: todayIso(), dueDate: "", invoiceNumber: "",
-  });
-  const [rental, setRental] = useState<RentalFields>({
-    items: [], issueDate: todayIso(), dueDate: "", invoiceNumber: "",
-  });
-  const [creditMemo, setCreditMemo] = useState<CreditMemoFields>({
-    amount: "", issueDate: todayIso(), originalInvoice: "",
+  const [deposit, setDeposit] = useState<DepositFields>(() => ({
+    amount: effective(data, "depositAmount"),
+    issueDate: todayIso(),
+    dueDate: data.eventDate ? addDaysIso(data.eventDate, -7) : "",
+    invoiceNumber: "",
+  }));
+  const [rental, setRental] = useState<RentalFields>(() => ({
+    items: buildLineItems(breakdown, rentalTarget, eventDateReadable),
+    issueDate: todayIso(),
+    dueDate: data.eventDate ? addDaysIso(data.eventDate, 2) : "",
+    invoiceNumber: "",
+  }));
+  const [creditMemo, setCreditMemo] = useState<CreditMemoFields>(() => ({
+    amount: effective(data, "depositAmount"),
+    issueDate: todayIso(),
+    originalInvoice: "",
     refundMethod: "", refundDescription: "", memoNumber: "",
-  });
+  }));
 
   // ── Seeding ───────────────────────────────────────────────────────────────
   // Each seeded field tracks its source until the user edits it. A change
@@ -93,19 +107,20 @@ export default function DocumentsPage() {
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
   useEffect(() => {
     if (!hydrated || depositAmountEdited || !initialDepositAmount) return;
-    setDeposit(f => ({ ...f, amount: initialDepositAmount }));
+    setDeposit(f => f.amount === initialDepositAmount ? f : { ...f, amount: initialDepositAmount });
   }, [hydrated, depositAmountEdited, initialDepositAmount]);
 
   useEffect(() => {
     if (!hydrated || depositDueEdited || !data.eventDate) return;
-    setDeposit(f => ({ ...f, dueDate: addDaysIso(data.eventDate, -7) }));
+    const dueDate = addDaysIso(data.eventDate, -7);
+    setDeposit(f => f.dueDate === dueDate ? f : { ...f, dueDate });
   }, [hydrated, depositDueEdited, data.eventDate]);
 
   // Rental: due date ← event date + 2 days.
   useEffect(() => {
     if (!hydrated || rentalDueEdited || !data.eventDate) return;
     const computed = addDaysIso(data.eventDate, 2);
-    if (computed) setRental(f => ({ ...f, dueDate: computed }));
+    if (computed) setRental(f => f.dueDate === computed ? f : { ...f, dueDate: computed });
   }, [hydrated, rentalDueEdited, data.eventDate]);
 
   // Rental: line items ← buildLineItems(live breakdown, negotiated total).
@@ -113,23 +128,15 @@ export default function DocumentsPage() {
   // render, so the items can never reflect an earlier pass through pricing.
   // Re-derives whenever the source of truth changes; manual edits within a
   // session survive re-renders since `rental.items` isn't in the dep list.
-  const breakdown = hydrated ? liveBreakdown(data) : null;
-  const rentalTarget = useMemo(() => {
-    const finalNum = parseFloat(effective(data, "finalPrice"));
-    if (Number.isFinite(finalNum) && finalNum > 0) return finalNum;
-    return breakdown?.total ?? 0;
-  }, [data, breakdown]);
-  const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
   // The selections are fingerprinted too: two different selections can share
   // a subtotal and total while producing different line items.
   const rentalDerivedKey = `${rentalTarget}|${breakdown?.subtotal ?? "x"}|${eventDateReadable}|${JSON.stringify(data.pricingSelections)}`;
+  const lastRentalDerivedKey = useRef(rentalDerivedKey);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hydrated) return;
-      setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
-    }, 0);
-    return () => clearTimeout(timer);
+    if (!hydrated || lastRentalDerivedKey.current === rentalDerivedKey) return;
+    lastRentalDerivedKey.current = rentalDerivedKey;
+    setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, rentalDerivedKey]);
 
@@ -142,7 +149,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (!hydrated || creditAmountEdited) return;
     const suggested = effective(data, "depositAmount");
-    if (suggested) setCreditMemo(f => ({ ...f, amount: suggested }));
+    if (suggested) setCreditMemo(f => f.amount === suggested ? f : { ...f, amount: suggested });
   }, [hydrated, creditAmountEdited, data]);
 
   // ── Generation state ──────────────────────────────────────────────────────

@@ -1,7 +1,12 @@
 import { EMPTY_STATE, sharedStateFromSnapshot, type SharedState } from "./host-state-model";
 const POINTER = "admin.host.active-draft.v2";
 const LEGACY = "admin.host.shared.v1";
+export const HOST_DRAFT_SELECTED_EVENT = "host:draft-selected";
 export const draftKey = (id: string) => `admin.host.draft.v2.${id}`;
+/** Tell an already-mounted Host workspace that an archived order selected a new draft. */
+export function notifyDraftSelected(id: string) {
+  window.dispatchEvent(new CustomEvent(HOST_DRAFT_SELECTED_EVENT, { detail: id }));
+}
 /** Active pointer is tab-local; draft contents have an immutable UUID owner. */
 export function beginDraft(data: SharedState, orderVersion?: string): string {
   const id = crypto.randomUUID();
