@@ -27,6 +27,16 @@ export type SigningRevision = {
   created_at: string;
 };
 
+export type SigningActivation = {
+  expectedUpdatedAt: string;
+  clubName: string;
+  eventDate: string;
+  rentalPrice: number;
+  depositAmount: number;
+  snapshot: Record<string, unknown>;
+  replacesRevisionIds: string[];
+};
+
 async function call<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const origin = backendOrigin();
   const key = backendKey();
@@ -59,9 +69,9 @@ export async function prepareSigning(orderId: string, payload: Record<string, un
   return result.revision;
 }
 
-export async function createSigningLinks(orderId: string, revisionId: string, approvedSha256: string) {
+export async function createSigningLinks(orderId: string, revisionId: string, approvedSha256: string, activation: SigningActivation) {
   const result = await call<{ revision: SigningRevision }>(`${base(orderId)}/${encodeURIComponent(revisionId)}/create-links`, {
-    method: "POST", body: { approvedSha256 },
+    method: "POST", body: { approvedSha256, activation },
   });
   return result.revision;
 }

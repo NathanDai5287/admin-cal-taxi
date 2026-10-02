@@ -28,9 +28,9 @@ export type RowState =
 function StatusPill({ state }: { state: RowState }) {
   const [text, cls] =
     state.kind === "generated"
-      ? [`Generated · ${state.number}`, "bg-ok-light text-ok border-ok/30"]
+      ? [state.detail ? `${state.detail} · ${state.number}` : `Generated · ${state.number}`, state.detail && state.detail !== "Signed" ? "bg-brand-light text-brand border-brand/30" : "bg-ok-light text-ok border-ok/30"]
       : state.kind === "ready"
-      ? ["Ready", "bg-brand-light text-brand border-brand/30"]
+      ? ["Available to generate", "bg-brand-light text-brand border-brand/30"]
       : state.kind === "unavailable"
       ? ["Not generated", "bg-canvas text-muted border-rule"]
       : state.kind === "waiting"
@@ -41,7 +41,7 @@ function StatusPill({ state }: { state: RowState }) {
     <span
       className={
         "inline-block px-2 py-0.5 border text-[10.5px] font-bold uppercase " +
-        "tracking-[0.10em] whitespace-nowrap " + cls
+        "tracking-[0.10em] max-w-full whitespace-normal break-words " + cls
       }
     >
       {text}
@@ -145,13 +145,14 @@ export default function DocumentRow({
           )}
           <Button
             type="button"
+            aria-label={`${downloadLabel ?? "Download PDF"}: ${label}`}
             onClick={onDownload}
             disabled={!canDownload}
             variant={downloadVariant ?? (isDone ? "secondary" : "primary")}
           >
             {busy
               ? "Generating…"
-              : downloadLabel ?? (isDone ? "Download again" : "Download PDF")}
+              : downloadLabel ?? "Download PDF"}
           </Button>
         </div>
       </div>

@@ -29,7 +29,7 @@ import {
 
 export default function WorkspaceActions({
   order,
-  loadLabel = "Load into Workspace",
+  loadLabel = "Edit order",
   showDuplicate = true,
   compact = false,
 }: {
@@ -57,8 +57,7 @@ export default function WorkspaceActions({
 
   function loadIntoWorkspace() {
     const ok = window.confirm(
-      "Load this order into the workspace? This replaces whatever is currently in " +
-      "Pricing, Contract, and Documents with this order's saved details.",
+      "Edit this order in a separate draft? Changes are saved only when you select Save changes or approve new signing links. Existing signing links stay active during preview.",
     );
     if (!ok) return;
     setBusy("load");
@@ -72,7 +71,7 @@ export default function WorkspaceActions({
       loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
     }, order.updatedAt);
     notifyDraftSelected(draftId);
-    router.push("/host/documents");
+    router.push("/host");
   }
 
   function duplicateAsNewEvent() {
@@ -118,7 +117,7 @@ export default function WorkspaceActions({
         disabled={busy !== null}
         onClick={duplicateAsNewEvent}
       >
-        {busy === "duplicate" ? "Duplicating…" : "Duplicate as New Event"}
+        {busy === "duplicate" ? "Duplicating…" : "Duplicate event"}
       </Button>}
     </>
   );

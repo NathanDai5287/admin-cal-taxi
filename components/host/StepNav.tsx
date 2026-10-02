@@ -12,10 +12,10 @@ import Link from "next/link";
 export type StepKey = "home" | "pricing" | "contract" | "documents";
 
 const STEPS: { key: StepKey; href: string; label: string; short: string }[] = [
-  { key: "home",      href: "/host",           label: "Event Details", short: "Details"   },
+  { key: "home",      href: "/host",           label: "Event & people", short: "Details"   },
   { key: "pricing",   href: "/host/pricing",   label: "Pricing",       short: "Pricing"   },
-  { key: "contract",  href: "/host/contract",  label: "Contract",      short: "Contract"  },
-  { key: "documents", href: "/host/documents", label: "Documents",     short: "Documents" },
+  { key: "contract",  href: "/host/contract",  label: "Contract terms", short: "Terms" },
+  { key: "documents", href: "/host/documents", label: "Review & signing", short: "Review" },
 ];
 
 function indexOfStep(current: StepKey): number {

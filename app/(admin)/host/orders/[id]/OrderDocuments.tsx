@@ -10,10 +10,9 @@ import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
 import { savedPricing } from "@/lib/host-saved-pricing";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
-import ContractPanel from "../../documents/ContractPanel";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
-import WorkspaceActions, { sharedStateFromSnapshot } from "./WorkspaceActions";
+import { sharedStateFromSnapshot } from "./WorkspaceActions";
 import OrderSigning from "./OrderSigning";
 import { buildLineItems } from "../../documents/build-line-items";
 import { listSigningAction } from "../../documents/signing-actions";
@@ -111,7 +110,9 @@ export default function OrderDocuments({ order, signingContract = null, signingL
 }) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
   const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
-  const [storedContract, setStoredContract] = useState(signingContract);
+  const contractSource = JSON.stringify(signingContract);
+  const [downloadedContract, setDownloadedContract] = useState<{ source: string; file: StoredContractDownload | null } | null>(null);
+  const storedContract = downloadedContract?.source === contractSource ? downloadedContract.file : signingContract;
   const [busy, setBusy] = useState<Partial<Record<DocumentKind, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<DocumentKind, string>>>({});
   const [downloadAllBusy, setDownloadAllBusy] = useState(false);
@@ -120,7 +121,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
   function stateFor(kind: DocumentKind): RowState {
     if (kind === "contract") {
       if (signingLookupFailed) return { kind: "waiting", reason: "Could not verify stored contracts. Reload before downloading." };
-      if (storedContract) return { kind: "generated", number: `${storedContract.state.replaceAll("_", " ")} · revision ${storedContract.revision}` };
+      if (storedContract) return { kind: "generated", number: `Revision ${storedContract.revision}`, detail: storedContract.state === "signed" ? "Signed" : storedContract.state.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase()) };
     }
     const doc = docs[kind];
     if (doc) return { kind: "generated", number: doc.number };
@@ -143,7 +144,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
           // Signing may have completed or changed since this page was loaded.
           const current = contractDownload(await listSigningAction(order.id));
           if (!current && storedContract) throw new Error("Signing history changed. Reload this order before downloading its contract.");
-          setStoredContract(current);
+          setDownloadedContract({ source: contractSource, file: current });
           if (current) {
             return fetchStoredPdf(`/api/host/signing/files/${encodeURIComponent(order.id)}/${encodeURIComponent(current.revisionId)}/${current.kind}`);
           }
@@ -194,7 +195,6 @@ export default function OrderDocuments({ order, signingContract = null, signingL
     setDownloadAllBusy(false);
   }
 
-  const contract = defaults.payloads.contract;
 
   return (
     <DocumentsSection
@@ -203,10 +203,13 @@ export default function OrderDocuments({ order, signingContract = null, signingL
           <Button type="button" onClick={downloadAll} disabled={downloadAllBusy} variant="secondary" compact className="min-w-0 flex-1 sm:flex-none">
             {downloadAllBusy ? "Downloading…" : "Download All"}
           </Button>
-          <WorkspaceActions order={order} loadLabel="Update Order" showDuplicate={false} compact />
           <span className="ml-auto hidden sm:inline text-[12px] text-muted whitespace-nowrap">Order: <span className="font-mono">{order.id}</span></span>
         </div>
         {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
+      </>}
+      contract={<>
+        <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle={storedContract?.previousSigned ? "Previous signed agreement; current replacement below" : "Current agreement and signing progress"} state={stateFor("contract")} summary={storedContract ? `${storedContract.kind === "completed" ? "Signed contract" : "Stored original"} · revision ${storedContract.revision}` : `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`} onDownload={() => { void download("contract"); }} busy={!!busy.contract} error={errors.contract} downloadLabel={storedContract?.previousSigned ? "Previous signed PDF" : storedContract?.kind === "completed" ? "Download signed PDF" : "Download PDF"} downloadVariant="secondary" grouped />
+        <OrderSigning key={order.id} order={order} />
       </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}
@@ -214,39 +217,28 @@ export default function OrderDocuments({ order, signingContract = null, signingL
         rentalAmount={Number(order.rentalPrice ?? 0)}
       />}
     >
-      {DOCUMENT_ORDER.map((kind, index) => {
+      {DOCUMENT_ORDER.filter(kind => kind !== "contract").map((kind, index) => {
         const doc = docs[kind];
         return <DocumentRow
           key={kind}
-          index={index + 1}
+          index={index + 2}
           kind={kind}
           label={DOCUMENT_META[kind].label}
           subtitle={DOCUMENT_META[kind].subtitle}
           state={stateFor(kind)}
-          summary={kind === "contract" && storedContract
-            ? `${storedContract.kind === "completed" ? "Exact completed PDF" : "Exact stored original"} · revision ${storedContract.revision}`
-            : rowSummary(kind, doc, order) ?? (kind === "contract"
-            ? `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`
-            : kind === "credit_memo" ? fmtUSD(order.depositAmount ?? 0)
+          summary={rowSummary(kind, doc, order) ?? (kind === "credit_memo" ? fmtUSD(order.depositAmount ?? 0)
             : `${fmtUSD(kind === "deposit_invoice" ? order.depositAmount ?? 0 : order.rentalPrice ?? 0)} · due ${formatDateISO(addDaysIso(order.eventDate, kind === "deposit_invoice" ? -7 : 2))}`)}
           onDownload={() => { void download(kind); }}
           busy={!!busy[kind]}
           error={errors[kind]}
           downloadLabel="Download PDF"
-          downloadVariant="primary"
-          fieldsLabel={kind === "contract" && storedContract ? "About this contract" : "View fields"}
-          defaultOpen={kind === "contract" && !!doc}
-          inlineFields={kind === "contract"}
+          downloadVariant="secondary"
+          fieldsLabel="View fields"
           grouped
         >
-          {kind === "contract"
-            ? storedContract
-              ? <p className="text-[13px] text-muted">Review the stored PDF for revision {storedContract.revision}&rsquo;s approved terms and signatures.</p>
-              : <ContractPanel sign={contract.sign === true} onSignChange={() => {}} readOnly />
-            : doc ? <SavedFields doc={doc} /> : <p className="text-[13px] text-muted">Generated from this order’s saved details. Load the order to customize invoice fields.</p>}
+          {doc ? <SavedFields doc={doc} /> : <p className="text-[13px] text-muted">Generated from this order’s saved details. Select Edit order to customize invoice fields.</p>}
         </DocumentRow>;
       })}
-      <OrderSigning key={order.id} order={order} />
     </DocumentsSection>
   );
 }

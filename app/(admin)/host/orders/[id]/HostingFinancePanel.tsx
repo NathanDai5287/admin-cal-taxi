@@ -75,7 +75,7 @@ export default function HostingFinancePanel({
     setStatusOverride("confirmed");
     const result = await confirmHostingContractAction(orderId);
     if (result.ok) {
-      setMessage("Contract confirmed in the finance plan.");
+      setMessage("Added to budget. Signatures and recorded payments are unchanged.");
       router.refresh();
     } else {
       setStatusOverride(undefined);
@@ -91,7 +91,7 @@ export default function HostingFinancePanel({
     setStatusOverride("cancelled");
     const result = await cancelHostingContractAction(orderId);
     if (result.ok) {
-      setMessage("Contract cancelled. Recorded payments remain in actual totals.");
+      setMessage("Removed from budget. Recorded payments and signing links are unchanged.");
       router.refresh();
     } else {
       setStatusOverride(undefined);
@@ -181,7 +181,7 @@ export default function HostingFinancePanel({
 
         {confirmed ? null : (
           <p className="text-sm text-muted">
-            {status === "cancelled" ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
+            {status === "cancelled" ? "This order is not included in the budget." : "Refundable deposits are excluded."}
           </p>
         )}
 

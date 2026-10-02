@@ -26,10 +26,10 @@ export default function HostHome() {
       {/* ── Step indicator + page heading ── */}
       <div>
         <StepIndicator current="home" />
-        <h1 className="page-title mt-6">Event Details</h1>
+        <h1 className="page-title mt-6">Event &amp; people</h1>
         <p className="page-lede">
-          Start here. Enter who you&rsquo;re renting to, when, and how big the event is. The
-          following pages — pricing, contract, and invoices — pull from these fields.
+          Add the organizations, their representatives, the event date, and guest count.
+          You can finish representative details before creating signing links.
         </p>
       </div>
 

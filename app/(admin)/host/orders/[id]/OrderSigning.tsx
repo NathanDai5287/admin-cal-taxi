@@ -59,5 +59,8 @@ export default function OrderSigning({ order }: { order: Order }) {
     <button type="button" className="mt-3 text-[13px] underline" onClick={() => window.location.reload()}>Reload order</button>
   </div>;
 
-  return <SigningPanel data={data} update={update} orderId={order.id} saveOrder={saveOrder} showPresignControl beforeSigningAction={checkFresh} />;
+  return <SigningPanel data={data} update={update} orderId={order.id} reviewedOrderVersion={() => version.current} saveOrder={saveOrder} showPresignControl beforeSigningAction={checkFresh} onFinalized={async () => {
+    const latest = await getOrderAction(order.id);
+    if (latest.ok) { version.current = latest.data.updatedAt; savedSnapshot.current = JSON.stringify(latest.data.snapshot); setData(signingDraft(latest.data)); }
+  }} />;
 }

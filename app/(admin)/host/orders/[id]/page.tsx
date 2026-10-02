@@ -16,7 +16,8 @@ import { ButtonLink } from "@/components/brand/button";
 import { notFound } from "next/navigation";
 import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
-import { listSigning } from "@/lib/host-signing";
+import { listSigning, type SigningRevision } from "@/lib/host-signing";
+import OrderOverview from "@/components/host/OrderOverview";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { fmtUSD } from "../order-format";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
@@ -64,11 +65,12 @@ export default async function OrderDetailPage({
 
   const supabase = createAdminClient();
   const signingPromise = listSigning(id)
-    .then((revisions): { contract: StoredContractDownload | null; failed: boolean } => ({
+    .then((revisions): { contract: StoredContractDownload | null; failed: boolean; revisions: SigningRevision[] } => ({
       contract: contractDownload(revisions),
       failed: false,
+      revisions,
     }))
-    .catch(() => ({ contract: null, failed: true }));
+    .catch(() => ({ contract: null, failed: true, revisions: [] as SigningRevision[] }));
   const financePromise = supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", id).maybeSingle();
   const paymentsPromise = supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
 
@@ -120,21 +122,21 @@ export default async function OrderDetailPage({
         </>
       } />
 
+      <OrderOverview order={order} revisions={signing.revisions} signingUnavailable={signing.failed} budgetIncluded={financeResult.data?.status === "confirmed"} recordedRentalPayments={(paymentsResult.data ?? []).filter(payment => payment.kind === "revenue" && !payment.reversed_at).reduce((total, payment) => total + Number(payment.amount), 0)} />
       <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} />
 
       <section className="card">
         <div className="card-header">
-          <span className="card-title">Ledger</span>
+          <span className="card-title">Document totals</span>
           <span className="card-subtitle">
-            What&rsquo;s been invoiced — the app never records payment receipt, so this is not a
-            statement of what was actually paid.
+            Generated invoices and credit memos only. Recorded payments are shown separately below.
           </span>
         </div>
         <div className="card-body grid gap-6 sm:grid-cols-4">
           <LedgerStat label="Deposit invoiced" value={ledger.depositInvoiced} />
           <LedgerStat label="Rental invoiced" value={ledger.rentalInvoiced} />
-          <LedgerStat label="Refunded" value={ledger.refunded} />
-          <LedgerStat label="Balance" value={ledger.balance} emphasize />
+          <LedgerStat label="Credit memo issued" value={ledger.refunded} />
+          <LedgerStat label="Net invoiced" value={ledger.balance} emphasize />
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 export type AreaKey = "living_room" | "dining_room" | "backyard";
 
-export type ContractSigner = { id: string; fullName: string; email: string; club: string };
+export type ContractSigner = { id: string; fullName: string; email: string; club: string; clubSlot?: number };
 
 /**
  * The computed pricing breakdown. Never stored in this state — it is a pure
@@ -268,6 +268,8 @@ export function sharedStateFromSnapshot(snapshot: Record<string, unknown>): Shar
     clubs: clubsFrom(snapshot.clubs, snapshot.clubName),
     contractSigners: Array.isArray(snapshot.contractSigners)
       ? snapshot.contractSigners.filter((s): s is SharedState["contractSigners"][number] => Boolean(s && typeof s === "object" && typeof (s as { id?: unknown }).id === "string" && typeof (s as { fullName?: unknown }).fullName === "string" && typeof (s as { email?: unknown }).email === "string" && typeof (s as { club?: unknown }).club === "string"))
+        .map(person => ({ id: person.id, fullName: person.fullName, email: person.email, club: person.club,
+          ...(typeof person.clubSlot === "number" && Number.isInteger(person.clubSlot) && person.clubSlot >= 0 && person.clubSlot < clubsFrom(snapshot.clubs, snapshot.clubName).length ? { clubSlot: person.clubSlot } : {}) }))
       : [],
     chapterSignerName: str(snapshot.chapterSignerName, ""),
     chapterSignerEmail: str(snapshot.chapterSignerEmail, ""),

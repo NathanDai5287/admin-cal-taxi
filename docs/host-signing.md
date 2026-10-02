@@ -1,13 +1,15 @@
 # Hosting contract signing
 
+The Host redesign uses a paired frontend/backend release. See [Local Host preview](host-local-preview.md) for the isolated sample preview and test scope. The backend migration adds a nullable approval column; it does not recreate requests, change recipient links, or alter stored PDFs. Documenso itself does not need an update or restart.
+
 The `/host` documents and order pages integrate with self-hosted Documenso Community Edition v2.19.0 and the companion Flask/Typst generator. A controlled live test deployment was installed on Minmus on Sep 30, 2026. Its SMTP sink does not relay mail; use controlled addresses until production email, backups, and capacity are approved.
 
 ## Administrator workflow
 
-1. Enter event and contract terms in the existing host steps. On Documents, enter each club representative's full name, email and club. Every club needs one or more representatives. Keep **Auto-sign Theta Xi** checked to use the generator's existing chapter signature, or leave it unchecked and enter the chapter representative's name and email.
+1. In Event & people, enter each club representative's full name and email under their club. Every club needs one or more representatives. In Contract terms, keep **Auto-sign Theta Xi** checked to use the generator's existing chapter signature, or leave it unchecked and enter the chapter representative's name and email. Review & signing summarizes the approved details before preview and link creation.
 2. Select **Preview contract for signing**. The app saves the order automatically with an idempotent order creation key, renders a revision, stores its exact PDF, and shows it in the page. Each signer has a dedicated printed execution page. The generator reads actual PDF box positions after rendering, so page count and wrapped names do not depend on sample PDF coordinates.
 3. Select **Create signing links** only after reviewing the PDF. The server sends the stored bytes to one Documenso envelope, sets distribution to `NONE`, signing order to `PARALLEL`, and assigns a required signature, name and date field to each recipient. It returns a private URL per person. The UI has **Copy signing link**, **Mark sent**, and **Copy completed-copy link** actions. Copying does not mark a link sent; **Mark sent** records the administrator's acknowledgement and can be undone.
-4. The Documents page and order detail use the same signer preparation and progress section. They show each person's link delivery acknowledgement and signing status, plus `N of M signed`. Refresh checks Documenso's current state. Once all recipients sign, the app downloads and stores the exact signed PDF and audit PDF before showing **Signed**. The order page offers those files and the original; existing unsigned archives are not described as signed.
+4. The Review & signing page and order detail use the same signer preparation and progress section. They show each person's link delivery acknowledgement and signing status, plus `N of M signed`. Refresh checks Documenso's current state. Once all recipients sign, the app downloads and stores the exact signed PDF and audit PDF before showing **Signed**. The order page offers those files and the original; existing unsigned archives are not described as signed.
 
 ## Recipient workflow
 
@@ -31,9 +33,9 @@ Documenso installation, certificate, DNS/tunnel, email, storage and backup instr
 
 ## Revisions and finances
 
-Each prepared contract has an immutable original PDF and a revision number. A changed payload creates a new revision; a pending previous envelope is cancelled before the new revision is available. The prior PDF and record remain. The backend rejects ordinary order term updates while a revision is pending or signed, requiring a new preview first. A failed/unknown create response is never retried blindly; **Check and resume request** searches the provider by the exact external revision ID. If no matching provider record appears after 15 minutes, it records a failed revision and permits a new one.
+Each prepared contract has an immutable original PDF and a revision number. A changed payload creates an inert preview revision: existing links and saved terms remain intact. Only explicit replacement activation cancels outstanding links, after administrator confirmation. Cancellation is verified against the provider before the approved terms and new request are activated. If all prior signatures are sealing, activation waits and retains the completed evidence. The prior PDF and record remain. The backend rejects ordinary order term updates while a revision is pending or signed, requiring reviewed replacement activation. A failed/unknown create response is never retried blindly; **Check and resume request** searches the provider by the exact external revision ID. If no matching provider record appears after 15 minutes, it records a failed revision and permits a new one.
 
-Signing does not invoke the financial confirmation action, change payment fields, or set a paid state. The `Contracted` order status from older workflows still means only that a contract document was generated.
+Signing does not invoke the financial confirmation action, change payment fields, or set a paid state. The document status now says **Contract PDF generated**; only explicit signature state and stored completed files establish **Signed**.
 
 ## Tested and pending
 

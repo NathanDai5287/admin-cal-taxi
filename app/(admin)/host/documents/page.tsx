@@ -40,12 +40,12 @@ import {
 import type { DocumentKind, OrderDocument } from "@/lib/host-orders-types";
 import { addDocumentAction, saveOrderAction, updateOrderAction } from "@/app/(admin)/host/orders/actions";
 import { buildLineItems } from "./build-line-items";
-import ContractPanel from "./ContractPanel";
 import DepositPanel from "./DepositPanel";
 import RentalPanel from "./RentalPanel";
 import CreditMemoPanel from "./CreditMemoPanel";
 import PaymentMessagePanel from "./PaymentMessagePanel";
 import SigningPanel from "./SigningPanel";
+import AgreementSummary from "@/components/host/AgreementSummary";
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message
@@ -508,7 +508,7 @@ export default function DocumentsPage() {
         effectiveRentalPrice(data) && `$${Number(effectiveRentalPrice(data)).toLocaleString("en-US")} fee`,
         effective(data, "depositAmount") && `$${Number(effective(data, "depositAmount")).toLocaleString("en-US")} deposit`,
         eventDateReadable,
-        contractSign && "auto-signed",
+        contractSign && "Theta Xi auto-sign enabled",
       ].filter(Boolean).join(" · ") || undefined
     : undefined;
 
@@ -545,10 +545,11 @@ export default function DocumentsPage() {
       <div>
         <StepIndicator current="documents" />
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <h1 className="page-title">Documents</h1>
+          <h1 className="page-title">Review &amp; signing</h1>
         </div>
       </div>
 
+      <AgreementSummary data={data} />
       <DocumentsSection
         actions={<>
           <div className="flex flex-nowrap items-center gap-3">
@@ -566,11 +567,11 @@ export default function DocumentsPage() {
               type="button"
               onClick={() => { void saveAndFinish(); }}
               disabled={saveBusy || !hydrated || !canSave}
-              variant="primary"
+              variant="secondary"
               compact
               className="min-w-0 flex-1 sm:flex-none"
             >
-              {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
+              {saveBusy ? "Saving…" : data.currentOrderId ? "Save changes" : "Save draft order"}
             </Button>
             {data.currentOrderId && (
               <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text" className="ml-auto whitespace-nowrap">
@@ -579,6 +580,7 @@ export default function DocumentsPage() {
               </ButtonLink>
             )}
           </div>
+          <p className="field-hint">Create signing links below to save and approve the contract. Downloads alone do not approve it.</p>
           {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
           {!canSave && hydrated && (
             <p className="text-[12px] text-muted">Add an organization and event date before saving this order.</p>
@@ -594,6 +596,10 @@ export default function DocumentsPage() {
           {saveError && <p className="text-warn text-[13px]">{saveError}</p>}
           {saveNotice && !saveError && <p className="text-ok text-[13px]">{saveNotice}</p>}
         </>}
+        contract={<>
+          <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle="Contract terms and named signature spaces" state={statusFor("contract")} summary={contractSummary} onDownload={() => generateDoc("contract")} busy={!!busy.contract} error={errors.contract ?? null} success={successes.contract ?? null} grouped downloadVariant="secondary" />
+          <SigningPanel data={data} update={update} orderId={data.currentOrderId} reviewedOrderVersion={() => draftOrderVersion(draftId)} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={finishWorkspace} />
+        </>}
         paymentMessage={
           <PaymentMessagePanel
             eventDate={hydrated ? data.eventDate : ""}
@@ -602,25 +608,6 @@ export default function DocumentsPage() {
           />
         }
       >
-        <DocumentRow
-          index={1}
-          kind="contract"
-          label={DOCUMENT_META.contract.label}
-          subtitle={DOCUMENT_META.contract.subtitle}
-          state={statusFor("contract")}
-          summary={contractSummary}
-          onDownload={() => generateDoc("contract")}
-          busy={!!busy.contract}
-          error={errors.contract ?? null}
-          success={successes.contract ?? null}
-          defaultOpen
-          grouped
-          inlineFields
-        >
-          <ContractPanel sign={contractSign} onSignChange={value => update("contractPresign", value)} />
-        </DocumentRow>
-        <SigningPanel data={data} update={update} orderId={data.currentOrderId} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={finishWorkspace} />
-
         <DocumentRow
           index={2}
           kind="deposit_invoice"
@@ -632,6 +619,7 @@ export default function DocumentsPage() {
           busy={!!busy.deposit_invoice}
           error={errors.deposit_invoice ?? null}
           success={successes.deposit_invoice ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <DepositPanel
@@ -660,6 +648,7 @@ export default function DocumentsPage() {
           busy={!!busy.rental_invoice}
           error={errors.rental_invoice ?? null}
           success={successes.rental_invoice ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <RentalPanel
@@ -687,6 +676,7 @@ export default function DocumentsPage() {
           busy={!!busy.credit_memo}
           error={errors.credit_memo ?? null}
           success={successes.credit_memo ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <CreditMemoPanel

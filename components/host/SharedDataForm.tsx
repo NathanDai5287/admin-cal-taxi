@@ -3,6 +3,7 @@
 import { Button } from "@/components/brand/button";
 import { isMultiClub, normalizeOrgName } from "@/lib/host-clubs";
 import { useSharedData } from "@/lib/host-shared-state";
+import RepresentativeFields from "./RepresentativeFields";
 
 /**
  * "Event Details" block. The single source of truth for the renting
@@ -22,15 +23,21 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
   const multi = isMultiClub(clubs);
 
   function setClub(i: number, v: string) {
+    const previous = normalizeOrgName(clubs[i]);
     const next = [...clubs];
     next[i] = v;
     update("clubs", next);
+    update("contractSigners", data.contractSigners.map(person => (person.clubSlot !== undefined ? person.clubSlot === i : !!previous && normalizeOrgName(person.club) === previous) ? { ...person, club: normalizeOrgName(v), clubSlot: i } : person));
   }
   function addClub() {
     update("clubs", [...clubs, ""]);
   }
   function removeClub(i: number) {
+    const name = normalizeOrgName(clubs[i]);
+    const belongs = (person: typeof data.contractSigners[number]) => person.clubSlot !== undefined ? person.clubSlot === i : normalizeOrgName(person.club) === name;
+    if (data.contractSigners.some(belongs) && !window.confirm(`Remove ${clubs[i]} and its representatives from this draft?`)) return;
     update("clubs", clubs.filter((_, j) => j !== i));
+    update("contractSigners", data.contractSigners.filter(person => !belongs(person)).map(person => person.clubSlot !== undefined && person.clubSlot > i ? { ...person, clubSlot: person.clubSlot - 1 } : person));
   }
 
   return (
@@ -39,7 +46,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
         <span className="card-title">Event Details</span>
         {!compact && (
           <span className="card-subtitle">
-            Reused across the pricing, contract, and documents steps.
+            Add each organization and the people who will sign for it.
           </span>
         )}
       </div>
@@ -49,7 +56,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
           <label className="field-label">
             {clubs.length > 1 ? "Organizations" : "Organization"}
           </label>
-          <div className="space-y-2 max-w-xl">
+          <div className="divide-y divide-rule">
             {clubs.map((club, i) => {
               // The contract numbers only the names that survive cleaning,
               // so the badge counts non-blank rows, not raw positions —
@@ -59,7 +66,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
                 ? clubs.slice(0, i).filter(c => c.trim()).length + 1
                 : null;
               return (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="py-5 first:pt-0 last:pb-0"><div className="flex items-center gap-2 max-w-xl">
                 {clubs.length > 1 && (
                   <span
                     className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted w-[46px] shrink-0 text-right"
@@ -91,7 +98,7 @@ export default function SharedDataForm({ compact = false }: { compact?: boolean 
                     ✕
                   </Button>
                 )}
-              </div>
+              </div><RepresentativeFields data={data} update={update} club={club} clubSlot={i} /></div>
               );
             })}
           </div>
