@@ -23,6 +23,11 @@ export const DOCUMENT_KINDS: DocumentKind[] = [
 /** One issued PDF, recorded at the moment it was generated. */
 export type OrderDocument = {
   id: string;
+  /** Immutable document owner and approved inputs, verified by the archive. */
+  expectedUpdatedAt?: string;
+  generationReceipt?: string;
+  sourceSnapshot?: Record<string, unknown>;
+  stale?: boolean;
   kind: DocumentKind;
   /**
    * Invoice or memo number (e.g. "DEP-2026-0505-PISIGM"). The backend derives
@@ -60,9 +65,9 @@ export type OrderStatus =
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   draft:      "Draft",
-  contracted: "Contracted",
-  invoiced:   "Invoiced",
-  completed:  "Completed",
+  contracted: "Contract PDF generated",
+  invoiced:   "Billing documents generated",
+  completed:  "Marked complete",
   cancelled:  "Cancelled",
 };
 
@@ -110,8 +115,7 @@ export function deriveStatus(order: {
 }): OrderStatus {
   if (order.statusOverride) return order.statusOverride;
   const kinds = new Set(order.documents.map(d => d.kind));
-  if (kinds.has("credit_memo")) return "completed";
-  if (kinds.has("rental_invoice") || kinds.has("deposit_invoice")) return "invoiced";
+  if (kinds.has("credit_memo") || kinds.has("rental_invoice") || kinds.has("deposit_invoice")) return "invoiced";
   if (kinds.has("contract")) return "contracted";
   return "draft";
 }
@@ -139,8 +143,8 @@ export type Ledger = {
  * Money summary for an order's detail page.
  *
  * This tracks what was *invoiced*, not what was *paid* — nothing in the app
- * records payment receipt, so `balance` is the amount billed and not yet
- * credited back, not a real accounts-receivable figure.
+ * records invoice totals here. Recorded payments are managed separately;
+ * `balance` is net invoiced, not a real accounts-receivable figure.
  */
 export function computeLedger(documents: OrderDocument[]): Ledger {
   const sum = (kind: DocumentKind) =>

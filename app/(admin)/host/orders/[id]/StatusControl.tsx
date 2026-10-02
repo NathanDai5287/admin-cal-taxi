@@ -12,7 +12,7 @@ import { setOrderStatusAction } from "../actions";
 import { STATUS_LABELS, type OrderStatus } from "@/lib/host-orders-types";
 
 const OPTIONS: { value: OrderStatus | ""; label: string }[] = [
-  { value: "",            label: "Auto (from documents)" },
+  { value: "",            label: "From generated documents" },
   { value: "draft",       label: STATUS_LABELS.draft },
   { value: "contracted",  label: STATUS_LABELS.contracted },
   { value: "invoiced",    label: STATUS_LABELS.invoiced },
@@ -50,7 +50,7 @@ export default function StatusControl({
   return (
     <div className="flex items-center gap-2.5">
       <label className="field-label mb-0 whitespace-nowrap" htmlFor="status-override">
-        Status
+        Order label
       </label>
       <select
         id="status-override"

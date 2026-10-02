@@ -7,7 +7,8 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
 import { formatDateISO } from "@/lib/host-format";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/lib/host-orders-types";
 import { fmtUSDOrDash, yearOf } from "./order-format";
 import StatusPill from "./StatusPill";
+import { setOrderNavigationPreview } from "./order-navigation-preview";
 
 const STATUS_FILTERS: (OrderStatus | "all")[] = [
   "all", "draft", "contracted", "invoiced", "completed", "cancelled",
@@ -110,12 +112,38 @@ export default function OrdersList({ orders }: { orders: OrderSummary[] }) {
 }
 
 function OrderRow({ order }: { order: OrderSummary }) {
+  const router = useRouter();
+  const prefetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const href = `/host/orders/${order.id}`;
+  useEffect(() => () => {
+    if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+  }, []);
+  const onIntent = () => {
+    setOrderNavigationPreview(order);
+    router.prefetch(href);
+  };
   const status = deriveSummaryStatus(order);
   const have = new Set(order.documentKinds);
 
   return (
     <Link
-      href={`/host/orders/${order.id}`}
+      href={href}
+      prefetch={false}
+      onMouseEnter={() => {
+        setOrderNavigationPreview(order);
+        if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+        prefetchTimer.current = setTimeout(() => {
+          router.prefetch(href);
+          prefetchTimer.current = null;
+        }, 120);
+      }}
+      onMouseLeave={() => {
+        if (prefetchTimer.current) clearTimeout(prefetchTimer.current);
+        prefetchTimer.current = null;
+      }}
+      onFocus={onIntent}
+      onTouchStart={onIntent}
+      onClick={() => setOrderNavigationPreview(order)}
       className="card-plain flex items-center gap-5 px-5 py-4 flex-wrap hover:border-brand transition-colors"
     >
       <div className="min-w-[180px] flex-1">

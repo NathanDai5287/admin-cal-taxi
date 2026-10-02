@@ -11,14 +11,17 @@ import { Button, ButtonLink } from "@/components/brand/button";
  * and records it in this page's local state for the session.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
-import { ApiCallError, generatePdf } from "@/lib/host-api";
+import { ApiCallError, downloadPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
 import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
 import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
+import { orderSnapshot as snapshotFor } from "@/lib/host-order-snapshot";
+import { draftOrderVersion, setDraftOrderVersion } from "@/lib/host-draft-storage";
 import { useSharedData } from "@/lib/host-shared-state";
 import {
   DOCUMENT_META,
@@ -37,11 +40,12 @@ import {
 import type { DocumentKind, OrderDocument } from "@/lib/host-orders-types";
 import { addDocumentAction, saveOrderAction, updateOrderAction } from "@/app/(admin)/host/orders/actions";
 import { buildLineItems } from "./build-line-items";
-import ContractPanel from "./ContractPanel";
 import DepositPanel from "./DepositPanel";
 import RentalPanel from "./RentalPanel";
 import CreditMemoPanel from "./CreditMemoPanel";
 import PaymentMessagePanel from "./PaymentMessagePanel";
+import SigningPanel from "./SigningPanel";
+import AgreementSummary from "@/components/host/AgreementSummary";
 
 function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message
@@ -57,21 +61,36 @@ function toNum(s: string): number | null {
 type GeneratedMap = Partial<Record<DocumentKind, Omit<OrderDocument, "id">>>;
 
 export default function DocumentsPage() {
-  const { hydrated, data, update, bulk } = useSharedData();
+  const { hydrated, draftId, isCurrent, data, update, bulk, finishOrder } = useSharedData();
+  const router = useRouter();
 
   // ── Per-document local fields ─────────────────────────────────────────────
-  const [contractSign, setContractSign] = useState(false);
+  const contractSign = data.contractPresign;
+  const breakdown = hydrated ? liveBreakdown(data) : null;
+  const rentalTarget = (() => {
+    const finalNum = parseFloat(effective(data, "finalPrice"));
+    return Number.isFinite(finalNum) && finalNum > 0 ? finalNum : breakdown?.total ?? 0;
+  })();
+  const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
 
-  const [deposit, setDeposit] = useState<DepositFields>({
-    amount: "", issueDate: todayIso(), dueDate: "", invoiceNumber: "",
-  });
-  const [rental, setRental] = useState<RentalFields>({
-    items: [], issueDate: todayIso(), dueDate: "", invoiceNumber: "",
-  });
-  const [creditMemo, setCreditMemo] = useState<CreditMemoFields>({
-    amount: "", issueDate: todayIso(), originalInvoice: "",
+  const [deposit, setDeposit] = useState<DepositFields>(() => ({
+    amount: effective(data, "depositAmount"),
+    issueDate: todayIso(),
+    dueDate: data.eventDate ? addDaysIso(data.eventDate, -7) : "",
+    invoiceNumber: "",
+  }));
+  const [rental, setRental] = useState<RentalFields>(() => ({
+    items: buildLineItems(breakdown, rentalTarget, eventDateReadable),
+    issueDate: todayIso(),
+    dueDate: data.eventDate ? addDaysIso(data.eventDate, 2) : "",
+    invoiceNumber: "",
+  }));
+  const [creditMemo, setCreditMemo] = useState<CreditMemoFields>(() => ({
+    amount: effective(data, "depositAmount"),
+    issueDate: todayIso(),
+    originalInvoice: "",
     refundMethod: "", refundDescription: "", memoNumber: "",
-  });
+  }));
 
   // ── Seeding ───────────────────────────────────────────────────────────────
   // Each seeded field tracks its source until the user edits it. A change
@@ -83,25 +102,25 @@ export default function DocumentsPage() {
   const [depositDueEdited, setDepositDueEdited] = useState(false);
   const [rentalDueEdited, setRentalDueEdited] = useState(false);
   const [creditAmountEdited, setCreditAmountEdited] = useState(false);
-  const [originalInvoiceEdited, setOriginalInvoiceEdited] = useState(false);
 
   // Deposit: amount ← effective(depositAmount), due date ← event date minus 7 days.
   const initialDepositAmount = hydrated ? effective(data, "depositAmount") : "";
   useEffect(() => {
     if (!hydrated || depositAmountEdited || !initialDepositAmount) return;
-    setDeposit(f => ({ ...f, amount: initialDepositAmount }));
+    setDeposit(f => f.amount === initialDepositAmount ? f : { ...f, amount: initialDepositAmount });
   }, [hydrated, depositAmountEdited, initialDepositAmount]);
 
   useEffect(() => {
     if (!hydrated || depositDueEdited || !data.eventDate) return;
-    setDeposit(f => ({ ...f, dueDate: addDaysIso(data.eventDate, -7) }));
+    const dueDate = addDaysIso(data.eventDate, -7);
+    setDeposit(f => f.dueDate === dueDate ? f : { ...f, dueDate });
   }, [hydrated, depositDueEdited, data.eventDate]);
 
   // Rental: due date ← event date + 2 days.
   useEffect(() => {
     if (!hydrated || rentalDueEdited || !data.eventDate) return;
     const computed = addDaysIso(data.eventDate, 2);
-    if (computed) setRental(f => ({ ...f, dueDate: computed }));
+    if (computed) setRental(f => f.dueDate === computed ? f : { ...f, dueDate: computed });
   }, [hydrated, rentalDueEdited, data.eventDate]);
 
   // Rental: line items ← buildLineItems(live breakdown, negotiated total).
@@ -109,23 +128,15 @@ export default function DocumentsPage() {
   // render, so the items can never reflect an earlier pass through pricing.
   // Re-derives whenever the source of truth changes; manual edits within a
   // session survive re-renders since `rental.items` isn't in the dep list.
-  const breakdown = hydrated ? liveBreakdown(data) : null;
-  const rentalTarget = useMemo(() => {
-    const finalNum = parseFloat(effective(data, "finalPrice"));
-    if (Number.isFinite(finalNum) && finalNum > 0) return finalNum;
-    return breakdown?.total ?? 0;
-  }, [data, breakdown]);
-  const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
   // The selections are fingerprinted too: two different selections can share
   // a subtotal and total while producing different line items.
   const rentalDerivedKey = `${rentalTarget}|${breakdown?.subtotal ?? "x"}|${eventDateReadable}|${JSON.stringify(data.pricingSelections)}`;
+  const lastRentalDerivedKey = useRef(rentalDerivedKey);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hydrated) return;
-      setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
-    }, 0);
-    return () => clearTimeout(timer);
+    if (!hydrated || lastRentalDerivedKey.current === rentalDerivedKey) return;
+    lastRentalDerivedKey.current = rentalDerivedKey;
+    setRental(f => ({ ...f, items: buildLineItems(liveBreakdown(data), rentalTarget, eventDateReadable) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, rentalDerivedKey]);
 
@@ -138,21 +149,8 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (!hydrated || creditAmountEdited) return;
     const suggested = effective(data, "depositAmount");
-    if (suggested) setCreditMemo(f => ({ ...f, amount: suggested }));
+    if (suggested) setCreditMemo(f => f.amount === suggested ? f : { ...f, amount: suggested });
   }, [hydrated, creditAmountEdited, data]);
-
-  // Credit memo: original invoice ← last generated deposit invoice number.
-  // Re-seeds whenever that number changes (including a deposit invoice
-  // regenerated with a new number in this same session), as long as the user
-  // hasn't typed one — an auto-filled value must never point at a superseded
-  // invoice.
-  useEffect(() => {
-    if (!hydrated || originalInvoiceEdited) return;
-    const latest = data.lastDepositInvoiceNumber;
-    if (latest) {
-      setCreditMemo(f => (f.originalInvoice === latest ? f : { ...f, originalInvoice: latest }));
-    }
-  }, [hydrated, originalInvoiceEdited, data.lastDepositInvoiceNumber]);
 
   // ── Generation state ──────────────────────────────────────────────────────
 
@@ -163,6 +161,7 @@ export default function DocumentsPage() {
   // stale until the next render; the ref never is. `renderTick` just forces
   // the re-render so the UI reflects it.
   const generatedRef = useRef<GeneratedMap>({});
+  const generatedInput = useRef("");
   const [, setRenderTick] = useState(0);
 
   // Generated documents belong to the event identity (organizations + date)
@@ -172,7 +171,7 @@ export default function DocumentsPage() {
   // "current", unblock checks can't borrow the old deposit-invoice number,
   // and Save can't archive old-identity PDFs onto the new event's order.
   const identityKey = hydrated
-    ? `${cleanClubs(data.clubs).join("\n")}|${data.eventDate}`
+    ? JSON.stringify({ data: snapshotFor(data), deposit, rental, creditMemo })
     : "";
   const identityRef = useRef(identityKey);
   useEffect(() => {
@@ -183,10 +182,13 @@ export default function DocumentsPage() {
   }, [identityKey]);
 
   function recordGenerated(kind: DocumentKind, doc: Omit<OrderDocument, "id">) {
+    generatedInput.current = currentInputs.current;
     generatedRef.current = { ...generatedRef.current, [kind]: doc };
     setRenderTick(v => v + 1);
   }
 
+  const currentInputs = useRef("");
+  currentInputs.current = JSON.stringify({ data: snapshotFor(data), deposit, rental, creditMemo });
   const generated = generatedRef.current;
 
   /**
@@ -196,8 +198,10 @@ export default function DocumentsPage() {
    * two documents of one kind would double-count in the order's ledger.
    */
   function generatedDocuments(): Omit<OrderDocument, "id">[] {
+    if (generatedInput.current !== currentInputs.current) return [];
+    const approved = JSON.stringify(snapshotFor(data));
     return DOCUMENT_ORDER.map(k => generatedRef.current[k]).filter(
-      (d): d is Omit<OrderDocument, "id"> => Boolean(d),
+      (d): d is Omit<OrderDocument, "id"> => Boolean(d && JSON.stringify(d.sourceSnapshot) === approved),
     );
   }
 
@@ -210,10 +214,9 @@ export default function DocumentsPage() {
    *  above hasn't re-rendered yet. */
   function resolvedOriginalInvoice(): string {
     return (
-      creditMemo.originalInvoice.trim()
-      || data.lastDepositInvoiceNumber
+      data.lastDepositInvoiceNumber
       || generatedRef.current.deposit_invoice?.number
-      || ""
+      || mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate).replace(/^CTR-/, "DEP-")
     );
   }
 
@@ -230,27 +233,17 @@ export default function DocumentsPage() {
     const gen = generated[kind];
     if (gen) return { kind: "generated", number: gen.number };
 
-    if (kind === "credit_memo") {
-      const hasDepositNumber =
-        creditMemo.originalInvoice.trim() !== ""
-        || Boolean(data.lastDepositInvoiceNumber)
-        || Boolean(generatedRef.current.deposit_invoice);
-      if (!hasDepositNumber) {
-        return {
-          kind: "waiting",
-          reason: "Generate the security deposit invoice first — its invoice number is needed here. Or type one in manually below.",
-        };
-      }
-    }
-
     const missing = missingFields(kind, data, fieldsFor());
     return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
   }
 
   async function generateDoc(
     kind: DocumentKind,
-    batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string },
+    batch?: { depositInvoiceNumber?: string; memoOriginalInvoice?: string; requests?: Map<DocumentKind, Promise<PdfFile>> },
   ): Promise<boolean> {
+    const approved = data;
+    const sourceSnapshot = snapshotFor(approved);
+    const inputVersion = JSON.stringify({ data: sourceSnapshot, deposit, rental, creditMemo });
     setErrors(e => ({ ...e, [kind]: null }));
     setSuccesses(s => ({ ...s, [kind]: null }));
     setBusy(b => ({ ...b, [kind]: true }));
@@ -288,7 +281,29 @@ export default function DocumentsPage() {
         }
       }
 
-      const { filename } = await generatePdf(DOCUMENT_META[kind].endpoint, payload);
+      const requests = batch?.requests ?? new Map<DocumentKind, Promise<PdfFile>>();
+      function requestPdf(requestKind: DocumentKind, requestPayload: Record<string, unknown>) {
+        let pending = requests.get(requestKind);
+        if (!pending) {
+          pending = fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, { ...requestPayload, _document_source: sourceSnapshot });
+          requests.set(requestKind, pending);
+        }
+        return pending;
+      }
+      const originalInvoice = String(payload.original_invoice ?? "");
+      const depositPayload = buildDepositPayload(data, { ...deposit, invoiceNumber: originalInvoice });
+      const needsDeposit = kind === "credit_memo";
+      const [file, referencedDeposit] = await Promise.all([
+        requestPdf(kind, payload),
+        needsDeposit ? requestPdf("deposit_invoice", depositPayload) : Promise.resolve(null),
+      ]);
+      if (!isCurrent(approved) || currentInputs.current !== inputVersion) throw new Error("Event or document details changed during generation. Generate the PDF again.");
+      if (referencedDeposit) {
+        const number = referencedDeposit.filename.replace(/\.pdf$/i, "");
+        recordGenerated("deposit_invoice", { kind: "deposit_invoice", number, filename: referencedDeposit.filename, amount: toNum(deposit.amount), generatedAt: new Date().toISOString(), payload: depositPayload, sourceSnapshot, generationReceipt: referencedDeposit.generationReceipt });
+        update("lastDepositInvoiceNumber", number);
+      }
+      const { filename } = downloadPdf(file);
       const number = kind === "contract"
         ? mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate)
         : filename.replace(/\.pdf$/i, "");
@@ -296,7 +311,7 @@ export default function DocumentsPage() {
       const doc: Omit<OrderDocument, "id"> = {
         kind, number, filename, amount,
         generatedAt: new Date().toISOString(),
-        payload,
+        payload, sourceSnapshot, generationReceipt: file.generationReceipt,
       };
 
       recordGenerated(kind, doc);
@@ -339,7 +354,7 @@ export default function DocumentsPage() {
         || data.lastDepositInvoiceNumber
         || mintContractNumber(cleanClubs(data.clubs)[0] ?? "partner", data.eventDate).replace(/^CTR-/, "DEP-")
       : "";
-    const memoOriginalInvoice = creditMemo.originalInvoice.trim() || depositInvoiceNumber;
+    const memoOriginalInvoice = depositInvoiceNumber || resolvedOriginalInvoice();
     const ready: DocumentKind[] = [];
     for (const kind of DOCUMENT_ORDER) {
       const status = kind === "credit_memo" && memoOriginalInvoice
@@ -355,9 +370,11 @@ export default function DocumentsPage() {
       }
       ready.push(kind);
     }
+    const requests = new Map<DocumentKind, Promise<PdfFile>>();
     const results = await Promise.all(ready.map(kind => generateDoc(kind, {
       depositInvoiceNumber,
       memoOriginalInvoice: memoOriginalInvoice || undefined,
+      requests,
     })));
     ready.forEach((kind, index) => {
       const ok = results[index];
@@ -378,6 +395,8 @@ export default function DocumentsPage() {
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const createRequestKeyRef = useRef("");
+  useEffect(() => { createRequestKeyRef.current = data.orderCreateRequestKey; }, [data.orderCreateRequestKey, identityKey]);
 
   // The archive keys a rental on these two, and rejects a save without them.
   const canSave = cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
@@ -396,63 +415,64 @@ export default function DocumentsPage() {
    * here, at save time, so the archive shows what was actually true when the
    * rental was saved — the live workspace itself stores none of them.
    */
-  function orderSnapshot(): Record<string, unknown> {
-    return {
-      ...data,
-      pricingBreakdown: liveBreakdown(data),
-      rentalPrice: effectiveRentalPrice(data),
-      depositAmount: effective(data, "depositAmount"),
-      maxGuests: effective(data, "maxGuests"),
-    };
-  }
-
   /**
    * Persist the workspace. Saving is idempotent: it always sends the current
    * document set, and the archive replaces any same-kind document it already
    * holds — so pressing this twice, or after regenerating a PDF, converges
    * rather than piling up duplicates.
    */
-  async function saveToOrders() {
+  async function saveToOrders(skipContract = false): Promise<string | null> {
     setSaveBusy(true);
     setSaveError(null);
     setSaveNotice(null);
     try {
-      const documents = generatedDocuments();
+      const documents = generatedDocuments().filter(doc => !skipContract || doc.kind !== "contract");
       const clubName = clubsDisplay(data.clubs);
 
       if (!data.currentOrderId) {
+        const requestKey = data.orderCreateRequestKey || createRequestKeyRef.current || crypto.randomUUID();
+        createRequestKeyRef.current = requestKey;
+        if (!data.orderCreateRequestKey) update("orderCreateRequestKey", requestKey);
         const res = await saveOrderAction({
+          requestKey,
           clubName,
           eventDate: data.eventDate,
           rentalPrice: toNum(effectiveRentalPrice(data)),
           depositAmount: toNum(effective(data, "depositAmount")),
-          snapshot: orderSnapshot(),
+          snapshot: snapshotFor(data),
           documents,
         });
-        if (!res.ok) { setSaveError(res.error); return; }
-        bulk({ currentOrderId: res.data.id, loadedOrderIdentity: `${clubName}|${data.eventDate}` });
+        if (!res.ok) { setSaveError(res.error); return null; }
+        if (!isCurrent(data)) throw new Error("This draft changed while saving. Its saved order is available in Orders; review before continuing.");
+        setDraftOrderVersion(draftId, res.data.updatedAt);
+        bulk({ currentOrderId: res.data.id, orderDraftIntent: "preview", loadedOrderIdentity: `${clubName}|${data.eventDate}` });
         setSaveNotice(
           documents.length
             ? `Saved as a new order with ${documents.length} document(s).`
             : "Saved as a new order. Generate documents and save again to attach them.",
         );
-        return;
+        return res.data.id;
       }
 
       // Existing order: re-send every document, plus refresh the stored
       // snapshot so pricing/contract edits made since the first save persist.
       const patch = await updateOrderAction(data.currentOrderId, {
+        expectedUpdatedAt: draftOrderVersion(draftId),
         clubName,
         eventDate: data.eventDate,
         rentalPrice: toNum(effectiveRentalPrice(data)),
         depositAmount: toNum(effective(data, "depositAmount")),
-        snapshot: orderSnapshot(),
+        snapshot: snapshotFor(data),
       });
-      if (!patch.ok) { setSaveError(patch.error); return; }
+      if (!patch.ok) { setSaveError(patch.error); return null; }
+      setDraftOrderVersion(draftId, patch.data.updatedAt);
+      if (!isCurrent(data)) throw new Error("This draft changed while saving. Review before continuing.");
 
       for (const doc of documents) {
-        const res = await addDocumentAction(data.currentOrderId, doc);
-        if (!res.ok) { setSaveError(res.error); return; }
+        const res = await addDocumentAction(data.currentOrderId, { ...doc, expectedUpdatedAt: draftOrderVersion(draftId) });
+        if (!res.ok) { setSaveError(res.error); return null; }
+        setDraftOrderVersion(draftId, res.data.updatedAt);
+        if (!isCurrent(data)) throw new Error("This draft changed while saving. Review before continuing.");
       }
       // The order now matches the workspace — reset the divergence baseline.
       bulk({ loadedOrderIdentity: `${clubName}|${data.eventDate}` });
@@ -461,9 +481,24 @@ export default function DocumentsPage() {
           ? `Order updated — ${documents.length} document(s) archived.`
           : "Order updated.",
       );
+      return data.currentOrderId;
+    } catch (err) {
+      setSaveError(errorMessage(err));
+      return null;
     } finally {
       setSaveBusy(false);
     }
+  }
+
+  function finishWorkspace(orderId: string) {
+    if (!isCurrent(data)) return;
+    finishOrder(orderId, data);
+    router.push(`/host/orders/${orderId}`);
+  }
+
+  async function saveAndFinish() {
+    const savedId = await saveToOrders();
+    if (savedId) finishWorkspace(savedId);
   }
 
   // ── Row summaries ─────────────────────────────────────────────────────────
@@ -473,7 +508,7 @@ export default function DocumentsPage() {
         effectiveRentalPrice(data) && `$${Number(effectiveRentalPrice(data)).toLocaleString("en-US")} fee`,
         effective(data, "depositAmount") && `$${Number(effective(data, "depositAmount")).toLocaleString("en-US")} deposit`,
         eventDateReadable,
-        contractSign && "auto-signed",
+        contractSign && "Theta Xi auto-sign enabled",
       ].filter(Boolean).join(" · ") || undefined
     : undefined;
 
@@ -505,19 +540,16 @@ export default function DocumentsPage() {
     ? "Auto-filled from the contract’s deposit amount."
     : undefined;
 
-  const creditMemoOriginalInvoiceHint = data.lastDepositInvoiceNumber
-    ? `Auto-filled from your last generated deposit invoice (${data.lastDepositInvoiceNumber}).`
-    : "Generate a deposit invoice first to auto-fill this.";
-
   return (
     <div className="space-y-8">
       <div>
         <StepIndicator current="documents" />
         <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <h1 className="page-title">Documents</h1>
+          <h1 className="page-title">Review &amp; signing</h1>
         </div>
       </div>
 
+      <AgreementSummary data={data} />
       <DocumentsSection
         actions={<>
           <div className="flex flex-nowrap items-center gap-3">
@@ -533,13 +565,13 @@ export default function DocumentsPage() {
             </Button>
             <Button
               type="button"
-              onClick={saveToOrders}
+              onClick={() => { void saveAndFinish(); }}
               disabled={saveBusy || !hydrated || !canSave}
-              variant="primary"
+              variant="secondary"
               compact
               className="min-w-0 flex-1 sm:flex-none"
             >
-              {saveBusy ? "Saving…" : data.currentOrderId ? "Update Order" : "Save to Orders"}
+              {saveBusy ? "Saving…" : data.currentOrderId ? "Save changes" : "Save draft order"}
             </Button>
             {data.currentOrderId && (
               <ButtonLink href={`/host/orders/${data.currentOrderId}`} variant="text" className="ml-auto whitespace-nowrap">
@@ -548,6 +580,7 @@ export default function DocumentsPage() {
               </ButtonLink>
             )}
           </div>
+          <p className="field-hint">Create signing links below to save and approve the contract. Downloads alone do not approve it.</p>
           {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
           {!canSave && hydrated && (
             <p className="text-[12px] text-muted">Add an organization and event date before saving this order.</p>
@@ -563,6 +596,10 @@ export default function DocumentsPage() {
           {saveError && <p className="text-warn text-[13px]">{saveError}</p>}
           {saveNotice && !saveError && <p className="text-ok text-[13px]">{saveNotice}</p>}
         </>}
+        contract={<>
+          <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle="Contract terms and named signature spaces" state={statusFor("contract")} summary={contractSummary} onDownload={() => generateDoc("contract")} busy={!!busy.contract} error={errors.contract ?? null} success={successes.contract ?? null} grouped downloadVariant="secondary" />
+          <SigningPanel data={data} update={update} orderId={data.currentOrderId} reviewedOrderVersion={() => draftOrderVersion(draftId)} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={finishWorkspace} />
+        </>}
         paymentMessage={
           <PaymentMessagePanel
             eventDate={hydrated ? data.eventDate : ""}
@@ -571,24 +608,6 @@ export default function DocumentsPage() {
           />
         }
       >
-        <DocumentRow
-          index={1}
-          kind="contract"
-          label={DOCUMENT_META.contract.label}
-          subtitle={DOCUMENT_META.contract.subtitle}
-          state={statusFor("contract")}
-          summary={contractSummary}
-          onDownload={() => generateDoc("contract")}
-          busy={!!busy.contract}
-          error={errors.contract ?? null}
-          success={successes.contract ?? null}
-          defaultOpen
-          grouped
-          inlineFields
-        >
-          <ContractPanel sign={contractSign} onSignChange={setContractSign} />
-        </DocumentRow>
-
         <DocumentRow
           index={2}
           kind="deposit_invoice"
@@ -600,6 +619,7 @@ export default function DocumentsPage() {
           busy={!!busy.deposit_invoice}
           error={errors.deposit_invoice ?? null}
           success={successes.deposit_invoice ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <DepositPanel
@@ -628,6 +648,7 @@ export default function DocumentsPage() {
           busy={!!busy.rental_invoice}
           error={errors.rental_invoice ?? null}
           success={successes.rental_invoice ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <RentalPanel
@@ -655,20 +676,18 @@ export default function DocumentsPage() {
           busy={!!busy.credit_memo}
           error={errors.credit_memo ?? null}
           success={successes.credit_memo ?? null}
+          downloadVariant="secondary"
           grouped
         >
           <CreditMemoPanel
             fields={creditMemo}
             onChange={patch => {
               if (patch.amount !== undefined) setCreditAmountEdited(true);
-              if (patch.originalInvoice !== undefined) setOriginalInvoiceEdited(true);
               setCreditMemo(f => ({ ...f, ...patch }));
             }}
             amountHint={creditMemoAmountHint}
-            originalInvoiceHint={creditMemoOriginalInvoiceHint}
             resets={{
               amount: creditAmountEdited ? () => setCreditAmountEdited(false) : undefined,
-              originalInvoice: originalInvoiceEdited ? () => setOriginalInvoiceEdited(false) : undefined,
             }}
           />
         </DocumentRow>

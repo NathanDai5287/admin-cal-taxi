@@ -1,9 +1,7 @@
 import { AppNav } from "@/components/brand/app-nav";
 
 const tabs = [
-  { href: "/host/pricing",   label: "Pricing"   },
-  { href: "/host/contract",  label: "Contract"  },
-  { href: "/host/documents", label: "Documents" },
+  { href: "/host",           label: "Create"    },
   { href: "/host/orders",    label: "Orders"    },
   { href: "/host/inquiries", label: "Inquiries" },
 ];
@@ -14,6 +12,7 @@ export default function Nav() {
       homeHref="/host"
       title="Theta Xi"
       subtitle="Rental Tools"
+      prefetchTabContent
       tabs={tabs}
     />
   );

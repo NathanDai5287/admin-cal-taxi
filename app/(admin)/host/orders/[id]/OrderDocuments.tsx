@@ -2,19 +2,56 @@
 
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
-import DocumentRow from "@/components/host/DocumentRow";
+import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
-import { ApiCallError, generatePdf } from "@/lib/host-api";
-import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
-import { formatDateISO } from "@/lib/host-format";
+import { ApiCallError, downloadPdf, fetchStoredPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
+import { DOCUMENT_META, DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from "@/lib/host-documents";
+import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
+import { savedPricing } from "@/lib/host-saved-pricing";
+import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
-import ContractPanel from "../../documents/ContractPanel";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
-import WorkspaceActions from "./WorkspaceActions";
+import { sharedStateFromSnapshot } from "./WorkspaceActions";
+import OrderSigning from "./OrderSigning";
+import { buildLineItems } from "../../documents/build-line-items";
+import { listSigningAction } from "../../documents/signing-actions";
+
+/** Missing unsigned PDFs use this order's details, never the Create workspace. */
+function defaultDocuments(order: Order, depositNumber?: string) {
+  const saved = sharedStateFromSnapshot(order.snapshot);
+  const data = {
+    ...saved,
+    clubs: saved.clubs.length ? saved.clubs : [order.clubName],
+    eventDate: order.eventDate,
+    finalPrice: String(order.rentalPrice ?? ""),
+    depositAmount: String(order.depositAmount ?? ""),
+    overrides: { ...saved.overrides, finalPrice: true, depositAmount: true },
+  };
+  const issueDate = todayIso();
+  const invoiceNumber = depositNumber || saved.lastDepositInvoiceNumber || mintContractNumber(data.clubs[0] ?? "partner", order.eventDate).replace(/^CTR-/, "DEP-");
+  const fields = {
+    contract: { sign: saved.contractPresign },
+    deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
+    rental: { items: buildLineItems(savedPricing(order.snapshot.pricingBreakdown), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
+    creditMemo: { amount: data.depositAmount, issueDate, originalInvoice: invoiceNumber, refundMethod: "", refundDescription: "", memoNumber: "" },
+  };
+  const payloads = {
+    contract: buildContractPayload(data, fields.contract),
+    deposit_invoice: buildDepositPayload(data, fields.deposit),
+    rental_invoice: buildRentalPayload(data, fields.rental),
+    credit_memo: buildCreditMemoPayload(data, fields.creditMemo),
+  };
+  const missing = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind,
+    kind === "rental_invoice" && (!Number.isFinite(order.rentalPrice) || (order.rentalPrice ?? 0) <= 0)
+      ? ["a positive rental fee"]
+      : missingFields(kind, data, fields),
+  ])) as Record<DocumentKind, string[]>;
+  return { payloads, missing };
+}
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
-  const matches = documents.filter(d => d.kind === kind);
+  const matches = documents.filter(d => d.kind === kind && !d.stale && d.sourceSnapshot);
   return matches.length ? matches.reduce((a, b) => a.generatedAt >= b.generatedAt ? a : b) : null;
 }
 
@@ -66,20 +103,63 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message : err instanceof Error ? err.message : "request failed";
 }
 
-export default function OrderDocuments({ order }: { order: Order }) {
+export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false }: {
+  order: Order;
+  signingContract?: StoredContractDownload | null;
+  signingLookupFailed?: boolean;
+}) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
+  const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
+  const contractSource = JSON.stringify(signingContract);
+  const [downloadedContract, setDownloadedContract] = useState<{ source: string; file: StoredContractDownload | null } | null>(null);
+  const storedContract = downloadedContract?.source === contractSource ? downloadedContract.file : signingContract;
   const [busy, setBusy] = useState<Partial<Record<DocumentKind, boolean>>>({});
   const [errors, setErrors] = useState<Partial<Record<DocumentKind, string>>>({});
   const [downloadAllBusy, setDownloadAllBusy] = useState(false);
   const [downloadAllReport, setDownloadAllReport] = useState<string | null>(null);
 
-  async function download(kind: DocumentKind): Promise<boolean> {
+  function stateFor(kind: DocumentKind): RowState {
+    if (kind === "contract") {
+      if (signingLookupFailed) return { kind: "waiting", reason: "Could not verify stored contracts. Reload before downloading." };
+      if (storedContract) return { kind: "generated", number: `Revision ${storedContract.revision}`, detail: storedContract.state === "signed" ? "Signed" : storedContract.state.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase()) };
+    }
     const doc = docs[kind];
-    if (!doc) return false;
+    if (doc) return { kind: "generated", number: doc.number };
+    const missing = defaults.missing[kind];
+    return missing.length ? { kind: "blocked", missing } : { kind: "ready" };
+  }
+
+  async function download(kind: DocumentKind, requests = new Map<DocumentKind, Promise<PdfFile>>()): Promise<boolean> {
+    const doc = docs[kind];
+    const state = stateFor(kind);
+    if (state.kind === "blocked" || state.kind === "waiting") return false;
     setBusy(previous => ({ ...previous, [kind]: true }));
     setErrors(previous => ({ ...previous, [kind]: "" }));
     try {
-      await generatePdf(DOCUMENT_META[kind].endpoint, doc.payload);
+      async function requestPdf(requestKind: DocumentKind): Promise<PdfFile> {
+        const cached = requests.get(requestKind);
+        if (cached) return cached;
+        const pending = (async () => {
+          if (requestKind !== "contract") return fetchGeneratedPdf(DOCUMENT_META[requestKind].endpoint, docs[requestKind]?.payload ?? defaults.payloads[requestKind]);
+          // Signing may have completed or changed since this page was loaded.
+          const current = contractDownload(await listSigningAction(order.id));
+          if (!current && storedContract) throw new Error("Signing history changed. Reload this order before downloading its contract.");
+          setDownloadedContract({ source: contractSource, file: current });
+          if (current) {
+            return fetchStoredPdf(`/api/host/signing/files/${encodeURIComponent(order.id)}/${encodeURIComponent(current.revisionId)}/${current.kind}`);
+          }
+          return fetchGeneratedPdf(DOCUMENT_META.contract.endpoint, docs.contract?.payload ?? defaults.payloads.contract);
+        })();
+        requests.set(requestKind, pending);
+        return pending;
+      }
+      // Prepare the referenced invoice automatically, sharing its request with
+      // Download All. The memo is downloaded only if both PDFs succeed.
+      const [file] = await Promise.all([
+        requestPdf(kind),
+        kind === "credit_memo" && !doc && !docs.deposit_invoice ? requestPdf("deposit_invoice") : Promise.resolve(),
+      ]);
+      downloadPdf(file);
       return true;
     } catch (err) {
       setErrors(previous => ({ ...previous, [kind]: errorMessage(err) }));
@@ -96,66 +176,67 @@ export default function OrderDocuments({ order }: { order: Order }) {
     const failed: string[] = [];
     const missing: string[] = [];
     const available = DOCUMENT_ORDER.filter(kind => {
-      if (docs[kind]) return true;
+      const state = stateFor(kind);
+      if (state.kind === "generated" || state.kind === "ready") return true;
       missing.push(DOCUMENT_META[kind].label);
       return false;
     });
-    const results = await Promise.all(available.map(download));
+    const requests = new Map<DocumentKind, Promise<PdfFile>>();
+    const results = await Promise.all(available.map(kind => download(kind, requests)));
     available.forEach((kind, index) => {
       if (results[index]) succeeded += 1;
       else failed.push(DOCUMENT_META[kind].label);
     });
     setDownloadAllReport([
       succeeded ? `${succeeded} downloaded` : "",
-      missing.length ? `not generated: ${missing.join(", ")}` : "",
+      missing.length ? `not ready: ${missing.join(", ")}` : "",
       failed.length ? `failed: ${failed.join(", ")}` : "",
     ].filter(Boolean).join(" · ") || "Nothing to download.");
     setDownloadAllBusy(false);
   }
 
-  const contract = docs.contract?.payload;
 
   return (
     <DocumentsSection
       actions={<>
         <div className="flex flex-nowrap items-center gap-3">
-          <Button type="button" onClick={downloadAll} disabled={downloadAllBusy || !order.documents.length} variant="secondary" compact className="min-w-0 flex-1 sm:flex-none">
+          <Button type="button" onClick={downloadAll} disabled={downloadAllBusy} variant="secondary" compact className="min-w-0 flex-1 sm:flex-none">
             {downloadAllBusy ? "Downloading…" : "Download All"}
           </Button>
-          <WorkspaceActions order={order} loadLabel="Update Order" showDuplicate={false} compact />
           <span className="ml-auto hidden sm:inline text-[12px] text-muted whitespace-nowrap">Order: <span className="font-mono">{order.id}</span></span>
         </div>
         {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
       </>}
+      contract={<>
+        <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle={storedContract?.previousSigned ? "Previous signed agreement; current replacement below" : "Current agreement and signing progress"} state={stateFor("contract")} summary={storedContract ? `${storedContract.kind === "completed" ? "Signed contract" : "Stored original"} · revision ${storedContract.revision}` : `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`} onDownload={() => { void download("contract"); }} busy={!!busy.contract} error={errors.contract} downloadLabel={storedContract?.previousSigned ? "Previous signed PDF" : storedContract?.kind === "completed" ? "Download signed PDF" : "Download PDF"} downloadVariant="secondary" grouped />
+        <OrderSigning key={order.id} order={order} />
+      </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}
-        depositAmount={String(contract?.deposit ?? order.depositAmount ?? "")}
-        rentalAmount={Number(contract?.price ?? order.rentalPrice ?? 0)}
+        depositAmount={String(order.depositAmount ?? "")}
+        rentalAmount={Number(order.rentalPrice ?? 0)}
       />}
     >
-      {DOCUMENT_ORDER.map((kind, index) => {
+      {DOCUMENT_ORDER.filter(kind => kind !== "contract").map((kind, index) => {
         const doc = docs[kind];
         return <DocumentRow
           key={kind}
-          index={index + 1}
+          index={index + 2}
           kind={kind}
           label={DOCUMENT_META[kind].label}
           subtitle={DOCUMENT_META[kind].subtitle}
-          state={doc ? { kind: "generated", number: doc.number } : { kind: "unavailable" }}
-          summary={rowSummary(kind, doc, order)}
+          state={stateFor(kind)}
+          summary={rowSummary(kind, doc, order) ?? (kind === "credit_memo" ? fmtUSD(order.depositAmount ?? 0)
+            : `${fmtUSD(kind === "deposit_invoice" ? order.depositAmount ?? 0 : order.rentalPrice ?? 0)} · due ${formatDateISO(addDaysIso(order.eventDate, kind === "deposit_invoice" ? -7 : 2))}`)}
           onDownload={() => { void download(kind); }}
           busy={!!busy[kind]}
           error={errors[kind]}
           downloadLabel="Download PDF"
-          downloadVariant="primary"
+          downloadVariant="secondary"
           fieldsLabel="View fields"
-          defaultOpen={kind === "contract" && !!doc}
-          inlineFields={kind === "contract"}
           grouped
         >
-          {doc && (kind === "contract"
-            ? <ContractPanel sign={doc.payload.sign === true} onSignChange={() => {}} readOnly />
-            : <SavedFields doc={doc} />)}
+          {doc ? <SavedFields doc={doc} /> : <p className="text-[13px] text-muted">Generated from this order’s saved details. Select Edit order to customize invoice fields.</p>}
         </DocumentRow>;
       })}
     </DocumentsSection>

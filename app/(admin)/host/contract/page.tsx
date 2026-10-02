@@ -6,6 +6,7 @@ import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-deriv
 import { cleanClubs, clubsDisplay, isMultiClub } from "@/lib/host-clubs";
 import { formatDateISO } from "@/lib/host-format";
 import { StepIndicator, StepNav } from "@/components/host/StepNav";
+import ChapterSigningFields from "@/components/host/ChapterSigningFields";
 
 const AREAS: { key: AreaKey; label: string; clearedDesc: string }[] = [
   { key: "living_room", label: "Living Room", clearedDesc: "the couches, tables, and carpet" },
@@ -44,7 +45,7 @@ export default function ContractPage() {
     <div className="space-y-8">
       <div>
         <StepIndicator current="contract" />
-        <h1 className="page-title mt-6">Hosting Contract</h1>
+        <h1 className="page-title mt-6">Contract terms</h1>
         <p className="page-lede">
           Fill in the event logistics. Organization, date, price, and capacity were set on the
           previous steps and are shown here for reference — follow the links to change them.
@@ -231,6 +232,10 @@ export default function ContractPage() {
         </div>
       </section>
 
+      <section className="card">
+        <div className="card-header"><h2 className="card-title">Theta Xi signature</h2></div>
+        <div className="card-body"><ChapterSigningFields data={data} update={update} /></div>
+      </section>
       <StepNav current="contract" />
     </div>
   );

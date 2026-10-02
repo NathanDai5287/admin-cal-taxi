@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * The hosting contract's only document-step-local field: whether to
- * pre-sign the Theta Xi side. Moved off /host/contract, which is now a pure
- * form. Local state, always defaults to false on each visit (never persisted).
+ * Chapter presigning preference for the hosting contract. The documents
+ * page stores this with the shared draft so it survives a reload.
  */
 export default function ContractPanel({
   sign,

@@ -10,7 +10,7 @@
 
 import { formatDateISO } from "./host-format";
 import { effective, effectiveRentalPrice } from "./host-derive";
-import { cleanClubs, clubsDisplay } from "./host-clubs";
+import { cleanClubs, clubsDisplay, normalizeOrgName } from "./host-clubs";
 import type { LineItem } from "@/components/host/LineItemList";
 import type { DocumentKind } from "./host-orders-types";
 import type { AreaKey, SharedState } from "./host-shared-state";
@@ -145,6 +145,12 @@ export function buildContractPayload(
     sound_system:    d.soundSystem,
     lighting_system: d.lightingSystem,
     sign: f.sign,
+    ...(d.contractSigners.length > 0 ? {
+      signers: [
+        ...d.contractSigners.map(s => ({ fullName: s.fullName.trim(), email: s.email.trim(), club: normalizeOrgName(s.club), role: "club" })),
+        ...(!f.sign ? [{ fullName: d.chapterSignerName.trim(), email: d.chapterSignerEmail.trim(), club: "Theta Xi Fraternity", role: "chapter" }] : []),
+      ],
+    } : {}),
   }, d);
 }
 
@@ -160,7 +166,7 @@ export function buildDepositPayload(
     // Forfeiture clause 3c cites the contract's 4a attendance cap.
     max_guests: String(Math.max(MINIMUM_CONTRACT_GUESTS, Number(d.numGuests))),
   }, d);
-  if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
+  body.invoice_number = f.invoiceNumber || mintContractNumber(cleanClubs(d.clubs)[0] ?? "partner", d.eventDate).replace(/^CTR-/, "DEP-");
   return withTreasurer(body, d);
 }
 
@@ -174,7 +180,7 @@ export function buildRentalPayload(
     due_date:   formatDateISO(f.dueDate),
     line_items: f.items.map(it => ({ description: it.description, amount: it.amount })),
   }, d);
-  if (f.invoiceNumber) body.invoice_number = f.invoiceNumber;
+  body.invoice_number = f.invoiceNumber || mintContractNumber(cleanClubs(d.clubs)[0] ?? "partner", d.eventDate).replace(/^CTR-/, "RNT-");
   return withTreasurer(body, d);
 }
 
@@ -186,11 +192,11 @@ export function buildCreditMemoPayload(
     event_date:       formatDateISO(d.eventDate),
     amount:           f.amount,
     issue_date:       formatDateISO(f.issueDate),
-    original_invoice: f.originalInvoice,
+    original_invoice: f.originalInvoice || mintContractNumber(cleanClubs(d.clubs)[0] ?? "partner", d.eventDate).replace(/^CTR-/, "DEP-"),
   }, d);
   if (f.refundMethod)      body.refund_method      = f.refundMethod;
   if (f.refundDescription) body.refund_description = f.refundDescription;
-  if (f.memoNumber)        body.memo_number        = f.memoNumber;
+  body.memo_number = f.memoNumber || mintContractNumber(cleanClubs(d.clubs)[0] ?? "partner", d.eventDate).replace(/^CTR-/, "CM-");
   return withTreasurer(body, d);
 }
 

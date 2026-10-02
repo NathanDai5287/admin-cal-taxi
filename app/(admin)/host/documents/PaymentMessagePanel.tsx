@@ -46,6 +46,7 @@ function paymentMessage({
     `Upon receipt of the full rental fee: The ${money.format(deposit)} security deposit is returned, subject to the hosting contract.`,
     "",
     "Zelle: calthetaxi@gmail.com",
+    "If you would prefer to pay by credit card or cash, please let us know.",
   ].join("\n");
 }
 

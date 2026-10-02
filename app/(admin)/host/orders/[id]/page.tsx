@@ -16,11 +16,12 @@ import { ButtonLink } from "@/components/brand/button";
 import { notFound } from "next/navigation";
 import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
-import { formatDateISO } from "@/lib/host-format";
+import { listSigning, type SigningRevision } from "@/lib/host-signing";
+import OrderOverview from "@/components/host/OrderOverview";
+import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { fmtUSD } from "../order-format";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
-import StatusPill from "../StatusPill";
 import ContractSnapshot from "./ContractSnapshot";
 import DeleteOrderButton from "./DeleteOrderButton";
 import OrderDocuments from "./OrderDocuments";
@@ -29,6 +30,7 @@ import PricingSnapshot from "./PricingSnapshot";
 import StatusControl from "./StatusControl";
 import WorkspaceActions from "./WorkspaceActions";
 import HostingFinancePanel from "./HostingFinancePanel";
+import OrderDetailHeader from "./OrderDetailHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,17 @@ export default async function OrderDetailPage({
     );
   }
 
+  const supabase = createAdminClient();
+  const signingPromise = listSigning(id)
+    .then((revisions): { contract: StoredContractDownload | null; failed: boolean; revisions: SigningRevision[] } => ({
+      contract: contractDownload(revisions),
+      failed: false,
+      revisions,
+    }))
+    .catch(() => ({ contract: null, failed: true, revisions: [] as SigningRevision[] }));
+  const financePromise = supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", id).maybeSingle();
+  const paymentsPromise = supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
+
   let order;
   try {
     order = await getOrder(id);
@@ -86,10 +99,10 @@ export default async function OrderDetailPage({
   const status = deriveStatus(order);
   const ledger = computeLedger(order.documents);
   const planPreview = hostingPlanFromOrder(order);
-  const supabase = createAdminClient();
-  const [financeResult, paymentsResult] = await Promise.all([
-    supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", order.id).maybeSingle(),
-    supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", order.id).order("paid_date", { ascending: false }),
+  const [signing, financeResult, paymentsResult] = await Promise.all([
+    signingPromise,
+    financePromise,
+    paymentsPromise,
   ]);
   if (financeResult.error || paymentsResult.error) throw new Error("Unable to load hosting finance details.");
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -100,54 +113,35 @@ export default async function OrderDetailPage({
   }).format(new Date());
 
   return (
-    <div className="space-y-10">
-      <div className="space-y-5">
-        <BackLink />
-
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <span className="page-eyebrow">Order</span>
-            <h1 className="page-title">{order.clubName || "(no organization)"}</h1>
-            <p className="text-[13.5px] text-muted mt-2">
-              {formatDateISO(order.eventDate) || "No event date"}
-            </p>
-            {/* Date only, from the UTC timestamp. Rendering the clock time
-                would show the server's timezone (UTC on Vercel) as though it
-                were the reader's, so an evening save reads as the next day. */}
-            <p className="text-[11.5px] text-muted mt-3">
-              Created {formatDateISO(order.createdAt.slice(0, 10))} · Updated{" "}
-              {formatDateISO(order.updatedAt.slice(0, 10))}
-            </p>
-          </div>
-          <StatusPill status={status} large />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-rule">
+    <div key={order.id} className="space-y-10">
+      <OrderDetailHeader order={order} status={status} actions={
+        <>
           <WorkspaceActions order={order} />
           <StatusControl orderId={order.id} current={order.statusOverride} />
           <DeleteOrderButton orderId={order.id} />
-        </div>
-      </div>
+        </>
+      } />
 
-      <OrderDocuments order={order} />
+      <OrderOverview order={order} revisions={signing.revisions} signingUnavailable={signing.failed} budgetIncluded={financeResult.data?.status === "confirmed"} recordedRentalPayments={(paymentsResult.data ?? []).filter(payment => payment.kind === "revenue" && !payment.reversed_at).reduce((total, payment) => total + Number(payment.amount), 0)} />
+      <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} />
 
       <section className="card">
         <div className="card-header">
-          <span className="card-title">Ledger</span>
+          <span className="card-title">Document totals</span>
           <span className="card-subtitle">
-            What&rsquo;s been invoiced — the app never records payment receipt, so this is not a
-            statement of what was actually paid.
+            Generated invoices and credit memos only. Recorded payments are shown separately below.
           </span>
         </div>
         <div className="card-body grid gap-6 sm:grid-cols-4">
           <LedgerStat label="Deposit invoiced" value={ledger.depositInvoiced} />
           <LedgerStat label="Rental invoiced" value={ledger.rentalInvoiced} />
-          <LedgerStat label="Refunded" value={ledger.refunded} />
-          <LedgerStat label="Balance" value={ledger.balance} emphasize />
+          <LedgerStat label="Credit memo issued" value={ledger.refunded} />
+          <LedgerStat label="Net invoiced" value={ledger.balance} emphasize />
         </div>
       </section>
 
       <HostingFinancePanel
+        key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data })}
         financeOrder={financeResult.data ? {
           status: financeResult.data.status,
           plannedRevenue: Number(financeResult.data.planned_revenue),
@@ -166,7 +160,7 @@ export default async function OrderDetailPage({
         today={today}
       />
 
-      <PricingSnapshot snapshot={order.snapshot} />
+      <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
       <ContractSnapshot snapshot={order.snapshot} />
 
       <OrderNotes orderId={order.id} initialNotes={order.notes} />

@@ -39,13 +39,6 @@ export default function DepositPanel({
           onChange={e => onChange({ dueDate: e.target.value })}
         />
       </Field>
-      <Field label="Invoice Number" hint="Optional. Leave blank to auto-generate.">
-        <input
-          className="field-input" placeholder="auto: DEP-YYYY-MMDD-XXXXXX"
-          value={fields.invoiceNumber}
-          onChange={e => onChange({ invoiceNumber: e.target.value })}
-        />
-      </Field>
     </div>
   );
 }

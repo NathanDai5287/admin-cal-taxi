@@ -18,6 +18,7 @@ import {
   createOrder,
   deleteOrder,
   getOrder,
+  getOrderFresh,
   updateOrder,
   type NewOrder,
   type OrderPatch,
@@ -76,6 +77,16 @@ export async function updateOrderAction(
     revalidatePath("/host/orders");
     revalidatePath(`/host/orders/${orderId}`);
     return { ok: true, data: order };
+  } catch (err) {
+    return failed(err);
+  }
+}
+
+export async function getOrderAction(orderId: string): Promise<ActionResult<Order>> {
+  await requireAdmin("/");
+  try {
+    const order = await getOrderFresh(orderId);
+    return order ? { ok: true, data: order } : failed(new Error("Order not found."));
   } catch (err) {
     return failed(err);
   }

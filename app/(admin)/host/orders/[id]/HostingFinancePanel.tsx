@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -47,12 +47,11 @@ export default function HostingFinancePanel({
   const firePermit = financeOrder?.plannedFirePermit ?? previewFirePermit;
 
   // Optimistic overrides: the UI flips instantly on click and only rolls back
-  // if the server action fails. Overrides clear once refreshed props arrive.
+  // if the server action fails. The parent remounts this panel when refreshed
+  // finance data changes, clearing these local overrides before paint.
   const [statusOverride, setStatusOverride] = useState<FinanceOrder["status"] | null | undefined>(undefined);
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
   const [reversedIds, setReversedIds] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => { setStatusOverride(undefined); }, [financeOrder?.status]);
-  useEffect(() => { setPendingPayments([]); setReversedIds(new Set()); }, [payments]);
 
   const status = statusOverride !== undefined ? statusOverride : financeOrder?.status ?? null;
   const confirmed = status === "confirmed";
@@ -76,7 +75,7 @@ export default function HostingFinancePanel({
     setStatusOverride("confirmed");
     const result = await confirmHostingContractAction(orderId);
     if (result.ok) {
-      setMessage("Contract confirmed in the finance plan.");
+      setMessage("Added to budget. Signatures and recorded payments are unchanged.");
       router.refresh();
     } else {
       setStatusOverride(undefined);
@@ -92,7 +91,7 @@ export default function HostingFinancePanel({
     setStatusOverride("cancelled");
     const result = await cancelHostingContractAction(orderId);
     if (result.ok) {
-      setMessage("Contract cancelled. Recorded payments remain in actual totals.");
+      setMessage("Removed from budget. Recorded payments and signing links are unchanged.");
       router.refresh();
     } else {
       setStatusOverride(undefined);
@@ -182,7 +181,7 @@ export default function HostingFinancePanel({
 
         {confirmed ? null : (
           <p className="text-sm text-muted">
-            {status === "cancelled" ? "This contract is cancelled and is not in the plan." : "Refundable deposits are excluded."}
+            {status === "cancelled" ? "This order is not included in the budget." : "Refundable deposits are excluded."}
           </p>
         )}
 

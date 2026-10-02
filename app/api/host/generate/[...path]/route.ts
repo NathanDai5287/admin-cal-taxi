@@ -70,5 +70,9 @@ export async function POST(
   const disposition = upstream.headers.get("content-disposition");
   if (disposition) headers.set("content-disposition", disposition);
 
+  const receipt = upstream.headers.get("x-document-receipt");
+  if (receipt) headers.set("x-document-receipt", receipt);
+  headers.set("cache-control", "no-store");
+
   return new NextResponse(upstream.body, { status: upstream.status, headers });
 }

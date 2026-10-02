@@ -52,7 +52,7 @@ export function ordersConfigured(): boolean {
 
 async function call<T>(
   path: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; fresh?: boolean },
 ): Promise<T> {
   let origin: string | null;
   try {
@@ -80,7 +80,7 @@ async function call<T>(
       },
       body: init?.body === undefined ? undefined : JSON.stringify(init.body),
       signal: AbortSignal.timeout(ARCHIVE_TIMEOUT_MS),
-      ...(method === "GET"
+      ...(method === "GET" && !init?.fresh
         ? { next: { revalidate: 600, tags: ["host-orders"] } }
         : { cache: "no-store" as const }),
     });
@@ -115,7 +115,18 @@ export async function listOrders(): Promise<OrderSummary[]> {
 /** The order, or null when it doesn't exist — so pages can call `notFound()`. */
 export async function getOrder(id: string): Promise<Order | null> {
   try {
-    const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`);
+    const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`, { fresh: true });
+    return order;
+  } catch (err) {
+    if (err instanceof OrdersRequestError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/** Read the current order snapshot before a signing action. */
+export async function getOrderFresh(id: string): Promise<Order | null> {
+  try {
+    const { order } = await call<{ order: Order }>(`/${encodeURIComponent(id)}`, { fresh: true });
     return order;
   } catch (err) {
     if (err instanceof OrdersRequestError && err.status === 404) return null;
@@ -125,6 +136,7 @@ export async function getOrder(id: string): Promise<Order | null> {
 
 /** Fields a caller supplies when first saving an order. */
 export type NewOrder = {
+  requestKey?: string;
   clubName: string;
   eventDate: string;
   rentalPrice: number | null;
@@ -140,6 +152,7 @@ export async function createOrder(input: NewOrder): Promise<Order> {
 }
 
 export type OrderPatch = Partial<{
+  expectedUpdatedAt: string;
   clubName: string;
   eventDate: string;
   rentalPrice: number | null;
