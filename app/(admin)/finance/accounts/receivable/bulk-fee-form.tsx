@@ -18,7 +18,7 @@ function SubmitFeesButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
     <Button disabled={pending || count === 0} type="submit" variant="primary">
-      {pending ? "Applying fees…" : `Apply fee to ${count || "selected"}`}
+      {pending ? "Adding charges…" : `Add charge to ${count || "selected"} ${count === 1 ? "member" : "members"}`}
     </Button>
   );
 }
@@ -96,13 +96,13 @@ export function ChargeMembersForm({
   return (
     <section className="card" aria-labelledby="bulk-fee-title">
       <div className="card-header">
-        <span className="card-title" id="bulk-fee-title">Charge members</span>
+        <span className="card-title" id="bulk-fee-title">Add charge</span>
         <span className="card-subtitle">Select members, then apply the same amount, due date, and reason.</span>
       </div>
       <form action={submit} className="bulk-fee-form">
         <div className="bulk-fee-settings">
           <div className="field">
-            <label className="field-label" htmlFor="bulk-fee-amount">Fee per member</label>
+            <label className="field-label" htmlFor="bulk-fee-amount">Charge per member</label>
             <div className="money-input"><span>$</span><input className="field-input" id="bulk-fee-amount" min="0.01" name="amountOwed" placeholder="0.00" step="0.01" type="number" required /></div>
           </div>
           <div className="field">
@@ -110,13 +110,13 @@ export function ChargeMembersForm({
             <input className="field-input" defaultValue={today} id="bulk-fee-date" name="dueDate" type="date" required />
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="bulk-fee-notes">Reason for fee</label>
+            <label className="field-label" htmlFor="bulk-fee-notes">Charge description</label>
             <input className="field-input" id="bulk-fee-notes" maxLength={500} name="notes" />
           </div>
           <label className="dues-search bulk-fee-search">
             <span className="sr-only">Search chapter members</span>
-            <span aria-hidden="true">⌕</span>
-            <input onChange={(event) => setQuery(event.target.value)} placeholder="Search members" type="search" value={query} />
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+            <input onChange={(event) => setQuery(event.target.value)} placeholder="Find members to charge" type="search" value={query} />
           </label>
         </div>
 

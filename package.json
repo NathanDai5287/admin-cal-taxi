@@ -10,7 +10,7 @@
     "preview:host": "node scripts/host-local-preview.mjs",
     "discord-bot": "node --env-file-if-exists=.env.local scripts/discord-bot.mjs",
     "test:accreditation": "node --test scripts/accreditation.test.mjs scripts/accreditation-chat.test.mjs scripts/accreditation-template-drafting.test.mjs scripts/accreditation-template-context.test.mjs",
-    "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs",
+    "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs scripts/dues-payments-database.test.mjs",
     "test:members": "node --test scripts/academic-calendar.test.mjs scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs",
     "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs scripts/manual-expense-receipt.test.mjs",
     "test:review": "node --test scripts/review-decisions.test.mjs",

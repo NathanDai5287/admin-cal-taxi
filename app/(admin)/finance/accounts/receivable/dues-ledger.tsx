@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
   bulkUpdateDuesBalances,
@@ -9,6 +9,7 @@ import {
   setDuesPaid,
   type DuesActionState,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
+import { DuesPaymentForm } from "./payment-form";
 import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -83,13 +84,22 @@ function WaiveBalanceButton({
 
 export function DuesLedger({
   mode = "view",
+  today = "",
+  chargeForm,
 }: {
   mode?: "view" | "manage";
+  today?: string;
+  chargeForm?: ReactNode;
 }) {
   const canManage = mode === "manage";
   const { rows: optimisticRows, applyMutation } = useDuesRows();
   const [filter, setFilter] = useState<Filter>("outstanding");
   const [query, setQuery] = useState("");
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [sort, setSort] = useState("due-date");
+  const [page, setPage] = useState(1);
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
+  const [showChargeForm, setShowChargeForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
   const [applyDueDate, setApplyDueDate] = useState(false);
@@ -133,8 +143,11 @@ export function DuesLedger({
       if (!normalizedQuery) return true;
       return [row.memberName, row.notes]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
-    });
-  }, [filter, query, optimisticRows]);
+    }).sort((a, b) => (sort === "name" ? a.memberName.localeCompare(b.memberName) : sort === "amount" ? b.amountOwed - a.amountOwed : a.dueDate.localeCompare(b.dueDate)) || a.memberName.localeCompare(b.memberName) || a.id.localeCompare(b.id));
+  }, [filter, query, sort, optimisticRows]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 25));
+  const currentPage = Math.min(page, pageCount);
+  const visibleRows = filtered.slice((currentPage - 1) * 25, currentPage * 25);
 
   const counts: Record<Filter, number> = {
     outstanding: optimisticRows.filter((row) => !row.isPaid).length,
@@ -142,7 +155,7 @@ export function DuesLedger({
     paid: optimisticRows.filter((row) => row.isPaid).length,
     all: optimisticRows.length,
   };
-  const allVisibleSelected = filtered.length > 0 && filtered.every((row) => selectedIds.includes(row.id));
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id));
 
   function toggleSelected(id: string) {
     setSelectedIds((current) => current.includes(id)
@@ -152,8 +165,8 @@ export function DuesLedger({
   }
 
   function selectRange(id: string, addToSelection: boolean) {
-    const anchorIndex = filtered.findIndex((row) => row.id === selectionAnchorId);
-    const clickedIndex = filtered.findIndex((row) => row.id === id);
+    const anchorIndex = visibleRows.findIndex((row) => row.id === selectionAnchorId);
+    const clickedIndex = visibleRows.findIndex((row) => row.id === id);
     if (anchorIndex < 0 || clickedIndex < 0) {
       setSelectedIds(addToSelection ? (current) => [...new Set([...current, id])] : [id]);
       setSelectionAnchorId(id);
@@ -162,25 +175,14 @@ export function DuesLedger({
 
     const rangeStart = Math.min(anchorIndex, clickedIndex);
     const rangeEnd = Math.max(anchorIndex, clickedIndex);
-    const rangeIds = filtered.slice(rangeStart, rangeEnd + 1).map((row) => row.id);
+    const rangeIds = visibleRows.slice(rangeStart, rangeEnd + 1).map((row) => row.id);
     setSelectedIds(addToSelection ? (current) => [...new Set([...current, ...rangeIds])] : rangeIds);
-  }
-
-  function selectRow(id: string, shiftKey: boolean, addToSelection: boolean) {
-    if (shiftKey) {
-      selectRange(id, addToSelection);
-      return;
-    }
-    setSelectedIds(addToSelection
-      ? (current) => current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
-      : [id]);
-    setSelectionAnchorId(id);
   }
 
   function selectVisible() {
     setSelectedIds((current) => allVisibleSelected
-      ? current.filter((id) => !filtered.some((row) => row.id === id))
-      : [...new Set([...current, ...filtered.map((row) => row.id)])]);
+      ? current.filter((id) => !visibleRows.some((row) => row.id === id))
+      : [...new Set([...current, ...visibleRows.map((row) => row.id)])]);
   }
 
   function submitPaidToggle(formData: FormData) {
@@ -216,20 +218,22 @@ export function DuesLedger({
     <section className="card dues-ledger-card" aria-labelledby={`${mode}-dues-ledger-title`}>
       <div className="dues-ledger-toolbar">
         <div>
-          <h2 className="card-title" id={`${mode}-dues-ledger-title`}>{canManage ? "Update existing balances" : "Member balances"}</h2>
-          <p className="mt-1 text-[13px] text-muted">{canManage ? "Change amounts, due dates, notes, or balance status." : "View what members owe and review payment status."}</p>
+          <h2 className="card-title" id={`${mode}-dues-ledger-title`}>Member balances</h2>
+          <p className="mt-1 text-[13px] text-muted">{canManage ? "Find a charge, record a payment, or open its details." : "View what members owe and review payment status."}</p>
         </div>
         <label className="dues-search">
           <span className="sr-only">Search member balances</span>
           <SearchIcon />
           <input
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search members"
+            onChange={(event) => { setQuery(event.target.value); setPage(1); }}
+            placeholder="Search by member or charge"
             type="search"
             value={query}
           />
         </label>
+        {canManage && chargeForm && <Button compact aria-expanded={showChargeForm} aria-controls="dues-add-charge" onClick={() => setShowChargeForm(!showChargeForm)}>{showChargeForm ? "Close charge form" : "Add charge"}</Button>}
       </div>
+      {showChargeForm && <div id="dues-add-charge" className="dues-add-charge">{chargeForm}</div>}
 
       <div className="dues-filter-bar" role="group" aria-label="Filter member balances">
         {(["outstanding", "overdue", "paid", "all"] as const).map((value) => (
@@ -237,7 +241,7 @@ export function DuesLedger({
             aria-pressed={filter === value}
             className={filter === value ? "active" : ""}
             key={value}
-            onClick={() => setFilter(value)}
+            onClick={() => { setFilter(value); setPage(1); }}
             type="button"
           >
             <span className="capitalize">{value}</span>
@@ -246,11 +250,16 @@ export function DuesLedger({
         ))}
       </div>
 
-      {canManage && <div className="dues-bulk-toolbar">
+      <div className="dues-list-controls">
+        {canManage && <label className="dues-select-page"><input type="checkbox" checked={allVisibleSelected} disabled={!visibleRows.length || bulkBusy} onChange={selectVisible} /> Select this page</label>}
+        <label className="dues-sort">Sort by <select value={sort} onChange={(event) => { setSort(event.target.value); setPage(1); }}><option value="due-date">Due date</option><option value="name">Member name</option><option value="amount">Remaining amount</option></select></label>
+      </div>
+
+      {canManage && selectedIds.length > 0 && <div className="dues-bulk-toolbar">
         <div className="dues-bulk-selection">
           <strong>{selectedIds.length ? `${selectedIds.length} selected` : "Select balances for bulk changes"}</strong>
-          <span className="dues-selection-hint">Click a row. Shift-click selects a range.</span>
-          <button disabled={!filtered.length} onClick={selectVisible} type="button">
+          <span className="dues-selection-hint">Use checkboxes. Shift-click selects a range.</span>
+          <button disabled={!visibleRows.length} onClick={selectVisible} type="button">
             {allVisibleSelected ? "Deselect visible" : "Select visible"}
           </button>
           {!!selectedIds.length && <button onClick={() => setSelectedIds([])} type="button">Clear selection</button>}
@@ -258,7 +267,7 @@ export function DuesLedger({
         {!!selectedIds.length && <div className="dues-bulk-actions">
           <form action={submitBulkPaid}>
             {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
-            <Button compact disabled={bulkBusy} type="submit" variant="primary">Clear balances</Button>
+            <Button compact disabled={bulkBusy} type="submit" variant="primary">Mark selected fully paid</Button>
           </form>
           <form action={submitBulkWaive}>
             {optimisticRows.filter((row) => selectedIds.includes(row.id)).map((row) => <input key={row.id} name="balanceVersion" type="hidden" value={`${row.id}|${row.updatedAt}`} />)}
@@ -270,7 +279,7 @@ export function DuesLedger({
               confirmText="Confirm waiver"
             />
           </form>
-          <small>Clearing marks balances fully paid and keeps their history.</small>
+          <small>Records the remaining amounts as payments dated today.</small>
         </div>}
       </div>}
 
@@ -284,21 +293,15 @@ export function DuesLedger({
         <div className="dues-bulk-list">
         {filtered.length ? (
           <div className="dues-list">
-            {filtered.map((row) => (
-            <article
-              className={`dues-row${canManage ? " selectable" : " read-only"}${canManage && selectedIds.includes(row.id) ? " selected" : ""}`}
-              key={row.id}
-              onClick={canManage ? (event) => {
-                if ((event.target as HTMLElement).closest("a, button, form, input, label, select, textarea, [role='button']")) return;
-                selectRow(row.id, event.shiftKey, event.metaKey || event.ctrlKey);
-              } : undefined}
-            >
+            {visibleRows.map((row) => (
+            <article className={`dues-charge${selectedIds.includes(row.id) ? " selected" : ""}`} key={row.id}>
+            <div className="dues-row">
               <div className="dues-person">
                 {canManage && <input
                   aria-label={`Select ${row.memberName}'s balance`}
                   checked={selectedIds.includes(row.id)}
                   className="dues-select"
-                  disabled={row.pending}
+                  disabled={row.pending || bulkBusy}
                   onClick={(event) => {
                     event.stopPropagation();
                     if (event.shiftKey) {
@@ -311,42 +314,50 @@ export function DuesLedger({
                   type="checkbox"
                 />}
                 <div className="min-w-0">
-                  <h3>{row.memberName}</h3>
+                  <h3><button className="dues-member-button" type="button" aria-expanded={openRowId === row.id} aria-controls={`dues-detail-${row.id}`} onClick={() => setOpenRowId(openRowId === row.id ? null : row.id)}>{row.memberName}</button></h3>
                   {row.notes.trim() ? <p className="dues-note">{row.notes}</p> : null}
-                  {!row.memberId && <p>Account link needed.</p>}
                   <p>
                     Due {formatDate(row.dueDate)}
                     {row.isOverdue ? <span className="dues-overdue-label">Overdue</span> : null}
                     {row.isPaid ? <span className="dues-paid-label">Paid</span> : null}
-                    {row.discordUserId ? <span className="dues-discord-linked">Discord linked</span> : null}
                   </p>
-                  {row.paidAmount > 0 && !row.isPaid ? (
+                  {row.paidAmount > 0 ? (
                     <p>Paid {formatMoney(row.paidAmount)} of {formatMoney(row.assessedAmount)}</p>
                   ) : null}
                 </div>
               </div>
 
               <div className="dues-balance">
-                <span>{row.isPaid ? "Settled" : "Amount owed"}</span>
-                <strong>{formatMoney(row.isPaid ? row.assessedAmount : row.amountOwed)}</strong>
+                <span>{row.isPaid ? "Paid" : "Remaining"}</span>
+                <strong>{formatMoney(row.amountOwed)}</strong>
               </div>
 
-              {canManage && <div className="dues-actions">
-                <form action={submitPaidToggle}>
-                  <input name="id" type="hidden" value={row.id} />
-                  <input name="paid" type="hidden" value={row.isPaid ? "false" : "true"} />
-                  <input name="updatedAt" type="hidden" value={row.updatedAt} />
-                  <Button compact disabled={row.pending} type="submit" variant={row.isPaid ? "secondary" : "primary"}>
-                    {row.isPaid ? "Reopen balance" : "Mark fully paid"}
-                  </Button>
-                </form>
-              </div>}
+              <div className="dues-actions">
+                <Button compact disabled={row.pending} variant={row.isPaid ? "secondary" : "primary"} aria-expanded={openRowId === row.id} aria-controls={`dues-detail-${row.id}`} onClick={() => setOpenRowId(openRowId === row.id ? null : row.id)}>{row.isPaid || !canManage ? "View details" : openRowId === row.id ? "Close details" : "Record payment"}</Button>
+              </div>
+            </div>
+            {openRowId === row.id && <div className="dues-charge-detail" id={`dues-detail-${row.id}`}>
+              <dl className="dues-detail-facts">
+                <div><dt>Total charge</dt><dd>{formatMoney(row.assessedAmount)}</dd></div>
+                <div><dt>Paid to date</dt><dd>{formatMoney(row.paidAmount)}</dd></div>
+                <div><dt>Account</dt><dd>{row.memberId ? "Linked" : "Account link needed"}</dd></div>
+                <div><dt>Discord</dt><dd>{row.discordUserId ? "Linked" : "Not linked"}</dd></div>
+              </dl>
+              {canManage && !row.isPaid && <DuesPaymentForm row={row} today={today} onRecorded={setPaymentMessage} />}
+              {canManage && row.isPaid && <form action={submitPaidToggle}>
+                <input name="id" type="hidden" value={row.id} />
+                <input name="paid" type="hidden" value="false" />
+                <input name="updatedAt" type="hidden" value={row.updatedAt} />
+                <p className="mb-2 text-xs text-muted">Reopening reverses all recorded payments on this charge and restores its full balance.</p>
+                <Button compact disabled={row.pending} type="submit" variant="secondary">Reopen balance</Button>
+              </form>}
+            </div>}
             </article>
             ))}
           </div>
         ) : (
           <div className="empty-state border-t border-rule">
-            {optimisticRows.length ? "No balances match this view." : canManage ? "No balances to update." : "No dues balances yet."}
+            {optimisticRows.length ? "No charges match this search and filter. Try All or clear your search." : canManage ? "No balances to update." : "No dues balances yet."}
           </div>
         )}
         </div>
@@ -377,6 +388,11 @@ export function DuesLedger({
           </aside>
         ) : null}
       </div>
+      {filtered.length > 0 && <nav className="dues-pagination" aria-label="Balance pages">
+        <span>{(currentPage - 1) * 25 + 1}–{Math.min(currentPage * 25, filtered.length)} of {filtered.length} charges</span>
+        <div><Button compact variant="secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</Button><span>Page {currentPage} of {pageCount}</span><Button compact variant="secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</Button></div>
+      </nav>}
+      <p role="status" className="dues-action-feedback success px-4 py-2">{paymentMessage}</p>
       {canManage && latestChargeState.message ? (
         <p aria-live="polite" className={`dues-action-feedback px-6 py-2 ${latestChargeState.status}`}>
           {latestChargeState.message}

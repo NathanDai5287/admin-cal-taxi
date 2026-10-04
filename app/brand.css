@@ -493,6 +493,30 @@
     @apply block mt-2 text-[28px] leading-none font-bold tabular-nums tracking-[-0.02em];
   }
   [data-brand] .dues-summary p { @apply mt-2 text-[12px] text-muted; }
+  [data-brand] .dues-summary-compact { @apply grid-cols-3; }
+  [data-brand] .dues-summary-compact > div { @apply px-3 py-3 border-b-0 border-r sm:px-4; }
+  [data-brand] .dues-summary-compact > .dues-summary-primary { @apply bg-surface text-ink border-rule; }
+  [data-brand] .dues-summary-compact span { @apply text-[11px] sm:text-xs normal-case tracking-normal font-medium text-muted; }
+  [data-brand] .dues-summary-compact strong { @apply mt-1 text-xl; }
+  [data-brand] .dues-summary-compact p { @apply hidden sm:block mt-1 text-muted; }
+  [data-brand] .dues-ledger-toolbar .dues-search { @apply flex-1 min-w-0; }
+  [data-brand] .dues-add-charge { @apply border-t border-rule p-4 bg-canvas; }
+  [data-brand] .dues-list-controls { @apply flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-rule text-xs text-muted; }
+  [data-brand] .dues-select-page { @apply flex items-center gap-2 cursor-pointer; }
+  [data-brand] .dues-select-page input { @apply accent-brand; }
+  [data-brand] .dues-sort { @apply flex items-center gap-2; }
+  [data-brand] .dues-sort select { @apply border border-rule bg-surface p-2 text-ink; }
+  [data-brand] .dues-charge.selected { @apply bg-brand-light; }
+  [data-brand] .dues-member-button { @apply text-left cursor-pointer hover:underline; }
+  [data-brand] .dues-charge-detail { @apply border-t border-rule bg-canvas p-4 grid gap-4; }
+  [data-brand] .dues-detail-facts { @apply grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs; }
+  [data-brand] .dues-detail-facts dt { @apply text-muted; }
+  [data-brand] .dues-detail-facts dd { @apply mt-1 font-semibold text-ink tabular-nums; }
+  [data-brand] .dues-payment-entry { @apply grid gap-4 sm:grid-cols-2; }
+  [data-brand] .dues-payment-result { @apply flex flex-wrap items-center justify-between gap-3 sm:col-span-2 text-sm; }
+  [data-brand] .dues-text-action { @apply mt-2 text-xs text-brand font-semibold cursor-pointer hover:underline disabled:opacity-50; }
+  [data-brand] .dues-pagination { @apply flex flex-wrap items-center justify-between gap-3 border-t border-rule px-4 py-3 text-xs text-muted; }
+  [data-brand] .dues-pagination > div { @apply flex flex-wrap items-center gap-3; }
   [data-brand] .dues-ledger-toolbar {
     @apply flex flex-wrap items-center justify-between gap-4 px-6 py-5;
   }

@@ -90,13 +90,12 @@ export default async function DuesPage() {
     <div className="grid gap-7">
       <div>
         <div>
-          <p className="page-eyebrow">Chapter finances</p>
-          <h1 className="page-title">Dues to collect</h1>
+          <h1 className="page-title">Dues</h1>
           <p className="page-lede">See what members owe, record payments, and add new dues when needed.</p>
         </div>
       </div>
 
-      <section className="dues-summary" aria-label="Dues summary">
+      <section className="dues-summary dues-summary-compact" aria-label="Dues summary">
         <div className="dues-summary-primary">
           <span>Total outstanding</span>
           <strong>{formatMoney(totalOutstanding)}</strong>
@@ -114,16 +113,8 @@ export default async function DuesPage() {
         </div>
       </section>
 
-      <div className="border-t border-rule pt-7">
-        <p className="page-eyebrow">Write access</p>
-        <h2 className="mt-1 text-[18px] font-bold text-ink">Manage dues</h2>
-        <p className="mt-1 text-[13px] text-muted">Add charges and make balance changes in this section.</p>
-      </div>
-
       <DuesBoard rows={rows} today={today}>
-        <ChargeMembersForm members={members} today={today} />
-
-        <DuesLedger mode="manage" />
+        <DuesLedger mode="manage" today={today} chargeForm={<ChargeMembersForm members={members} today={today} />} />
       </DuesBoard>
 
       <DuesAnnouncement

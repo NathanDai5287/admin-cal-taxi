@@ -18,6 +18,16 @@ All activity belongs to the current academic term. Academic years and their Fall
 
 ## Data and rollout
 
+### Dues collection workflow
+
+The Dues page starts with a compact summary and one balance list. Search matches member names and charge descriptions; Outstanding is the default filter. Sort by due date, member name, or remaining amount, with 25 charges per page.
+
+Open a member's name or **Record payment** to review the charge and enter an amount received and payment date. **Use remaining balance** fills the amount for a full payment; the form previews the remaining balance before saving. This uses the existing dated, retry-safe `record_dues_payment` RPC from `20260922000000_finance_plan_actual.sql`; the UI change needs no new migration.
+
+**Add charge** opens the member picker and shared amount/date/description form. Checkboxes select charges for bulk changes; clicking a name opens details. Bulk tools appear only after selection. **Mark selected fully paid** records remaining balances as payments dated today; waivers remain separate. Reopening a paid charge reverses all of its recorded payments and restores the full balance.
+
+Verification: all 12 `npm run test:dues` checks pass, including partial/full payments, overpayment rejection, payment dates, and duplicate request IDs in an isolated PGlite database. Browser checks with mocked actions cover search, sorting, pagination, checkbox selection, the charge picker, payment success/failure, and desktop/mobile layout. Changed-file lint and the production build pass. Repository-wide lint has existing errors in hosting test/preview files.
+
 Apply `supabase/migrations/20260914000000_finance_boundaries.sql` before deploying this code. This migration has been tested in an isolated PostgreSQL cluster, not applied to a live database by this change.
 
 - Existing funding rows remain actual income (`kind = income`), consistent with how the financial PDF previously used them. New Planning entries are forecasts and do not affect actual income. Existing category limits remain intact; forecasts start empty.

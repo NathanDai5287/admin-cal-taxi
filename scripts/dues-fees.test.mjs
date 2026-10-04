@@ -33,7 +33,7 @@ test("existing balance rows use the bulk editor without profile icons", async ()
 
   assert.doesNotMatch(ledger, /dues-avatar|Edit charge/);
   assert.match(ledger, /dues-bulk-inspector/);
-  assert.match(ledger, /Mark fully paid/);
+  assert.match(ledger, /Record payment/);
   assert.match(ledger, /Waive selected/);
 });
 
@@ -81,12 +81,12 @@ test("new feedback wins and successful bulk actions clear selection", async () =
   assert.doesNotMatch(ledger, /some\(\(state\) => state\.status === "error"\)/);
 });
 
-test("charge rows support standard range and modifier selection", async () => {
+test("checkboxes support range selection while member names open details", async () => {
   const ledger = await readFile(new URL("dues-ledger.tsx", receivablesDirectory), "utf8");
 
   assert.match(ledger, /selectRange\(id: string, addToSelection: boolean\)/);
-  assert.match(ledger, /event\.shiftKey, event\.metaKey \|\| event\.ctrlKey/);
-  assert.match(ledger, /filtered\.slice\(rangeStart, rangeEnd \+ 1\)/);
-  assert.match(ledger, /closest\("a, button, form, input, label, select, textarea/);
+  assert.match(ledger, /selectRange\(row\.id, event\.metaKey \|\| event\.ctrlKey\)/);
+  assert.match(ledger, /visibleRows\.slice\(rangeStart, rangeEnd \+ 1\)/);
+  assert.match(ledger, /className="dues-member-button"[\s\S]*?setOpenRowId/);
   assert.match(ledger, /Shift-click selects a range/);
 });
