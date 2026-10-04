@@ -63,7 +63,7 @@ test("waivers and hosting cancellations remove planned values only", async () =>
   assert.equal(summary.plannedIncome, 0);
   assert.equal(summary.actualIncome, 600);
   assert.equal(summary.plannedExpenses, 1000);
-  assert.equal(summary.actualExpenses, 125);
+  assert.equal(summary.actualExpenses, 0);
 });
 
 test("legacy manual dues do not double count assigned dues", async () => {
@@ -82,15 +82,38 @@ test("legacy manual dues do not double count assigned dues", async () => {
   assert.equal(summary.excludedLegacyDues.length, 1);
 });
 
-test("hosting permits belong to Socials in both the forecast and actual expenses", async () => {
+test("hosting permit paid status affects neither spending nor its Socials forecast", async () => {
   const { buildPlanVsActual } = await loadCalculator();
   const summary = buildPlanVsActual({ ...baseInput(), hostingOrders: [{ plannedRevenue: 1400, plannedFirePermit: 125, status: "confirmed" }], hostingPayments: [{ amount: 75, kind: "fire_permit" }] });
   const socials = summary.expenseBreakdown.find(row => row.category === "socials");
   const house = summary.expenseBreakdown.find(row => row.category === "house");
   assert.equal(socials.planned, 125);
-  assert.equal(socials.actual, 75);
+  assert.equal(socials.actual, 0);
   assert.equal(house.planned, 1000);
   assert.equal(house.actual, 0);
+});
+
+test("a reimbursement for two permits is counted once despite hosting paid status", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({
+    ...baseInput(),
+    approvedReimbursements: [{ category: "socials", amount: 250 }],
+    hostingOrders: [{ plannedRevenue: 1400, plannedFirePermit: 125, status: "confirmed" }],
+    hostingPayments: [{ amount: 125, kind: "fire_permit" }, { amount: 1400, kind: "revenue" }],
+  });
+  assert.equal(summary.actualExpenses, 250);
+  assert.equal(summary.expenseBreakdown.find(row => row.category === "socials").actual, 250);
+  assert.equal(summary.actualIncome, 1400);
+});
+
+test("a chapter-paid permit is counted once through a direct expense", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({
+    ...baseInput(),
+    directExpenses: [{ category: "socials", amount: 125 }],
+    hostingPayments: [{ amount: 125, kind: "fire_permit" }],
+  });
+  assert.equal(summary.actualExpenses, 125);
 });
 
 test("hosting confirmation storage is unique and cancellation keeps payments", async () => {

@@ -106,10 +106,9 @@ export async function GET(request: Request) {
       amount: Number(row.amount),
       reimbursed: row.reimbursed,
     })),
-    manualExpenses: [
-      ...(manualResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
-      ...hostingPayments.filter((row) => row.kind === "fire_permit").map((row) => ({ category: "socials" as const, amount: Number(row.amount) })),
-    ],
+    // Hosting permit paid status does not represent a chapter cash expense.
+    // The paid reimbursement or direct expense records the cash outflow.
+    manualExpenses: (manualResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
     receivables: receivables.map((row) => ({
       amountAssessed: Number(row.amount_assessed),
       amountPaid: Number(row.amount_paid),

@@ -72,10 +72,9 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
       + (category === "socials"
         ? sum(confirmedHosting.map((order) => order.plannedFirePermit))
         : 0);
-    const actual = sum(actualExpenses.filter((expense) => expense.category === category).map((expense) => expense.amount))
-      + (category === "socials"
-        ? sum(input.hostingPayments.filter((payment) => payment.kind === "fire_permit").map((payment) => payment.amount))
-        : 0);
+    // Permit payments track fulfillment on the order. Spending comes from the
+    // reimbursement or direct expense, so the same permit is counted once.
+    const actual = sum(actualExpenses.filter((expense) => expense.category === category).map((expense) => expense.amount));
     return { category, label, planned: dollars(planned), actual: dollars(actual) };
   });
 

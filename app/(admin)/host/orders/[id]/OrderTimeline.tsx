@@ -190,7 +190,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <Milestone title="Send deposit invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, -7))}`} done={delivered("deposit_invoice")}>
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
       </Milestone>
-      <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid · Socials expense` : "No fire permit expense in this agreement."} done={permitTotal === 0 || permitPaid >= permitTotal}>
+      <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid` : "No fire permit required."} done={permitTotal === 0 || permitPaid >= permitTotal}>
         {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Update fire permit payment</a>}
       </Milestone>
       <Milestone title="Event held" detail={`${formatDateISO(order.eventDate)}`} done={held}>
