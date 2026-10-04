@@ -12,6 +12,7 @@ import { cancelHostingEventAction, copyHostingSigningLinkAction, refreshHostingP
 import { hostingEmailDraft } from "@/lib/host-email-draft";
 import { createHostingDocumentCache, createHostingPreviewCache } from "@/lib/host-preview-client";
 import { fmtUSD } from "../order-format";
+import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 
 export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
@@ -30,6 +31,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const documentSelection = useRef(0);
   const pausePolling = useRef(false);
   const revision = currentRevision(revisions);
+  const representatives = sharedStateFromSnapshot(order.snapshot);
+  const signerClubs = new Map(representatives.contractSigners.map(person => [person.email.trim().toLowerCase(), person.club.trim()]));
+  if (representatives.chapterSignerEmail.trim()) signerClubs.set(representatives.chapterSignerEmail.trim().toLowerCase(), "Theta Xi");
   const progress = eventProgress(order.eventDate, revisions, workflow, today, order.statusOverride === "cancelled");
   const cancelled = progress.stage === "cancelled";
   const wasSent = contractWasSent(revision, workflow);
@@ -165,10 +169,13 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed · updates automatically` : "Signature progress will appear after approval."} done={signed}>
         {revision && <>
           <ul className="divide-y divide-rule">
-            {revision.recipients.map(person => <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-3">
-              <div className="min-w-0"><p className="text-[13px] font-semibold [overflow-wrap:anywhere]">{person.name}<span className={`ml-3 font-normal ${person.status === "SIGNED" ? "text-ok" : "text-muted"}`}>{person.status === "SIGNED" ? "Signed" : "Pending"}</span></p><p className="mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">{person.email}</p></div>
+            {revision.recipients.map(person => {
+              const club = signerClubs.get(person.email.trim().toLowerCase());
+              return <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-3">
+              <div className="min-w-0"><p className="text-[13px] font-semibold [overflow-wrap:anywhere]">{person.name}<span className={`ml-3 font-normal ${person.status === "SIGNED" ? "text-ok" : "text-muted"}`}>{person.status === "SIGNED" ? "Signed" : "Pending"}</span></p>{club && <p className="mt-1 text-[12px] font-medium text-ink [overflow-wrap:anywhere]">Representing {club}</p>}<p className="mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">{person.email}</p></div>
               {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-3"><Button compact variant="text" disabled={busy || !allowed || !wasSent} onClick={() => prepare("reminder", [person.email])}>Remind</Button><Button compact variant="text" disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link</Button></div>}
-            </li>)}
+            </li>;
+            })}
           </ul>
           <div className="mt-3 flex flex-wrap items-center gap-4">{!signed && emailButton("reminder", "Review reminder to unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}>Download signed contract</a>}{signed && revision.files.audit && <a className="text-[13px] text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
           <p className="mt-3 text-[12px] text-muted">{signed ? "The completed contract and audit trail are emailed automatically to every signer once ready." : "Reminders go only to unsigned people, at most once per person each day."}</p>
