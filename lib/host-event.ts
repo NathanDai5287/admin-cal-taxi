@@ -1,4 +1,4 @@
-import type { SigningRevision } from "./host-signing";
+import type { SigningPerson, SigningRevision } from "./host-signing";
 
 export type EventStage = "draft" | "sent" | "signed" | "held" | "cancelled";
 export const EVENT_STAGE_LABELS: Record<EventStage, string> = {
@@ -15,6 +15,24 @@ export type EventWorkflow = {
   activatedAt: string; cancelledAt: string | null; deliveries: EmailDelivery[];
   refund: { amount: number; date: string; method: string } | null;
 };
+export type SignerProgress = { state: "signed" | "pending" | "not_sent" | "unconfirmed"; label: string };
+export function signerProgress(person: SigningPerson, revision: SigningRevision, workflow: EventWorkflow): SignerProgress {
+  if (person.status === "SIGNED") return { state: "signed", label: "Signed" };
+  const deliveries = workflow.deliveries.filter(delivery => delivery.revision_id === revision.id
+    && delivery.recipient.trim().toLowerCase() === person.email.trim().toLowerCase()
+    && (delivery.kind === "invitation" || delivery.kind === "reminder"));
+  if (person.sentAt || deliveries.some(delivery => delivery.status === "sent")) {
+    return { state: "pending", label: "Pending signature — invitation sent" };
+  }
+  // Preserve previously shared signing requests without claiming tracked email delivery.
+  if (revision.envelope_id && Date.parse(revision.created_at) < Date.parse(workflow.activatedAt)) {
+    return { state: "pending", label: "Pending signature — signing request predates email tracking" };
+  }
+  if (deliveries.some(delivery => ["sending", "failed", "uncertain"].includes(delivery.status))) {
+    return { state: "unconfirmed", label: "Email delivery unconfirmed — check email activity" };
+  }
+  return { state: "not_sent", label: "Invitation not sent" };
+}
 export function eventToday(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }

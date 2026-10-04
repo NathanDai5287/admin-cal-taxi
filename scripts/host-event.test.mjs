@@ -5,11 +5,30 @@ import { build } from "esbuild";
 import { PGlite } from "@electric-sql/pglite";
 
 const compiled = await build({ stdin: { contents: 'export * from "./lib/host-event"; export * from "./lib/host-email-template";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node" });
-const { eventProgress, eventToday, hostingEmail } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+const { eventProgress, eventToday, hostingEmail, signerProgress } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const workflow = { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null };
 const revision = { id: "sig_test", revision: 1, state: "awaiting_signatures", created_at: "2026-10-01T12:00:00Z", envelope_id: "envelope_existing", recipients: [{ name: "First", email: "one@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/one" }], signedCount: 0, totalCount: 1 };
 test("existing pending envelopes are sent without recreating or manually tracking them", () => {
   assert.deepEqual(eventProgress("2026-10-16", [revision], workflow, "2026-10-04"), { stage: "sent", signed: 0, total: 1 });
+});
+
+test("signer icons distinguish individual delivery from another recipient and queued previews", () => {
+  const fresh = { ...revision, created_at: "2026-10-05T12:00:00Z" };
+  const person = fresh.recipients[0];
+  const delivery = { revision_id: fresh.id, recipient: person.email, kind: "invitation", status: "sent" };
+  const state = (rows, signer = person, current = fresh) => signerProgress(signer, current, { ...workflow, deliveries: rows }).state;
+  assert.equal(state([]), "not_sent");
+  assert.equal(state([{ ...delivery, status: "queued" }]), "not_sent");
+  assert.equal(state([{ ...delivery, recipient: "other@example.test" }]), "not_sent");
+  assert.equal(state([{ ...delivery, revision_id: "old_revision" }]), "not_sent");
+  assert.equal(state([{ ...delivery, kind: "deposit_invoice" }]), "not_sent");
+  assert.equal(state([{ ...delivery, recipient: person.email.toUpperCase() }]), "pending");
+  assert.equal(state([{ ...delivery, kind: "reminder" }]), "pending");
+  assert.equal(state([], { ...person, sentAt: "2026-10-05T12:00:00Z" }), "pending");
+  assert.equal(state([], person, revision), "pending");
+  for (const status of ["sending", "failed", "uncertain"]) assert.equal(state([{ ...delivery, status }]), "unconfirmed");
+  assert.equal(state([{ ...delivery, status: "failed" }, delivery]), "pending");
+  assert.equal(state([], { ...person, status: "SIGNED" }), "signed");
 });
 test("new links remain draft until sent; abandoned drafts do not become held", () => {
   const fresh = { ...revision, created_at: "2026-10-05T12:00:00Z" };

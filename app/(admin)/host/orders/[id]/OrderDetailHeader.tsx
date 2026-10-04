@@ -28,7 +28,7 @@ export default function OrderDetailHeader({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-rule">
+      <div className="flex flex-wrap items-center gap-3">
         {actions}
       </div>
     </div>

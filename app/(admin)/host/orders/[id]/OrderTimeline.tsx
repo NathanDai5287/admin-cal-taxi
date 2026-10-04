@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation";
 import { Button, ButtonLink } from "@/components/brand/button";
 import { addDaysIso, formatDateISO } from "@/lib/host-format";
-import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, EVENT_STAGE_LABELS, type EmailKind, type EventWorkflow } from "@/lib/host-event";
+import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
 import type { EmailPreview } from "@/lib/host-email";
 import type { SigningRevision } from "@/lib/host-signing";
 import type { Order } from "@/lib/host-orders-types";
@@ -41,7 +41,8 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const held = progress.stage === "held";
   const allowed = emailConfigured && !signingUnavailable && !cancelled && !!revision;
   const delivered = (kind: EmailKind) => workflow.deliveries.some(d => d.kind === kind && d.status === "sent" && d.revision_id === revision?.id);
-  const hasUnsentInvitation = workflow.deliveries.some(d => d.kind === "invitation" && d.status !== "sent" && d.revision_id === revision?.id);
+  const hasUnsentInvitation = workflow.deliveries.some(d => d.kind === "invitation" && d.status !== "sent" && d.revision_id === revision?.id)
+    || !!revision?.recipients.some(person => ["not_sent", "unconfirmed"].includes(signerProgress(person, revision, workflow).state));
 
   useEffect(() => {
     async function poll() {
@@ -171,9 +172,14 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
           <ul className="divide-y divide-rule">
             {revision.recipients.map(person => {
               const club = signerClubs.get(person.email.trim().toLowerCase());
+              const signature = signerProgress(person, revision, workflow);
               return <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-3">
-              <div className="min-w-0"><p className="text-[13px] font-semibold [overflow-wrap:anywhere]">{person.name}<span className={`ml-3 font-normal ${person.status === "SIGNED" ? "text-ok" : "text-muted"}`}>{person.status === "SIGNED" ? "Signed" : "Pending"}</span></p>{club && <p className="mt-1 text-[12px] font-medium text-ink [overflow-wrap:anywhere]">Representing {club}</p>}<p className="mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">{person.email}</p></div>
-              {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-3"><Button compact variant="text" disabled={busy || !allowed || !wasSent} onClick={() => prepare("reminder", [person.email])}>Remind</Button><Button compact variant="text" disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link</Button></div>}
+              <div className="min-w-0">
+                <p className="flex items-center gap-3 text-[13px] font-semibold"><span className="min-w-0 [overflow-wrap:anywhere]">{person.name}</span><SignatureIcon progress={signature} /></p>
+                {club && <p className="mt-1 text-[12px] font-medium text-ink [overflow-wrap:anywhere]">{club}</p>}
+                <p className="mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">{person.email}</p>
+              </div>
+              {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-3"><Button compact variant="text" disabled={busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind</Button><Button compact variant="text" disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link</Button></div>}
             </li>;
             })}
           </ul>
@@ -186,7 +192,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
         <p className="mt-2 text-[12px] text-muted">The refundable deposit is separate from rental revenue.</p>
       </Milestone>
       <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid · Socials expense` : "No fire permit expense in this agreement."} done={permitTotal === 0 || permitPaid >= permitTotal}>
-        {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Record payment in finances</a>}
+        {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Update fire permit payment</a>}
       </Milestone>
       <Milestone title="Event held" detail={`${formatDateISO(order.eventDate)} · advances automatically after this date in Berkeley time`} done={held}>
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
@@ -237,4 +243,14 @@ function Milestone({ title, detail, done, children, last = false }: { title: str
     <span aria-hidden="true" className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-surface ${done ? "border-brand text-brand" : "border-rule"}`}>{done && <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" /></svg>}</span>
     <h3 className="text-[15px] font-semibold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3><p className="mt-1 text-[13px] leading-relaxed text-muted">{detail}</p>{children && <div className="mt-3">{children}</div>}
   </li>;
+}
+function SignatureIcon({ progress }: { progress: SignerProgress }) {
+  const color = progress.state === "signed" ? "text-ok" : progress.state === "pending" ? "text-brand" : progress.state === "unconfirmed" ? "text-warn" : "text-muted";
+  return <svg role="img" aria-label={progress.label} viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 ${color}`} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <title>{progress.label}</title>
+    {progress.state === "signed" ? <><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></>
+      : progress.state === "pending" ? <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>
+      : progress.state === "not_sent" ? <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></>
+      : <><path d="m12 3 10 18H2L12 3Z" /><path d="M12 9v5m0 3h.01" /></>}
+  </svg>;
 }

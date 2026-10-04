@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
-import { recordHostingPaymentAction, reverseHostingPaymentAction } from "../actions";
+import { recordHostingPaymentAction, undoHostingPaymentStatusAction } from "../actions";
 
 type FinanceOrder = {
   status: "confirmed" | "cancelled";
@@ -41,7 +41,6 @@ export default function HostingFinancePanel({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [editing, setEditing] = useState<Payment["kind"] | null>(null);
   const [requestIds, setRequestIds] = useState({
     revenue: crypto.randomUUID(),
     fire_permit: crypto.randomUUID(),
@@ -56,10 +55,8 @@ export default function HostingFinancePanel({
   const [reversedIds, setReversedIds] = useState<ReadonlySet<string>>(new Set());
 
   const confirmed = financeOrder?.status === "confirmed" && !eventCancelled;
-  const displayPayments: (Payment & { pending?: boolean })[] = [
-    ...pendingPayments.map((payment) => ({ ...payment, pending: true })),
-    ...payments.map((payment) => reversedIds.has(payment.id) ? { ...payment, reversedAt: new Date().toISOString() } : payment),
-  ];
+  const displayPayments = [...pendingPayments, ...payments].map(payment => reversedIds.has(payment.id)
+    ? { ...payment, reversedAt: "undone" } : payment);
   // Drift: the archived order was edited after confirmation. The confirmed
   // values are the ledger of record and stay frozen; this note makes the
   // disagreement visible instead of silent.
@@ -70,14 +67,14 @@ export default function HostingFinancePanel({
   const revenuePaid = activePayments.filter((payment) => payment.kind === "revenue").reduce((total, payment) => total + payment.amount, 0);
   const permitPaid = activePayments.filter((payment) => payment.kind === "fire_permit").reduce((total, payment) => total + payment.amount, 0);
 
-  async function recordPayment(kind: Payment["kind"], formData: FormData) {
+  async function recordPayment(kind: Payment["kind"]) {
     setBusy(true);
     setMessage("");
     const optimistic: Payment = {
       id: `pending-${crypto.randomUUID()}`,
       kind,
-      amount: Number(formData.get("amount")),
-      paidDate: String(formData.get("paidDate")),
+      amount: Math.round(((kind === "revenue" ? revenue - revenuePaid : firePermit - permitPaid)) * 100) / 100,
+      paidDate: today,
       reversedAt: null,
     };
     setPendingPayments((current) => [optimistic, ...current]);
@@ -90,7 +87,8 @@ export default function HostingFinancePanel({
         requestId: requestIds[kind],
       });
       if (result.ok) {
-        setMessage("Payment recorded.");
+        setPendingPayments(current => current.map(payment => payment.id === optimistic.id ? { ...payment, id: result.data.id } : payment));
+        setMessage(`${kind === "revenue" ? "Rental fee" : "Fire permit"} marked paid.`);
         setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
         router.refresh();
       } else {
@@ -103,67 +101,47 @@ export default function HostingFinancePanel({
     } finally { setBusy(false); }
   }
 
-  async function reversePayment(paymentId: string) {
-    if (!window.confirm("Reverse this payment record?")) return;
+  async function undoPaid(kind: Payment["kind"]) {
+    const paymentIds = activePayments.filter(payment => payment.kind === kind).map(payment => payment.id);
     setBusy(true);
     setMessage("");
-    setReversedIds((current) => new Set(current).add(paymentId));
+    setReversedIds(current => new Set([...current, ...paymentIds]));
     try {
-      const result = await reverseHostingPaymentAction(paymentId);
-      if (result.ok) {
-        setMessage("Payment reversed.");
-        router.refresh();
-      } else {
-        setReversedIds((current) => {
-          const next = new Set(current);
-          next.delete(paymentId);
-          return next;
-        });
-        setMessage(result.error);
-      }
-    } catch {
-      setReversedIds(current => { const next = new Set(current); next.delete(paymentId); return next; });
-      setMessage("Could not confirm the reversal. Reload to check the payment, then retry if needed.");
+      const result = await undoHostingPaymentStatusAction({ orderId, kind, paymentIds });
+      if (!result.ok) throw new Error(result.error);
+      setMessage(`${kind === "revenue" ? "Rental fee" : "Fire permit"} marked unpaid.`);
+      router.refresh();
+    } catch (error) {
+      setReversedIds(current => new Set([...current].filter(id => !paymentIds.includes(id))));
+      setMessage(error instanceof Error ? error.message : "Could not undo paid status. Reload to check the payment, then retry.");
     } finally { setBusy(false); }
   }
 
   return (
-    <section id="event-finances" aria-label="Event finances" className="scroll-mt-6 border-y border-rule py-3">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <h2 className="text-[13px] font-semibold">Finances</h2>
-        <div className="flex flex-wrap items-center gap-3"><span className="text-[13px]">Rental fee <span className="ml-2 tabular-nums text-muted">{formatMoney(revenuePaid)} / {formatMoney(revenue)}</span></span><Button compact variant="text" disabled={busy || !confirmed || revenuePaid >= revenue} onClick={() => setEditing(editing === "revenue" ? null : "revenue")}>{revenuePaid >= revenue && revenue > 0 ? "Paid" : editing === "revenue" ? "Close" : "Record payment"}</Button></div>
-        <div className="flex flex-wrap items-center gap-3"><span className="text-[13px]">Fire permit <span className="ml-2 tabular-nums text-muted">{firePermit > 0 ? `${formatMoney(permitPaid)} / ${formatMoney(firePermit)}` : "Not required"}</span></span>{firePermit > 0 && <Button compact variant="text" disabled={busy || !confirmed || permitPaid >= firePermit} onClick={() => setEditing(editing === "fire_permit" ? null : "fire_permit")}>{permitPaid >= firePermit ? "Paid" : editing === "fire_permit" ? "Close" : "Record payment"}</Button>}</div>
+    <section id="event-finances" aria-label="Event payments" className="scroll-mt-6 border-b border-rule pb-4">
+      <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+        {([{ kind: "revenue", label: "Rental payment", total: revenue, paid: revenuePaid },
+          { kind: "fire_permit", label: "Fire permit", total: firePermit, paid: permitPaid }] as const).map(item => {
+          const paid = item.total > 0 && item.paid >= item.total;
+          return <div key={item.kind} className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0 text-[13px]">
+              <span className="font-medium">{item.label}</span>
+              <span className="ml-2 tabular-nums text-muted">{item.total > 0 ? formatMoney(item.total) : "Not required"}</span>
+              {item.total > 0 && <span className={`mt-1 flex items-center gap-1.5 text-[12px] ${paid ? "text-ok" : "text-muted"}`}>
+                {paid && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 8 3 3 7-7" /></svg>}
+                {paid ? "Paid" : "Unpaid"}
+              </span>}
+            </div>
+            {item.total > 0 && <Button compact variant={paid ? "text" : "secondary"} disabled={busy || (!paid && !confirmed)}
+              aria-label={`${paid ? "Undo paid status for" : "Mark paid:"} ${item.label.toLowerCase()}`}
+              onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{paid ? "Undo paid" : "Mark paid"}</Button>}
+            {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={busy} onClick={() => undoPaid(item.kind)}>Undo paid</Button>}
+          </div>;
+        })}
       </div>
-      {editing && confirmed && <div className="mt-4 max-w-2xl"><PaymentForm key={editing} busy={busy} defaultAmount={Math.max(editing === "revenue" ? revenue - revenuePaid : firePermit - permitPaid, 0)} idPrefix={editing === "revenue" ? "hosting-revenue" : "fire-permit"} label={editing === "revenue" ? "Rental fee" : "Fire permit"} onSubmit={data => recordPayment(editing, data)} paid={editing === "revenue" ? revenuePaid : permitPaid} total={editing === "revenue" ? revenue : firePermit} today={today} /></div>}
       {drifted && <p className="mt-3 text-[12px] text-warn">Saved terms changed. The forecast retains {formatMoney(revenue)} rental and {formatMoney(firePermit)} permit; recorded payments remain.</p>}
-      {!confirmed && <p className="mt-2 text-[12px] text-muted">{eventCancelled || financeOrder?.status === "cancelled" ? "Event cancelled. Payment history retained." : "Record payments after the contract is sent."}</p>}
-      {displayPayments.length > 0 && <details className="mt-2"><summary className="cursor-pointer text-[12px] text-muted">Payment history</summary><ul className="mt-3 divide-y divide-rule">{displayPayments.map(payment => <li key={payment.id} className="py-3 text-[13px]"><div className="flex justify-between gap-3"><strong>{payment.kind === "revenue" ? "Rental fee" : "Fire permit"}</strong><span className="tabular-nums">{formatMoney(payment.amount)}</span></div><p className="mt-1 text-muted">{payment.paidDate} · {payment.reversedAt ? "Reversed" : payment.pending ? "Recording…" : "Recorded"}</p>{!payment.reversedAt && !payment.pending && <Button compact variant="text" disabled={busy} onClick={() => reversePayment(payment.id)}>Reverse record</Button>}</li>)}</ul></details>}
+      {!confirmed && <p className="mt-2 text-[12px] text-muted">{eventCancelled || financeOrder?.status === "cancelled" ? "Event cancelled." : "Mark payments after the contract is sent."}</p>}
       {message && <p role="status" aria-live="polite" className="mt-2 text-[13px] [overflow-wrap:anywhere]">{message}</p>}
     </section>
-  );
-}
-
-function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, today, total }: {
-  busy: boolean;
-  defaultAmount: number;
-  idPrefix: string;
-  label: string;
-  onSubmit: (formData: FormData) => void;
-  paid: number;
-  today: string;
-  total: number;
-}) {
-  const [paidDate, setPaidDate] = useState(today);
-  const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
-  const paidInFull = total > 0 && paid >= total;
-  return (
-    <form action={onSubmit} className="grid content-start gap-3">
-      <span className="sr-only">Record {label} payment</span>
-      <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-date`}>Date</label><input className="field-input" value={paidDate} onChange={e => setPaidDate(e.target.value)} id={`${idPrefix}-date`} name="paidDate" type="date" max={today} required /></div>
-        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-amount`}>Amount</label><div className="money-input"><span>$</span><input className="field-input" value={amount} onChange={e => setAmount(e.target.value)} id={`${idPrefix}-amount`} min="0.01" name="amount" step="0.01" type="number" required /></div></div>
-        <Button compact disabled={busy || paidInFull} type="submit" variant="secondary">{paidInFull ? "Paid in full" : "Record payment"}</Button>
-      </div>
-    </form>
   );
 }

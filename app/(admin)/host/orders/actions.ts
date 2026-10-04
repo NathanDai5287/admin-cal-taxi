@@ -244,6 +244,33 @@ export async function reverseHostingPaymentAction(paymentId: string) {
   return { ok: true, data: null } as const;
 }
 
+export async function undoHostingPaymentStatusAction(input: {
+  orderId: string;
+  kind: "revenue" | "fire_permit";
+  paymentIds: string[];
+}) {
+  const { userId } = await requireAdmin("/");
+  const parsed = z.object({
+    orderId: z.string().min(1).max(200),
+    kind: z.enum(["revenue", "fire_permit"]),
+    paymentIds: z.array(z.string().uuid()).min(1).max(500),
+  }).safeParse(input);
+  if (!parsed.success) return failed(new Error("Reload this order before undoing its paid status."));
+  // One statement reverses the selected payment records together. Existing
+  // amounts and dates stay immutable, including any older partial payments.
+  const { error } = await createAdminClient().from("hosting_finance_payments")
+    .update({ reversed_at: new Date().toISOString(), reversed_by: userId, reversal_reason: "Paid status undone" })
+    .eq("order_id", parsed.data.orderId)
+    .eq("kind", parsed.data.kind)
+    .in("id", parsed.data.paymentIds)
+    .is("reversed_at", null);
+  if (error) return failed(error);
+  revalidatePath(`/host/orders/${parsed.data.orderId}`);
+  revalidatePath("/finance/planning");
+  revalidatePath("/finance/reports");
+  return { ok: true, data: null } as const;
+}
+
 export async function setOrderNotesAction(
   orderId: string,
   notes: string,

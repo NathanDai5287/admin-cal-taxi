@@ -30,5 +30,13 @@ export async function setOrderNotesAction(id: string, notes: string) { return up
 export async function deleteOrderAction(id: string) { const data = read(); data.orders = data.orders.filter(order => order.id !== id); write(data); return ok(null); }
 export async function confirmHostingContractAction(id: string) { const data = read(); data.finance[id] ??= { included: false, payments: [] }; data.finance[id].included = true; write(data); return ok(null); }
 export async function cancelHostingContractAction(id: string) { const data = read(); data.finance[id] ??= { included: false, payments: [] }; data.finance[id].included = false; write(data); return ok(null); }
-export async function recordHostingPaymentAction(input: any) { if (localStorage.getItem("host.preview.fail-payment") === "true") throw new Error("Simulated payment network failure"); const data = read(); data.finance[input.orderId] ??= { included: false, payments: [] }; data.finance[input.orderId].payments.push({ id: crypto.randomUUID(), kind: input.kind, amount: input.amount, paidDate: input.paidDate, reversedAt: null }); write(data); return ok(null); }
+export async function recordHostingPaymentAction(input: any) { if (localStorage.getItem("host.preview.fail-payment") === "true") throw new Error("Simulated payment network failure"); const data = read(); data.finance[input.orderId] ??= { included: false, payments: [] }; const id = crypto.randomUUID(); data.finance[input.orderId].payments.push({ id, kind: input.kind, amount: input.amount, paidDate: input.paidDate, reversedAt: null }); write(data); return ok({ id }); }
 export async function reverseHostingPaymentAction(id: string) { if (localStorage.getItem("host.preview.fail-reversal") === "true") throw new Error("Simulated reversal network failure"); const data = read(); for (const finance of Object.values(data.finance)) { const item = finance.payments.find(payment => payment.id === id); if (item) item.reversedAt = new Date().toISOString(); } write(data); return ok(null); }
+export async function undoHostingPaymentStatusAction(input: { orderId: string; kind: "revenue" | "fire_permit"; paymentIds: string[] }) {
+  if (localStorage.getItem("host.preview.fail-reversal") === "true") throw new Error("Simulated reversal network failure");
+  const data = read();
+  for (const payment of data.finance[input.orderId]?.payments ?? []) {
+    if (payment.kind === input.kind && input.paymentIds.includes(payment.id) && !payment.reversedAt) payment.reversedAt = new Date().toISOString();
+  }
+  write(data); return ok(null);
+}
