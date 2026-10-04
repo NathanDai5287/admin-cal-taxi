@@ -5,6 +5,7 @@ import SigningPanel from "../../documents/SigningPanel";
 import { getOrderAction, updateOrderAction } from "../actions";
 import { EMPTY_STATE, type SharedState } from "@/lib/host-shared-state";
 import type { Order } from "@/lib/host-orders-types";
+import type { SigningRevision } from "@/lib/host-signing";
 import { sharedStateFromSnapshot } from "./WorkspaceActions";
 
 function signingDraft(order: Order): SharedState {
@@ -22,7 +23,7 @@ function signingDraft(order: Order): SharedState {
   };
 }
 
-export default function OrderSigning({ order }: { order: Order }) {
+export default function OrderSigning({ order, revisions }: { order: Order; revisions?: SigningRevision[] }) {
   const [data, setData] = useState<SharedState>(() => signingDraft(order));
   const [stale, setStale] = useState(false);
   const version = useRef(order.updatedAt);
@@ -59,7 +60,7 @@ export default function OrderSigning({ order }: { order: Order }) {
     <button type="button" className="mt-3 text-[13px] underline" onClick={() => window.location.reload()}>Reload order</button>
   </div>;
 
-  return <SigningPanel data={data} update={update} orderId={order.id} reviewedOrderVersion={() => version.current} saveOrder={saveOrder} showPresignControl beforeSigningAction={checkFresh} onFinalized={async () => {
+  return <SigningPanel data={data} update={update} orderId={order.id} reviewedOrderVersion={() => version.current} saveOrder={saveOrder} preparationEnabled={false} initialRevisions={revisions} beforeSigningAction={checkFresh} onFinalized={async () => {
     const latest = await getOrderAction(order.id);
     if (latest.ok) { version.current = latest.data.updatedAt; savedSnapshot.current = JSON.stringify(latest.data.snapshot); setData(signingDraft(latest.data)); }
   }} />;

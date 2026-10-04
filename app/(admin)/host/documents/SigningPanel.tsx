@@ -41,17 +41,20 @@ function validate(data: SharedState): string | null {
   return null;
 }
 
-export default function SigningPanel({ data, update, orderId, saveOrder, reviewedOrderVersion, showPresignControl = false, beforeSigningAction, onFinalized }: {
+export default function SigningPanel({ data, update, orderId, saveOrder, reviewedOrderVersion, showPresignControl = false, preparationEnabled = true, initialRevisions, beforeSigningAction, onFinalized }: {
   data: SharedState;
   update: <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
   orderId: string;
   saveOrder: () => Promise<string | null>;
   reviewedOrderVersion: () => string | undefined;
   showPresignControl?: boolean;
+  preparationEnabled?: boolean;
+  initialRevisions?: SigningRevision[];
   beforeSigningAction?: () => Promise<void>;
   onFinalized?: (orderId: string) => void | Promise<void>;
 }) {
-  const [revisions, setRevisions] = useState<SigningRevision[]>([]);
+  const [revisions, setRevisions] = useState<SigningRevision[]>(initialRevisions ?? []);
+  const [historyLoaded, setHistoryLoaded] = useState(initialRevisions !== undefined || !orderId);
   const [preview, setPreview] = useState<SigningRevision | null>(null);
   const [previewPayload, setPreviewPayload] = useState("");
   const [busy, setBusy] = useState(false);
@@ -86,6 +89,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
         if (latestSeen.current === undefined) { latestSeen.current = latestId; setHistoryChanged(false); }
         else if (latestSeen.current !== latestId) setHistoryChanged(true);
         setRevisions(rows);
+        setHistoryLoaded(true);
       }
     }).catch(err => { if (active) setError(err instanceof Error ? err.message : "Could not load signing status"); }); }
     reload();
@@ -211,14 +215,14 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
 
   const activeRevision = revisions.find(row => ["awaiting_signatures", "preparing_completed_copy", "signed", "activating", "created", "creating", "creation_uncertain"].includes(row.state));
   const history = revisions.filter(row => row.id !== activeRevision?.id && row.id !== preview?.id);
-  const showPreparation = !activeRevision || editing || !!preview;
+  const showPreparation = preparationEnabled && historyLoaded && (!activeRevision || editing || !!preview);
   return <div className="space-y-6 bg-canvas/40 px-5 py-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 className="card-title">{activeRevision ? "Current contract" : "Review & signing"}</h2>
-        <p className="card-subtitle mt-1.5">{activeRevision ? "Track signatures on the same contract. Payments are recorded separately." : "Review the named representatives and full PDF, then create their personal links."}</p>
+        <h2 className="card-title">{activeRevision ? "Current contract" : preparationEnabled ? "Review & signing" : "Contract signing"}</h2>
+        <p className="card-subtitle mt-1.5">{activeRevision ? "Track signatures on the same contract. Payments are recorded separately." : !historyLoaded ? "Loading signing status…" : preparationEnabled ? "Review the named representatives and full PDF, then create their personal links." : "Use Edit order to review representatives and prepare signing links in a separate draft."}</p>
       </div>
-      {activeRevision && !editing && <Button type="button" variant="text" compact onClick={() => setEditing(true)}>Prepare replacement</Button>}
+      {preparationEnabled && activeRevision && !editing && <Button type="button" variant="text" compact onClick={() => setEditing(true)}>Prepare replacement</Button>}
     </div>
     {showPreparation && <div className="space-y-5">
       {showPresignControl ? <>

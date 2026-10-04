@@ -72,7 +72,7 @@ function App() {
       {order && <div className="space-y-10">
         <OrderDetailHeader order={order} status={deriveStatus(order)} actions={<WorkspaceActions order={order} />} />
         <OrderOverview order={order} revisions={revisions} budgetIncluded={finance.included} recordedRentalPayments={finance.payments.filter(payment => payment.kind === "revenue" && !payment.reversedAt).reduce((sum, payment) => sum + payment.amount, 0)} />
-        <OrderDocuments key={order.id + order.updatedAt} order={order} signingContract={contractDownload(revisions)} />
+        <OrderDocuments key={order.id + order.updatedAt} order={order} signingContract={contractDownload(revisions)} signingRevisions={revisions} />
         <section className="card"><div className="card-header"><h2 className="card-title">Document totals</h2><p className="card-subtitle">Generated invoices and credit memos only. Recorded payments are shown separately below.</p></div><dl className="card-body grid gap-5 sm:grid-cols-4">{Object.entries({ "Deposit invoiced": ledger!.depositInvoiced, "Rental invoiced": ledger!.rentalInvoiced, "Credit memo issued": ledger!.refunded, "Net invoiced": ledger!.balance }).map(([label, value]) => <div key={label}><dt className="field-label">{label}</dt><dd>${value.toFixed(2)}</dd></div>)}</dl></section>
         <HostingFinancePanel key={JSON.stringify(finance)} orderId={order.id} financeOrder={finance.included ? { status: "confirmed", plannedRevenue: order.rentalPrice ?? 0, plannedFirePermit: 125 } : null} payments={finance.payments} previewRevenue={order.rentalPrice ?? 0} previewFirePermit={125} today="2026-10-02" />
         <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />

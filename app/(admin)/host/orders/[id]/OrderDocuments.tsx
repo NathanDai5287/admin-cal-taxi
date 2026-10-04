@@ -10,6 +10,7 @@ import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
 import { savedPricing } from "@/lib/host-saved-pricing";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
+import type { SigningRevision } from "@/lib/host-signing";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
 import { sharedStateFromSnapshot } from "./WorkspaceActions";
@@ -103,10 +104,11 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message : err instanceof Error ? err.message : "request failed";
 }
 
-export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false }: {
+export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false, signingRevisions }: {
   order: Order;
   signingContract?: StoredContractDownload | null;
   signingLookupFailed?: boolean;
+  signingRevisions?: SigningRevision[];
 }) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
   const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
@@ -209,7 +211,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
       </>}
       contract={<>
         <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle={storedContract?.previousSigned ? "Previous signed agreement; current replacement below" : "Current agreement and signing progress"} state={stateFor("contract")} summary={storedContract ? `${storedContract.kind === "completed" ? "Signed contract" : "Stored original"} · revision ${storedContract.revision}` : `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`} onDownload={() => { void download("contract"); }} busy={!!busy.contract} error={errors.contract} downloadLabel={storedContract?.previousSigned ? "Previous signed PDF" : storedContract?.kind === "completed" ? "Download signed PDF" : "Download PDF"} downloadVariant="secondary" grouped />
-        <OrderSigning key={order.id} order={order} />
+        <OrderSigning key={order.id} order={order} revisions={signingRevisions} />
       </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}

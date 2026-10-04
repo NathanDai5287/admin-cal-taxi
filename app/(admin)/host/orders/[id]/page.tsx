@@ -123,7 +123,7 @@ export default async function OrderDetailPage({
       } />
 
       <OrderOverview order={order} revisions={signing.revisions} signingUnavailable={signing.failed} budgetIncluded={financeResult.data?.status === "confirmed"} recordedRentalPayments={(paymentsResult.data ?? []).filter(payment => payment.kind === "revenue" && !payment.reversed_at).reduce((total, payment) => total + Number(payment.amount), 0)} />
-      <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} />
+      <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} signingRevisions={signing.failed ? undefined : signing.revisions} />
 
       <section className="card">
         <div className="card-header">
