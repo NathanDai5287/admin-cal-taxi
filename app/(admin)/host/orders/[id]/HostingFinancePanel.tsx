@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
-import { cancelHostingContractAction, confirmHostingContractAction, recordHostingPaymentAction, reverseHostingPaymentAction } from "../actions";
+import { recordHostingPaymentAction, reverseHostingPaymentAction } from "../actions";
 
 type FinanceOrder = {
   status: "confirmed" | "cancelled";
@@ -28,6 +28,7 @@ export default function HostingFinancePanel({
   financeOrder,
   payments,
   today,
+  eventCancelled = false,
 }: {
   orderId: string;
   previewRevenue: number;
@@ -35,6 +36,7 @@ export default function HostingFinancePanel({
   financeOrder: FinanceOrder | null;
   payments: Payment[];
   today: string;
+  eventCancelled?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -49,12 +51,10 @@ export default function HostingFinancePanel({
   // Optimistic overrides: the UI flips instantly on click and only rolls back
   // if the server action fails. The parent remounts this panel when refreshed
   // finance data changes, clearing these local overrides before paint.
-  const [statusOverride, setStatusOverride] = useState<FinanceOrder["status"] | null | undefined>(undefined);
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([]);
   const [reversedIds, setReversedIds] = useState<ReadonlySet<string>>(new Set());
 
-  const status = statusOverride !== undefined ? statusOverride : financeOrder?.status ?? null;
-  const confirmed = status === "confirmed";
+  const confirmed = financeOrder?.status === "confirmed" && !eventCancelled;
   const displayPayments: (Payment & { pending?: boolean })[] = [
     ...pendingPayments.map((payment) => ({ ...payment, pending: true })),
     ...payments.map((payment) => reversedIds.has(payment.id) ? { ...payment, reversedAt: new Date().toISOString() } : payment),
@@ -69,37 +69,6 @@ export default function HostingFinancePanel({
   const revenuePaid = activePayments.filter((payment) => payment.kind === "revenue").reduce((total, payment) => total + payment.amount, 0);
   const permitPaid = activePayments.filter((payment) => payment.kind === "fire_permit").reduce((total, payment) => total + payment.amount, 0);
 
-  async function confirmContract() {
-    setBusy(true);
-    setMessage("");
-    setStatusOverride("confirmed");
-    const result = await confirmHostingContractAction(orderId);
-    if (result.ok) {
-      setMessage("Added to budget. Signatures and recorded payments are unchanged.");
-      router.refresh();
-    } else {
-      setStatusOverride(undefined);
-      setMessage(result.error);
-    }
-    setBusy(false);
-  }
-
-  async function cancelContract() {
-    if (!window.confirm("Remove this contract from budgeting? Its planned values will leave Finance Planning. Recorded payments will remain.")) return;
-    setBusy(true);
-    setMessage("");
-    setStatusOverride("cancelled");
-    const result = await cancelHostingContractAction(orderId);
-    if (result.ok) {
-      setMessage("Removed from budget. Recorded payments and signing links are unchanged.");
-      router.refresh();
-    } else {
-      setStatusOverride(undefined);
-      setMessage(result.error);
-    }
-    setBusy(false);
-  }
-
   async function recordPayment(kind: Payment["kind"], formData: FormData) {
     setBusy(true);
     setMessage("");
@@ -111,22 +80,26 @@ export default function HostingFinancePanel({
       reversedAt: null,
     };
     setPendingPayments((current) => [optimistic, ...current]);
-    const result = await recordHostingPaymentAction({
-      orderId,
-      kind,
-      amount: optimistic.amount,
-      paidDate: optimistic.paidDate,
-      requestId: requestIds[kind],
-    });
-    if (result.ok) {
-      setMessage("Payment recorded.");
-      setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
-      router.refresh();
-    } else {
-      setPendingPayments((current) => current.filter((payment) => payment.id !== optimistic.id));
-      setMessage(result.error);
-    }
-    setBusy(false);
+    try {
+      const result = await recordHostingPaymentAction({
+        orderId,
+        kind,
+        amount: optimistic.amount,
+        paidDate: optimistic.paidDate,
+        requestId: requestIds[kind],
+      });
+      if (result.ok) {
+        setMessage("Payment recorded.");
+        setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
+        router.refresh();
+      } else {
+        setPendingPayments((current) => current.filter((payment) => payment.id !== optimistic.id));
+        setMessage(result.error);
+      }
+    } catch {
+      setPendingPayments(current => current.filter(payment => payment.id !== optimistic.id));
+      setMessage("Could not confirm the payment. Retry with the same details; the payment will be recorded only once.");
+    } finally { setBusy(false); }
   }
 
   async function reversePayment(paymentId: string) {
@@ -134,82 +107,39 @@ export default function HostingFinancePanel({
     setBusy(true);
     setMessage("");
     setReversedIds((current) => new Set(current).add(paymentId));
-    const result = await reverseHostingPaymentAction(paymentId);
-    if (result.ok) {
-      setMessage("Payment reversed.");
-      router.refresh();
-    } else {
-      setReversedIds((current) => {
-        const next = new Set(current);
-        next.delete(paymentId);
-        return next;
-      });
-      setMessage(result.error);
-    }
-    setBusy(false);
+    try {
+      const result = await reverseHostingPaymentAction(paymentId);
+      if (result.ok) {
+        setMessage("Payment reversed.");
+        router.refresh();
+      } else {
+        setReversedIds((current) => {
+          const next = new Set(current);
+          next.delete(paymentId);
+          return next;
+        });
+        setMessage(result.error);
+      }
+    } catch {
+      setReversedIds(current => { const next = new Set(current); next.delete(paymentId); return next; });
+      setMessage("Could not confirm the reversal. Reload to check the payment, then retry if needed.");
+    } finally { setBusy(false); }
   }
 
   return (
-    <section className="card" aria-labelledby="hosting-finance-title">
-      <div className="card-header">
-        <span className="card-title" id="hosting-finance-title">Plan and payments</span>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {confirmed ? (
-            <Button compact disabled={busy} onClick={cancelContract} type="button" variant="danger">Remove from budgeting</Button>
-          ) : (
-            <Button compact disabled={busy || revenue <= 0} onClick={confirmContract} type="button" variant="primary">Apply to budget</Button>
-          )}
-        </div>
+    <aside id="event-finances" className="scroll-mt-6 border-t border-rule pt-5 xl:border-t-0 xl:border-l xl:pl-7 xl:pt-0">
+      <h2 className="text-lg font-semibold">Finances</h2>
+      <p className="mt-2 text-[13px] leading-relaxed text-muted">Rental payment and fire permit are tracked independently. Sent events enter the forecast automatically.</p>
+      {drifted && <p className="mt-4 text-[13px] text-warn">Saved terms changed after forecasting. The forecast keeps the original {formatMoney(revenue)} rental fee and {formatMoney(firePermit)} permit; recorded payments are retained.</p>}
+      <div className="mt-6 space-y-7">
+        {confirmed ? <PaymentForm busy={busy} defaultAmount={Math.max(revenue - revenuePaid, 0)} idPrefix="hosting-revenue" label="Rental fee" onSubmit={(data) => recordPayment("revenue", data)} paid={revenuePaid} today={today} total={revenue} /> : <div><h3 className="text-sm font-semibold">Rental fee</h3><p className="mt-2 text-sm text-muted">{formatMoney(revenuePaid)} of {formatMoney(revenue)} received</p></div>}
+        {firePermit > 0 ? confirmed ? <PaymentForm busy={busy} defaultAmount={Math.max(firePermit - permitPaid, 0)} idPrefix="fire-permit" label="Fire permit" onSubmit={(data) => recordPayment("fire_permit", data)} paid={permitPaid} today={today} total={firePermit} /> : <div><h3 className="text-sm font-semibold">Fire permit</h3><p className="mt-2 text-sm text-muted">{formatMoney(permitPaid)} of {formatMoney(firePermit)} paid</p></div> : <div><h3 className="text-sm font-semibold">Fire permit</h3><p className="mt-2 text-sm text-muted">Not required for this event.</p></div>}
       </div>
-      <div className="card-body grid gap-5">
-        <div className="border border-rule bg-surface px-5 py-4">
-          <span className="field-label">Rental revenue</span>
-          <strong className="mt-1 block text-[28px] leading-tight tabular-nums">{formatMoney(revenue)}</strong>
-          <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-rule pt-3">
-            <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted">Fire permit expense</span>
-            <span className="text-[15px] font-semibold tabular-nums text-muted">{formatMoney(firePermit)}</span>
-          </div>
-        </div>
-
-        {drifted ? (
-          <p className="border border-rule px-3 py-2 text-[12.5px] text-warn">
-            The order has changed since confirmation — it now reads {formatMoney(previewRevenue)} revenue
-            and {formatMoney(previewFirePermit)} fire permit. The plan keeps the confirmed values
-            above; cancel and re-confirm to move the plan to the new numbers.
-          </p>
-        ) : null}
-
-        {confirmed ? null : (
-          <p className="text-sm text-muted">
-            {status === "cancelled" ? "This order is not included in the budget." : "Refundable deposits are excluded."}
-          </p>
-        )}
-
-        {confirmed ? (
-          <div className="grid gap-6 border-t border-rule pt-5 lg:grid-cols-2">
-            <PaymentForm busy={busy} defaultAmount={Math.max(revenue - revenuePaid, 0)} idPrefix="hosting-revenue" label="Hosting payment" onSubmit={(data) => recordPayment("revenue", data)} paid={revenuePaid} today={today} total={revenue} />
-            {firePermit > 0 ? <PaymentForm busy={busy} defaultAmount={Math.max(firePermit - permitPaid, 0)} idPrefix="fire-permit" label="Fire-permit payment" onSubmit={(data) => recordPayment("fire_permit", data)} paid={permitPaid} today={today} total={firePermit} /> : <p className="text-sm text-muted">This contract has no fire-permit expense.</p>}
-          </div>
-        ) : null}
-        {displayPayments.length ? (
-          <div className="table-scroll border-t border-rule pt-4">
-            <table className="data-table">
-              <thead><tr><th>Date</th><th>Payment</th><th>Amount</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
-              <tbody>{displayPayments.map((payment) => (
-                <tr key={payment.id}>
-                  <td>{new Date(`${payment.paidDate}T12:00:00`).toLocaleDateString("en-US")}</td>
-                  <td>{payment.kind === "revenue" ? "Hosting revenue" : "Fire permit"}</td>
-                  <td className="amount">{formatMoney(payment.amount)}</td>
-                  <td>{payment.reversedAt ? "Reversed" : payment.pending ? "Recording…" : "Recorded"}</td>
-                  <td className="text-right">{payment.reversedAt || payment.pending ? null : <Button compact disabled={busy} onClick={() => reversePayment(payment.id)} type="button" variant="text">Reverse</Button>}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        ) : null}
-        <p aria-live="polite" className="form-message">{message}</p>
-      </div>
-    </section>
+      <p className="mt-4 text-[12px] text-muted">Fire permits are Socials expenses. Refundable deposits are excluded from revenue.</p>
+      {!confirmed && <p className="mt-4 text-[13px] text-muted">{eventCancelled || financeOrder?.status === "cancelled" ? "This event is excluded from the forecast. Recorded payments remain below." : "Payment recording becomes available after the contract is sent and the forecast updates."}</p>}
+      {displayPayments.length > 0 && <details className="mt-6 border-t border-rule pt-4"><summary className="cursor-pointer text-sm font-semibold">Payment history</summary><ul className="mt-3 divide-y divide-rule">{displayPayments.map(payment => <li key={payment.id} className="py-3 text-[13px]"><div className="flex justify-between gap-3"><strong>{payment.kind === "revenue" ? "Rental fee" : "Fire permit"}</strong><span className="tabular-nums">{formatMoney(payment.amount)}</span></div><p className="mt-1 text-muted">{payment.paidDate} · {payment.reversedAt ? "Reversed" : payment.pending ? "Recording…" : "Recorded"}</p>{!payment.reversedAt && !payment.pending && <Button compact variant="text" disabled={busy} onClick={() => reversePayment(payment.id)}>Reverse record</Button>}</li>)}</ul></details>}
+      <p aria-live="polite" className="mt-3 text-[13px] [overflow-wrap:anywhere]">{message}</p>
+    </aside>
   );
 }
 
@@ -223,6 +153,8 @@ function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, tod
   today: string;
   total: number;
 }) {
+  const [paidDate, setPaidDate] = useState(today);
+  const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : "");
   const percent = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   const paidInFull = total > 0 && paid >= total;
   return (
@@ -238,10 +170,10 @@ function PaymentForm({ busy, defaultAmount, idPrefix, label, onSubmit, paid, tod
           <div className={`h-full transition-[width] ${paidInFull ? "bg-ok" : "bg-brand"}`} style={{ width: `${percent}%` }} />
         </div>
       </div>
-      <div className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-date`}>Date</label><input className="field-input" defaultValue={today} id={`${idPrefix}-date`} name="paidDate" type="date" required /></div>
-        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-amount`}>Amount</label><div className="money-input"><span>$</span><input className="field-input" defaultValue={defaultAmount || ""} id={`${idPrefix}-amount`} min="0.01" name="amount" step="0.01" type="number" required /></div></div>
-        <Button disabled={busy} type="submit" variant="secondary">Record</Button>
+      <div className="grid items-end gap-3 sm:grid-cols-2">
+        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-date`}>Date</label><input className="field-input" value={paidDate} onChange={e => setPaidDate(e.target.value)} id={`${idPrefix}-date`} name="paidDate" type="date" max={today} required /></div>
+        <div className="field"><label className="field-label" htmlFor={`${idPrefix}-amount`}>Amount</label><div className="money-input"><span>$</span><input className="field-input" value={amount} onChange={e => setAmount(e.target.value)} id={`${idPrefix}-amount`} min="0.01" name="amount" step="0.01" type="number" required /></div></div>
+        <Button className="sm:col-span-2" disabled={busy || paidInFull} type="submit" variant="secondary">{paidInFull ? "Paid in full" : "Record payment"}</Button>
       </div>
     </form>
   );

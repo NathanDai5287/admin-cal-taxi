@@ -17,9 +17,9 @@ export default function OrderDetailHeader({
 
       <div className="flex items-start justify-between gap-6 flex-wrap">
         <div>
-          <h1 className="page-title">{formatDateISO(order.eventDate) || "Event order"}</h1>
+          <h1 className="page-title">{order.clubName || "Event order"}</h1>
           <p className="text-[13.5px] text-muted mt-2">
-            {order.clubName || "No organization"}
+            {formatDateISO(order.eventDate) || "Date to be determined"}
           </p>
           <p className="text-[11.5px] text-muted mt-3">
             Created {formatDateISO(order.createdAt.slice(0, 10))} · Updated{" "}

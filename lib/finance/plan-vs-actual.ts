@@ -69,11 +69,11 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
   const actualExpenses = [...input.approvedReimbursements, ...input.directExpenses];
   const expenseBreakdown = categories.map(([category, label]) => {
     const planned = cents(input.categoryBudgets[category] ?? 0)
-      + (category === "house"
+      + (category === "socials"
         ? sum(confirmedHosting.map((order) => order.plannedFirePermit))
         : 0);
     const actual = sum(actualExpenses.filter((expense) => expense.category === category).map((expense) => expense.amount))
-      + (category === "house"
+      + (category === "socials"
         ? sum(input.hostingPayments.filter((payment) => payment.kind === "fire_permit").map((payment) => payment.amount))
         : 0);
     return { category, label, planned: dollars(planned), actual: dollars(actual) };

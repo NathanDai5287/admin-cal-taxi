@@ -29,6 +29,7 @@ import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { z } from "zod";
+import { listSigning } from "@/lib/host-signing";
 
 export type ActionResult<T> =
   | { ok: true; data: T }
@@ -259,6 +260,8 @@ export async function deleteOrderAction(orderId: string): Promise<ActionResult<n
   if (finance.error) return failed(finance.error);
   if (finance.data) return failed(new Error("This order has finance history and cannot be deleted."));
   try {
+    const revisions = await listSigning(orderId);
+    if (revisions.some(revision => !!revision.envelope_id)) return failed(new Error("This order has a signing request and cannot be deleted. Use Cancel event to retain its history."));
     await deleteOrder(orderId);
     revalidatePath("/host/orders");
     return { ok: true, data: null };

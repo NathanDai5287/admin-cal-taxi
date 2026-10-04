@@ -100,6 +100,7 @@ export type Order = {
 
 /** Row shape for the list view — everything but `snapshot` and `documents`. */
 export type OrderSummary = Omit<Order, "snapshot" | "documents"> & {
+  eventProgress?: import("./host-event").EventProgress;
   documentCount: number;
   /** Kinds issued, so the list can show which of the four are done. */
   documentKinds: DocumentKind[];

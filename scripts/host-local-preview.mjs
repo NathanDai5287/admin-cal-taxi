@@ -19,6 +19,7 @@ const result = await build({ entryPoints: [path.join(source, "entry.tsx")], outf
   plugins: [{ name: "local-actions-only", setup(build) {
     build.onResolve({ filter: /(^|\/)actions$/ }, () => ({ path: path.join(source, "orders-actions.ts") }));
     build.onResolve({ filter: /\/signing-actions$/ }, () => ({ path: path.join(source, "signing-actions.ts") }));
+    build.onResolve({ filter: /\/email-actions$/ }, () => ({ path: path.join(source, "email-actions.ts") }));
     build.onResolve({ filter: /^(server-only|@supabase\/|next\/headers|next\/cache)/ }, args => ({ errors: [{ text: `Production-only dependency blocked: ${args.path}` }] }));
   } }],
 });

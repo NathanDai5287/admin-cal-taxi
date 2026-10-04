@@ -82,6 +82,17 @@ test("legacy manual dues do not double count assigned dues", async () => {
   assert.equal(summary.excludedLegacyDues.length, 1);
 });
 
+test("hosting permits belong to Socials in both the forecast and actual expenses", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({ ...baseInput(), hostingOrders: [{ plannedRevenue: 1400, plannedFirePermit: 125, status: "confirmed" }], hostingPayments: [{ amount: 75, kind: "fire_permit" }] });
+  const socials = summary.expenseBreakdown.find(row => row.category === "socials");
+  const house = summary.expenseBreakdown.find(row => row.category === "house");
+  assert.equal(socials.planned, 125);
+  assert.equal(socials.actual, 75);
+  assert.equal(house.planned, 1000);
+  assert.equal(house.actual, 0);
+});
+
 test("hosting confirmation storage is unique and cancellation keeps payments", async () => {
   const migration = await readFile(new URL("../supabase/migrations/20260922000000_finance_plan_actual.sql", import.meta.url), "utf8");
   const actions = await readFile(new URL("../app/(admin)/host/orders/actions.ts", import.meta.url), "utf8");

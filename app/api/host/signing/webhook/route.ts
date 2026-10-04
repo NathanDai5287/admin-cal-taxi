@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { backendKey, backendOrigin } from "@/lib/host-backend";
+import { workflowDb } from "@/lib/host-workflow";
+import { sendCompletedContract } from "@/lib/host-email";
 
 export async function POST(request: Request) {
   const expected = process.env.DOCUMENSO_WEBHOOK_SECRET;
@@ -28,5 +30,11 @@ export async function POST(request: Request) {
     body: JSON.stringify({ envelopeId }), cache: "no-store", signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) return new Response("Could not process notification", { status: 503 });
+  const reference = await workflowDb().from("hosting_signing_references").select("order_id,envelope_id").eq("revision_id", revisionId).maybeSingle();
+  if (reference.error) return new Response("Could not route completion email", { status: 503 });
+  if (reference.data && reference.data.envelope_id === envelopeId) {
+    try { await sendCompletedContract(reference.data.order_id, revisionId); }
+    catch { return new Response("Completion email needs retry", { status: 503 }); }
+  }
   return Response.json({ ok: true });
 }

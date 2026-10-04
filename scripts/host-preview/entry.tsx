@@ -16,9 +16,11 @@ import HostingFinancePanel from "../../app/(admin)/host/orders/[id]/HostingFinan
 import PricingSnapshot from "../../app/(admin)/host/orders/[id]/PricingSnapshot";
 import ContractSnapshot from "../../app/(admin)/host/orders/[id]/ContractSnapshot";
 import OrderNotes from "../../app/(admin)/host/orders/[id]/OrderNotes";
-import OrderOverview from "../../components/host/OrderOverview";
+import OrderTimeline from "../../app/(admin)/host/orders/[id]/OrderTimeline";
+import { previewWorkflow } from "./email-actions";
+import { eventProgress } from "../../lib/host-event";
 import { contractDownload } from "../../lib/host-contract-download";
-import { deriveStatus, computeLedger } from "../../lib/host-orders-types";
+import { deriveStatus } from "../../lib/host-orders-types";
 import { read, write, reset, exampleDraft, EXAMPLE_ORDER_ID } from "./data";
 import { navigate, usePathname } from "./navigation";
 
@@ -44,7 +46,7 @@ function App() {
   const order = data.orders.find(row => row.id === id);
   const revisions = data.revisions[id] ?? [];
   const finance = data.finance[id] ?? { included: false, payments: [] };
-  const ledger = order ? computeLedger(order.documents) : null;
+
   function simulate() {
     const next = read(); const revision = next.revisions[id]?.find(row => row.state === "awaiting_signatures"); if (!revision) return;
     const person = revision.recipients.find(person => person.status !== "SIGNED"); if (person) person.status = "SIGNED";
@@ -54,7 +56,7 @@ function App() {
   }
   return <div data-brand>
     <aside className="border-b border-rule bg-brand-light px-6 py-3 text-[13px] space-y-2">
-      <p className="font-semibold">Local preview: sample data only. Signing, payments, and PDFs are simulated. Your live five-person contract is untouched.</p>
+      <p className="font-semibold">Local preview: sample data only. Signing, payments, and PDFs are simulated. Your live signing requests are untouched.</p>
       <div className="flex flex-wrap items-center gap-4">
         <Button compact variant="text" onClick={() => { const draft = beginDraft(exampleDraft()); notifyDraftSelected(draft); navigate("/host"); }}>Load example draft</Button>
         <ButtonLink compact variant="text" href={`/host/orders/${EXAMPLE_ORDER_ID}`}>Five-person sample order</ButtonLink>
@@ -68,15 +70,16 @@ function App() {
       {pathname === "/host/pricing" && <PricingPage />}
       {pathname === "/host/contract" && <ContractPage />}
       {pathname === "/host/documents" && <DocumentsPage />}
-      {pathname === "/host/orders" && <div className="space-y-8"><h1 className="page-title">Orders</h1><OrdersList orders={data.orders.map(order => ({ ...order, documentCount: order.documents.length, documentKinds: order.documents.map(doc => doc.kind) }))} /></div>}
+      {pathname === "/host/orders" && <div className="space-y-8"><h1 className="page-title">Orders</h1><OrdersList orders={data.orders.map(order => ({ ...order, eventProgress: eventProgress(order.eventDate, data.revisions[order.id] ?? [], previewWorkflow(order.id), "2026-10-04"), documentCount: order.documents.length, documentKinds: order.documents.map(doc => doc.kind) }))} /></div>}
       {order && <div className="space-y-10">
         <OrderDetailHeader order={order} status={deriveStatus(order)} actions={<WorkspaceActions order={order} />} />
-        <OrderOverview order={order} revisions={revisions} budgetIncluded={finance.included} recordedRentalPayments={finance.payments.filter(payment => payment.kind === "revenue" && !payment.reversedAt).reduce((sum, payment) => sum + payment.amount, 0)} />
-        <OrderDocuments key={order.id + order.updatedAt} order={order} signingContract={contractDownload(revisions)} signingRevisions={revisions} />
-        <section className="card"><div className="card-header"><h2 className="card-title">Document totals</h2><p className="card-subtitle">Generated invoices and credit memos only. Recorded payments are shown separately below.</p></div><dl className="card-body grid gap-5 sm:grid-cols-4">{Object.entries({ "Deposit invoiced": ledger!.depositInvoiced, "Rental invoiced": ledger!.rentalInvoiced, "Credit memo issued": ledger!.refunded, "Net invoiced": ledger!.balance }).map(([label, value]) => <div key={label}><dt className="field-label">{label}</dt><dd>${value.toFixed(2)}</dd></div>)}</dl></section>
+        <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" emailConfigured rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
         <HostingFinancePanel key={JSON.stringify(finance)} orderId={order.id} financeOrder={finance.included ? { status: "confirmed", plannedRevenue: order.rentalPrice ?? 0, plannedFirePermit: 125 } : null} payments={finance.payments} previewRevenue={order.rentalPrice ?? 0} previewFirePermit={125} today="2026-10-02" />
-        <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
-        <ContractSnapshot snapshot={order.snapshot} /><OrderNotes orderId={order.id} initialNotes={order.notes} />
+        </div>
+        <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6"><OrderDocuments key={order.id} order={order} signingContract={contractDownload(revisions)} signingRevisions={revisions} showSigning={false} /></div></details>
+        <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Saved pricing & contract terms</summary><div className="mt-6 space-y-6"><PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
+        <ContractSnapshot snapshot={order.snapshot} /></div></details><OrderNotes orderId={order.id} initialNotes={order.notes} />
       </div>}
       {pathname.startsWith("/preview-sign/") && <p>This is a local demonstration link. Use “Simulate one signature” on the sample order to preview progress.</p>}
       {pathname === "/host/inquiries" && <p>Inquiry management is outside this local contract preview.</p>}

@@ -12,18 +12,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
 import { formatDateISO } from "@/lib/host-format";
 import {
-  STATUS_LABELS,
-  deriveSummaryStatus,
   type DocumentKind,
-  type OrderStatus,
   type OrderSummary,
 } from "@/lib/host-orders-types";
 import { fmtUSDOrDash, yearOf } from "./order-format";
 import StatusPill from "./StatusPill";
+import { EVENT_STAGE_LABELS, type EventStage } from "@/lib/host-event";
 import { setOrderNavigationPreview } from "./order-navigation-preview";
 
-const STATUS_FILTERS: (OrderStatus | "all")[] = [
-  "all", "draft", "contracted", "invoiced", "completed", "cancelled",
+const STATUS_FILTERS: (EventStage | "all")[] = [
+  "all", "draft", "sent", "signed", "held", "cancelled",
 ];
 
 /** Single-letter marker for the document strip on each row. */
@@ -36,13 +34,13 @@ const DOC_ABBR: Record<DocumentKind, string> = {
 
 export default function OrdersList({ orders }: { orders: OrderSummary[] }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [status, setStatus] = useState<EventStage | "all">("all");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return orders.filter(o => {
       if (q && !o.clubName.toLowerCase().includes(q)) return false;
-      if (status !== "all" && deriveSummaryStatus(o) !== status) return false;
+      if (status !== "all" && (o.eventProgress?.unavailable || o.eventProgress?.stage !== status)) return false;
       return true;
     });
   }, [orders, query, status]);
@@ -81,10 +79,10 @@ export default function OrdersList({ orders }: { orders: OrderSummary[] }) {
             id="orders-status"
             className="field-input"
             value={status}
-            onChange={e => setStatus(e.target.value as OrderStatus | "all")}
+            onChange={e => setStatus(e.target.value as EventStage | "all")}
           >
             {STATUS_FILTERS.map(s => (
-              <option key={s} value={s}>{s === "all" ? "All statuses" : STATUS_LABELS[s]}</option>
+              <option key={s} value={s}>{s === "all" ? "All stages" : EVENT_STAGE_LABELS[s]}</option>
             ))}
           </select>
         </div>
@@ -122,7 +120,6 @@ function OrderRow({ order }: { order: OrderSummary }) {
     setOrderNavigationPreview(order);
     router.prefetch(href);
   };
-  const status = deriveSummaryStatus(order);
   const have = new Set(order.documentKinds);
 
   return (
@@ -153,7 +150,7 @@ function OrderRow({ order }: { order: OrderSummary }) {
         </p>
       </div>
 
-      <StatusPill status={status} />
+      <StatusPill progress={order.eventProgress ?? { stage: "draft", signed: 0, total: 0, unavailable: true }} />
 
       <div className="text-right min-w-[100px]">
         <p className="text-[13.5px] tabular-nums text-ink">{fmtUSDOrDash(order.rentalPrice)}</p>

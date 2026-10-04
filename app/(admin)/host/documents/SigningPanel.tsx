@@ -12,7 +12,7 @@ import { orderSnapshot } from "@/lib/host-order-snapshot";
 import { clubsDisplay } from "@/lib/host-clubs";
 import { effective, effectiveRentalPrice } from "@/lib/host-derive";
 import { getOrderAction } from "../orders/actions";
-import { createSigningLinksAction, listSigningAction, markSigningLinkSentAction, prepareSigningAction, reconcileSigningAction, syncSigningAction } from "./signing-actions";
+import { createSigningLinksAction, listSigningAction, prepareSigningAction, reconcileSigningAction, syncSigningAction } from "./signing-actions";
 
 function validate(data: SharedState): string | null {
   const clubs = [...new Set(cleanClubs(data.clubs).map(normalizeOrgName))];
@@ -204,14 +204,6 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
     await copy(`${window.location.origin}/host/signing/copy#${token}`, id);
   }
 
-  async function markSent(revision: SigningRevision, email: string, sent: boolean) {
-    setBusy(true); setError("");
-    try {
-      const updated = await markSigningLinkSentAction(revision.order_id, revision.id, email, sent);
-      setRevisions(old => old.map(row => row.id === updated.id ? updated : row));
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not update link delivery"); }
-    finally { setBusy(false); }
-  }
 
   const activeRevision = revisions.find(row => ["awaiting_signatures", "preparing_completed_copy", "signed", "activating", "created", "creating", "creation_uncertain"].includes(row.state));
   const history = revisions.filter(row => row.id !== activeRevision?.id && row.id !== preview?.id);
@@ -246,7 +238,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
         <p className="card-subtitle mt-1.5">Revision {preview.revision}: review the contract before creating signing links.</p>
       </div>
       <iframe title="Contract signing preview" className="h-[540px] w-full border border-rule bg-surface" src={`/api/host/signing/files/${preview.order_id}/${preview.id}/original`} />
-      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Creating links…" : "Create signing links"}</Button><p className="field-hint">Saves the approved agreement. No invitations are emailed.</p></div>
+      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Approving…" : "Approve contract"}</Button><p className="field-hint">Saves the approved agreement. Review and send its emails from the event timeline.</p></div>
       {previewPayload !== currentPayload && <p className="text-[12px] text-warn">Details changed after preview. Prepare a new revision.</p>}
     </div>}
     {error && <p role="alert" className="text-[13px] text-warn">{error}</p>}
@@ -261,7 +253,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
         {(["activating", "created", "creating", "creation_uncertain"].includes(revision.state)) && <Button type="button" variant="secondary" compact disabled={busy} onClick={() => recover(revision)}>Check and resume request</Button>}
       </div>
       {revision.files.original && revision.state !== "signed" && <a className="text-[13px] font-semibold text-brand underline" href={`/api/host/signing/files/${revision.order_id}/${revision.id}/original`}>View current contract: unsigned original</a>}
-      {revision.state === "awaiting_signatures" && <p className="text-[13px]">Links are ready: copy and send each personal link yourself. Copying does not mark it sent.</p>}
+      {revision.state === "awaiting_signatures" && <div className="flex flex-wrap items-center gap-3"><p className="text-[13px]">Agreement approved. Send invitations and track progress from the event timeline.</p><ButtonLink href={`/host/orders/${revision.order_id}`} variant="primary" compact>Open event timeline</ButtonLink></div>}
       <div className="divide-y divide-rule">
       {revision.recipients.map(person => <div key={person.email} className="grid min-w-0 gap-3 py-4 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
         <div className="min-w-0 text-[13px]">
@@ -273,7 +265,6 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {revision.state === "awaiting_signatures" && person.status !== "SIGNED" && <Button type="button" variant="secondary" compact onClick={() => copy(person.link, `sign-${person.email}`)}>{copied === `sign-${person.email}` ? "Copied" : "Copy signing link"}</Button>}
-          {revision.state === "awaiting_signatures" && person.status !== "SIGNED" && <Button type="button" variant="text" compact disabled={busy} onClick={() => markSent(revision, person.email, !person.sentAt)}>{person.sentAt ? "Undo sent" : "Mark sent"}</Button>}
           {person.copyToken && revision.state === "signed" && <Button type="button" variant="text" compact onClick={() => copyFinal(person.copyToken!, `copy-${person.email}`)}>{copied === `copy-${person.email}` ? "Copied" : "Copy final contract link"}</Button>}
         </div>
       </div>)}

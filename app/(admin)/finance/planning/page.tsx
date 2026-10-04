@@ -125,7 +125,7 @@ export default async function PlanningPage() {
       {estimatedActualDates ? <p className="border border-rule bg-surface px-4 py-3 text-xs text-muted">{estimatedActualDates} legacy {estimatedActualDates === 1 ? "payment uses" : "payments use"} the best available historical date.</p> : null}
 
       <section className="card" id="expense-plan">
-        <div className="card-header"><span className="card-title">Expense category plan</span><span className="card-subtitle">Fire permits add to the House plan automatically.</span></div>
+        <div className="card-header"><span className="card-title">Expense category plan</span><span className="card-subtitle">Fire permits add to the Socials plan automatically.</span></div>
         <ExpensePlanForm budgets={Object.fromEntries(budgets)} />
       </section>
     </div>

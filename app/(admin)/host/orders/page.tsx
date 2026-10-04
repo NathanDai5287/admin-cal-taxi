@@ -16,6 +16,9 @@ import { ButtonLink } from "@/components/brand/button";
 
 import { listOrders, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
 import OrdersList from "./OrdersList";
+import { listSigning } from "@/lib/host-signing";
+import { loadWorkflow } from "@/lib/host-workflow";
+import { eventProgress } from "@/lib/host-event";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +57,16 @@ export default async function OrdersPage() {
   let orders;
   try {
     orders = await listOrders();
+    // Bound simultaneous requests; a failed lookup is shown as unavailable,
+    // never guessed from generated document kinds.
+    for (let offset = 0; offset < orders.length; offset += 4) {
+      await Promise.all(orders.slice(offset, offset + 4).map(async order => {
+        try {
+          const [revisions, workflow] = await Promise.all([listSigning(order.id), loadWorkflow(order.id)]);
+          order.eventProgress = eventProgress(order.eventDate, revisions, workflow, undefined, order.statusOverride === "cancelled");
+        } catch { order.eventProgress = { stage: "draft", signed: 0, total: 0, unavailable: true }; }
+      }));
+    }
   } catch (err) {
     if (err instanceof OrdersUnavailableError) {
       return (

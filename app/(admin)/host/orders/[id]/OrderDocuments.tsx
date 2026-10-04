@@ -5,51 +5,17 @@ import { Button } from "@/components/brand/button";
 import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { ApiCallError, downloadPdf, fetchStoredPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
-import { DOCUMENT_META, DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from "@/lib/host-documents";
-import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
-import { savedPricing } from "@/lib/host-saved-pricing";
+import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
+import { addDaysIso, formatDateISO } from "@/lib/host-format";
+import { defaultDocuments } from "@/lib/host-order-documents";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
 import type { SigningRevision } from "@/lib/host-signing";
 import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
-import { sharedStateFromSnapshot } from "./WorkspaceActions";
 import OrderSigning from "./OrderSigning";
-import { buildLineItems } from "../../documents/build-line-items";
 import { listSigningAction } from "../../documents/signing-actions";
 
-/** Missing unsigned PDFs use this order's details, never the Create workspace. */
-function defaultDocuments(order: Order, depositNumber?: string) {
-  const saved = sharedStateFromSnapshot(order.snapshot);
-  const data = {
-    ...saved,
-    clubs: saved.clubs.length ? saved.clubs : [order.clubName],
-    eventDate: order.eventDate,
-    finalPrice: String(order.rentalPrice ?? ""),
-    depositAmount: String(order.depositAmount ?? ""),
-    overrides: { ...saved.overrides, finalPrice: true, depositAmount: true },
-  };
-  const issueDate = todayIso();
-  const invoiceNumber = depositNumber || saved.lastDepositInvoiceNumber || mintContractNumber(data.clubs[0] ?? "partner", order.eventDate).replace(/^CTR-/, "DEP-");
-  const fields = {
-    contract: { sign: saved.contractPresign },
-    deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
-    rental: { items: buildLineItems(savedPricing(order.snapshot.pricingBreakdown), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
-    creditMemo: { amount: data.depositAmount, issueDate, originalInvoice: invoiceNumber, refundMethod: "", refundDescription: "", memoNumber: "" },
-  };
-  const payloads = {
-    contract: buildContractPayload(data, fields.contract),
-    deposit_invoice: buildDepositPayload(data, fields.deposit),
-    rental_invoice: buildRentalPayload(data, fields.rental),
-    credit_memo: buildCreditMemoPayload(data, fields.creditMemo),
-  };
-  const missing = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind,
-    kind === "rental_invoice" && (!Number.isFinite(order.rentalPrice) || (order.rentalPrice ?? 0) <= 0)
-      ? ["a positive rental fee"]
-      : missingFields(kind, data, fields),
-  ])) as Record<DocumentKind, string[]>;
-  return { payloads, missing };
-}
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
   const matches = documents.filter(d => d.kind === kind && !d.stale && d.sourceSnapshot);
@@ -104,11 +70,12 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message : err instanceof Error ? err.message : "request failed";
 }
 
-export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false, signingRevisions }: {
+export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false, signingRevisions, showSigning = true }: {
   order: Order;
   signingContract?: StoredContractDownload | null;
   signingLookupFailed?: boolean;
   signingRevisions?: SigningRevision[];
+  showSigning?: boolean;
 }) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
   const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
@@ -211,7 +178,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
       </>}
       contract={<>
         <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle={storedContract?.previousSigned ? "Previous signed agreement; current replacement below" : "Current agreement and signing progress"} state={stateFor("contract")} summary={storedContract ? `${storedContract.kind === "completed" ? "Signed contract" : "Stored original"} · revision ${storedContract.revision}` : `${fmtUSD(order.rentalPrice ?? 0)} fee · ${formatDateISO(order.eventDate)}`} onDownload={() => { void download("contract"); }} busy={!!busy.contract} error={errors.contract} downloadLabel={storedContract?.previousSigned ? "Previous signed PDF" : storedContract?.kind === "completed" ? "Download signed PDF" : "Download PDF"} downloadVariant="secondary" grouped />
-        <OrderSigning key={order.id} order={order} revisions={signingRevisions} />
+        {showSigning && <OrderSigning key={order.id} order={order} revisions={signingRevisions} />}
       </>}
       paymentMessage={<PaymentMessagePanel
         eventDate={order.eventDate}

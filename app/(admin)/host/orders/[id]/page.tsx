@@ -15,11 +15,12 @@ import { ButtonLink } from "@/components/brand/button";
 
 import { notFound } from "next/navigation";
 import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-orders";
-import { computeLedger, deriveStatus } from "@/lib/host-orders-types";
+import { deriveStatus } from "@/lib/host-orders-types";
 import { listSigning, type SigningRevision } from "@/lib/host-signing";
-import OrderOverview from "@/components/host/OrderOverview";
+import OrderTimeline from "./OrderTimeline";
+import { loadWorkflow } from "@/lib/host-workflow";
+import { hostEmailConfigured } from "@/lib/host-email";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
-import { fmtUSD } from "../order-format";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import ContractSnapshot from "./ContractSnapshot";
@@ -27,7 +28,6 @@ import DeleteOrderButton from "./DeleteOrderButton";
 import OrderDocuments from "./OrderDocuments";
 import OrderNotes from "./OrderNotes";
 import PricingSnapshot from "./PricingSnapshot";
-import StatusControl from "./StatusControl";
 import WorkspaceActions from "./WorkspaceActions";
 import HostingFinancePanel from "./HostingFinancePanel";
 import OrderDetailHeader from "./OrderDetailHeader";
@@ -97,7 +97,7 @@ export default async function OrderDetailPage({
   if (!order) notFound();
 
   const status = deriveStatus(order);
-  const ledger = computeLedger(order.documents);
+  const workflow = await loadWorkflow(id);
   const planPreview = hostingPlanFromOrder(order);
   const [signing, financeResult, paymentsResult] = await Promise.all([
     signingPromise,
@@ -117,29 +117,15 @@ export default async function OrderDetailPage({
       <OrderDetailHeader order={order} status={status} actions={
         <>
           <WorkspaceActions order={order} />
-          <StatusControl orderId={order.id} current={order.statusOverride} />
-          <DeleteOrderButton orderId={order.id} />
+          {!signing.failed && !signing.revisions.some(r => !!r.envelope_id) && <DeleteOrderButton orderId={order.id} />}
         </>
       } />
 
-      <OrderOverview order={order} revisions={signing.revisions} signingUnavailable={signing.failed} budgetIncluded={financeResult.data?.status === "confirmed"} recordedRentalPayments={(paymentsResult.data ?? []).filter(payment => payment.kind === "revenue" && !payment.reversed_at).reduce((total, payment) => total + Number(payment.amount), 0)} />
-      <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} signingRevisions={signing.failed ? undefined : signing.revisions} />
-
-      <section className="card">
-        <div className="card-header">
-          <span className="card-title">Document totals</span>
-          <span className="card-subtitle">
-            Generated invoices and credit memos only. Recorded payments are shown separately below.
-          </span>
-        </div>
-        <div className="card-body grid gap-6 sm:grid-cols-4">
-          <LedgerStat label="Deposit invoiced" value={ledger.depositInvoiced} />
-          <LedgerStat label="Rental invoiced" value={ledger.rentalInvoiced} />
-          <LedgerStat label="Credit memo issued" value={ledger.refunded} />
-          <LedgerStat label="Net invoiced" value={ledger.balance} emphasize />
-        </div>
-      </section>
-
+      <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} signingUnavailable={signing.failed}
+        rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
+        permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
+        permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
       <HostingFinancePanel
         key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data })}
         financeOrder={financeResult.data ? {
@@ -148,6 +134,7 @@ export default async function OrderDetailPage({
           plannedFirePermit: Number(financeResult.data.planned_fire_permit),
         } : null}
         orderId={order.id}
+        eventCancelled={!!workflow.cancelledAt || order.statusOverride === "cancelled"}
         payments={(paymentsResult.data ?? []).map((payment) => ({
           id: payment.id,
           kind: payment.kind,
@@ -160,34 +147,17 @@ export default async function OrderDetailPage({
         today={today}
       />
 
+      </div>
+      <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6">
+        <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} signingRevisions={signing.failed ? undefined : signing.revisions} showSigning={false} />
+        <ul className="mt-5 space-y-3">{signing.revisions.map(revision => <li key={revision.id} className="flex flex-wrap gap-4 text-sm"><span>Revision {revision.revision} · {revision.state.replaceAll("_", " ")}</span>{revision.files.original && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/original`}>Original</a>}{revision.files.completed && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`}>Signed PDF</a>}{revision.files.audit && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`}>Audit</a>}</li>)}</ul>
+      </div></details>
+      <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Saved pricing & contract terms</summary><div className="mt-6 space-y-6">
       <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
       <ContractSnapshot snapshot={order.snapshot} />
 
+      </div></details>
       <OrderNotes orderId={order.id} initialNotes={order.notes} />
-    </div>
-  );
-}
-
-function LedgerStat({
-  label,
-  value,
-  emphasize = false,
-}: {
-  label: string;
-  value: number;
-  emphasize?: boolean;
-}) {
-  return (
-    <div>
-      <p className="field-label">{label}</p>
-      <p
-        className={
-          "tabular-nums " +
-          (emphasize ? "text-[20px] font-bold text-brand" : "text-[16px] font-semibold text-ink")
-        }
-      >
-        {fmtUSD(value)}
-      </p>
     </div>
   );
 }

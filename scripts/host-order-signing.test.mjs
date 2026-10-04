@@ -15,6 +15,7 @@ const result = await build({
   stdin: { contents: `
     export { default as OrderSigning } from "./app/(admin)/host/orders/[id]/OrderSigning";
     export { default as SigningPanel } from "./app/(admin)/host/documents/SigningPanel";
+    export { default as OrderTimeline } from "./app/(admin)/host/orders/[id]/OrderTimeline";
     export { exampleDraft } from "./scripts/host-preview/data";
   `, resolveDir: root, loader: "tsx" },
   bundle: true, write: false, platform: "node", format: "cjs", jsx: "automatic",
@@ -23,12 +24,13 @@ const result = await build({
   plugins: [{ name: "local-actions", setup(build) {
     build.onResolve({ filter: /(^|\/)actions$/ }, () => ({ path: path.join(preview, "orders-actions.ts") }));
     build.onResolve({ filter: /\/signing-actions$/ }, () => ({ path: path.join(preview, "signing-actions.ts") }));
+    build.onResolve({ filter: /\/email-actions$/ }, () => ({ path: path.join(preview, "email-actions.ts") }));
     build.onResolve({ filter: /^(server-only|@supabase\/|next\/headers|next\/cache)/ }, args => ({ errors: [{ text: `Live dependency blocked: ${args.path}` }] }));
   } }],
 });
 const compiled = { exports: {} };
 vm.runInThisContext(`(function(require,module,exports){${result.outputFiles[0].text}\n})`)(createRequire(path.join(root, "package.json")), compiled, compiled.exports);
-const { OrderSigning, SigningPanel, exampleDraft } = compiled.exports;
+const { OrderSigning, SigningPanel, OrderTimeline, exampleDraft } = compiled.exports;
 const data = exampleDraft();
 const order = { id: "ord_test", clubName: data.clubs.join(", "), eventDate: data.eventDate, rentalPrice: 1400, depositAmount: 300, snapshot: data, documents: [], updatedAt: "2026-10-01T18:00:00Z" };
 const revision = { id: "sig_test", order_id: order.id, revision: 1, state: "awaiting_signatures", signedCount: 0, totalCount: 5, files: { original: true, completed: false, audit: false }, recipients: data.contractSigners.map(person => ({ name: person.fullName, email: person.email, status: "NOT_SIGNED", link: "https://example.test/sign" })) };
@@ -61,4 +63,13 @@ test("draft preparation waits for existing history but remains available for a n
   const fresh = renderToStaticMarkup(createElement(SigningPanel, { ...props, orderId: "" }));
   assert.match(fresh, /Preview contract/);
   assert.match(fresh, /Edit people/);
+});
+
+test("timeline first render preserves pending signer progress without exposing the signer editor", () => {
+  const pending = { ...revision, created_at: "2026-10-01T18:00:00Z", envelope_id: "envelope_existing" };
+  const html = renderToStaticMarkup(createElement(OrderTimeline, { order, revisions: [pending], workflow: { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null }, today: "2026-10-04", emailConfigured: true, rentalPaid: 0, permitPaid: 0, permitTotal: 125 }));
+  assert.match(html, /0 of 5 signed/);
+  assert.match(html, /Review reminder to unsigned signers/);
+  for (const person of pending.recipients) assert.ok(html.includes(person.name));
+  assert.doesNotMatch(html, /Edit people|Preview contract|Prepare replacement|Mark sent|Undo sent/);
 });

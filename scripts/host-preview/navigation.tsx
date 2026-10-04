@@ -7,6 +7,5 @@ export function navigate(href: string) {
 export function usePathname() {
   return useSyncExternalStore(callback => { window.addEventListener("popstate", callback); return () => window.removeEventListener("popstate", callback); }, () => location.pathname, () => "/host");
 }
-export function useRouter() {
-  return { push: navigate, replace: navigate, prefetch() {}, refresh() { window.dispatchEvent(new Event("preview-data")); } };
-}
+const router = { push: navigate, replace: navigate, prefetch() {}, refresh() { window.dispatchEvent(new Event("preview-data")); } };
+export function useRouter() { return router; }

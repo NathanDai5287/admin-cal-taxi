@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   }
 
   const categoryBudgets = Object.fromEntries(categoryBudgetsFromRows(budgetsResult.data)) as Partial<Record<ReimbursementCategory, number | null>>;
-  categoryBudgets.house = Number(categoryBudgets.house ?? 0) + (hostingPlansResult.data ?? []).reduce((total, row) => total + Number(row.planned_fire_permit), 0);
+  categoryBudgets.socials = Number(categoryBudgets.socials ?? 0) + (hostingPlansResult.data ?? []).reduce((total, row) => total + Number(row.planned_fire_permit), 0);
   const outstandingLiabilities = (liabilitiesResult.data ?? [])
     .reduce((total, row) => total + Number(row.amount), 0);
 
@@ -108,7 +108,7 @@ export async function GET(request: Request) {
     })),
     manualExpenses: [
       ...(manualResult.data ?? []).map((row) => ({ category: row.category, amount: Number(row.amount) })),
-      ...hostingPayments.filter((row) => row.kind === "fire_permit").map((row) => ({ category: "house" as const, amount: Number(row.amount) })),
+      ...hostingPayments.filter((row) => row.kind === "fire_permit").map((row) => ({ category: "socials" as const, amount: Number(row.amount) })),
     ],
     receivables: receivables.map((row) => ({
       amountAssessed: Number(row.amount_assessed),

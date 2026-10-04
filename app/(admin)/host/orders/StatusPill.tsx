@@ -6,6 +6,7 @@
  */
 
 import { STATUS_LABELS, type OrderStatus } from "@/lib/host-orders-types";
+import { EVENT_STAGE_LABELS, type EventProgress } from "@/lib/host-event";
 
 const STYLES: Record<OrderStatus, string> = {
   draft:      "bg-canvas text-muted border-rule",
@@ -18,8 +19,10 @@ const STYLES: Record<OrderStatus, string> = {
 export default function StatusPill({
   status,
   large = false,
+  progress,
 }: {
-  status: OrderStatus;
+  status?: OrderStatus;
+  progress?: EventProgress;
   large?: boolean;
 }) {
   return (
@@ -30,10 +33,10 @@ export default function StatusPill({
           ? "px-3 py-1 text-[12px] tracking-[0.12em]"
           : "px-2 py-0.5 text-[10.5px] tracking-[0.10em]") +
         " " +
-        STYLES[status]
+        (progress ? progress.stage === "draft" || progress.stage === "cancelled" || progress.unavailable ? STYLES.draft : progress.stage === "sent" ? STYLES.contracted : STYLES.completed : STYLES[status ?? "draft"])
       }
     >
-      {STATUS_LABELS[status]}
+      {progress ? progress.unavailable ? "Status unavailable" : `${EVENT_STAGE_LABELS[progress.stage]}${progress.total ? ` · ${progress.signed}/${progress.total}` : ""}` : STATUS_LABELS[status ?? "draft"]}
     </span>
   );
 }
