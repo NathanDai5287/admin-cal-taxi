@@ -19,7 +19,7 @@ export async function createSigningLinksAction(orderId: string, id: string, _has
   pending.forEach(row => { row.state = "cancelled"; });
   Object.assign(order, { clubName: activation.clubName, eventDate: activation.eventDate, rentalPrice: activation.rentalPrice, depositAmount: activation.depositAmount, snapshot: activation.snapshot, updatedAt: new Date().toISOString() });
   revision.state = "awaiting_signatures"; revision.envelope_id = "local-envelope";
-  revision.recipients.forEach((person, index) => { person.link = `${location.origin}/preview-sign/${revision.id}/${index}`; person.copyToken = `local-copy-${revision.id}-${index}`; });
+  revision.recipients.forEach((person, index) => { person.link = `https://example.test/preview-sign/${revision.id}/${index}`; person.copyToken = `local-copy-${revision.id}-${index}`; });
   write(data); return revision;
 }
 export async function syncSigningAction(orderId: string, id: string) { const row = read().revisions[orderId]?.find(row => row.id === id); if (!row) throw new Error("Sample revision not found."); return row; }

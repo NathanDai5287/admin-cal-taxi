@@ -27,16 +27,15 @@ function config() {
   return { from: process.env.HOST_EMAIL_FROM || "Theta Xi Hosting <host@cal.taxi>", replyTo: process.env.HOST_EMAIL_REPLY_TO!.trim() };
 }
 async function context(orderId: string, revisionId: string, refresh: boolean) {
-  const order = await getOrderFresh(orderId);
+  const [order, revisions, workflow] = await Promise.all([getOrderFresh(orderId), listSigning(orderId), loadWorkflow(orderId)]);
   if (!order) throw new Error("Order not found.");
-  let revision = currentRevision(await listSigning(orderId));
+  let revision = currentRevision(revisions);
   if (!revision || revision.id !== revisionId) throw new Error("The current signing revision changed. Reload this order.");
   if (refresh && revision.envelope_id) {
     await syncSigning(orderId, revision.id);
     revision = currentRevision(await listSigning(orderId));
     if (!revision || revision.id !== revisionId) throw new Error("The current signing revision changed. Reload this order.");
   }
-  const workflow = await loadWorkflow(orderId);
   if (workflow.cancelledAt || order.statusOverride === "cancelled") throw new Error("This event is cancelled. Email sending is disabled.");
   await registerSigning(revision);
   return { order, revision, workflow };
@@ -85,7 +84,9 @@ function preview(row: DeliveryRow): EmailPreview {
 }
 export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPreview[]> {
   const sender = config();
-  const { order, revision, workflow } = await context(input.orderId, input.revisionId, true);
+  // Preview uses archived state; delivery still synchronizes Documenso and
+  // checks current terms, payments and recipients immediately before sending.
+  const { order, revision, workflow } = await context(input.orderId, input.revisionId, false);
   if (order.updatedAt !== input.expectedUpdatedAt) throw new Error("Order details changed. Reload before preparing an email.");
   const signing = input.kind === "invitation" || input.kind === "reminder";
   if (signing && revision.state !== "awaiting_signatures") throw new Error("This contract no longer needs signatures.");
@@ -97,7 +98,21 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   const selected = input.recipients?.length ? eligible.filter(p => input.recipients!.includes(p.email)) : eligible;
   if (!selected.length) throw new Error("There are no eligible recipients for this email.");
   if (input.recipients?.some(email => !eligible.some(p => p.email === email))) throw new Error("A selected recipient is no longer eligible. Reload signing progress.");
-  const payments = await rentalPayments(order.id);
+  const payments = input.kind === "receipt" || input.kind === "refund" ? await rentalPayments(order.id) : { rows: [], total: 0, hash: "" };
+  if (input.kind === "refund") {
+    if (payments.total < (order.rentalPrice ?? Infinity)) throw new Error("Record full rental payment before confirming the deposit return.");
+    const refund = input.refund;
+    if (!refund || !Number.isFinite(refund.amount) || refund.amount <= 0 || refund.amount > (order.depositAmount ?? 0) || !/^\d{4}-\d{2}-\d{2}$/.test(refund.date) || refund.date > eventToday() || !refund.method.trim() || refund.method.length > 120) throw new Error("Enter the amount, date, and method of the deposit you actually returned.");
+    if (workflow.refund && hash(workflow.refund) !== hash(refund)) throw new Error("A different deposit return was already confirmed. Check the existing record before sending.");
+  }
+  const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
+  const requestKey = (email: string) => hash([order.id, revision.id, input.kind, email.toLowerCase(), suffix]);
+  const keys = selected.map(person => requestKey(person.email));
+  const db = workflowDb();
+  const existing = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
+  if (existing.error) throw new Error("Unable to load saved previews.");
+  const saved = (existing.data ?? []) as DeliveryRow[];
+  if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
   const money = (n: number) => `$${n.toFixed(2)}`;
   let attachments: Attachment[] = []; let detail = "";
   if (input.kind === "invitation") attachments = [await exactFile(revision, "original")];
@@ -109,27 +124,21 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     attachments = [await statementPdf(order, "Rental payment receipt", [detail, ...payments.rows.map(r => `${r.paid_date}: ${money(Number(r.amount))} (record ${r.id})`), "This receipt covers the recorded rental payments listed above. The refundable deposit is separate."])];
   }
   if (input.kind === "refund") {
-    if (payments.total < (order.rentalPrice ?? Infinity)) throw new Error("Record full rental payment before confirming the deposit return.");
-    const refund = input.refund;
-    if (!refund || !Number.isFinite(refund.amount) || refund.amount <= 0 || refund.amount > (order.depositAmount ?? 0) || !/^\d{4}-\d{2}-\d{2}$/.test(refund.date) || refund.date > eventToday() || !refund.method.trim() || refund.method.length > 120) throw new Error("Enter the amount, date, and method of the deposit you actually returned.");
-    if (workflow.refund && hash(workflow.refund) !== hash(refund)) throw new Error("A different deposit return was already confirmed. Check the existing record before sending.");
+    const refund = input.refund!;
     detail = `Deposit returned: ${money(refund.amount)} on ${refund.date} via ${refund.method}.`;
     attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: ${money(order.depositAmount ?? 0)}.`, "Return information recorded by the hosting administrator."])];
   }
-  const db = workflowDb(); const result: EmailPreview[] = [];
-  for (const person of selected) {
+  const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
     const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo: sender.replyTo });
     const body: MessageBody = { from: sender.from, to: [person.email], reply_to: sender.replyTo, ...message, attachments };
-    const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
-    const requestKey = hash([order.id, revision.id, input.kind, person.email.toLowerCase(), suffix]);
     const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.refund ? { refund: input.refund } : {}) };
-    const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: requestKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload }, { onConflict: "request_key", ignoreDuplicates: true });
-    if (inserted.error) throw new Error("Unable to save the email preview. No email was sent.");
-    const row = await db.from("hosting_email_deliveries").select("*").eq("request_key", requestKey).single();
-    if (row.error) throw new Error("Unable to load the email preview.");
-    result.push(preview(row.data as DeliveryRow));
-  }
-  return result;
+    return { request_key: requestKey(person.email), order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload };
+  });
+  const inserted = await db.from("hosting_email_deliveries").upsert(pending, { onConflict: "request_key", ignoreDuplicates: true });
+  if (inserted.error) throw new Error("Unable to save the email preview. No email was sent.");
+  const rows = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
+  if (rows.error || rows.data?.length !== selected.length) throw new Error("Unable to load the email preview.");
+  return selected.map(person => preview((rows.data as DeliveryRow[]).find(row => row.recipient === person.email)!));
 }
 export async function deliverHostingEmails(orderId: string, ids: string[]) {
   if (!hostEmailConfigured()) throw new Error("Hosting email is not configured.");

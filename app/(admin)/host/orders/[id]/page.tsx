@@ -113,7 +113,7 @@ export default async function OrderDetailPage({
   }).format(new Date());
 
   return (
-    <div key={order.id} className="space-y-10">
+    <div key={order.id} className="space-y-7">
       <OrderDetailHeader order={order} status={status} actions={
         <>
           <WorkspaceActions order={order} />
@@ -121,11 +121,6 @@ export default async function OrderDetailPage({
         </>
       } />
 
-      <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} signingUnavailable={signing.failed}
-        rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
-        permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
-        permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
       <HostingFinancePanel
         key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data })}
         financeOrder={financeResult.data ? {
@@ -147,7 +142,10 @@ export default async function OrderDetailPage({
         today={today}
       />
 
-      </div>
+      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={process.env.HOST_EMAIL_REPLY_TO} signingUnavailable={signing.failed}
+        rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
+        permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
+        permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
       <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6">
         <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} signingRevisions={signing.failed ? undefined : signing.revisions} showSigning={false} />
         <ul className="mt-5 space-y-3">{signing.revisions.map(revision => <li key={revision.id} className="flex flex-wrap gap-4 text-sm"><span>Revision {revision.revision} · {revision.state.replaceAll("_", " ")}</span>{revision.files.original && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/original`}>Original</a>}{revision.files.completed && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`}>Signed PDF</a>}{revision.files.audit && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`}>Audit</a>}</li>)}</ul>

@@ -20,7 +20,7 @@ function initial(): PreviewData {
   order.snapshot.pricingBreakdown = liveBreakdown(draft);
   const revision: SigningRevision = { id: "sig_local_pending", order_id: order.id, revision: 1, state: "awaiting_signatures", original_sha256: "local-preview", envelope_id: "local-envelope", signedCount: 0, totalCount: 5,
     files: { original: true, completed: false, audit: false }, error: null, created_at: order.createdAt,
-    recipients: draft.contractSigners.map((person, i) => ({ id: i + 1, name: person.fullName, email: person.email, status: "NOT_SIGNED", link: `${location.origin}/preview-sign/${person.id}`, sentAt: order.createdAt, copyToken: `local-copy-${i}` })) };
+    recipients: draft.contractSigners.map((person, i) => ({ id: i + 1, name: person.fullName, email: person.email, status: "NOT_SIGNED", link: `https://example.test/preview-sign/${person.id}`, sentAt: order.createdAt, copyToken: `local-copy-${i}` })) };
   return { orders: [order], revisions: { [order.id]: [revision] }, finance: { [order.id]: { included: true, payments: [] } } };
 }
 export function read(): PreviewData {

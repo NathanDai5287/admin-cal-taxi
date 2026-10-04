@@ -19,7 +19,7 @@ test("reminders preserve envelope identity, refresh progress, and never leak ano
   const snapshot = JSON.stringify(state.revision); const previews = await prepareHostingEmail(request);
   const calls = []; globalThis.fetch = async (url, init) => { assert.equal(url, "https://api.resend.com/emails"); calls.push(JSON.parse(init.body)); return Response.json({ id: "provider_test" }); };
   const result = await deliverHostingEmails(state.order.id, previews.map(p => p.id));
-  assert.equal(result.sent, 1); assert.ok(state.syncs >= 2); assert.equal(JSON.stringify(state.revision), snapshot);
+  assert.equal(result.sent, 1); assert.ok(state.syncs >= 1); assert.equal(JSON.stringify(state.revision), snapshot);
   assert.deepEqual(calls[0].to, ["one@example.test"]); assert.match(calls[0].html, /sign\/one/); assert.doesNotMatch(calls[0].html, /sign\/two/);
   await deliverHostingEmails(state.order.id, previews.map(p => p.id)); assert.equal(calls.length, 1);
 });
@@ -39,4 +39,13 @@ test("cancellation and changed order terms block previously prepared emails", as
   state.rows = []; const previews = await prepareHostingEmail(request); state.cancelled = true;
   await assert.rejects(deliverHostingEmails(state.order.id, previews.map(p => p.id)), /cancelled/); state.cancelled = false;
   state.order.rentalPrice = 1500; const result = await deliverHostingEmails(state.order.id, previews.map(p => p.id)); assert.equal(result.sent, 0); assert.match(result.errors[0], /changed/); state.order.rentalPrice = 1400;
+});
+test("warming and reopening a private preview reuses exact PDF bytes without syncing or regenerating", async () => {
+  state.rows = []; state.files = 0; state.syncs = 0;
+  const input = { ...request, kind: "invitation", recipients: undefined };
+  const first = await prepareHostingEmail(input);
+  assert.equal(first.length, 2); assert.equal(state.files, 1); assert.equal(state.syncs, 0);
+  const second = await prepareHostingEmail(input);
+  assert.deepEqual(second, first); assert.equal(state.files, 1); assert.equal(state.syncs, 0);
+  assert.equal(state.rows.length, 2);
 });

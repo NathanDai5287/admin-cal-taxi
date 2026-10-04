@@ -17,7 +17,7 @@ import PricingSnapshot from "../../app/(admin)/host/orders/[id]/PricingSnapshot"
 import ContractSnapshot from "../../app/(admin)/host/orders/[id]/ContractSnapshot";
 import OrderNotes from "../../app/(admin)/host/orders/[id]/OrderNotes";
 import OrderTimeline from "../../app/(admin)/host/orders/[id]/OrderTimeline";
-import { previewWorkflow } from "./email-actions";
+import { previewHostingEmailAction, previewWorkflow } from "./email-actions";
 import { eventProgress } from "../../lib/host-event";
 import { contractDownload } from "../../lib/host-contract-download";
 import { deriveStatus } from "../../lib/host-orders-types";
@@ -30,6 +30,7 @@ const localFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
   const url = new URL(String(input), location.origin);
   if (url.origin !== location.origin) throw new Error("Remote requests are disabled in the local preview.");
+  if (url.pathname.endsWith("/email-previews")) { const delay = Number(localStorage.getItem("host.preview.delay") || 0); if (delay) await new Promise(resolve => setTimeout(resolve, delay)); return Response.json(await previewHostingEmailAction(JSON.parse(String(init?.body)))); }
   if (url.pathname.startsWith("/api/host")) {
     const sample = await localFetch("/sample.pdf");
     return new Response(await sample.arrayBuffer(), { headers: { "Content-Type": "application/pdf", "Content-Disposition": 'attachment; filename="local-preview.pdf"', "X-Generation-Receipt": "local-sample" } });
@@ -73,10 +74,8 @@ function App() {
       {pathname === "/host/orders" && <div className="space-y-8"><h1 className="page-title">Orders</h1><OrdersList orders={data.orders.map(order => ({ ...order, eventProgress: eventProgress(order.eventDate, data.revisions[order.id] ?? [], previewWorkflow(order.id), "2026-10-04"), documentCount: order.documents.length, documentKinds: order.documents.map(doc => doc.kind) }))} /></div>}
       {order && <div className="space-y-10">
         <OrderDetailHeader order={order} status={deriveStatus(order)} actions={<WorkspaceActions order={order} />} />
-        <div className="grid items-start gap-10 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" emailConfigured rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
         <HostingFinancePanel key={JSON.stringify(finance)} orderId={order.id} financeOrder={finance.included ? { status: "confirmed", plannedRevenue: order.rentalPrice ?? 0, plannedFirePermit: 125 } : null} payments={finance.payments} previewRevenue={order.rentalPrice ?? 0} previewFirePermit={125} today="2026-10-02" />
-        </div>
+        <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" emailConfigured rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
         <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6"><OrderDocuments key={order.id} order={order} signingContract={contractDownload(revisions)} signingRevisions={revisions} showSigning={false} /></div></details>
         <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Saved pricing & contract terms</summary><div className="mt-6 space-y-6"><PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
         <ContractSnapshot snapshot={order.snapshot} /></div></details><OrderNotes orderId={order.id} initialNotes={order.notes} />
