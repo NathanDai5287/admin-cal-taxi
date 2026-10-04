@@ -18,16 +18,13 @@ import { getOrder, ordersConfigured, OrdersUnavailableError } from "@/lib/host-o
 import { deriveStatus } from "@/lib/host-orders-types";
 import { listSigning, type SigningRevision } from "@/lib/host-signing";
 import OrderTimeline from "./OrderTimeline";
+import OrderSupportingDetails from "./OrderSupportingDetails";
 import { loadWorkflow } from "@/lib/host-workflow";
 import { hostEmailConfigured } from "@/lib/host-email";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
-import ContractSnapshot from "./ContractSnapshot";
 import DeleteOrderButton from "./DeleteOrderButton";
-import OrderDocuments from "./OrderDocuments";
-import OrderNotes from "./OrderNotes";
-import PricingSnapshot from "./PricingSnapshot";
 import WorkspaceActions from "./WorkspaceActions";
 import HostingFinancePanel from "./HostingFinancePanel";
 import OrderDetailHeader from "./OrderDetailHeader";
@@ -146,16 +143,7 @@ export default async function OrderDetailPage({
         rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
-      <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6">
-        <OrderDocuments key={order.id} order={order} signingContract={signing.contract} signingLookupFailed={signing.failed} signingRevisions={signing.failed ? undefined : signing.revisions} showSigning={false} />
-        <ul className="mt-5 space-y-3">{signing.revisions.map(revision => <li key={revision.id} className="flex flex-wrap gap-4 text-sm"><span>Revision {revision.revision} · {revision.state.replaceAll("_", " ")}</span>{revision.files.original && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/original`}>Original</a>}{revision.files.completed && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`}>Signed PDF</a>}{revision.files.audit && <a className="text-brand underline" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`}>Audit</a>}</li>)}</ul>
-      </div></details>
-      <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Saved pricing & contract terms</summary><div className="mt-6 space-y-6">
-      <PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
-      <ContractSnapshot snapshot={order.snapshot} />
-
-      </div></details>
-      <OrderNotes orderId={order.id} initialNotes={order.notes} />
+      <OrderSupportingDetails order={order} revisions={signing.revisions} signingContract={signing.contract} signingLookupFailed={signing.failed} />
     </div>
   );
 }

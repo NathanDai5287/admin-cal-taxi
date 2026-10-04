@@ -70,12 +70,13 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiCallError ? err.message : err instanceof Error ? err.message : "request failed";
 }
 
-export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false, signingRevisions, showSigning = true }: {
+export default function OrderDocuments({ order, signingContract = null, signingLookupFailed = false, signingRevisions, showSigning = true, compact = false }: {
   order: Order;
   signingContract?: StoredContractDownload | null;
   signingLookupFailed?: boolean;
   signingRevisions?: SigningRevision[];
   showSigning?: boolean;
+  compact?: boolean;
 }) {
   const docs = Object.fromEntries(DOCUMENT_ORDER.map(kind => [kind, latestByKind(order.documents, kind)])) as Record<DocumentKind, OrderDocument | null>;
   const defaults = defaultDocuments(order, docs.deposit_invoice?.number);
@@ -164,6 +165,30 @@ export default function OrderDocuments({ order, signingContract = null, signingL
     setDownloadAllBusy(false);
   }
 
+  if (compact) return <section aria-label="Documents">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-lg font-semibold">Documents</h2>
+      <Button compact variant="text" onClick={downloadAll} disabled={downloadAllBusy}>{downloadAllBusy ? "Downloading…" : "Download all"}</Button>
+    </div>
+    {downloadAllReport && <p role="status" className="mt-2 text-[12px] text-muted">{downloadAllReport}</p>}
+    <ul className="mt-3 space-y-4">{DOCUMENT_ORDER.map(kind => {
+      const doc = docs[kind];
+      const state = stateFor(kind);
+      const label = DOCUMENT_META[kind].label;
+      return <li key={kind}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0 text-[13px]">
+            <p className="font-medium">{label}</p>
+            <p className="text-[12px] text-muted">{kind === "contract" && storedContract?.previousSigned ? `Previous signed agreement · revision ${storedContract.revision}` : state.kind === "generated" ? [state.detail, state.number].filter(Boolean).join(" · ") : state.kind === "ready" ? "Not generated" : state.kind === "blocked" ? `Missing: ${state.missing.join(", ")}` : state.kind === "waiting" ? state.reason : "Unavailable"}</p>
+          </div>
+          <Button compact variant="text" aria-label={`Download PDF: ${label}`} disabled={!!busy[kind] || state.kind === "blocked" || state.kind === "waiting" || state.kind === "unavailable"} onClick={() => { void download(kind); }}>{busy[kind] ? "Downloading…" : kind === "contract" && storedContract?.kind === "completed" ? "Signed PDF" : "Download PDF"}</Button>
+        </div>
+        {doc && kind !== "contract" && <div className="mt-2"><SavedFields doc={doc} /></div>}
+        {errors[kind] && <p role="status" className="mt-1 text-[12px] text-warn">{errors[kind]}</p>}
+      </li>;
+    })}</ul>
+    <div className="mt-3"><PaymentMessagePanel compact eventDate={order.eventDate} depositAmount={String(order.depositAmount ?? "")} rentalAmount={Number(order.rentalPrice ?? 0)} /></div>
+  </section>;
 
   return (
     <DocumentsSection

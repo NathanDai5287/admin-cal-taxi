@@ -22,15 +22,15 @@ export default function PricingSnapshot({ snapshot, rentalPrice, depositAmount }
   const b = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
   const historical = savedPricing(raw);
   const items = historical && rentalPrice !== null ? buildLineItems(historical, rentalPrice, "") : [];
-  return <section className="card">
-    <div className="card-header"><span className="card-title">Pricing Snapshot</span><span className="card-subtitle">Agreed pricing for this order.</span></div>
-    <div className="card-body">
-      {items.map((item, index) => <div key={index} className="flex items-baseline justify-between gap-4 text-[13px] py-2 border-b border-rule/60">
+  return <section className="min-w-0">
+    <h2 className="text-lg font-semibold">Pricing</h2>
+    <div className="mt-3">
+      {items.map((item, index) => <div key={index} className="flex items-baseline justify-between gap-4 text-[13px] py-1">
         <span>{item.description.replaceAll(" — ", ": ")}</span><span className="tabular-nums shrink-0">{fmtUSD(Number(item.amount))}</span>
       </div>)}
-      <div className="flex justify-between gap-4 text-[15px] py-3 font-bold text-brand"><span>Agreed rental fee</span><span className="tabular-nums">{rentalPrice === null ? "Not set" : fmtUSD(rentalPrice)}</span></div>
-      <div className="flex justify-between gap-4 text-[13px] py-2"><span>Refundable security deposit</span><span className="tabular-nums">{depositAmount === null ? "Not set" : fmtUSD(depositAmount)}</span></div>
-      {b && num(b.total) !== null && <p className="text-[12px] text-muted pt-3 border-t border-rule">Original calculator estimate: {fmtUSD(num(b.total)!)}. The agreed fee above includes any negotiated adjustment.</p>}
+      <div className="flex justify-between gap-4 text-[13px] py-1 font-semibold text-brand"><span>Agreed rental fee</span><span className="tabular-nums">{rentalPrice === null ? "Not set" : fmtUSD(rentalPrice)}</span></div>
+      <div className="flex justify-between gap-4 text-[13px] py-1"><span>Refundable deposit</span><span className="tabular-nums">{depositAmount === null ? "Not set" : fmtUSD(depositAmount)}</span></div>
+      {b && num(b.total) !== null && <p className="text-[12px] text-muted mt-2">Original estimate: {fmtUSD(num(b.total)!)}</p>}
     </div>
   </section>;
 }

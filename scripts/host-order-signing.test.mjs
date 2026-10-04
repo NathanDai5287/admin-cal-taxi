@@ -69,7 +69,7 @@ test("timeline first render preserves pending signer progress without exposing t
   const pending = { ...revision, created_at: "2026-10-01T18:00:00Z", envelope_id: "envelope_existing" };
   const html = renderToStaticMarkup(createElement(OrderTimeline, { order, revisions: [pending], workflow: { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null }, today: "2026-10-04", emailConfigured: true, rentalPaid: 0, permitPaid: 0, permitTotal: 125 }));
   assert.match(html, /0 of 5 signed/);
-  assert.match(html, /Review reminder to unsigned signers/);
+  assert.match(html, /Remind unsigned signers/);
   for (const person of pending.recipients) assert.ok(html.includes(person.name));
   assert.doesNotMatch(html, /Edit people|Preview contract|Prepare replacement|Mark sent|Undo sent/);
 });

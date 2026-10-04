@@ -41,21 +41,19 @@ export default function OrderNotes({
   }
 
   return (
-    <section className="card">
-      <div className="card-header">
-        <span className="card-title">Notes</span>
-        <span className="card-subtitle">Free-form, visible only in the archive.</span>
-      </div>
-      <div className="card-body space-y-3">
+    <section className="min-w-0">
+      <h2 className="text-lg font-semibold">Notes</h2>
+      <div className="mt-3 space-y-2">
         <textarea
           className="field-textarea"
-          rows={4}
+          rows={2}
+          aria-label="Order notes"
           value={notes}
           onChange={e => onChange(e.target.value)}
-          placeholder="Anything worth remembering about this rental…"
+          placeholder="Add a note"
         />
         <div className="flex items-center gap-4">
-          <Button type="button" variant="secondary" disabled={busy || !dirty} onClick={save}>
+          <Button compact type="button" variant="text" disabled={busy || !dirty} onClick={save}>
             {busy ? "Saving…" : "Save Notes"}
           </Button>
           {!busy && justSaved && !dirty && <span className="text-[12px] text-ok">Saved</span>}

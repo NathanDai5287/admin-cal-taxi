@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ButtonLink } from "@/components/brand/button";
+import { Button } from "@/components/brand/button";
 import { addDaysIso, formatDateISO } from "@/lib/host-format";
 import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
 import type { EmailPreview } from "@/lib/host-email";
@@ -150,9 +150,11 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const emailButton = (kind: EmailKind, label: string, enabled = true) => <Button type="button" compact variant="secondary" disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}>{label}</Button>;
   const visiblePdf = pdfPreview?.scope === scope ? pdfPreview : null;
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
+  const activity = workflow.deliveries.filter(d => d.status !== "queued");
+  const unsentCount = previews.filter(p => p.status !== "sent").length;
   return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
     <section className="min-w-0">
-    <div className="mb-7 flex flex-wrap items-baseline justify-between gap-3">
+    <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
     </div>
@@ -163,17 +165,16 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <Milestone title="Prepare agreement" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental fee · ${fmtUSD(order.depositAmount ?? 0)} refundable deposit`} done={!!revision || order.documents.some(d => d.kind === "contract") }>
         {revision ? <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}>View approved contract · revision {revision.revision}</a> : <p className="text-sm text-muted">Use Edit order to prepare and approve the contract.</p>}
       </Milestone>
-      <Milestone title="Send contract" detail={wasSent ? "The agreement has been shared with its signers." : "Review the email, then send each signer their personal link."} done={wasSent}>
+      <Milestone title="Send contract" detail={wasSent ? "Sent" : undefined} done={wasSent}>
         {(!wasSent || hasUnsentInvitation) && emailButton("invitation", hasUnsentInvitation ? "Review remaining invitations" : "Review & send contract")}
-        {wasSent && !delivered("invitation") && <p className="text-[13px] text-muted">Existing signing request preserved. Invitations were shared before email tracking began.</p>}
       </Milestone>
-      <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed · updates automatically` : "Signature progress will appear after approval."} done={signed}>
+      <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed` : "Awaiting contract approval"} done={signed}>
         {revision && <>
-          <ul className="divide-y divide-rule">
+          <ul className="space-y-1">
             {revision.recipients.map(person => {
               const club = signerClubs.get(person.email.trim().toLowerCase());
               const signature = signerProgress(person, revision, workflow);
-              return <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-3">
+              return <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-2">
               <div className="min-w-0">
                 <p className="flex items-center gap-3 text-[13px] font-semibold"><span className="min-w-0 [overflow-wrap:anywhere]">{person.name}</span><SignatureIcon progress={signature} /></p>
                 {club && <p className="mt-1 text-[12px] font-medium text-ink [overflow-wrap:anywhere]">{club}</p>}
@@ -183,65 +184,68 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
             </li>;
             })}
           </ul>
-          <div className="mt-3 flex flex-wrap items-center gap-4">{!signed && emailButton("reminder", "Review reminder to unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}>Download signed contract</a>}{signed && revision.files.audit && <a className="text-[13px] text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
-          <p className="mt-3 text-[12px] text-muted">{signed ? "The completed contract and audit trail are emailed automatically to every signer once ready." : "Reminders go only to unsigned people, at most once per person each day."}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}>Download signed contract</a>}{signed && revision.files.audit && <a className="text-[13px] text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
         </>}
       </Milestone>
-      <Milestone title="Send deposit invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, -7))} · seven days before the event`} done={delivered("deposit_invoice")}>
+      <Milestone title="Send deposit invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, -7))}`} done={delivered("deposit_invoice")}>
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
-        <p className="mt-2 text-[12px] text-muted">The refundable deposit is separate from rental revenue.</p>
       </Milestone>
       <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid · Socials expense` : "No fire permit expense in this agreement."} done={permitTotal === 0 || permitPaid >= permitTotal}>
         {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Update fire permit payment</a>}
       </Milestone>
-      <Milestone title="Event held" detail={`${formatDateISO(order.eventDate)} · advances automatically after this date in Berkeley time`} done={held}>
+      <Milestone title="Event held" detail={`${formatDateISO(order.eventDate)}`} done={held}>
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
       </Milestone>
-      <Milestone title="Send rental invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, 2))} · two days after the event`} done={delivered("rental_invoice")}>
+      <Milestone title="Send rental invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, 2))}`} done={delivered("rental_invoice")}>
         {emailButton("rental_invoice", delivered("rental_invoice") ? "View rental email" : "Review rental invoice", wasSent)}
       </Milestone>
       <Milestone title="Receipt & return deposit" detail={`${fmtUSD(rentalPaid)} rental payment received${workflow.refund ? ` · ${fmtUSD(workflow.refund.amount)} deposit returned` : ""}`} done={delivered("receipt") && delivered("refund")} last>
         {emailButton("receipt", "Review payment receipt", rentalPaid > 0 && wasSent)}
-        <p className="mt-3 text-[13px] text-muted">After full rental payment, return the deposit according to the agreement. Confirm the actual return details below before emailing.</p>
-        <details className="mt-4 border-t border-rule pt-3"><summary className="cursor-pointer text-[13px] font-semibold">Deposit return details</summary><div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <h4 className="mt-4 text-[13px] font-semibold">Deposit return</h4>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <label className="field-label">Amount returned<input className="field-input mt-1" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
           <label className="field-label">Return date<input className="field-input mt-1" type="date" max={today} value={refund.date} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
           <label className="field-label sm:col-span-2">Return method<input className="field-input mt-1" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
           <div className="sm:col-span-2">{emailButton("refund", "Review return confirmation", wasSent && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
-        </div></details>
+        </div>
       </Milestone>
     </ol>
-    <details className="mt-8 border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Email activity</summary>
-      {!workflow.deliveries.length ? <p className="mt-3 text-sm text-muted">No emails recorded here yet. Existing signing links remain active.</p> : <ul className="mt-3 divide-y divide-rule">{workflow.deliveries.map(d => <li key={d.id} className="py-3 text-[13px]"><div className="flex flex-wrap justify-between gap-2"><strong>{EMAIL_LABELS[d.kind]}</strong><span>{d.status === "sent" ? "Accepted by email service" : d.status === "queued" ? "Preview prepared" : d.status}</span></div><p className="mt-1 text-muted [overflow-wrap:anywhere]">{d.recipient} · {new Date(d.sent_at ?? d.created_at).toLocaleString("en-US")}</p>{d.error && <p className="mt-1 text-warn [overflow-wrap:anywhere]">{d.error}</p>}</li>)}</ul>}
-    </details>
-    <div className="mt-8 flex flex-wrap items-center gap-4 border-t border-rule pt-5"><ButtonLink href="/host/orders" variant="text" compact>Back to orders</ButtonLink>{!cancelled && <Button variant="text" compact disabled={busy} onClick={cancel}>Cancel event</Button>}</div>
+    {activity.length > 0 && <section className="mt-7" aria-label="Email activity">
+      <h3 className="text-sm font-semibold">Email activity</h3>
+      <ul className="mt-2 space-y-3">{activity.map(d => <li key={d.id} className="text-[12px]">
+        <div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{EMAIL_LABELS[d.kind]}</span><span className={d.status === "failed" || d.status === "uncertain" ? "text-warn" : "text-muted"}>{d.status === "sent" ? "Sent" : d.status}</span></div>
+        <p className="text-muted [overflow-wrap:anywhere]">{d.recipient} · {new Date(d.sent_at ?? d.created_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+        {d.error && <p className="mt-1 text-warn [overflow-wrap:anywhere]">{d.error}</p>}
+      </li>)}</ul>
+    </section>}
+    {!cancelled && <Button className="mt-5" variant="text" compact disabled={busy} onClick={cancel}>Cancel event</Button>}
     </section>
-    <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 border-t border-rule pt-5 lg:sticky lg:top-6 lg:border-t-0 lg:border-l lg:pl-7 lg:pt-0">
+    <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 pt-5 lg:sticky lg:top-6 lg:pl-7 lg:pt-0">
       <h2 className="text-lg font-semibold">Preview</h2>
       {(busy || message) && <p role="status" aria-live="polite" className="mt-3 text-[13px] text-ink [overflow-wrap:anywhere]">{busy ? "Working…" : message}</p>}
-      {!selected && !visiblePdf && <div className="mt-5 flex min-h-64 items-center justify-center border border-rule bg-surface px-7 text-center text-sm leading-relaxed text-muted">Choose a document or reminder from the timeline to review it here.</div>}
+      {!selected && !visiblePdf && <div className="mt-5 flex min-h-64 items-center justify-center border border-rule bg-surface px-7 text-center text-sm leading-relaxed text-muted">Select a document or email to preview.</div>}
       {visiblePdf && <div className="mt-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">{visiblePdf.label}</h3><a className="text-[13px] text-brand underline" href={visiblePdf.url} target="_blank" rel="noopener noreferrer">Open PDF</a></div>
         {visiblePdf.blob ? <iframe title={`${visiblePdf.label} preview`} src={visiblePdf.blob} className="h-[75vh] min-h-96 w-full border border-rule bg-white" /> : <div role="status" className="flex h-96 items-center justify-center border border-rule text-sm text-muted">Loading PDF…</div>}
         <Button compact variant="text" className="mt-3" onClick={() => { ++documentSelection.current; setPdfPreview(null); }}> {selected ? "Back to email" : "Close preview"}</Button>
       </div>}
     {selected && !visiblePdf && <div className="mt-4">
-      <p className="mt-2 text-[13px] text-muted">Each person receives an individual email. Replies go to {previewReplyTo}.</p>
+      <p className="mt-2 text-[13px] text-muted">Reply-to: {previewReplyTo}</p>
       <label className="field-label mt-4 block" htmlFor="email-recipient-preview">Recipient</label>
       <select id="email-recipient-preview" className="field-input" value={previewIndex} disabled={busy} onChange={e => setPreviewIndex(Number(e.target.value))}>{previews.map((p, i) => <option key={p.id || p.recipient} value={i}>{p.recipient}{p.status === "sent" ? " · already sent" : ""}</option>)}</select>
       <p className="my-3 text-[13px] font-semibold">{selected.subject}</p>
       <iframe title="Hosting email preview" sandbox="" srcDoc={selected.html} className="h-[min(560px,60vh)] min-h-80 w-full border border-rule bg-white" />
-      <p role="status" className="mt-3 text-[12px] text-muted">{preparing ? "Preparing attachments in the background…" : !selected.id ? "Preview shown. Attachments could not be prepared; select the action again to retry." : "Attachments ready. Sending verifies the current agreement and payments."}</p>
+      {(preparing || !selected.id) && <p role="status" className="mt-3 text-[12px] text-muted">{preparing ? "Preparing attachments…" : "Attachments unavailable. Select this action again to retry."}</p>}
       <div className="mt-3 flex flex-wrap gap-4">{selected.attachments.map((name, i) => <a key={name} href={`/api/host/emails/${selected.id}/files/${i}`} onPointerEnter={() => { void documents.load(`/api/host/emails/${selected.id}/files/${i}`).catch(() => {}); }} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, name); }} className="text-[13px] text-brand underline underline-offset-4 [overflow-wrap:anywhere]">Preview {name}</a>)}</div>
-      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")} onClick={send}>{busy ? "Sending…" : `Send ${previews.filter(p => p.status !== "sent").length} email${previews.filter(p => p.status !== "sent").length === 1 ? "" : "s"}`}</Button><Button variant="text" disabled={busy} onClick={() => { ++selection.current; setPreviews([]); setPreparing(false); }}>Close preview</Button></div>
+      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")} onClick={send}>{busy ? "Sending…" : unsentCount === 0 ? "Already sent" : `Send ${unsentCount} email${unsentCount === 1 ? "" : "s"}`}</Button><Button variant="text" disabled={busy} onClick={() => { ++selection.current; setPreviews([]); setPreparing(false); }}>Close preview</Button></div>
     </div>}
     </aside>
   </div>;
 }
-function Milestone({ title, detail, done, children, last = false }: { title: string; detail: string; done: boolean; children?: ReactNode; last?: boolean }) {
-  return <li className={`relative pl-7 ${last ? "pb-0" : "pb-8"}`}>
+function Milestone({ title, detail, done, children, last = false }: { title: string; detail?: string; done: boolean; children?: ReactNode; last?: boolean }) {
+  return <li className={`relative pl-7 ${last ? "pb-0" : "pb-5"}`}>
     <span aria-hidden="true" className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-surface ${done ? "border-brand text-brand" : "border-rule"}`}>{done && <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" /></svg>}</span>
-    <h3 className="text-[15px] font-semibold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3><p className="mt-1 text-[13px] leading-relaxed text-muted">{detail}</p>{children && <div className="mt-3">{children}</div>}
+    <h3 className="text-[15px] font-semibold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="mt-1 text-[13px] leading-relaxed text-muted">{detail}</p>}{children && <div className="mt-2">{children}</div>}
   </li>;
 }
 function SignatureIcon({ progress }: { progress: SignerProgress }) {

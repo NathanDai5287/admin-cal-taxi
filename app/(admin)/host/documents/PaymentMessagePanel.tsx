@@ -22,6 +22,7 @@ type Props = {
   eventDate: string;
   depositAmount: string;
   rentalAmount: number;
+  compact?: boolean;
 };
 
 function paymentMessage({
@@ -67,6 +68,11 @@ export default function PaymentMessagePanel(props: Props) {
       setCopyError(true);
     }
   }
+
+  if (props.compact) return <div className="flex flex-wrap items-center gap-3">
+    <Button compact variant="text" disabled={!message} onClick={copyMessage}>{copied ? "Copied" : "Copy payment instructions"}</Button>
+    {copyError && <span role="status" className="text-[12px] text-warn">Could not copy. Retry with clipboard access enabled.</span>}
+  </div>;
 
   return (
     <section className="border-t border-rule" aria-labelledby="payment-message-title">

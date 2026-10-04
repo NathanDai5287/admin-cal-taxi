@@ -10,12 +10,9 @@ import ContractPage from "../../app/(admin)/host/contract/page";
 import DocumentsPage from "../../app/(admin)/host/documents/page";
 import OrdersList from "../../app/(admin)/host/orders/OrdersList";
 import OrderDetailHeader from "../../app/(admin)/host/orders/[id]/OrderDetailHeader";
-import OrderDocuments from "../../app/(admin)/host/orders/[id]/OrderDocuments";
 import WorkspaceActions from "../../app/(admin)/host/orders/[id]/WorkspaceActions";
 import HostingFinancePanel from "../../app/(admin)/host/orders/[id]/HostingFinancePanel";
-import PricingSnapshot from "../../app/(admin)/host/orders/[id]/PricingSnapshot";
-import ContractSnapshot from "../../app/(admin)/host/orders/[id]/ContractSnapshot";
-import OrderNotes from "../../app/(admin)/host/orders/[id]/OrderNotes";
+import OrderSupportingDetails from "../../app/(admin)/host/orders/[id]/OrderSupportingDetails";
 import OrderTimeline from "../../app/(admin)/host/orders/[id]/OrderTimeline";
 import { previewHostingEmailAction, previewWorkflow } from "./email-actions";
 import { eventProgress } from "../../lib/host-event";
@@ -72,13 +69,11 @@ function App() {
       {pathname === "/host/contract" && <ContractPage />}
       {pathname === "/host/documents" && <DocumentsPage />}
       {pathname === "/host/orders" && <div className="space-y-8"><h1 className="page-title">Orders</h1><OrdersList orders={data.orders.map(order => ({ ...order, eventProgress: eventProgress(order.eventDate, data.revisions[order.id] ?? [], previewWorkflow(order.id), "2026-10-04"), documentCount: order.documents.length, documentKinds: order.documents.map(doc => doc.kind) }))} /></div>}
-      {order && <div className="space-y-10">
+      {order && <div className="space-y-7">
         <OrderDetailHeader order={order} status={deriveStatus(order)} actions={<WorkspaceActions order={order} />} />
         <HostingFinancePanel key={JSON.stringify(finance)} orderId={order.id} financeOrder={finance.included ? { status: "confirmed", plannedRevenue: order.rentalPrice ?? 0, plannedFirePermit: 125 } : null} payments={finance.payments} previewRevenue={order.rentalPrice ?? 0} previewFirePermit={125} today="2026-10-02" />
         <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" emailConfigured rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
-        <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Stored documents & contract history</summary><div className="mt-6"><OrderDocuments key={order.id} order={order} signingContract={contractDownload(revisions)} signingRevisions={revisions} showSigning={false} /></div></details>
-        <details className="border-t border-rule pt-5"><summary className="cursor-pointer text-sm font-semibold">Saved pricing & contract terms</summary><div className="mt-6 space-y-6"><PricingSnapshot snapshot={order.snapshot} rentalPrice={order.rentalPrice} depositAmount={order.depositAmount} />
-        <ContractSnapshot snapshot={order.snapshot} /></div></details><OrderNotes orderId={order.id} initialNotes={order.notes} />
+        <OrderSupportingDetails order={order} revisions={revisions} signingContract={contractDownload(revisions)} />
       </div>}
       {pathname.startsWith("/preview-sign/") && <p>This is a local demonstration link. Use “Simulate one signature” on the sample order to preview progress.</p>}
       {pathname === "/host/inquiries" && <p>Inquiry management is outside this local contract preview.</p>}

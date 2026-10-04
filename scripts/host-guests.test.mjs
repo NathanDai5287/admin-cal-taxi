@@ -16,6 +16,7 @@ function eventWithGuests(numGuests) {
   return {
     numGuests,
     clubs: ["Test Organization"],
+    contractSigners: [],
     eventDate: "2026-10-15",
     areas: {},
     cleared: {},
