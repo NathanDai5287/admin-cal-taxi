@@ -174,7 +174,9 @@ Public sections use broad fluid gutters and hairline grid divisions. Content wid
 
 The recruitment page uses an equal blue-and-photograph split on desktop. On mobile, its chapter-life photograph leads before the introduction and chapter facts.
 
-At 760px and below, the hero paths stack with equal height and prominence. Two-column records, actions, facts, and footers become one column without changing their order.
+At 760px and below, equally weighted recruitment and hosting links precede the stacked hero photos. Two-column records, actions, facts, and footers become one column without changing their order. At intermediate widths, the hero uses a narrower divider and smaller headings and actions to fit both paths.
+
+The homepage chapter introduction ends with a direct recruitment action. Recruitment dates use a compact notice when none are posted. The venue summary pairs facts with an inquiry action, while the hosting hero retains the chapter flag photo. Footer links use 14px text and a minimum 44px target height.
 
 **The Equal Paths Rule.** Recruitment and hosting receive equal area, action strength, and placement.
 

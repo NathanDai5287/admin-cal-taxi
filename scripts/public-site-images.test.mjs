@@ -21,7 +21,7 @@ async function sourceFiles(directory) {
   return nestedFiles.flat();
 }
 
-test("each supplied photograph has one public content placement", async () => {
+test("each placed photograph appears once and reserved assets remain unused", async () => {
   const provenance = JSON.parse(await readFile(
     new URL("../public/site/image-provenance.json", import.meta.url),
     "utf8",
@@ -35,6 +35,11 @@ test("each supplied photograph has one public content placement", async () => {
 
   for (const { asset, route, sourceSha256 } of provenance) {
     assert.match(sourceSha256, /^[a-f0-9]{64}$/);
+    if (route === null) {
+      assert.equal(publicSource.split(`@/public/site/${asset}`).length - 1, 0, asset);
+      assert.ok((await readFile(new URL(`../public/site/${asset}`, import.meta.url))).length, asset);
+      continue;
+    }
     assert.equal(publicSource.split(`@/public/site/${asset}`).length - 1, 1, asset);
 
     const routeSource = await readFile(routeFiles[route], "utf8");

@@ -6,7 +6,6 @@ import graduationImage from "@/public/site/berkeley-graduation.jpg";
 import houseMealImage from "@/public/site/chapter-house-meal.jpg";
 import socialNightImage from "@/public/site/chapter-social-night.jpg";
 import workImage from "@/public/site/chapter-work.jpg";
-import exteriorImage from "@/public/site/venue-exterior.jpg";
 import { LightboxImage } from "@/components/public/lightbox-image";
 import { Arrow } from "@/components/public/public-shell";
 import styles from "./home.module.css";
@@ -16,6 +15,10 @@ export default function PublicHomePage() {
     <main className={styles.home} id="main-content">
       <section className="crossroads" aria-labelledby="crossroads-title">
         <h1 className="sr-only" id="crossroads-title">Meet Theta Xi or host an event at the chapter house</h1>
+        <nav className="crossroads-routes" aria-label="Choose your path">
+          <Link href="/rush"><span>Meet the chapter</span><Arrow /></Link>
+          <Link href="/host"><span>Plan an event</span><Arrow /></Link>
+        </nav>
         <LightboxImage
           alt="Five Nu Chapter members holding awards"
           className="crossroads-path crossroads-chapter"
@@ -86,6 +89,9 @@ export default function PublicHomePage() {
         </div>
         <div className="chapter-invitation">
           <p>Come meet the people who make the chapter.</p>
+          <Link className="public-action public-action-dark" href="/rush">
+            Meet the chapter <Arrow />
+          </Link>
         </div>
       </section>
 
@@ -108,14 +114,14 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      <section className="public-ledger" aria-labelledby="events-title">
+      <section className={`public-ledger ${styles.eventsNotice}`} aria-labelledby="events-title">
         <div className="public-ledger-heading">
-          <h2 id="events-title">What is happening</h2>
+          <h2 id="events-title">Recruitment dates</h2>
         </div>
         <div className="public-empty-state">
-          <p>New event dates are being prepared.</p>
-          <span>Confirmed recruitment dates will appear on the public events page.</span>
-          <Link href="/events">View event schedule</Link>
+          <p>No public dates are posted yet.</p>
+          <span>Check the events page for future announcements.</span>
+          <Link href="/events">Visit the events page <Arrow /></Link>
         </div>
       </section>
 
@@ -127,18 +133,17 @@ export default function PublicHomePage() {
             Our event team can help coordinate the setup.
           </p>
         </div>
-        <LightboxImage
-          alt="The brick chapter house with a Theta Xi banner and members gathered on the front lawn"
-          className="venue-preview-photo"
-          sizes="(max-width: 760px) 100vw, (max-width: 1624px) 36vw, 516px"
-          src={exteriorImage}
-        />
-        <dl>
-          <div><dt>Guest capacity</dt><dd>Up to 200</dd></div>
-          <div><dt>Location</dt><dd>2639 Durant Ave</dd></div>
-          <div><dt>Setup</dt><dd>Flexible layout</dd></div>
-          <div><dt>Support</dt><dd>Event coordination</dd></div>
-        </dl>
+        <div className="venue-preview-details">
+          <dl>
+            <div><dt>Guest capacity</dt><dd>Up to 200</dd></div>
+            <div><dt>Location</dt><dd>2639 Durant Ave</dd></div>
+            <div><dt>Setup</dt><dd>Flexible layout</dd></div>
+            <div><dt>Support</dt><dd>Event coordination</dd></div>
+          </dl>
+          <Link className="public-action public-action-dark" href="/host#venue-inquiry">
+            Ask about a date <Arrow />
+          </Link>
+        </div>
       </section>
     </main>
   );

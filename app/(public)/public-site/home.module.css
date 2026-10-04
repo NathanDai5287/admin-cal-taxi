@@ -17,3 +17,46 @@
 .home .photoGrid {
   gap: var(--home-photo-gap);
 }
+
+/* Unavailable dates need a clear notice, not a full editorial section. */
+.home .eventsNotice {
+  padding: 40px max(
+    var(--home-edge-inset),
+    calc((100% - var(--home-content-width)) / 2)
+  );
+}
+
+.eventsNotice :global(.public-ledger-heading) {
+  max-width: none;
+}
+
+.eventsNotice h2 {
+  font-size: clamp(26px, 2.5vw, 36px);
+  line-height: 1.15;
+}
+
+.eventsNotice :global(.public-empty-state) {
+  max-width: none;
+  margin-top: 24px;
+  padding: 20px 0 0;
+  gap: 16px 32px;
+  border-bottom: 0;
+}
+
+.eventsNotice a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  font-size: 14px;
+}
+
+.eventsNotice svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
