@@ -66,6 +66,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const [previewScope, setPreviewScope] = useState("");
   useEffect(() => { pausePolling.current = busy || (previewScope === scope && (preparing || previews.length > 0)) || pdfPreview?.scope === scope; }, [busy, preparing, previews.length, previewScope, scope, pdfPreview?.scope]);
   const [cache] = useState(createHostingPreviewCache);
+  // Undo followed by re-recording the same amount must not reuse a receipt
+  // frozen against the previous payment IDs.
+  useEffect(() => { cache.clear(); }, [cache, depositPaid, rentalPaid]);
   const warm = useCallback((kind: EmailKind) => {
     if (!revision) return Promise.reject(new Error("Approve a contract first."));
     const key = `${scope}:${kind}:${kind === "refund" ? JSON.stringify(refund) : ""}`;
