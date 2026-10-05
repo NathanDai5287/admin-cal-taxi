@@ -128,14 +128,23 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (group.error) throw new Error("Unable to load the shared email preview.");
     if (group.data?.length) {
       const row = group.data[0] as DeliveryRow;
-      // Upgrade only unattempted receipt previews, preserving delivery identity.
+      // Upgrade only unattempted previews, preserving delivery identity.
       // Sent messages and retries retain their exact archived attachment bytes.
-      if (input.kind === "deposit_receipt" && row.status === "queued" && !row.attempted_at && row.payload.depositReceiptStyle !== 1) {
-        const payload = { ...row.payload, depositReceiptStyle: 1, body: { ...row.payload.body, attachments: [depositReceiptAttachment(order, payments.rows, row.payload.body.reply_to)] } };
+      let payload = row.payload;
+      if (row.status === "queued" && !row.attempted_at) {
+        if (invoice) {
+          const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : order.rentalPrice ?? undefined;
+          const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, invoiceAmount, replyTo: row.payload.body.reply_to });
+          if (message.html !== row.payload.body.html || message.text !== row.payload.body.text) payload = { ...row.payload, body: { ...row.payload.body, ...message } };
+        } else if (row.payload.depositReceiptStyle !== 1) {
+          payload = { ...row.payload, depositReceiptStyle: 1, body: { ...row.payload.body, attachments: [depositReceiptAttachment(order, payments.rows, row.payload.body.reply_to)] } };
+        }
+      }
+      if (payload !== row.payload) {
         const update = await db.from("hosting_email_deliveries").update({ payload }).eq("id", row.id).eq("status", "queued").is("attempted_at", null);
-        if (update.error) throw new Error("Unable to update the deposit receipt preview.");
+        if (update.error) throw new Error("Unable to update the email preview.");
         const fresh = await db.from("hosting_email_deliveries").select("*").eq("id", row.id);
-        if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the deposit receipt preview.");
+        if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the email preview.");
         return [preview(fresh.data[0] as DeliveryRow)];
       }
       return [preview(row)];

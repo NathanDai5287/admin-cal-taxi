@@ -73,12 +73,16 @@ test("both shared invoices include all six club representatives, including signe
       assert.equal(previews.length, 1);
       assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
       assert.match(previews[0].html, kind === "deposit_invoice" ? /\$300\.00 is the total across all clubs/ : /\$1400\.00 is the total across all clubs/);
+      assert.match(previews[0].html, /Zelle at calthetaxi@gmail\.com/);
+      assert.match(previews[0].html, /Would you prefer cash or credit card\?/);
+      assert.match(previews[0].html, /Credit card payments have a 3% surcharge/);
       assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1);
     }
     assert.equal(generated.length, 2);
     assert.equal(sent.length, 2);
     assert.ok(sent.every(body => body.to.length === 6));
     assert.ok(sent.every(body => body.html.includes("Hello everyone,")));
+    assert.ok(sent.every(body => body.text.includes("calthetaxi@gmail.com") && body.text.includes("3% surcharge")));
     const sentBodies = JSON.stringify(state.rows.map(row => row.payload));
     await prepareHostingEmail({ ...request, kind: "deposit_invoice", recipients: undefined });
     assert.equal(JSON.stringify(state.rows.map(row => row.payload)), sentBodies);
@@ -148,4 +152,27 @@ test("receipt style upgrades only unattempted drafts and preserves delivery IDs"
   await prepareHostingEmail(input);
   assert.equal(state.rows[0].payload.body.attachments[0].content, "frozen-attempted-pdf");
   state.rows = []; state.deposits = [];
+});
+
+test("invoice payment instructions update queued drafts without regenerating PDFs or changing retry bodies", async () => {
+  const originalOrder = structuredClone(state.order);
+  try {
+    state.rows = [];
+    state.order.documents = [{ kind: "deposit_invoice", stale: false, sourceSnapshot: {}, generatedAt: "2026-10-04", payload: {} }];
+    globalThis.fetch = async () => new Response("saved invoice PDF", { headers: { "Content-Type": "application/pdf" } });
+    const input = { ...request, kind: "deposit_invoice", recipients: undefined };
+    const original = await prepareHostingEmail(input);
+    const attachments = structuredClone(state.rows[0].payload.body.attachments);
+    state.rows[0].payload.body.html = "old invoice email"; state.rows[0].payload.body.text = "old invoice email";
+    globalThis.fetch = async () => { throw Error("Must reuse the saved invoice PDF"); };
+    const updated = await prepareHostingEmail(input);
+    assert.equal(updated[0].id, original[0].id);
+    assert.match(updated[0].html, /calthetaxi@gmail\.com/);
+    assert.match(state.rows[0].payload.body.text, /3% surcharge/);
+    assert.deepEqual(state.rows[0].payload.body.attachments, attachments);
+    state.rows[0].status = "failed"; state.rows[0].attempted_at = "2026-10-04T12:00:00Z";
+    state.rows[0].payload.body.html = "frozen retry body";
+    await prepareHostingEmail(input);
+    assert.equal(state.rows[0].payload.body.html, "frozen retry body");
+  } finally { state.order = originalOrder; state.rows = []; }
 });
