@@ -131,3 +131,21 @@ test("deposit receipts require a received deposit and reject an undone payment a
   assert.deepEqual(calls[0].to, ["one@example.test", "two@example.test"]);
   state.rows = []; state.deposits = [];
 });
+
+test("receipt style upgrades only unattempted drafts and preserves delivery IDs", async () => {
+  state.rows = []; state.deposits = [{ id: "deposit-style", order_id: state.order.id, amount: 300, paid_date: "2026-10-04", reversed_at: null }];
+  const input = { ...request, kind: "deposit_receipt", recipients: undefined };
+  const original = await prepareHostingEmail(input);
+  delete state.rows[0].payload.depositReceiptStyle;
+  state.rows[0].payload.body.attachments[0].content = "old-basic-pdf";
+  const upgraded = await prepareHostingEmail(input);
+  assert.equal(upgraded[0].id, original[0].id);
+  assert.equal(state.rows[0].payload.depositReceiptStyle, 1);
+  assert.notEqual(state.rows[0].payload.body.attachments[0].content, "old-basic-pdf");
+  delete state.rows[0].payload.depositReceiptStyle;
+  state.rows[0].status = "failed"; state.rows[0].attempted_at = "2026-10-04T12:00:00Z";
+  state.rows[0].payload.body.attachments[0].content = "frozen-attempted-pdf";
+  await prepareHostingEmail(input);
+  assert.equal(state.rows[0].payload.body.attachments[0].content, "frozen-attempted-pdf");
+  state.rows = []; state.deposits = [];
+});

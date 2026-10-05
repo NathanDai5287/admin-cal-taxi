@@ -10,10 +10,11 @@ import { loadWorkflow, registerSigning, ensureHostingForecast, workflowDb } from
 import { createAdminClient } from "./reimbursements/supabase/admin";
 import { defaultDocuments } from "./host-order-documents";
 import type { Order } from "./host-orders-types";
+import { renderDepositReceiptPdf } from "./host-deposit-receipt-pdf";
 
 type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; depositReceiptStyle?: number; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
@@ -88,6 +89,9 @@ async function invoicePdf(order: Order, kind: "deposit_invoice" | "rental_invoic
 function preview(row: DeliveryRow): EmailPreview {
   return { id: row.id, recipient: row.recipient, subject: row.payload.body.subject, html: row.payload.body.html, attachments: row.payload.body.attachments.map(a => a.filename), status: row.status };
 }
+function depositReceiptAttachment(order: Order, payments: { id: string; amount: number; paid_date: string }[], contact: string): Attachment {
+  return { filename: `deposit-payment-receipt-${order.id}.pdf`, content: Buffer.from(renderDepositReceiptPdf(order, payments, eventToday(), contact)).toString("base64") };
+}
 export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPreview[]> {
   const sender = config();
   // Preview uses archived state; delivery still synchronizes Documenso and
@@ -122,7 +126,20 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     const groupKey = hash([order.id, revision.id, input.kind, "group", [...recipients].sort(), suffix]);
     const group = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
     if (group.error) throw new Error("Unable to load the shared email preview.");
-    if (group.data?.length) return [preview(group.data[0] as DeliveryRow)];
+    if (group.data?.length) {
+      const row = group.data[0] as DeliveryRow;
+      // Upgrade only unattempted receipt previews, preserving delivery identity.
+      // Sent messages and retries retain their exact archived attachment bytes.
+      if (input.kind === "deposit_receipt" && row.status === "queued" && !row.attempted_at && row.payload.depositReceiptStyle !== 1) {
+        const payload = { ...row.payload, depositReceiptStyle: 1, body: { ...row.payload.body, attachments: [depositReceiptAttachment(order, payments.rows, row.payload.body.reply_to)] } };
+        const update = await db.from("hosting_email_deliveries").update({ payload }).eq("id", row.id).eq("status", "queued").is("attempted_at", null);
+        if (update.error) throw new Error("Unable to update the deposit receipt preview.");
+        const fresh = await db.from("hosting_email_deliveries").select("*").eq("id", row.id);
+        if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the deposit receipt preview.");
+        return [preview(fresh.data[0] as DeliveryRow)];
+      }
+      return [preview(row)];
+    }
     const legacy = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
     if (legacy.error) throw new Error("Unable to verify previous invoice deliveries.");
     const legacyRows = (legacy.data ?? []) as DeliveryRow[];
@@ -132,12 +149,12 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (input.kind === "deposit_receipt") {
       if (payments.total <= 0) throw new Error("Mark the deposit received before sending its receipt.");
       detail = `Deposit payments received: $${payments.total.toFixed(2)}. Remaining deposit: $${Math.max((order.depositAmount ?? 0) - payments.total, 0).toFixed(2)}.`;
-      attachments = [await statementPdf(order, "Deposit payment receipt", [detail, ...payments.rows.map(row => `${row.paid_date}: $${Number(row.amount).toFixed(2)} (record ${row.id})`), "This refundable deposit is held separately from the rental fee. It is not rental income."])];
+      attachments = [depositReceiptAttachment(order, payments.rows, sender.replyTo)];
     } else {
       attachments = legacyRows[0]?.payload.body.attachments ?? [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
     }
     const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, replyTo: sender.replyTo });
-    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash };
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}) };
     const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
     if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
     const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
