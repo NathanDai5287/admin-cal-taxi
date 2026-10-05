@@ -13,6 +13,7 @@ import { hostingEmailDraft } from "@/lib/host-email-draft";
 import { createHostingDocumentCache, createHostingPreviewCache } from "@/lib/host-preview-client";
 import { fmtUSD } from "../order-format";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
+import OrderPreviewReader from "./OrderPreviewReader";
 
 export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
@@ -155,7 +156,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
   const activity = workflow.deliveries.filter(d => d.status !== "queued");
   const unsentCount = previews.filter(p => p.status !== "sent").length;
-  return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+  return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
     <section className="min-w-0">
     <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
@@ -226,25 +227,12 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     </section>}
     {!cancelled && <Button className="mt-5" variant="text" compact disabled={busy} onClick={cancel}>Cancel event</Button>}
     </section>
-    <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 pt-5 lg:sticky lg:top-6 lg:pl-7 lg:pt-0">
-      <h2 className="text-lg font-semibold">Preview</h2>
-      {(busy || message) && <p role="status" aria-live="polite" className="mt-3 text-[13px] text-ink [overflow-wrap:anywhere]">{busy ? "Working…" : message}</p>}
-      {!selected && !visiblePdf && <div className="mt-5 flex min-h-64 items-center justify-center border border-rule bg-surface px-7 text-center text-sm leading-relaxed text-muted">Select a document or email to preview.</div>}
-      {visiblePdf && <div className="mt-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h3 className="text-sm font-semibold">{visiblePdf.label}</h3><a className="text-[13px] text-brand underline" href={visiblePdf.url} target="_blank" rel="noopener noreferrer">Open PDF</a></div>
-        {visiblePdf.blob ? <iframe title={`${visiblePdf.label} preview`} src={visiblePdf.blob} className="h-[75vh] min-h-96 w-full border border-rule bg-white" /> : <div role="status" className="flex h-96 items-center justify-center border border-rule text-sm text-muted">Loading PDF…</div>}
-        <Button compact variant="text" className="mt-3" onClick={() => { ++documentSelection.current; setPdfPreview(null); }}> {selected ? "Back to email" : "Close preview"}</Button>
-      </div>}
-    {selected && !visiblePdf && <div className="mt-4">
-      <p className="mt-2 text-[13px] text-muted">Reply-to: {previewReplyTo}</p>
-      {previews.length === 1 && selected.recipient.includes(", ") ? <div className="mt-4"><p className="field-label">To · all club representatives</p><ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted [overflow-wrap:anywhere]">{selected.recipient.split(", ").map(email => <li key={email}>{email}</li>)}</ul></div> : <><label className="field-label mt-4 block" htmlFor="email-recipient-preview">Recipient</label>
-      <select id="email-recipient-preview" className="field-input" value={previewIndex} disabled={busy} onChange={e => setPreviewIndex(Number(e.target.value))}>{previews.map((p, i) => <option key={p.id || p.recipient} value={i}>{p.recipient}{p.status === "sent" ? " · already sent" : ""}</option>)}</select></>}
-      <p className="my-3 text-[13px] font-semibold">{selected.subject}</p>
-      <iframe title="Hosting email preview" sandbox="" srcDoc={selected.html} className="h-[min(560px,60vh)] min-h-80 w-full border border-rule bg-white" />
-      {(preparing || !selected.id) && <p role="status" className="mt-3 text-[12px] text-muted">{preparing ? "Preparing attachments…" : "Attachments unavailable. Select this action again to retry."}</p>}
-      <div className="mt-3 flex flex-wrap gap-4">{selected.attachments.map((name, i) => <a key={name} href={`/api/host/emails/${selected.id}/files/${i}`} onPointerEnter={() => { void documents.load(`/api/host/emails/${selected.id}/files/${i}`).catch(() => {}); }} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, name); }} className="text-[13px] text-brand underline underline-offset-4 [overflow-wrap:anywhere]">Preview {name}</a>)}</div>
-      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")} onClick={send}>{busy ? "Sending…" : unsentCount === 0 ? "Already sent" : unsentCount === 1 ? "Send email" : `Send ${unsentCount} emails`}</Button><Button variant="text" disabled={busy} onClick={() => { ++selection.current; setPreviews([]); setPreparing(false); }}>Close preview</Button></div>
-    </div>}
+    <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 pt-5 lg:sticky lg:top-6 lg:pt-0">
+      <OrderPreviewReader email={selected} emails={previews} index={previewIndex} onIndex={index => { ++documentSelection.current; setPdfPreview(null); setPreviewIndex(index); }} pdf={visiblePdf} replyTo={previewReplyTo} preparing={preparing} busy={busy} message={message}
+        sendDisabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")}
+        sendLabel={busy ? "Sending…" : unsentCount === 0 ? "Already sent" : unsentCount === 1 ? "Send email" : `Send ${unsentCount} emails`} onSend={() => { void send(); }}
+        onClose={() => { ++selection.current; ++documentSelection.current; setPreviews([]); setPreparing(false); setPdfPreview(null); }}
+        onEmail={() => { ++documentSelection.current; setPdfPreview(null); }} onDocument={(url, label) => { void openDocument(url, label); }} onWarmDocument={url => { void documents.load(url).catch(() => {}); }} />
     </aside>
   </div>;
 }

@@ -5,17 +5,18 @@ import OrderDocuments from "./OrderDocuments";
 import PricingSnapshot from "./PricingSnapshot";
 import ContractSnapshot from "./ContractSnapshot";
 import OrderNotes from "./OrderNotes";
+import OrderIcon from "@/components/host/OrderIcon";
 
 export default function OrderSupportingDetails({ order, revisions, signingContract, signingLookupFailed = false }: {
   order: Order; revisions: SigningRevision[]; signingContract: StoredContractDownload | null; signingLookupFailed?: boolean;
 }) {
-  return <div className="grid items-start gap-x-10 gap-y-8 pt-4 lg:grid-cols-2">
+  return <div aria-label="Order details" className="grid items-start gap-x-10 gap-y-8 pt-4 lg:grid-cols-2">
     <div className="min-w-0 space-y-7">
       <OrderDocuments key={order.id} order={order} signingContract={signingContract} signingLookupFailed={signingLookupFailed} signingRevisions={signingLookupFailed ? undefined : revisions} showSigning={false} compact />
       {revisions.length > 0 && <section aria-label="Contract versions">
         <h2 className="text-sm font-semibold">Contract versions</h2>
-        <ul className="mt-2 space-y-2">{revisions.map(revision => <li key={revision.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[12px]">
-          <span className="text-muted">Revision {revision.revision} · {revision.state.replaceAll("_", " ")}</span>
+        <ul className="mt-2 space-y-2">{revisions.map(revision => <li key={revision.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px]">
+          <span className="inline-flex items-center gap-1.5 font-medium"><OrderIcon name={revision.state === "signed" ? "check" : "clock"} className={`h-4 w-4 ${revision.state === "signed" ? "text-ok" : "text-muted"}`} />Revision {revision.revision}<span className="sr-only"> · {revision.state.replaceAll("_", " ")}</span></span>
           {revision.files.original && <a className="text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/original`}>Original</a>}
           {revision.files.completed && <a className="text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`}>Signed PDF</a>}
           {revision.files.audit && <a className="text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`}>Audit</a>}

@@ -15,6 +15,7 @@ import PaymentMessagePanel from "../../documents/PaymentMessagePanel";
 import { fmtUSD } from "../order-format";
 import OrderSigning from "./OrderSigning";
 import { listSigningAction } from "../../documents/signing-actions";
+import OrderIcon from "@/components/host/OrderIcon";
 
 
 function latestByKind(documents: OrderDocument[], kind: DocumentKind): OrderDocument | null {
@@ -168,20 +169,27 @@ export default function OrderDocuments({ order, signingContract = null, signingL
   if (compact) return <section aria-label="Documents">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Documents</h2>
-      <Button compact variant="text" onClick={downloadAll} disabled={downloadAllBusy}>{downloadAllBusy ? "Downloading…" : "Download all"}</Button>
+      <Button compact variant="text" className="inline-flex items-center gap-2" onClick={downloadAll} disabled={downloadAllBusy}><OrderIcon name="download" />{downloadAllBusy ? "Downloading…" : "Download all"}</Button>
     </div>
     {downloadAllReport && <p role="status" className="mt-2 text-[12px] text-muted">{downloadAllReport}</p>}
-    <ul className="mt-3 space-y-4">{DOCUMENT_ORDER.map(kind => {
+    <ul className="mt-3 space-y-1 bg-surface p-1">{DOCUMENT_ORDER.map(kind => {
       const doc = docs[kind];
       const state = stateFor(kind);
       const label = DOCUMENT_META[kind].label;
-      return <li key={kind}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      const executed = kind === "contract" && storedContract?.kind === "completed";
+      const status = state.kind === "generated" ? state.detail || "Saved" : state.kind === "ready" ? "On demand" : state.kind === "blocked" ? "Needs details" : state.kind === "waiting" ? "Check status" : "Unavailable";
+      const color = executed ? "bg-ok-light text-ok" : state.kind === "generated" ? "bg-brand-light text-brand" : state.kind === "blocked" || state.kind === "waiting" ? "bg-warn-light text-warn" : "bg-canvas text-muted";
+      return <li key={kind} className="px-2 py-2.5">
+        <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-3">
+          <OrderIcon name="file" className={`h-5 w-5 ${executed ? "text-ok" : "text-muted"}`} />
           <div className="min-w-0 text-[13px]">
-            <p className="font-medium">{label}</p>
-            <p className="text-[12px] text-muted">{kind === "contract" && storedContract?.previousSigned ? `Previous signed agreement · revision ${storedContract.revision}` : state.kind === "generated" ? [state.detail, state.number].filter(Boolean).join(" · ") : state.kind === "ready" ? "Not generated" : state.kind === "blocked" ? `Missing: ${state.missing.join(", ")}` : state.kind === "waiting" ? state.reason : "Unavailable"}</p>
+            <p className="font-medium leading-snug">{label}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]"><span className={`inline-flex items-center gap-1 px-1.5 py-0.5 font-medium ${color}`}>{executed && <OrderIcon name="check" className="h-3 w-3" />}{status}</span>{state.kind === "generated" && <span className="text-muted [overflow-wrap:anywhere]">{state.number}</span>}</div>
+            {kind === "contract" && storedContract?.previousSigned && <p className="mt-1 text-[11px] text-muted">Previous signed agreement</p>}
+            {state.kind === "blocked" && <p className="mt-1 text-[11px] text-warn">Missing: {state.missing.join(", ")}</p>}
+            {state.kind === "waiting" && <p className="mt-1 text-[11px] text-warn">{state.reason}</p>}
           </div>
-          <Button compact variant="text" aria-label={`Download PDF: ${label}`} disabled={!!busy[kind] || state.kind === "blocked" || state.kind === "waiting" || state.kind === "unavailable"} onClick={() => { void download(kind); }}>{busy[kind] ? "Downloading…" : kind === "contract" && storedContract?.kind === "completed" ? "Signed PDF" : "Download PDF"}</Button>
+          <button type="button" className="inline-flex min-h-9 items-center gap-1.5 px-2 text-[12px] font-semibold text-brand hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Download PDF: ${label}`} title={state.kind === "ready" ? "Generate and download PDF" : "Download saved PDF"} disabled={!!busy[kind] || state.kind === "blocked" || state.kind === "waiting" || state.kind === "unavailable"} onClick={() => { void download(kind); }}><OrderIcon name="download" /><span>{busy[kind] ? "Loading…" : "PDF"}</span></button>
         </div>
         {doc && kind !== "contract" && <div className="mt-2"><SavedFields doc={doc} /></div>}
         {errors[kind] && <p role="status" className="mt-1 text-[12px] text-warn">{errors[kind]}</p>}
