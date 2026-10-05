@@ -28,7 +28,6 @@ export default async function UsersLayout({ children }: { children: React.ReactN
         tabs={[
           { href: "/users", label: "Members" },
           { href: "/users/announcements", label: "Discord messages" },
-          { href: "/email-activity", label: "Email activity" },
         ]}
       />
       <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>
