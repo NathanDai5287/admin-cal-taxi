@@ -4,6 +4,7 @@ const tabs = [
   { href: "/host",           label: "Create"    },
   { href: "/host/orders",    label: "Orders"    },
   { href: "/host/inquiries", label: "Inquiries" },
+  { href: "/email-activity", label: "Email activity" },
 ];
 
 export default function Nav() {

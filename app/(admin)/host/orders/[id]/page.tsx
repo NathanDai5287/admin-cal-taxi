@@ -149,6 +149,7 @@ export default async function OrderDetailPage({
         rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
+      <ButtonLink href={`/email-activity?order=${order.id}`} variant="text">View email opens and link visits</ButtonLink>
       <OrderSupportingDetails order={order} revisions={signing.revisions} signingContract={signing.contract} signingLookupFailed={signing.failed} />
     </div>
   );

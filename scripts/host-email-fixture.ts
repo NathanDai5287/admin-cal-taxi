@@ -47,3 +47,6 @@ export function workflowDb() {
     async rpc(_name: string, input: { p_id: string }) { const row = state.rows.find(r => r.id === input.p_id); if (!row || row.status === "sent") return { data: false, error: null }; row.status = "sending"; return { data: true, error: null }; },
   };
 }
+
+export async function prepareTrackedEmail<T>(body: T) { return { id: "tracking-fixture", body }; }
+export async function recordEmailProvider() {}

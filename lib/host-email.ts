@@ -1,4 +1,5 @@
 import "server-only";
+import { prepareTrackedEmail, recordEmailProvider } from "./email-tracking";
 import { createHash } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { backendKey, backendOrigin } from "./host-backend";
@@ -236,11 +237,13 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
       if (saved.error) throw new Error("Unable to save the deposit return record.");
     }
     try {
+      const tracked = await prepareTrackedEmail(row.payload.body, { key: `hosting/${row.id}`, kind: "hosting", relatedId: orderId, recipient: row.recipient });
       const response = await fetch("https://api.resend.com/emails", {
-        method: "POST", headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `hosting/${row.id}` }, body: JSON.stringify(row.payload.body), signal: AbortSignal.timeout(25_000),
+        method: "POST", headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `hosting/${row.id}` }, body: JSON.stringify(tracked.body), signal: AbortSignal.timeout(25_000),
       });
       const answer = await response.json() as { id?: string; message?: string };
       if (!response.ok || !answer.id) throw new Error(answer.message || `Email service returned ${response.status}.`);
+      await recordEmailProvider(tracked.id, answer.id);
       const saved = await db.from("hosting_email_deliveries").update({ status: "sent", provider_id: answer.id, sent_at: new Date().toISOString(), error: null }).eq("id", row.id);
       if (saved.error) throw new Error("Email accepted; delivery history could not be saved. Retry uses the same email key.");
       sent++;

@@ -41,6 +41,11 @@ const ADMIN_APPS = [
     description: "Invite members and manage who has access",
   },
   {
+    href: "/email-activity",
+    label: "Email activity",
+    description: "Recorded email opens and link visits",
+  },
+  {
     href: "/connections",
     label: "Connected AI clients",
     description: "Review and remove AI tools that can manage app data",

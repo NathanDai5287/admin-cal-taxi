@@ -1,6 +1,8 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { randomUUID } from "node:crypto";
+import { prepareTrackedEmail, recordEmailProvider } from "../email-tracking";
 
 type InviteRole = "member" | "admin";
 
@@ -77,13 +79,17 @@ export async function sendInviteEmails(emails: string[], role: InviteRole, reque
   const resend = new Resend(apiKey);
   const { subject, text, html } = inviteCopy(role);
 
+  const deliveryKey = requestId || randomUUID();
   const results = await Promise.all(
-    emails.map((email, index) =>
-      resend.emails.send(
-        { from, to: email, subject, text, html },
-        requestId ? { idempotencyKey: `${requestId}:${index}` } : undefined,
-      ),
-    ),
+    emails.map(async (email, index) => {
+      const key = `${deliveryKey}:${index}`;
+      const tracked = await prepareTrackedEmail({ from, to: email, subject, text, html }, {
+        key: `invite/${key}`, kind: "invite", recipient: email,
+      });
+      const result = await resend.emails.send(tracked.body, { idempotencyKey: key });
+      if (result.data) await recordEmailProvider(tracked.id, result.data.id);
+      return result;
+    }),
   );
 
   const failed = results.filter(({ error }) => error);

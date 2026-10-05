@@ -5,7 +5,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 const root = process.cwd(); const fixture = path.join(root, "scripts/host-email-fixture.ts");
 const result = await build({ stdin: { contents: 'export * from "./lib/host-email"; export { hostingEmailDraft } from "./lib/host-email-draft"; export { state } from "./scripts/host-email-fixture";', resolveDir: root }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "safe-transports", setup(build) {
-  build.onResolve({ filter: /host-orders$|host-signing$|host-workflow$|host-backend$|supabase\/admin$/ }, () => ({ path: fixture }));
+  build.onResolve({ filter: /host-orders$|host-signing$|host-workflow$|host-backend$|email-tracking$|supabase\/admin$/ }, () => ({ path: fixture }));
   build.onResolve({ filter: /^server-only$/ }, () => ({ path: "empty", namespace: "empty" }));
   build.onLoad({ filter: /.*/, namespace: "empty" }, () => ({ contents: "" }));
 } }] });

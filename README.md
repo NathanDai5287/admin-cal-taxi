@@ -312,3 +312,26 @@ RLS, rolling limits, immutable approvals and preserved legacy embeddings.
 The social-event fixture contains explicitly labeled test text, not actual
 fraternity rules. Actual-model quality and official-template visual review remain
 deployment acceptance checks requiring the key and official documents.
+
+## Email activity
+
+Administrators can open `/email-activity` to see new emails, recorded opens,
+and individual link destinations with visit times. Each order also links to its email activity.
+Times use Pacific time. Only emails sent after activation have tracking.
+
+Emails continue to send without tracking until `EMAIL_TRACKING_SECRET` is set.
+The activity page shows that setup is pending during this period.
+Apply `supabase/migrations/20261007000000_email_tracking.sql` first.
+Then set `EMAIL_TRACKING_SECRET` to a stable random secret of at least 32 bytes
+(for example, run `openssl rand -hex 32`). Keep it unchanged so old email links
+remain valid, including when database credentials change.
+Set `NEXT_PUBLIC_SITE_URL` to the public, reachable admin address
+(default: `https://admin.cal.taxi`). Tracking uses the existing Supabase database
+and public routes on this site. It adds no paid service and does not require
+Resend open or click tracking settings. Existing email provider limits still apply.
+
+Email apps can load tracking images automatically or block them. Security tools
+can visit links automatically. Recorded activity cannot prove a person read an email.
+Group emails cannot identify which recipient opened or clicked. Tracking covers
+web links in HTML and plain-text email content. It cannot track PDF attachments,
+links inside attachments, `mailto:` links, or telephone links.

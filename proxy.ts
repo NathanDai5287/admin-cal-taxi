@@ -22,6 +22,7 @@ const PUBLIC_HOSTNAMES = new Set([
 export default async function proxy(request: NextRequest) {
   const hostname = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/email-tracking/")) return NextResponse.next();
 
   if (PUBLIC_HOSTNAMES.has(hostname)) {
     const publicPath = publicSitePath(pathname);
