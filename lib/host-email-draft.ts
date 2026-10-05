@@ -11,6 +11,6 @@ export function hostingEmailDraft(order: Order, revision: SigningRevision, kind:
   const renters = new Set(((order.snapshot.contractSigners ?? []) as { email?: string }[]).map(p => p.email?.trim().toLowerCase()));
   const detail = kind === "receipt" ? `Rental payments received: $${rentalPaid.toFixed(2)}. Remaining rental fee: $${Math.max((order.rentalPrice ?? 0) - rentalPaid, 0).toFixed(2)}.` : kind === "refund" && refund ? `Deposit returned: $${refund.amount.toFixed(2)} on ${refund.date} via ${refund.method}.` : "";
   return revision.recipients.filter(p => signing ? p.status !== "SIGNED" : kind === "completed" || renters.has(p.email.toLowerCase())).map(person => ({
-    id: "", recipient: person.email, ...hostingEmail({ kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo }), attachments: [], status: "draft",
+    id: "", recipient: person.email, ...hostingEmail({ kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, invoiceAmount: kind === "deposit_invoice" ? order.depositAmount ?? undefined : kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined, replyTo }), attachments: [], status: "draft",
   }));
 }

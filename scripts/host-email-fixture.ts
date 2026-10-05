@@ -32,7 +32,8 @@ export function workflowDb() {
         return { data: structuredClone(rows), error: null };
       };
       const chain = {
-        select() { return chain; }, order() { return chain; }, is() { return chain; },
+        select() { return chain; }, order() { return chain; },
+        is(key: string, value: unknown) { filters.push(row => (row[key] ?? null) === value); return chain; },
         eq(key: string, value: unknown) { filters.push(row => row[key] === value); return chain; },
         in(key: string, values: unknown[]) { filters.push(row => values.includes(row[key])); return chain; },
         upsert(value: Record<string, unknown> | Record<string, unknown>[]) { mode = "upsert"; inserts = Array.isArray(value) ? value : [value]; return chain; },

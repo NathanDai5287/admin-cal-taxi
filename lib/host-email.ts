@@ -95,7 +95,9 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   const savedPeople = order.snapshot.contractSigners as { email?: string }[] | undefined;
   const renterEmails = new Set((Array.isArray(savedPeople) ? savedPeople : []).map(p => p.email?.trim().toLowerCase()).filter(Boolean));
   const eligible = revision.recipients.filter(p => signing ? p.status !== "SIGNED" : input.kind === "completed" || renterEmails.has(p.email.toLowerCase()));
-  const selected = input.recipients?.length ? eligible.filter(p => input.recipients!.includes(p.email)) : eligible;
+  const invoice = input.kind === "deposit_invoice" || input.kind === "rental_invoice";
+  // An invoice is one shared balance, sent to every renting club representative.
+  const selected = !invoice && input.recipients?.length ? eligible.filter(p => input.recipients!.includes(p.email)) : eligible;
   if (!selected.length) throw new Error("There are no eligible recipients for this email.");
   if (input.recipients?.some(email => !eligible.some(p => p.email === email))) throw new Error("A selected recipient is no longer eligible. Reload signing progress.");
   const payments = input.kind === "receipt" || input.kind === "refund" ? await rentalPayments(order.id) : { rows: [], total: 0, hash: "" };
@@ -111,7 +113,29 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   const db = workflowDb();
   const existing = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
   if (existing.error) throw new Error("Unable to load saved previews.");
-  const saved = (existing.data ?? []) as DeliveryRow[];
+  let saved = (existing.data ?? []) as DeliveryRow[];
+  const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : input.kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined;
+  // Background previews may predate this copy. Update only never-attempted
+  // drafts, preserving their IDs and PDF bytes; retries keep the frozen body.
+  if (invoice) {
+    let refreshed = false;
+    for (const row of saved) {
+      if (row.status !== "queued" || row.attempted_at) continue;
+      const person = selected.find(p => p.email === row.recipient)!;
+      const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, invoiceAmount, replyTo: row.payload.body.reply_to });
+      if (row.payload.body.html === message.html) continue;
+      const update = await db.from("hosting_email_deliveries")
+        .update({ payload: { ...row.payload, body: { ...row.payload.body, ...message } } })
+        .eq("id", row.id).eq("status", "queued").is("attempted_at", null);
+      if (update.error) throw new Error("Unable to update the invoice preview. No email was sent.");
+      refreshed = true;
+    }
+    if (refreshed) {
+      const fresh = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
+      if (fresh.error) throw new Error("Unable to load the invoice preview.");
+      saved = (fresh.data ?? []) as DeliveryRow[];
+    }
+  }
   if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
   const money = (n: number) => `$${n.toFixed(2)}`;
   let attachments: Attachment[] = []; let detail = "";
@@ -129,7 +153,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: ${money(order.depositAmount ?? 0)}.`, "Return information recorded by the hosting administrator."])];
   }
   const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
-    const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo: sender.replyTo });
+    const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, invoiceAmount, replyTo: sender.replyTo });
     const body: MessageBody = { from: sender.from, to: [person.email], reply_to: sender.replyTo, ...message, attachments };
     const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.refund ? { refund: input.refund } : {}) };
     return { request_key: requestKey(person.email), order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload };
@@ -150,6 +174,14 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
   const revisionId = rows[0].revision_id;
   if (rows.some(r => r.revision_id !== revisionId || r.kind !== rows[0].kind)) throw new Error("Choose emails from one preview.");
   const { order, revision } = await context(orderId, revisionId, true);
+  if (rows[0].kind === "deposit_invoice" || rows[0].kind === "rental_invoice") {
+    const renterEmails = new Set(((order.snapshot.contractSigners ?? []) as { email?: string }[]).map(p => p.email?.trim().toLowerCase()).filter(Boolean));
+    const representatives = revision.recipients.filter(p => renterEmails.has(p.email.toLowerCase()));
+    const recipients = new Set(rows.map(row => row.recipient.toLowerCase()));
+    if (!representatives.length || representatives.some(p => !recipients.has(p.email.toLowerCase())) || rows.some(row => !renterEmails.has(row.recipient.toLowerCase()))) {
+      throw new Error("Invoice emails must include every club representative. Reopen the invoice preview.");
+    }
+  }
   const payments = await rentalPayments(orderId);
   let sent = 0; let skipped = 0; const errors: string[] = [];
   for (const row of rows) {
