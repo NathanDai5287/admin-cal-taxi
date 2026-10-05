@@ -7,6 +7,17 @@ import { PGlite } from "@electric-sql/pglite";
 const compiled = await build({ stdin: { contents: 'export * from "./lib/host-event"; export * from "./lib/host-email-template";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node" });
 const { eventProgress, eventToday, hostingEmail, signerProgress } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const workflow = { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null };
+test("invoice emails calculate calendar due dates across year boundaries and leap days", () => {
+  for (const [kind, eventDate, dueDate] of [
+    ["deposit_invoice", "2027-01-03", "December 27, 2026"],
+    ["rental_invoice", "2028-02-27", "February 29, 2028"],
+    ["rental_invoice", "2026-11-01", "November 3, 2026"],
+  ]) {
+    const message = hostingEmail({ kind, name: "everyone", organization: "Club", eventDate, replyTo: "host@example.test" });
+    assert.ok(message.text.includes(`is due ${dueDate}.`));
+    assert.ok(message.html.includes(`is due ${dueDate}.`));
+  }
+});
 const revision = { id: "sig_test", revision: 1, state: "awaiting_signatures", created_at: "2026-10-01T12:00:00Z", envelope_id: "envelope_existing", recipients: [{ name: "First", email: "one@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/one" }], signedCount: 0, totalCount: 1 };
 test("existing pending envelopes are sent without recreating or manually tracking them", () => {
   assert.deepEqual(eventProgress("2026-10-16", [revision], workflow, "2026-10-04"), { stage: "sent", signed: 0, total: 1 });

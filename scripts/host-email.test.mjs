@@ -73,6 +73,7 @@ test("both shared invoices include all six club representatives, including signe
       assert.equal(previews.length, 1);
       assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
       assert.match(previews[0].html, kind === "deposit_invoice" ? /\$300\.00 is the total across all clubs/ : /\$1400\.00 is the total across all clubs/);
+      assert.match(previews[0].html, kind === "deposit_invoice" ? /deposit is due October 9, 2026/ : /rental fee is due October 18, 2026/);
       assert.match(previews[0].html, /Zelle at calthetaxi@gmail\.com/);
       assert.match(previews[0].html, /Would you prefer cash or credit card\?/);
       assert.match(previews[0].html, /Credit card payments have a 3% surcharge/);
@@ -83,6 +84,8 @@ test("both shared invoices include all six club representatives, including signe
     assert.ok(sent.every(body => body.to.length === 6));
     assert.ok(sent.every(body => body.html.includes("Hello everyone,")));
     assert.ok(sent.every(body => body.text.includes("calthetaxi@gmail.com") && body.text.includes("3% surcharge")));
+    assert.match(sent[0].text, /deposit is due October 9, 2026/);
+    assert.match(sent[1].text, /rental fee is due October 18, 2026/);
     const sentBodies = JSON.stringify(state.rows.map(row => row.payload));
     await prepareHostingEmail({ ...request, kind: "deposit_invoice", recipients: undefined });
     assert.equal(JSON.stringify(state.rows.map(row => row.payload)), sentBodies);
