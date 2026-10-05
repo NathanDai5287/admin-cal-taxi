@@ -14,9 +14,9 @@ import { createHostingDocumentCache, createHostingPreviewCache } from "@/lib/hos
 import { fmtUSD } from "../order-format";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 
-export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
+export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
-  rentalPaid: number; permitPaid: number; permitTotal: number; previewReplyTo?: string;
+  rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
@@ -62,7 +62,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     return () => { clearInterval(timer); window.removeEventListener("focus", poll); };
   }, [order.id, cancelled, router]);
 
-  const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, today, cancelled]);
+  const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, depositPaid, today, cancelled]);
   const [previewScope, setPreviewScope] = useState("");
   useEffect(() => { pausePolling.current = busy || (previewScope === scope && (preparing || previews.length > 0)) || pdfPreview?.scope === scope; }, [busy, preparing, previews.length, previewScope, scope, pdfPreview?.scope]);
   const [cache] = useState(createHostingPreviewCache);
@@ -84,12 +84,12 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     const timer = setTimeout(() => {
       const kinds: EmailKind[] = [];
       if (revision?.state === "awaiting_signatures") { if (!wasSent || hasUnsentInvitation) kinds.push("invitation"); if (wasSent) kinds.push("reminder"); }
-      if (wasSent) { kinds.push("deposit_invoice", "rental_invoice"); if (rentalPaid > 0) kinds.push("receipt"); }
+      if (wasSent) { kinds.push("deposit_invoice", "rental_invoice"); if (depositPaid > 0) kinds.push("deposit_receipt"); if (rentalPaid > 0) kinds.push("receipt"); }
       for (const kind of kinds) void warm(kind).catch(() => {});
       if (revision?.files.original) void documents.load(`/api/host/signing/files/${order.id}/${revision.id}/original`).catch(() => {});
     }, 150);
     return () => clearTimeout(timer);
-  }, [allowed, revision?.state, wasSent, hasUnsentInvitation, rentalPaid, warm, documents, order.id, revision?.id, revision?.files.original]);
+  }, [allowed, revision?.state, wasSent, hasUnsentInvitation, rentalPaid, depositPaid, warm, documents, order.id, revision?.id, revision?.files.original]);
   const refundKey = JSON.stringify(refund);
   useEffect(() => {
     if (!allowed || !wasSent || rentalPaid < (order.rentalPrice ?? Infinity) || refund.amount <= 0 || !refund.method.trim()) return;
@@ -102,7 +102,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     const token = ++selection.current; ++documentSelection.current;
     const choose = (rows: EmailPreview[]) => recipients?.length ? rows.filter(p => recipients.includes(p.recipient)) : rows;
     setMessage(""); setPdfPreview(null); setPreviewIndex(0); setPreparing(true); setPreviewScope(scope);
-    try { setPreviews(choose(hostingEmailDraft(order, revision, kind, rentalPaid, previewReplyTo, refund))); }
+    try { setPreviews(choose(hostingEmailDraft(order, revision, kind, rentalPaid, previewReplyTo, refund, depositPaid))); }
     catch { setPreviews([]); setPreparing(false); setMessage("A personal signing link is unavailable. Reload signing progress and retry."); return; }
     // Desktop stays in place; mobile brings the preview into view.
     requestAnimationFrame(() => { if (window.innerWidth < 1024) previewSection.current?.scrollIntoView({ block: "start" }); });
@@ -190,6 +190,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <Milestone title="Send deposit invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, -7))}`} done={delivered("deposit_invoice")}>
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
       </Milestone>
+      <Milestone title="Receive deposit" detail={`${fmtUSD(depositPaid)} of ${fmtUSD(order.depositAmount ?? 0)} received`} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
+        {emailButton("deposit_receipt", "Review deposit receipt", depositPaid > 0 && wasSent)}
+      </Milestone>
       <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid` : "No fire permit required."} done={permitTotal === 0 || permitPaid >= permitTotal}>
         {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Update fire permit payment</a>}
       </Milestone>
@@ -231,13 +234,13 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       </div>}
     {selected && !visiblePdf && <div className="mt-4">
       <p className="mt-2 text-[13px] text-muted">Reply-to: {previewReplyTo}</p>
-      <label className="field-label mt-4 block" htmlFor="email-recipient-preview">Recipient</label>
-      <select id="email-recipient-preview" className="field-input" value={previewIndex} disabled={busy} onChange={e => setPreviewIndex(Number(e.target.value))}>{previews.map((p, i) => <option key={p.id || p.recipient} value={i}>{p.recipient}{p.status === "sent" ? " · already sent" : ""}</option>)}</select>
+      {previews.length === 1 && selected.recipient.includes(", ") ? <div className="mt-4"><p className="field-label">To · all club representatives</p><ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted [overflow-wrap:anywhere]">{selected.recipient.split(", ").map(email => <li key={email}>{email}</li>)}</ul></div> : <><label className="field-label mt-4 block" htmlFor="email-recipient-preview">Recipient</label>
+      <select id="email-recipient-preview" className="field-input" value={previewIndex} disabled={busy} onChange={e => setPreviewIndex(Number(e.target.value))}>{previews.map((p, i) => <option key={p.id || p.recipient} value={i}>{p.recipient}{p.status === "sent" ? " · already sent" : ""}</option>)}</select></>}
       <p className="my-3 text-[13px] font-semibold">{selected.subject}</p>
       <iframe title="Hosting email preview" sandbox="" srcDoc={selected.html} className="h-[min(560px,60vh)] min-h-80 w-full border border-rule bg-white" />
       {(preparing || !selected.id) && <p role="status" className="mt-3 text-[12px] text-muted">{preparing ? "Preparing attachments…" : "Attachments unavailable. Select this action again to retry."}</p>}
       <div className="mt-3 flex flex-wrap gap-4">{selected.attachments.map((name, i) => <a key={name} href={`/api/host/emails/${selected.id}/files/${i}`} onPointerEnter={() => { void documents.load(`/api/host/emails/${selected.id}/files/${i}`).catch(() => {}); }} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, name); }} className="text-[13px] text-brand underline underline-offset-4 [overflow-wrap:anywhere]">Preview {name}</a>)}</div>
-      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")} onClick={send}>{busy ? "Sending…" : unsentCount === 0 ? "Already sent" : `Send ${unsentCount} email${unsentCount === 1 ? "" : "s"}`}</Button><Button variant="text" disabled={busy} onClick={() => { ++selection.current; setPreviews([]); setPreparing(false); }}>Close preview</Button></div>
+      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")} onClick={send}>{busy ? "Sending…" : unsentCount === 0 ? "Already sent" : unsentCount === 1 ? "Send email" : `Send ${unsentCount} emails`}</Button><Button variant="text" disabled={busy} onClick={() => { ++selection.current; setPreviews([]); setPreparing(false); }}>Close preview</Button></div>
     </div>}
     </aside>
   </div>;

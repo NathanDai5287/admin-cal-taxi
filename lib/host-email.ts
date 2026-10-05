@@ -46,6 +46,12 @@ async function rentalPayments(orderId: string) {
   const rows = result.data ?? [];
   return { rows, total: rows.reduce((n, r) => n + Number(r.amount), 0), hash: hash(rows) };
 }
+async function depositPayments(orderId: string) {
+  const result = await workflowDb().from("hosting_deposit_payments").select("id,amount,paid_date").eq("order_id", orderId).is("reversed_at", null).order("id");
+  if (result.error) throw new Error("Unable to verify recorded deposit payments.");
+  const rows = (result.data ?? []) as { id: string; amount: number; paid_date: string }[];
+  return { rows, total: rows.reduce((n, row) => n + Number(row.amount), 0), hash: hash(rows) };
+}
 async function exactFile(revision: SigningRevision, kind: "original" | "completed" | "audit"): Promise<Attachment> {
   const response = await signingFile(revision.order_id, revision.id, kind);
   return { filename: `hosting-contract-r${revision.revision}-${kind}.pdf`, content: Buffer.from(await response.arrayBuffer()).toString("base64") };
@@ -100,48 +106,52 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   const selected = !invoice && input.recipients?.length ? eligible.filter(p => input.recipients!.includes(p.email)) : eligible;
   if (!selected.length) throw new Error("There are no eligible recipients for this email.");
   if (input.recipients?.some(email => !eligible.some(p => p.email === email))) throw new Error("A selected recipient is no longer eligible. Reload signing progress.");
-  const payments = input.kind === "receipt" || input.kind === "refund" ? await rentalPayments(order.id) : { rows: [], total: 0, hash: "" };
+  const payments = input.kind === "deposit_receipt" ? await depositPayments(order.id) : input.kind === "receipt" || input.kind === "refund" ? await rentalPayments(order.id) : { rows: [], total: 0, hash: "" };
   if (input.kind === "refund") {
     if (payments.total < (order.rentalPrice ?? Infinity)) throw new Error("Record full rental payment before confirming the deposit return.");
     const refund = input.refund;
     if (!refund || !Number.isFinite(refund.amount) || refund.amount <= 0 || refund.amount > (order.depositAmount ?? 0) || !/^\d{4}-\d{2}-\d{2}$/.test(refund.date) || refund.date > eventToday() || !refund.method.trim() || refund.method.length > 120) throw new Error("Enter the amount, date, and method of the deposit you actually returned.");
     if (workflow.refund && hash(workflow.refund) !== hash(refund)) throw new Error("A different deposit return was already confirmed. Check the existing record before sending.");
   }
-  const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
+  const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "deposit_receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
   const requestKey = (email: string) => hash([order.id, revision.id, input.kind, email.toLowerCase(), suffix]);
   const keys = selected.map(person => requestKey(person.email));
   const db = workflowDb();
+  if (invoice || input.kind === "deposit_receipt") {
+    const recipients = [...new Set(eligible.map(p => p.email.toLowerCase()))];
+    const groupKey = hash([order.id, revision.id, input.kind, "group", [...recipients].sort(), suffix]);
+    const group = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
+    if (group.error) throw new Error("Unable to load the shared email preview.");
+    if (group.data?.length) return [preview(group.data[0] as DeliveryRow)];
+    const legacy = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
+    if (legacy.error) throw new Error("Unable to verify previous invoice deliveries.");
+    const legacyRows = (legacy.data ?? []) as DeliveryRow[];
+    if (legacyRows.some(row => row.status !== "queued" || row.attempted_at)) throw new Error("This invoice has individual delivery history. It will not be resent as a new group email.");
+    const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : input.kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined;
+    let detail = ""; let attachments: Attachment[];
+    if (input.kind === "deposit_receipt") {
+      if (payments.total <= 0) throw new Error("Mark the deposit received before sending its receipt.");
+      detail = `Deposit payments received: $${payments.total.toFixed(2)}. Remaining deposit: $${Math.max((order.depositAmount ?? 0) - payments.total, 0).toFixed(2)}.`;
+      attachments = [await statementPdf(order, "Deposit payment receipt", [detail, ...payments.rows.map(row => `${row.paid_date}: $${Number(row.amount).toFixed(2)} (record ${row.id})`), "This refundable deposit is held separately from the rental fee. It is not rental income."])];
+    } else {
+      attachments = legacyRows[0]?.payload.body.attachments ?? [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
+    }
+    const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, replyTo: sender.replyTo });
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash };
+    const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
+    if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
+    const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
+    if (saved.error || saved.data?.length !== 1) throw new Error("Unable to load the shared email preview.");
+    return [preview(saved.data[0] as DeliveryRow)];
+  }
   const existing = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
   if (existing.error) throw new Error("Unable to load saved previews.");
-  let saved = (existing.data ?? []) as DeliveryRow[];
-  const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : input.kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined;
-  // Background previews may predate this copy. Update only never-attempted
-  // drafts, preserving their IDs and PDF bytes; retries keep the frozen body.
-  if (invoice) {
-    let refreshed = false;
-    for (const row of saved) {
-      if (row.status !== "queued" || row.attempted_at) continue;
-      const person = selected.find(p => p.email === row.recipient)!;
-      const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, invoiceAmount, replyTo: row.payload.body.reply_to });
-      if (row.payload.body.html === message.html) continue;
-      const update = await db.from("hosting_email_deliveries")
-        .update({ payload: { ...row.payload, body: { ...row.payload.body, ...message } } })
-        .eq("id", row.id).eq("status", "queued").is("attempted_at", null);
-      if (update.error) throw new Error("Unable to update the invoice preview. No email was sent.");
-      refreshed = true;
-    }
-    if (refreshed) {
-      const fresh = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
-      if (fresh.error) throw new Error("Unable to load the invoice preview.");
-      saved = (fresh.data ?? []) as DeliveryRow[];
-    }
-  }
+  const saved = (existing.data ?? []) as DeliveryRow[];
   if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
   const money = (n: number) => `$${n.toFixed(2)}`;
   let attachments: Attachment[] = []; let detail = "";
   if (input.kind === "invitation") attachments = [await exactFile(revision, "original")];
   if (input.kind === "completed") attachments = await Promise.all([exactFile(revision, "completed"), exactFile(revision, "audit")]);
-  if (input.kind === "deposit_invoice" || input.kind === "rental_invoice") attachments = [await invoicePdf(order, input.kind)];
   if (input.kind === "receipt") {
     if (payments.total <= 0) throw new Error("Record a rental payment before sending a receipt.");
     detail = `Rental payments received: ${money(payments.total)}. Remaining rental fee: ${money(Math.max((order.rentalPrice ?? 0) - payments.total, 0))}.`;
@@ -153,7 +163,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: ${money(order.depositAmount ?? 0)}.`, "Return information recorded by the hosting administrator."])];
   }
   const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
-    const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, invoiceAmount, replyTo: sender.replyTo });
+    const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo: sender.replyTo });
     const body: MessageBody = { from: sender.from, to: [person.email], reply_to: sender.replyTo, ...message, attachments };
     const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.refund ? { refund: input.refund } : {}) };
     return { request_key: requestKey(person.email), order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload };
@@ -174,20 +184,20 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
   const revisionId = rows[0].revision_id;
   if (rows.some(r => r.revision_id !== revisionId || r.kind !== rows[0].kind)) throw new Error("Choose emails from one preview.");
   const { order, revision } = await context(orderId, revisionId, true);
-  if (rows[0].kind === "deposit_invoice" || rows[0].kind === "rental_invoice") {
+  if (rows[0].kind === "deposit_invoice" || rows[0].kind === "rental_invoice" || rows[0].kind === "deposit_receipt") {
     const renterEmails = new Set(((order.snapshot.contractSigners ?? []) as { email?: string }[]).map(p => p.email?.trim().toLowerCase()).filter(Boolean));
     const representatives = revision.recipients.filter(p => renterEmails.has(p.email.toLowerCase()));
-    const recipients = new Set(rows.map(row => row.recipient.toLowerCase()));
-    if (!representatives.length || representatives.some(p => !recipients.has(p.email.toLowerCase())) || rows.some(row => !renterEmails.has(row.recipient.toLowerCase()))) {
-      throw new Error("Invoice emails must include every club representative. Reopen the invoice preview.");
+    const recipients = new Set(rows[0].payload.body.to.map(email => email.toLowerCase()));
+    if (rows.length !== 1 || !representatives.length || recipients.size !== new Set(representatives.map(p => p.email.toLowerCase())).size || representatives.some(p => !recipients.has(p.email.toLowerCase())) || [...recipients].some(email => !renterEmails.has(email))) {
+      throw new Error("Reopen the preview to send one shared email to every club representative.");
     }
   }
-  const payments = await rentalPayments(orderId);
+  const payments = rows[0].kind === "deposit_receipt" ? await depositPayments(orderId) : await rentalPayments(orderId);
   let sent = 0; let skipped = 0; const errors: string[] = [];
   for (const row of rows) {
     if (row.status === "sent") { sent++; continue; }
     if (row.payload.termsHash !== termsHash(order)) { errors.push("Order terms changed. Prepare a fresh preview."); continue; }
-    if ((row.kind === "receipt" || row.kind === "refund") && row.payload.paymentsHash !== payments.hash) { errors.push("Payment records changed. Prepare a fresh preview."); continue; }
+    if ((row.kind === "receipt" || row.kind === "deposit_receipt" || row.kind === "refund") && row.payload.paymentsHash !== payments.hash) { errors.push("Payment records changed. Prepare a fresh preview."); continue; }
     if ((row.kind === "invitation" || row.kind === "reminder") && (revision.state !== "awaiting_signatures" || revision.recipients.find(p => p.email === row.recipient)?.status === "SIGNED")) { skipped++; continue; }
     // Recheck cancellation immediately before each delivery, including batch retries.
     if ((await loadWorkflow(orderId)).cancelledAt) { errors.push("Event cancelled; remaining emails were not sent."); break; }

@@ -5,10 +5,10 @@ export const EVENT_STAGE_LABELS: Record<EventStage, string> = {
   draft: "Draft", sent: "Sent", signed: "Signed", held: "Event held", cancelled: "Cancelled",
 };
 export type EventProgress = { stage: EventStage; signed: number; total: number; unavailable?: boolean };
-export type EmailKind = "invitation" | "reminder" | "completed" | "deposit_invoice" | "rental_invoice" | "receipt" | "refund";
+export type EmailKind = "invitation" | "reminder" | "completed" | "deposit_invoice" | "rental_invoice" | "deposit_receipt" | "receipt" | "refund";
 export const EMAIL_LABELS: Record<EmailKind, string> = {
   invitation: "Contract invitation", reminder: "Signing reminder", completed: "Signed contract",
-  deposit_invoice: "Deposit invoice", rental_invoice: "Rental invoice", receipt: "Rental payment receipt", refund: "Deposit return confirmation",
+  deposit_invoice: "Deposit invoice", rental_invoice: "Rental invoice", deposit_receipt: "Deposit payment receipt", receipt: "Rental payment receipt", refund: "Deposit return confirmation",
 };
 export type EmailDelivery = { id: string; revision_id: string | null; kind: EmailKind; recipient: string; status: string; sent_at: string | null; created_at: string; error: string | null };
 export type EventWorkflow = {

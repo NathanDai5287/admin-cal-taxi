@@ -2,7 +2,7 @@
 export const state = {
   order: { id: "ord_test", updatedAt: "2026-10-01T12:00:00Z", clubName: "Sample Club", eventDate: "2026-10-16", rentalPrice: 1400, depositAmount: 300, snapshot: { contractSigners: [{ email: "one@example.test" }, { email: "two@example.test" }] }, documents: [], statusOverride: null },
   revision: { id: "sig_test", order_id: "ord_test", revision: 1, state: "awaiting_signatures", envelope_id: "envelope_existing", created_at: "2026-10-01T12:00:00Z", signedCount: 0, totalCount: 2, files: { original: true, completed: false, audit: false }, recipients: [{ name: "One", email: "one@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/one" }, { name: "Two", email: "two@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/two" }] },
-  cancelled: false, syncs: 0, forecasts: 0, files: 0, rows: [] as Record<string, unknown>[],
+  cancelled: false, syncs: 0, forecasts: 0, files: 0, rows: [] as Record<string, unknown>[], deposits: [] as Record<string, unknown>[],
 };
 export async function getOrderFresh() { return structuredClone(state.order); }
 export async function listSigning() { return [structuredClone(state.revision)]; }
@@ -23,6 +23,7 @@ export function workflowDb() {
       let mode = "read"; let patch: Record<string, unknown> = {}; let inserts: Record<string, unknown>[] = [];
       const result = () => {
         if (table === "hosting_finance_payments") return { data: [], error: null };
+        if (table === "hosting_deposit_payments") return { data: state.deposits.filter(row => filters.every(f => f(row))), error: null };
         if (mode === "upsert") {
           for (const insert of inserts) if (!state.rows.some(r => r.request_key === insert.request_key)) state.rows.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), attempted_at: null, status: "queued", ...insert });
           return { data: null, error: null };

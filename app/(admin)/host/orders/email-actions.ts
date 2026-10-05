@@ -3,14 +3,37 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { prepareHostingEmail, deliverHostingEmails, sendCompletedContract } from "@/lib/host-email";
-import { currentRevision, contractWasSent } from "@/lib/host-event";
+import { currentRevision, contractWasSent, eventToday } from "@/lib/host-event";
 import { listSigning, syncSigning } from "@/lib/host-signing";
 import { getOrderFresh } from "@/lib/host-orders";
 import { ensureHostingForecast, loadWorkflow, workflowDb } from "@/lib/host-workflow";
 
-const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().min(1).max(120) }).optional() });
+const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "deposit_receipt", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().min(1).max(120) }).optional() });
 function failure(error: unknown) { return { ok: false as const, error: error instanceof Error ? error.message : "Request failed. Please retry." }; }
 function refresh(orderId: string) { revalidatePath(`/host/orders/${orderId}`); revalidatePath("/host/orders"); revalidatePath("/finance/planning"); }
+export async function recordHostingDepositAction(input: { orderId: string; amount: number; paidDate: string; requestId: string }) {
+  const { userId } = await requireAdmin("/");
+  try {
+    const parsed = z.object({ orderId: z.string().min(1).max(200), amount: z.number().positive(), paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), requestId: z.string().uuid() }).parse(input);
+    if (parsed.paidDate > eventToday()) throw new Error("Choose today or an earlier payment date.");
+    const order = await getOrderFresh(parsed.orderId);
+    if (!order || order.statusOverride === "cancelled") throw new Error("This order cannot receive a deposit.");
+    const { data, error } = await workflowDb().rpc("record_hosting_deposit", { p_order_id: order.id, p_amount: parsed.amount, p_limit: order.depositAmount, p_paid_date: parsed.paidDate, p_request_id: parsed.requestId, p_user_id: userId });
+    if (error) throw new Error(error.message);
+    refresh(order.id);
+    return { ok: true as const, data: { id: data as string } };
+  } catch (error) { return failure(error); }
+}
+export async function undoHostingDepositAction(input: { orderId: string; paymentIds: string[] }) {
+  const { userId } = await requireAdmin("/");
+  try {
+    const parsed = z.object({ orderId: z.string().min(1).max(200), paymentIds: z.array(z.string().uuid()).min(1).max(500) }).parse(input);
+    const { error } = await workflowDb().from("hosting_deposit_payments").update({ reversed_at: new Date().toISOString(), reversed_by: userId, reversal_reason: "Paid status undone" }).eq("order_id", parsed.orderId).in("id", parsed.paymentIds).is("reversed_at", null);
+    if (error) throw new Error(error.message);
+    refresh(parsed.orderId);
+    return { ok: true as const, data: null };
+  } catch (error) { return failure(error); }
+}
 export async function previewHostingEmailAction(input: z.infer<typeof requestSchema>) {
   await requireAdmin("/");
   try { return { ok: true as const, data: await prepareHostingEmail(requestSchema.parse(input)) }; } catch (error) { return failure(error); }

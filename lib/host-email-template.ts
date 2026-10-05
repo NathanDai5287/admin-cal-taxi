@@ -12,6 +12,7 @@ export function hostingEmail(input: { kind: EmailKind; name: string; organizatio
     : input.kind === "completed" ? "Everyone has signed the hosting agreement. Your completed contract and its audit trail are attached for your records."
     : input.kind === "deposit_invoice" ? `Your deposit invoice is attached. The refundable deposit is due seven days before your event. ${sharedInvoiceMessage(input.invoiceAmount)}`
     : input.kind === "rental_invoice" ? `Your rental invoice is attached. The rental fee is due two days after your event. ${sharedInvoiceMessage(input.invoiceAmount)}`
+    : input.kind === "deposit_receipt" ? "Your receipt for the refundable deposit we received is attached. This payment is separate from the rental fee."
     : input.kind === "receipt" ? "Your receipt for the rental payment we received is attached. Thank you."
     : "The deposit return details are attached for your records.";
   const href = input.link && /^https:\/\//.test(input.link) ? escapeEmail(input.link) : "";

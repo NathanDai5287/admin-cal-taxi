@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { recordHostingPaymentAction, undoHostingPaymentStatusAction } from "../actions";
+import { recordHostingDepositAction, undoHostingDepositAction } from "../email-actions";
 
 type FinanceOrder = {
   status: "confirmed" | "cancelled";
@@ -15,7 +16,7 @@ type FinanceOrder = {
 
 type Payment = {
   id: string;
-  kind: "revenue" | "fire_permit";
+  kind: "revenue" | "fire_permit" | "deposit";
   amount: number;
   paidDate: string;
   reversedAt: string | null;
@@ -25,6 +26,7 @@ export default function HostingFinancePanel({
   orderId,
   previewRevenue,
   previewFirePermit,
+  depositTotal = 0,
   financeOrder,
   payments,
   today,
@@ -33,6 +35,7 @@ export default function HostingFinancePanel({
   orderId: string;
   previewRevenue: number;
   previewFirePermit: number;
+  depositTotal?: number;
   financeOrder: FinanceOrder | null;
   payments: Payment[];
   today: string;
@@ -44,6 +47,7 @@ export default function HostingFinancePanel({
   const [requestIds, setRequestIds] = useState({
     revenue: crypto.randomUUID(),
     fire_permit: crypto.randomUUID(),
+    deposit: crypto.randomUUID(),
   });
   const revenue = financeOrder?.plannedRevenue ?? previewRevenue;
   const firePermit = financeOrder?.plannedFirePermit ?? previewFirePermit;
@@ -66,6 +70,8 @@ export default function HostingFinancePanel({
   const activePayments = displayPayments.filter((payment) => !payment.reversedAt);
   const revenuePaid = activePayments.filter((payment) => payment.kind === "revenue").reduce((total, payment) => total + payment.amount, 0);
   const permitPaid = activePayments.filter((payment) => payment.kind === "fire_permit").reduce((total, payment) => total + payment.amount, 0);
+  const depositPaid = activePayments.filter(payment => payment.kind === "deposit").reduce((total, payment) => total + payment.amount, 0);
+  const paymentLabel = (kind: Payment["kind"]) => kind === "deposit" ? "Deposit" : kind === "revenue" ? "Rental fee" : "Fire permit";
 
   async function recordPayment(kind: Payment["kind"]) {
     setBusy(true);
@@ -73,22 +79,23 @@ export default function HostingFinancePanel({
     const optimistic: Payment = {
       id: `pending-${crypto.randomUUID()}`,
       kind,
-      amount: Math.round(((kind === "revenue" ? revenue - revenuePaid : firePermit - permitPaid)) * 100) / 100,
+      amount: Math.round((kind === "deposit" ? depositTotal - depositPaid : kind === "revenue" ? revenue - revenuePaid : firePermit - permitPaid) * 100) / 100,
       paidDate: today,
       reversedAt: null,
     };
     setPendingPayments((current) => [optimistic, ...current]);
     try {
-      const result = await recordHostingPaymentAction({
+      const paymentInput = {
         orderId,
         kind,
         amount: optimistic.amount,
         paidDate: optimistic.paidDate,
         requestId: requestIds[kind],
-      });
+      };
+      const result = kind === "deposit" ? await recordHostingDepositAction(paymentInput) : await recordHostingPaymentAction({ ...paymentInput, kind });
       if (result.ok) {
         setPendingPayments(current => current.map(payment => payment.id === optimistic.id ? { ...payment, id: result.data.id } : payment));
-        setMessage(`${kind === "revenue" ? "Rental fee" : "Fire permit"} marked paid.`);
+        setMessage(`${paymentLabel(kind)} marked paid.`);
         setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
         router.refresh();
       } else {
@@ -107,9 +114,9 @@ export default function HostingFinancePanel({
     setMessage("");
     setReversedIds(current => new Set([...current, ...paymentIds]));
     try {
-      const result = await undoHostingPaymentStatusAction({ orderId, kind, paymentIds });
+      const result = kind === "deposit" ? await undoHostingDepositAction({ orderId, paymentIds }) : await undoHostingPaymentStatusAction({ orderId, kind, paymentIds });
       if (!result.ok) throw new Error(result.error);
-      setMessage(`${kind === "revenue" ? "Rental fee" : "Fire permit"} marked unpaid.`);
+      setMessage(`${paymentLabel(kind)} marked unpaid.`);
       router.refresh();
     } catch (error) {
       setReversedIds(current => new Set([...current].filter(id => !paymentIds.includes(id))));
@@ -119,8 +126,9 @@ export default function HostingFinancePanel({
 
   return (
     <section id="event-finances" aria-label="Event payments" className="scroll-mt-6 border-b border-rule pb-4">
-      <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
-        {([{ kind: "revenue", label: "Rental payment", total: revenue, paid: revenuePaid },
+      <div className="grid gap-x-8 gap-y-4 sm:grid-cols-3">
+        {([{ kind: "deposit", label: "Deposit received", total: depositTotal, paid: depositPaid },
+          { kind: "revenue", label: "Rental payment", total: revenue, paid: revenuePaid },
           { kind: "fire_permit", label: "Fire permit", total: firePermit, paid: permitPaid }] as const).map(item => {
           const paid = item.total > 0 && item.paid >= item.total;
           return <div key={item.kind} className="flex flex-wrap items-center justify-between gap-3">
@@ -129,12 +137,12 @@ export default function HostingFinancePanel({
               <span className="ml-2 tabular-nums text-muted">{item.total > 0 ? formatMoney(item.total) : "Not required"}</span>
               {item.total > 0 && <span className={`mt-1 flex items-center gap-1.5 text-[12px] ${paid ? "text-ok" : "text-muted"}`}>
                 {paid && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 8 3 3 7-7" /></svg>}
-                {paid ? "Paid" : "Unpaid"}
+                {item.kind === "deposit" ? paid ? "Received" : "Not received" : paid ? "Paid" : "Unpaid"}
               </span>}
             </div>
             {item.total > 0 && <Button compact variant={paid ? "text" : "secondary"} disabled={busy || (!paid && !confirmed)}
-              aria-label={`${paid ? "Undo paid status for" : "Mark paid:"} ${item.label.toLowerCase()}`}
-              onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{paid ? "Undo paid" : "Mark paid"}</Button>}
+              aria-label={`${paid ? "Undo paid status for" : item.kind === "deposit" ? "Mark received:" : "Mark paid:"} ${item.label.toLowerCase()}`}
+              onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{item.kind === "deposit" ? paid ? "Undo received" : "Mark received" : paid ? "Undo paid" : "Mark paid"}</Button>}
             {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={busy} onClick={() => undoPaid(item.kind)}>Undo paid</Button>}
           </div>;
         })}

@@ -1,8 +1,15 @@
 import { read, write } from "./data";
-import { hostingEmail } from "../../lib/host-email-template";
+import { hostingEmailDraft } from "../../lib/host-email-draft";
+import { recordHostingPaymentAction } from "./orders-actions";
 import type { EmailRequest, EmailPreview } from "../../lib/host-email";
 import type { EventWorkflow } from "../../lib/host-event";
 const key = "host.timeline.preview.v1";
+export async function recordHostingDepositAction(input: { orderId: string; amount: number; paidDate: string; requestId: string }) { return recordHostingPaymentAction({ ...input, kind: "deposit" }); }
+export async function undoHostingDepositAction(input: { orderId: string; paymentIds: string[] }) {
+  const data = read();
+  for (const payment of data.finance[input.orderId]?.payments ?? []) if (payment.kind === "deposit" && input.paymentIds.includes(payment.id) && !payment.reversedAt) payment.reversedAt = new Date().toISOString();
+  write(data); return { ok: true as const, data: null };
+}
 export function previewWorkflow(orderId: string): EventWorkflow {
   return JSON.parse(localStorage.getItem(`${key}.${orderId}`) ?? '{"activatedAt":"2026-10-04T12:00:00Z","cancelledAt":null,"deliveries":[],"refund":null}');
 }
@@ -11,8 +18,11 @@ export async function refreshHostingProgressAction() { return { ok: true as cons
 export async function previewHostingEmailAction(input: EmailRequest) {
   const data = read(); const order = data.orders.find(o => o.id === input.orderId)!;
   const revision = data.revisions[input.orderId].find(r => r.id === input.revisionId)!;
-  const people = revision.recipients.filter(p => (!input.recipients?.length || input.recipients.includes(p.email)) && (input.kind !== "reminder" || p.status !== "SIGNED"));
-  const result: EmailPreview[] = people.map(person => ({ id: crypto.randomUUID(), recipient: person.email, ...hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: `https://example.test/sign/${person.id}`, replyTo: "nathan.dai@berkeley.edu" }), attachments: input.kind === "reminder" ? [] : ["illustrative-document.pdf"], status: "queued" }));
+  const payments = data.finance[input.orderId]?.payments.filter(p => !p.reversedAt) ?? [];
+  const total = (kind: "revenue" | "deposit") => payments.filter(p => p.kind === kind).reduce((n,p) => n+p.amount,0);
+  const result: EmailPreview[] = hostingEmailDraft(order, revision, input.kind, total("revenue"), "nathan.dai@berkeley.edu", input.refund, total("deposit"))
+    .filter(p => p.recipient.includes(", ") || !input.recipients?.length || input.recipients.includes(p.recipient))
+    .map(p => ({ ...p, id: crypto.randomUUID(), attachments: input.kind === "reminder" ? [] : ["illustrative-document.pdf"], status: "queued" }));
   const workflow = previewWorkflow(order.id); for (const row of result) workflow.deliveries.unshift({ id: row.id, revision_id: revision.id, kind: input.kind, recipient: row.recipient, status: "queued", sent_at: null, created_at: new Date().toISOString(), error: null });
   save(order.id, workflow); return { ok: true as const, data: result };
 }

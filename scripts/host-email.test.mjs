@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { build } from "esbuild";
 import path from "node:path";
+import { createHash } from "node:crypto";
 const root = process.cwd(); const fixture = path.join(root, "scripts/host-email-fixture.ts");
 const result = await build({ stdin: { contents: 'export * from "./lib/host-email"; export { hostingEmailDraft } from "./lib/host-email-draft"; export { state } from "./scripts/host-email-fixture";', resolveDir: root }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "safe-transports", setup(build) {
   build.onResolve({ filter: /host-orders$|host-signing$|host-workflow$|host-backend$|supabase\/admin$/ }, () => ({ path: fixture }));
@@ -69,23 +70,22 @@ test("both shared invoices include all six club representatives, including signe
       const previews = await prepareHostingEmail({ ...request, kind, recipients: ["club0@example.test"] });
       const draft = hostingEmailDraft(state.order, state.revision, kind, 0, process.env.HOST_EMAIL_REPLY_TO);
       assert.deepEqual(draft.map(p => [p.recipient, p.html]), previews.map(p => [p.recipient, p.html]));
-      assert.equal(previews.length, 6);
-      assert.deepEqual(previews.map(p => p.recipient), state.order.snapshot.contractSigners.map(p => p.email));
+      assert.equal(previews.length, 1);
+      assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
       assert.match(previews[0].html, kind === "deposit_invoice" ? /\$300\.00 is the total across all clubs/ : /\$1400\.00 is the total across all clubs/);
-      await assert.rejects(deliverHostingEmails(state.order.id, [previews[0].id]), /every club representative/);
-      assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 6);
+      assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1);
     }
     assert.equal(generated.length, 2);
-    assert.equal(sent.length, 12);
-    assert.ok(sent.every(body => body.to.length === 1));
-    assert.ok(sent.slice(0, 6).every(body => body.attachments[0].content === sent[0].attachments[0].content));
+    assert.equal(sent.length, 2);
+    assert.ok(sent.every(body => body.to.length === 6));
+    assert.ok(sent.every(body => body.html.includes("Hello everyone,")));
     const sentBodies = JSON.stringify(state.rows.map(row => row.payload));
     await prepareHostingEmail({ ...request, kind: "deposit_invoice", recipients: undefined });
     assert.equal(JSON.stringify(state.rows.map(row => row.payload)), sentBodies);
   } finally { state.order = originalOrder; state.revision = originalRevision; state.rows = []; }
 });
 
-test("old invoice drafts gain shared-balance copy without changing frozen retries or PDF bytes", async () => {
+test("legacy queued invoices reuse PDF bytes; previously attempted individual deliveries block a new group send", async () => {
   const originalOrder = structuredClone(state.order);
   try {
     state.rows = [];
@@ -93,15 +93,41 @@ test("old invoice drafts gain shared-balance copy without changing frozen retrie
     globalThis.fetch = async () => new Response("invoice bytes", { headers: { "Content-Type": "application/pdf" } });
     const input = { ...request, kind: "deposit_invoice", recipients: undefined };
     await prepareHostingEmail(input);
-    for (const row of state.rows) { row.payload.body.html = "old invoice copy"; row.payload.body.text = "old invoice copy"; }
-    state.rows[1].status = "failed"; state.rows[1].attempted_at = "2026-10-04T12:00:00Z";
-    const attachments = JSON.stringify(state.rows.map(row => row.payload.body.attachments));
-    const ids = state.rows.map(row => row.id);
+    const group = structuredClone(state.rows[0]);
+    const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+    const suffix = hash({ terms: group.payload.termsHash, kind: input.kind, payments: "", refund: undefined });
+    state.rows = state.revision.recipients.map(person => ({ ...structuredClone(group), id: crypto.randomUUID(), recipient: person.email, request_key: hash([state.order.id, state.revision.id, input.kind, person.email.toLowerCase(), suffix]), payload: { ...structuredClone(group.payload), body: { ...structuredClone(group.payload.body), to: [person.email], html: "old invoice copy" } } }));
+    const legacy = structuredClone(state.rows);
     globalThis.fetch = async () => { throw Error("Must reuse invoice PDF"); };
     const updated = await prepareHostingEmail(input);
     assert.match(updated[0].html, /\$300\.00 is the total across all clubs/);
-    assert.equal(updated[1].html, "old invoice copy");
-    assert.deepEqual(updated.map(row => row.id), ids);
-    assert.equal(JSON.stringify(state.rows.map(row => row.payload.body.attachments)), attachments);
+    assert.equal(updated.length, 1);
+    assert.deepEqual(state.rows.slice(0, 2), legacy);
+    assert.deepEqual(state.rows[2].payload.body.attachments, group.payload.body.attachments);
+    state.rows = legacy;
+    state.rows[0].status = "failed"; state.rows[0].attempted_at = "2026-10-04T12:00:00Z";
+    await assert.rejects(prepareHostingEmail(input), /individual delivery history/);
   } finally { state.order = originalOrder; state.rows = []; }
+});
+
+test("deposit receipts require a received deposit and reject an undone payment at send time", async () => {
+  state.rows = []; state.deposits = [];
+  const input = { ...request, kind: "deposit_receipt", recipients: undefined };
+  await assert.rejects(prepareHostingEmail(input), /Mark the deposit received/);
+  state.deposits = [{ id: "deposit-one", order_id: state.order.id, amount: 300, paid_date: "2026-10-04", reversed_at: null }];
+  const previews = await prepareHostingEmail(input);
+  assert.equal(previews.length, 1);
+  assert.match(previews[0].html, /Deposit payments received: \$300\.00/);
+  assert.match(previews[0].attachments[0], /deposit-payment-receipt.*\.pdf/);
+  const draft = hostingEmailDraft(state.order, state.revision, "deposit_receipt", 0, process.env.HOST_EMAIL_REPLY_TO, undefined, 300);
+  assert.equal(draft[0].html, previews[0].html);
+  state.deposits[0].reversed_at = "2026-10-04";
+  globalThis.fetch = async () => { throw Error("Must not email a stale deposit receipt"); };
+  const stale = await deliverHostingEmails(state.order.id, previews.map(p => p.id));
+  assert.equal(stale.sent, 0); assert.match(stale.errors[0], /Payment records changed/);
+  state.deposits[0].reversed_at = null;
+  const calls = []; globalThis.fetch = async (_url, init) => { calls.push(JSON.parse(init.body)); return Response.json({ id: "receipt-provider" }); };
+  assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1);
+  assert.deepEqual(calls[0].to, ["one@example.test", "two@example.test"]);
+  state.rows = []; state.deposits = [];
 });

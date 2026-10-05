@@ -13,7 +13,7 @@ export function exampleDraft(): SharedState {
     overrides: { finalPrice: true, depositAmount: true, maxGuests: false }, areas: { living_room: true, dining_room: false, backyard: true },
     contractSigners: samplePeople.map((fullName, index) => ({ id: `local-person-${index}`, fullName, email: `person${index + 1}@example.test`, club: clubs[index] })) };
 }
-export type PreviewData = { orders: Order[]; revisions: Record<string, SigningRevision[]>; finance: Record<string, { included: boolean; payments: { id: string; kind: "revenue" | "fire_permit"; amount: number; paidDate: string; reversedAt: string | null }[] }> };
+export type PreviewData = { orders: Order[]; revisions: Record<string, SigningRevision[]>; finance: Record<string, { included: boolean; payments: { id: string; kind: "revenue" | "fire_permit" | "deposit"; amount: number; paidDate: string; reversedAt: string | null }[] }> };
 function initial(): PreviewData {
   const draft = { ...exampleDraft(), documentContextId: EXAMPLE_ORDER_ID };
   const order: Order = { id: EXAMPLE_ORDER_ID, clubName: draft.clubs.join(", ").replace(/, ([^,]*)$/, ", and $1"), eventDate: draft.eventDate, rentalPrice: 1400, depositAmount: 300, snapshot: orderSnapshot(draft), documents: [], notes: "Local sample: five representatives awaiting signatures. This is not your live order.", statusOverride: null, createdAt: "2026-10-01T18:00:00Z", updatedAt: "2026-10-01T18:00:00Z" };

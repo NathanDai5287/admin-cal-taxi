@@ -19,7 +19,7 @@ import { deriveStatus } from "@/lib/host-orders-types";
 import { listSigning, type SigningRevision } from "@/lib/host-signing";
 import OrderTimeline from "./OrderTimeline";
 import OrderSupportingDetails from "./OrderSupportingDetails";
-import { loadWorkflow } from "@/lib/host-workflow";
+import { loadWorkflow, workflowDb } from "@/lib/host-workflow";
 import { hostEmailConfigured } from "@/lib/host-email";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
@@ -70,6 +70,7 @@ export default async function OrderDetailPage({
     .catch(() => ({ contract: null, failed: true, revisions: [] as SigningRevision[] }));
   const financePromise = supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", id).maybeSingle();
   const paymentsPromise = supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
+  const depositsPromise = workflowDb().from("hosting_deposit_payments").select("id,amount,paid_date,reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
 
   let order;
   try {
@@ -96,12 +97,15 @@ export default async function OrderDetailPage({
   const status = deriveStatus(order);
   const workflow = await loadWorkflow(id);
   const planPreview = hostingPlanFromOrder(order);
-  const [signing, financeResult, paymentsResult] = await Promise.all([
+  const [signing, financeResult, paymentsResult, depositsResult] = await Promise.all([
     signingPromise,
     financePromise,
     paymentsPromise,
+    depositsPromise,
   ]);
-  if (financeResult.error || paymentsResult.error) throw new Error("Unable to load hosting finance details.");
+  if (financeResult.error || paymentsResult.error || depositsResult.error) throw new Error("Unable to load hosting finance details.");
+  const deposits = (depositsResult.data ?? []) as { id: string; amount: number; paid_date: string; reversed_at: string | null }[];
+  const depositPaid = deposits.filter(p => !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -119,7 +123,7 @@ export default async function OrderDetailPage({
       } />
 
       <HostingFinancePanel
-        key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data })}
+        key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data, deposits })}
         financeOrder={financeResult.data ? {
           status: financeResult.data.status,
           plannedRevenue: Number(financeResult.data.planned_revenue),
@@ -127,19 +131,21 @@ export default async function OrderDetailPage({
         } : null}
         orderId={order.id}
         eventCancelled={!!workflow.cancelledAt || order.statusOverride === "cancelled"}
-        payments={(paymentsResult.data ?? []).map((payment) => ({
+        payments={[...(paymentsResult.data ?? []).map((payment) => ({
           id: payment.id,
           kind: payment.kind,
           amount: Number(payment.amount),
           paidDate: payment.paid_date,
           reversedAt: payment.reversed_at,
-        }))}
+        })), ...deposits.map(payment => ({ id: payment.id, kind: "deposit" as const, amount: Number(payment.amount), paidDate: payment.paid_date, reversedAt: payment.reversed_at }))]}
+        depositTotal={order.depositAmount ?? 0}
         previewFirePermit={planPreview.plannedFirePermit}
         previewRevenue={planPreview.plannedRevenue}
         today={today}
       />
 
       <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={process.env.HOST_EMAIL_REPLY_TO} signingUnavailable={signing.failed}
+        depositPaid={depositPaid}
         rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
