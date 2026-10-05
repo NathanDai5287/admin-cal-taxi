@@ -14,8 +14,9 @@ test("invoice emails calculate calendar due dates across year boundaries and lea
     ["rental_invoice", "2026-11-01", "November 3, 2026"],
   ]) {
     const message = hostingEmail({ kind, name: "everyone", organization: "Club", eventDate, replyTo: "host@example.test" });
-    assert.ok(message.text.includes(`is due ${dueDate}.`));
-    assert.ok(message.html.includes(`is due ${dueDate}.`));
+    const due = `is due ${dueDate}${kind === "deposit_invoice" ? ", seven days before the event" : ""}.`;
+    assert.ok(message.text.includes(due));
+    assert.ok(message.html.includes(due));
   }
 });
 const revision = { id: "sig_test", revision: 1, state: "awaiting_signatures", created_at: "2026-10-01T12:00:00Z", envelope_id: "envelope_existing", recipients: [{ name: "First", email: "one@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/one" }], signedCount: 0, totalCount: 1 };

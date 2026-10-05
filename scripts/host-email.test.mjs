@@ -74,6 +74,9 @@ test("both shared invoices include all six club representatives, including signe
       assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
       assert.match(previews[0].html, kind === "deposit_invoice" ? /\$300\.00 is the total across all clubs/ : /\$1400\.00 is the total across all clubs/);
       assert.match(previews[0].html, kind === "deposit_invoice" ? /deposit is due October 9, 2026/ : /rental fee is due October 18, 2026/);
+      if (kind === "deposit_invoice") assert.match(previews[0].html, /October 9, 2026, seven days before the event/);
+      assert.match(previews[0].html, /Include a relevant payment note\./);
+      assert.doesNotMatch(previews[0].html, /Include the event date in the payment note/);
       assert.match(previews[0].html, /Zelle at calthetaxi@gmail\.com/);
       assert.match(previews[0].html, /Would you prefer cash or credit card\?/);
       assert.match(previews[0].html, /Credit card payments have a 3% surcharge/);

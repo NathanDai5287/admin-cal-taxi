@@ -14,7 +14,7 @@ export function hostingEmail(input: { kind: EmailKind; name: string; organizatio
   const message = input.kind === "invitation" ? "Please review and sign your hosting agreement using your personal link below."
     : input.kind === "reminder" ? "Your signature is still needed on the hosting agreement. Please use your personal link below to review and sign."
     : input.kind === "completed" ? "Everyone has signed the hosting agreement. Your completed contract and its audit trail are attached for your records."
-    : input.kind === "deposit_invoice" ? `Your deposit invoice is attached. The refundable deposit is due ${formatDateISO(addDaysIso(input.eventDate, -7))}. ${sharedInvoiceMessage(input.invoiceAmount)}`
+    : input.kind === "deposit_invoice" ? `Your deposit invoice is attached. The refundable deposit is due ${formatDateISO(addDaysIso(input.eventDate, -7))}, seven days before the event. ${sharedInvoiceMessage(input.invoiceAmount)}`
     : input.kind === "rental_invoice" ? `Your rental invoice is attached. The rental fee is due ${formatDateISO(addDaysIso(input.eventDate, 2))}. ${sharedInvoiceMessage(input.invoiceAmount)}`
     : input.kind === "deposit_receipt" ? "Your receipt for the refundable deposit we received is attached. This payment is separate from the rental fee."
     : input.kind === "receipt" ? "Your receipt for the rental payment we received is attached. Thank you."
@@ -28,5 +28,5 @@ export function hostingEmail(input: { kind: EmailKind; name: string; organizatio
 
 function sharedInvoiceMessage(amount?: number) {
   const total = amount === undefined ? "The invoiced amount" : `$${amount.toFixed(2)}`;
-  return `${total} is the total across all clubs, not an amount owed by each club. Please coordinate payment; it may come from any representative. Include the event date in the payment note.`;
+  return `${total} is the total across all clubs, not an amount owed by each club. Please coordinate payment; it may come from any representative. Include a relevant payment note.`;
 }
