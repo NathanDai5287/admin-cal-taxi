@@ -55,6 +55,12 @@ export function categoryBudgetsFromRows(value: unknown) {
   return categoryBudgetMap(legacy);
 }
 
+export function originalCategoryBudgetsFromRows(value: unknown) {
+  if (!Array.isArray(value)) return categoryBudgetMap(undefined);
+  const current = value.find((row) => row && typeof row === "object" && "original_category_amounts" in row);
+  return current ? categoryBudgetMap(current.original_category_amounts) : categoryBudgetsFromRows(value);
+}
+
 export function formatMoney(value: number | string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

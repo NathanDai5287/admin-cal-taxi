@@ -33,6 +33,8 @@ type HostingPayment = {
 
 export type PlanVsActualInput = {
   categoryBudgets: Partial<Record<ReimbursementCategory, number | null>>;
+  originalCategoryBudgets?: Partial<Record<ReimbursementCategory, number | null>>;
+  completedCategories?: ReimbursementCategory[];
   receivables: Receivable[];
   duesPayments: DuesPayment[];
   incomeEntries: IncomeEntry[];
@@ -68,14 +70,17 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
 
   const actualExpenses = [...input.approvedReimbursements, ...input.directExpenses];
   const expenseBreakdown = categories.map(([category, label]) => {
-    const planned = cents(input.categoryBudgets[category] ?? 0)
-      + (category === "socials"
-        ? sum(confirmedHosting.map((order) => order.plannedFirePermit))
-        : 0);
+    const permitPlan = category === "socials"
+      ? sum(confirmedHosting.map((order) => order.plannedFirePermit))
+      : 0;
+    const planned = cents((input.originalCategoryBudgets ?? input.categoryBudgets)[category] ?? 0) + permitPlan;
+    const forecast = cents(input.categoryBudgets[category] ?? 0) + permitPlan;
     // Permit payments track fulfillment on the order. Spending comes from the
     // reimbursement or direct expense, so the same permit is counted once.
     const actual = sum(actualExpenses.filter((expense) => expense.category === category).map((expense) => expense.amount));
-    return { category, label, planned: dollars(planned), actual: dollars(actual) };
+    const completed = input.completedCategories?.includes(category) ?? false;
+    const expected = completed ? actual : Math.max(forecast, actual);
+    return { category, label, planned: dollars(planned), actual: dollars(actual), expected: dollars(expected), completed };
   });
 
   const incomeBreakdown = [
@@ -88,12 +93,14 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
   const actualIncome = incomeBreakdown.reduce((total, row) => total + cents(row.actual), 0);
   const plannedExpenses = expenseBreakdown.reduce((total, row) => total + cents(row.planned), 0);
   const actualExpenseTotal = expenseBreakdown.reduce((total, row) => total + cents(row.actual), 0);
+  const expectedExpenses = expenseBreakdown.reduce((total, row) => total + cents(row.expected), 0);
 
   return {
     plannedIncome: dollars(plannedIncome),
     actualIncome: dollars(actualIncome),
     plannedExpenses: dollars(plannedExpenses),
     actualExpenses: dollars(actualExpenseTotal),
+    expectedExpenses: dollars(expectedExpenses),
     incomeBreakdown,
     expenseBreakdown,
     excludedLegacyDues: input.incomeEntries.filter((entry) => legacyDuesSources.has(entry.source)),

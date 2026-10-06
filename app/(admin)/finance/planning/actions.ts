@@ -7,7 +7,6 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categories } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
-import type { Database } from "@/lib/reimbursements/supabase/database.types";
 
 const budgetKeys = categories.map(([value]) => value);
 const amountSchema = z.preprocess(
@@ -51,24 +50,17 @@ export async function saveReimbursementBudgets(
   if (!parsed.success) return { status: "error", message: "Enter valid non-negative amounts." };
 
   const supabase = createAdminClient();
-  const { error: categoryMapError } = await supabase.from("reimbursement_budgets").upsert({
+  const completed = budgetKeys.filter((key) => {
+    if (formData.get("complete-category") === key) return true;
+    if (formData.get("reopen-category") === key) return false;
+    return formData.get(`completed-${key}`) === "on";
+  });
+  const { error } = await supabase.from("reimbursement_budgets").upsert({
     id: true,
     category_amounts: parsed.data,
+    completed_categories: completed,
     updated_by: userId,
   }, { onConflict: "id" });
-
-  let error = categoryMapError;
-  if (categoryMapError?.code === "PGRST204" || categoryMapError?.code === "42703") {
-    const legacyRows = budgetKeys.map((budgetKey) => ({
-      budget_key: budgetKey,
-      amount: parsed.data[budgetKey] ?? null,
-      updated_by: userId,
-    })) as unknown as Database["public"]["Tables"]["reimbursement_budgets"]["Insert"][];
-    error = (await supabase.from("reimbursement_budgets").upsert(
-      legacyRows,
-      { onConflict: "budget_key" },
-    )).error;
-  }
 
   if (error) return { status: "error", message: "The expense plan could not be saved." };
   revalidateBudgetPages();

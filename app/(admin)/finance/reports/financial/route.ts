@@ -1,7 +1,7 @@
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 import { buildFinancialReport, type IncomeSource } from "@/lib/reimbursements/financial-report";
 import { renderFinancialReportPdf } from "@/lib/reimbursements/financial-report-pdf";
-import { categoryBudgetsFromRows, type ReimbursementCategory } from "@/lib/reimbursements/format";
+import { originalCategoryBudgetsFromRows, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const categoryBudgets = Object.fromEntries(categoryBudgetsFromRows(budgetsResult.data)) as Partial<Record<ReimbursementCategory, number | null>>;
+  const categoryBudgets = Object.fromEntries(originalCategoryBudgetsFromRows(budgetsResult.data)) as Partial<Record<ReimbursementCategory, number | null>>;
   categoryBudgets.socials = Number(categoryBudgets.socials ?? 0) + (hostingPlansResult.data ?? []).reduce((total, row) => total + Number(row.planned_fire_permit), 0);
   const outstandingLiabilities = (liabilitiesResult.data ?? [])
     .reduce((total, row) => total + Number(row.amount), 0);

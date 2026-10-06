@@ -104,17 +104,23 @@ export type Database = {
         Row: {
           id: boolean;
           category_amounts: Json;
+          original_category_amounts: Json;
+          completed_categories: Database["public"]["Enums"]["reimbursement_category"][];
           updated_by: string | null;
           updated_at: string;
         };
         Insert: {
           id?: boolean;
           category_amounts?: Json;
+          original_category_amounts?: Json;
+          completed_categories?: Database["public"]["Enums"]["reimbursement_category"][];
           updated_by?: string | null;
           updated_at?: string;
         };
         Update: {
           category_amounts?: Json;
+          original_category_amounts?: Json;
+          completed_categories?: Database["public"]["Enums"]["reimbursement_category"][];
           updated_by?: string | null;
           updated_at?: string;
         };

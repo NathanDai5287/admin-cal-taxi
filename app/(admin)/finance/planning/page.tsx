@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ExpensePlanForm } from "@/app/(admin)/finance/planning/expense-plan-form";
 import { buildPlanVsActual } from "@/lib/finance/plan-vs-actual";
 import { requireAdmin } from "@/lib/reimbursements/auth";
-import { categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
+import { categoryBudgetsFromRows, originalCategoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -41,6 +41,9 @@ export default async function PlanningPage() {
   if (failed?.error) throw new Error(`Unable to load the finance plan: ${failed.error.message}`);
 
   const budgets = categoryBudgetsFromRows(budgetResult.data);
+  const budgetPlan = budgetResult.data?.[0];
+  const originalBudgets = originalCategoryBudgetsFromRows(budgetResult.data);
+  const completedCategories = budgetPlan?.completed_categories ?? [];
   // Approved reimbursements count toward actual spending whether or not the
   // chapter has paid them yet. Paid rows count by payment date; unpaid rows
   // count by the receipt (or submission) date.
@@ -50,6 +53,8 @@ export default async function PlanningPage() {
   });
   const summary = buildPlanVsActual({
     categoryBudgets: Object.fromEntries(budgets),
+    originalCategoryBudgets: Object.fromEntries(originalBudgets),
+    completedCategories,
     receivables: (receivablesResult.data ?? []).map((row) => ({ amountAssessed: Number(row.amount_assessed), waived: Boolean(row.waived_at) })),
     duesPayments: (duesPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount) })),
     incomeEntries: (incomeResult.data ?? []).map((entry) => ({ amount: Number(entry.amount), kind: entry.kind, source: entry.source })),
@@ -80,8 +85,12 @@ export default async function PlanningPage() {
         <div className="grid grid-cols-2 border-y border-rule md:grid-cols-4">
           <Total label="Planned income" value={summary.plannedIncome} planned />
           <Total label="Actual income" value={summary.actualIncome} />
-          <Total label="Planned expenses" value={summary.plannedExpenses} planned />
+          <Total label="Original planned expenses" value={summary.plannedExpenses} planned />
           <Total label="Actual expenses" value={summary.actualExpenses} />
+        </div>
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule bg-surface px-4 py-3">
+          <p className="text-xs text-muted">Expected expenses use actual spending for completed categories.</p>
+          <p className="text-sm font-semibold">Expected expenses <span className="ml-3 tabular-nums">{formatMoney(summary.expectedExpenses)}</span></p>
         </div>
       </section>
 
@@ -103,7 +112,9 @@ export default async function PlanningPage() {
           {summary.expenseBreakdown.map((row) => (
             <PlanBarRow
               actual={row.actual}
-              hasPlan={row.planned > 0 || budgets.get(row.category) != null}
+              hasPlan={row.planned > 0 || originalBudgets.get(row.category) != null}
+              completed={row.completed}
+              expected={row.expected}
               href={`/finance/reports?category=${row.category}`}
               key={row.category}
               kind="expense"
@@ -125,8 +136,8 @@ export default async function PlanningPage() {
       {estimatedActualDates ? <p className="border border-rule bg-surface px-4 py-3 text-xs text-muted">{estimatedActualDates} legacy {estimatedActualDates === 1 ? "payment uses" : "payments use"} the best available historical date.</p> : null}
 
       <section className="card" id="expense-plan">
-        <div className="card-header"><span className="card-title">Expense category plan</span><span className="card-subtitle">Fire permits add to the Socials plan automatically.</span></div>
-        <ExpensePlanForm budgets={Object.fromEntries(budgets)} />
+        <div className="card-header"><span className="card-title">Expected expenses by category</span><span className="card-subtitle">Your original plan stays saved when you change expected expenses.</span></div>
+        <ExpensePlanForm budgets={Object.fromEntries(budgets)} completedCategories={completedCategories} expenses={summary.expenseBreakdown} />
       </section>
     </div>
   );
@@ -140,7 +151,7 @@ function Breakdown({ title, note, children }: { title: string; note: string; chi
   return <section className="min-w-0 self-start border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="plan-grid">{children}</div></section>;
 }
 
-function PlanBarRow({ actual, hasPlan, href, kind, label, planned }: { actual: number; hasPlan: boolean; href: string; kind: "income" | "expense"; label: string; planned: number }) {
+function PlanBarRow({ actual, hasPlan, href, kind, label, planned, completed = false, expected }: { actual: number; hasPlan: boolean; href: string; kind: "income" | "expense"; label: string; planned: number; completed?: boolean; expected?: number }) {
   const maximum = Math.max(planned, actual, 1);
   const width = actual === 0 ? 0 : Math.max(2, Math.min(100, (actual / maximum) * 100));
   const over = hasPlan && actual > planned;
@@ -151,19 +162,20 @@ function PlanBarRow({ actual, hasPlan, href, kind, label, planned }: { actual: n
   let status = "";
   if (over) status = `${formatMoney(actual - planned)} ${kind === "income" ? "above" : "over"} plan`;
   else if (hasPlan && actual === planned) status = "On plan";
-  else if (hasPlan) status = `${formatMoney(planned - actual)} remaining`;
+  else if (hasPlan) status = `${formatMoney(planned - actual)} ${completed ? "under plan" : "remaining"}`;
 
   return (
     <article className="plan-row">
       <div className="plan-row-head">
-        <Link className="text-[13px] font-semibold text-brand underline-offset-4 hover:underline" href={href}>{label} →</Link>
+        <Link className="text-[13px] font-semibold text-brand underline-offset-4 hover:underline" href={href}>{label}{completed ? " · Completed" : ""} →</Link>
         <span>{formatMoney(actual)}{hasPlan ? <small> / {formatMoney(planned)}</small> : null}</span>
       </div>
       <div className="spend-track" aria-hidden="true"><span className={tone} style={{ width: `${width}%` }} /></div>
       <div className={`spend-row-meta${tone ? ` ${tone}` : ""}`}>
-        <span>{hasPlan ? (percent === null ? `${formatMoney(planned)} plan` : `${percent}% of plan`) : "No plan set"}</span>
+        <span>{hasPlan ? (percent === null ? `${formatMoney(planned)} plan` : `${percent}% of ${kind === "expense" ? "original " : ""}plan`) : "No plan set"}</span>
         <span>{status}</span>
       </div>
+      {expected !== undefined ? <p className="mt-2 text-xs text-muted">Expected {formatMoney(expected)}</p> : null}
     </article>
   );
 }

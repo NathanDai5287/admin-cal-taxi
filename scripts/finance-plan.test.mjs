@@ -213,3 +213,40 @@ test("paid charge edits cannot change recorded cash", async () => {
   assert.match(migration, /create trigger chapter_receivables_protect_paid_amount/);
   assert.match(migration, /A paid charge amount cannot be changed/);
 });
+
+test("completed categories use recorded spending while retaining their original plan", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({
+    ...baseInput(),
+    categoryBudgets: { rush: 1200, house: 1000 },
+    originalCategoryBudgets: { rush: 1000, house: 1000 },
+    completedCategories: ["rush"],
+    approvedReimbursements: [{ category: "rush", amount: 1150 }],
+  });
+  const rush = summary.expenseBreakdown.find((row) => row.category === "rush");
+  assert.equal(rush.planned, 1000);
+  assert.equal(rush.actual, 1150);
+  assert.equal(rush.expected, 1150);
+  assert.equal(rush.completed, true);
+  assert.equal(summary.plannedExpenses, 2000);
+  assert.equal(summary.expectedExpenses, 2150);
+});
+
+test("completion removes unused forecast and reopening restores it", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const input = { ...baseInput(), categoryBudgets: { rush: 1000 }, originalCategoryBudgets: { rush: 800 }, directExpenses: [{ category: "rush", amount: 650 }] };
+  const completed = buildPlanVsActual({ ...input, completedCategories: ["rush"] });
+  const reopened = buildPlanVsActual(input);
+  assert.equal(completed.expectedExpenses, 650);
+  assert.equal(reopened.expectedExpenses, 1000);
+  assert.equal(completed.plannedExpenses, reopened.plannedExpenses);
+});
+
+test("expected expenses include overspending and later entries in completed categories", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const input = { ...baseInput(), categoryBudgets: { rush: 1000 }, directExpenses: [{ category: "rush", amount: 1150 }] };
+  assert.equal(buildPlanVsActual(input).expectedExpenses, 1150);
+  const later = buildPlanVsActual({ ...input, completedCategories: ["rush"], approvedReimbursements: [{ category: "rush", amount: 50 }] });
+  assert.equal(later.expectedExpenses, 1200);
+  assert.equal(later.actualExpenses, 1200);
+});

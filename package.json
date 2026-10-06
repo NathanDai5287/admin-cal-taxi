@@ -21,7 +21,7 @@
     "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs",
     "test:public-site": "node --test scripts/public-site-routing.test.mjs scripts/public-site-images.test.mjs",
     "test:venue": "node --test scripts/venue-inquiries.test.mjs",
-    "test:finance": "node --test scripts/finance-plan.test.mjs && bash scripts/finance-plan-database.test.sh"
+    "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
