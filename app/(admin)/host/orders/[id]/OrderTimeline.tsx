@@ -14,6 +14,9 @@ import { createHostingDocumentCache, createHostingPreviewCache } from "@/lib/hos
 import { fmtUSD } from "../order-format";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 import OrderPreviewReader from "./OrderPreviewReader";
+import OrderIcon from "@/components/host/OrderIcon";
+
+const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
 export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
@@ -151,54 +154,59 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     if (!revision) return;
     try { const result = await copyHostingSigningLinkAction(order.id, revision.id, email); if (!result.ok) { setMessage(result.error); return; } await navigator.clipboard.writeText(result.data); setMessage("Personal signing link copied."); } catch { setMessage("Clipboard unavailable. Reload and retry."); }
   }
-  const emailButton = (kind: EmailKind, label: string, enabled = true) => <Button type="button" compact variant="secondary" disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}>{label}</Button>;
+  const emailButton = (kind: EmailKind, label: string, enabled = true) => <button type="button" className={timelineAction} disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
   const visiblePdf = pdfPreview?.scope === scope ? pdfPreview : null;
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
   const activity = workflow.deliveries.filter(d => d.status !== "queued");
   const unsentCount = previews.filter(p => p.status !== "sent").length;
   return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
-    <section className="min-w-0">
-    <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+    <section aria-label="Event timeline" className="min-w-0">
+    <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
     </div>
     {cancelled && <p className="mb-6 text-sm text-warn">This event is cancelled. Its signing and payment history is retained.</p>}
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
     {signingUnavailable && <p className="mb-6 text-sm text-warn">Could not verify signing history. Reload before sending documents.</p>}
-    <ol className="ml-2 border-l border-rule">
-      <Milestone title="Prepare agreement" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental fee · ${fmtUSD(order.depositAmount ?? 0)} refundable deposit`} done={!!revision || order.documents.some(d => d.kind === "contract") }>
-        {revision ? <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}>View approved contract · revision {revision.revision}</a> : <p className="text-sm text-muted">Use Edit order to prepare and approve the contract.</p>}
+    <ol aria-label="Event stages" className="ml-2 border-l border-rule">
+      <Milestone title="Prepare agreement" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision || order.documents.some(d => d.kind === "contract") }>
+        {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <p className="text-[12px] text-muted">Use Edit order to prepare and approve the contract.</p>}
       </Milestone>
       <Milestone title="Send contract" detail={wasSent ? "Sent" : undefined} done={wasSent}>
         {(!wasSent || hasUnsentInvitation) && emailButton("invitation", hasUnsentInvitation ? "Review remaining invitations" : "Review & send contract")}
       </Milestone>
       <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed` : "Awaiting contract approval"} done={signed}>
         {revision && <>
-          <ul className="space-y-1">
+          <div className="bg-surface px-2.5 py-1">
+          <table aria-label="Contract signers" className="w-full table-fixed text-left text-[12px]">
+            <colgroup><col className="w-[54%]" /><col /><col className="w-5" /></colgroup>
+            <thead><tr className="text-[11px] text-muted"><th scope="col" className="py-1 pr-2 font-normal">Signer</th><th scope="col" className="py-1 pr-2 font-normal">Club</th><th scope="col"><span className="sr-only">Signature status</span></th></tr></thead>
+            <tbody>
             {revision.recipients.map(person => {
               const club = signerClubs.get(person.email.trim().toLowerCase());
               const signature = signerProgress(person, revision, workflow);
-              return <li key={person.email} className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 py-2">
-              <div className="min-w-0">
-                <p className="flex items-center gap-3 text-[13px] font-semibold"><span className="min-w-0 [overflow-wrap:anywhere]">{person.name}</span><SignatureIcon progress={signature} /></p>
-                {club && <p className="mt-1 text-[12px] font-medium text-ink [overflow-wrap:anywhere]">{club}</p>}
-                <p className="mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">{person.email}</p>
-              </div>
-              {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-3"><Button compact variant="text" disabled={busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind</Button><Button compact variant="text" disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link</Button></div>}
-            </li>;
+              return <tr key={person.email}>
+                <td className="py-1 pr-2 align-top"><p className="font-medium text-ink [overflow-wrap:anywhere]">{person.name}</p><a href={`mailto:${person.email}`} title={person.email} className="mt-0.5 block truncate text-[11px] text-muted hover:text-brand">{person.email}</a>
+                  {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
+                </td>
+                <td className="py-1 pr-2 align-top leading-snug text-muted [overflow-wrap:anywhere]">{club || "—"}</td>
+                <td className="py-1 align-top"><SignatureIcon progress={signature} /></td>
+              </tr>;
             })}
-          </ul>
-          <div className="mt-3 flex flex-wrap items-center gap-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className="text-[13px] font-semibold text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}>Download signed contract</a>}{signed && revision.files.audit && <a className="text-[13px] text-brand underline underline-offset-4" href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
+            </tbody>
+          </table>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Signed contract</a>}{signed && revision.files.audit && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
         </>}
       </Milestone>
       <Milestone title="Send deposit invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, -7))}`} done={delivered("deposit_invoice")}>
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
       </Milestone>
-      <Milestone title="Receive deposit" detail={`${fmtUSD(depositPaid)} of ${fmtUSD(order.depositAmount ?? 0)} received`} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
+      <Milestone title="Receive deposit" detail={`${fmtUSD(depositPaid)} / ${fmtUSD(order.depositAmount ?? 0)}`} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
         {emailButton("deposit_receipt", "Review deposit receipt", depositPaid > 0 && wasSent)}
       </Milestone>
-      <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} of ${fmtUSD(permitTotal)} paid` : "No fire permit required."} done={permitTotal === 0 || permitPaid >= permitTotal}>
-        {permitTotal > 0 && <a className="text-[13px] text-brand underline underline-offset-4" href="#event-finances">Update fire permit payment</a>}
+      <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} / ${fmtUSD(permitTotal)}` : "Not required"} done={permitTotal === 0 || permitPaid >= permitTotal}>
+        {permitTotal > 0 && <a className={timelineAction} href="#event-finances">Update fire permit payment</a>}
       </Milestone>
       <Milestone title="Event held" detail={`${formatDateISO(order.eventDate)}`} done={held}>
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
@@ -206,17 +214,20 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <Milestone title="Send rental invoice" detail={`Due ${formatDateISO(addDaysIso(order.eventDate, 2))}`} done={delivered("rental_invoice")}>
         {emailButton("rental_invoice", delivered("rental_invoice") ? "View rental email" : "Review rental invoice", wasSent)}
       </Milestone>
-      <Milestone title="Receipt & return deposit" detail={`${fmtUSD(rentalPaid)} rental payment received${workflow.refund ? ` · ${fmtUSD(workflow.refund.amount)} deposit returned` : ""}`} done={delivered("receipt") && delivered("refund")} last>
+      <Milestone title="Receipt & return deposit" detail={`${fmtUSD(rentalPaid)} rental received${workflow.refund ? ` · ${fmtUSD(workflow.refund.amount)} returned` : ""}`} done={delivered("receipt") && delivered("refund")} last>
         {emailButton("receipt", "Review payment receipt", rentalPaid > 0 && wasSent)}
-        <h4 className="mt-4 text-[13px] font-semibold">Deposit return</h4>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          <label className="field-label">Amount returned<input className="field-input mt-1" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
-          <label className="field-label">Return date<input className="field-input mt-1" type="date" max={today} value={refund.date} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
-          <label className="field-label sm:col-span-2">Return method<input className="field-input mt-1" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
-          <div className="sm:col-span-2">{emailButton("refund", "Review return confirmation", wasSent && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
-        </div>
+        <a className={`${timelineAction} ml-3`} href="#deposit-return-details">Deposit return details</a>
       </Milestone>
     </ol>
+    <section id="deposit-return-details" aria-label="Deposit return details" className="mt-5 scroll-mt-6">
+      <h3 className="text-[13px] font-semibold">Deposit return</h3>
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+        <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
+        <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" max={today} value={refund.date} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
+        <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
+        <div className="col-span-2">{emailButton("refund", "Review return confirmation", wasSent && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
+      </div>
+    </section>
     {activity.length > 0 && <section className="mt-7" aria-label="Email activity">
       <h3 className="text-sm font-semibold">Email activity</h3>
       <ul className="mt-2 space-y-3">{activity.map(d => <li key={d.id} className="text-[12px]">
@@ -237,9 +248,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   </div>;
 }
 function Milestone({ title, detail, done, children, last = false }: { title: string; detail?: string; done: boolean; children?: ReactNode; last?: boolean }) {
-  return <li className={`relative pl-7 ${last ? "pb-0" : "pb-5"}`}>
+  return <li className={`relative pl-5 ${last ? "pb-0" : "pb-3"}`}>
     <span aria-hidden="true" className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-surface ${done ? "border-brand text-brand" : "border-rule"}`}>{done && <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" /></svg>}</span>
-    <h3 className="text-[15px] font-semibold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="mt-1 text-[13px] leading-relaxed text-muted">{detail}</p>}{children && <div className="mt-2">{children}</div>}
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><h3 className="text-[15px] font-bold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="text-[12px] text-muted tabular-nums">{detail}</p>}</div>{children && <div className="mt-1">{children}</div>}
   </li>;
 }
 function SignatureIcon({ progress }: { progress: SignerProgress }) {
