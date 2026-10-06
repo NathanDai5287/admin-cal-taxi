@@ -177,25 +177,19 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       </Milestone>
       <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed` : "Awaiting contract approval"} done={signed}>
         {revision && <>
-          <div className="bg-surface px-2.5 py-1">
-          <table aria-label="Contract signers" className="w-full table-fixed text-left text-[12px]">
-            <colgroup><col className="w-[54%]" /><col /><col className="w-5" /></colgroup>
-            <thead><tr className="text-[11px] text-muted"><th scope="col" className="py-1 pr-2 font-normal">Signer</th><th scope="col" className="py-1 pr-2 font-normal">Club</th><th scope="col"><span className="sr-only">Signature status</span></th></tr></thead>
-            <tbody>
+          <ul aria-label="Contract signers" className="mt-2 space-y-1 text-[12px]">
             {revision.recipients.map(person => {
               const club = signerClubs.get(person.email.trim().toLowerCase());
               const signature = signerProgress(person, revision, workflow);
-              return <tr key={person.email}>
-                <td className="py-1 pr-2 align-top"><p className="font-medium text-ink [overflow-wrap:anywhere]">{person.name}</p><a href={`mailto:${person.email}`} title={person.email} className="mt-0.5 block truncate text-[11px] text-muted hover:text-brand">{person.email}</a>
+              return <li key={person.email} className="grid grid-cols-[1rem_minmax(0,1.1fr)_minmax(0,1fr)] items-start gap-x-2.5 py-1">
+                <span className="pt-0.5"><SignatureIcon progress={signature} /></span>
+                <div className="min-w-0"><p className="font-medium text-ink [overflow-wrap:anywhere]">{person.name}</p><a href={`mailto:${person.email}`} title={person.email} className="mt-0.5 block truncate text-[11px] text-muted hover:text-brand">{person.email}</a>
                   {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
-                </td>
-                <td className="py-1 pr-2 align-top leading-snug text-muted [overflow-wrap:anywhere]">{club || "—"}</td>
-                <td className="py-1 align-top"><SignatureIcon progress={signature} /></td>
-              </tr>;
+                </div>
+                <p className="leading-snug text-muted [overflow-wrap:anywhere]">{club || "—"}</p>
+              </li>;
             })}
-            </tbody>
-          </table>
-          </div>
+          </ul>
           <div className="mt-1 flex flex-wrap items-center gap-x-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Signed contract</a>}{signed && revision.files.audit && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
         </>}
       </Milestone>
