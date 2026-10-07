@@ -287,6 +287,9 @@ export type Database = {
       };
       chapter_receivables: {
         Row: {
+          payment_plan_frequency: string | null;
+          payment_plan_amount: number | null;
+          payment_plan_interval_days: number | null;
           member_id: string | null;
           id: string;
           member_name: string;
@@ -302,6 +305,9 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          payment_plan_frequency?: string | null;
+          payment_plan_amount?: number | null;
+          payment_plan_interval_days?: number | null;
           member_id?: string | null;
           id?: string;
           member_name: string;
@@ -317,6 +323,9 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          payment_plan_frequency?: string | null;
+          payment_plan_amount?: number | null;
+          payment_plan_interval_days?: number | null;
           member_id?: string | null;
           member_name?: string;
           amount_assessed?: number;
@@ -613,6 +622,16 @@ export type Database = {
       mcp_open_dues: { Args: Record<PropertyKey, never>; Returns: Json };
       record_dues_payment: {
         Args: { p_payment_amount: number; p_payment_date: string; p_receivable_id: string; p_request_id: string };
+        Returns: boolean;
+      };
+      set_receivable_payment_plan: {
+        Args: {
+          p_id: string;
+          p_updated_at: string;
+          p_frequency: string | null;
+          p_amount: number | null;
+          p_interval_days: number | null;
+        };
         Returns: boolean;
       };
       record_hosting_payment: {

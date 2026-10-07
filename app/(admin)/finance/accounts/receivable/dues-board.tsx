@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useOptimistic, type ReactNode } from "react";
+import { compareDuesBalances, type DuesPaymentPlan } from "@/lib/reimbursements/dues-payment-plan";
 
 export type DuesRow = {
   id: string;
@@ -16,6 +17,7 @@ export type DuesRow = {
   isOverdue: boolean;
   paymentRequestId: string;
   updatedAt: string;
+  paymentPlan: DuesPaymentPlan | null;
   pending?: boolean;
 };
 
@@ -32,10 +34,7 @@ export type RowMutation =
   | { type: "waive"; ids: string[] };
 
 function sortRows(rows: DuesRow[]) {
-  return [...rows].sort((a, b) =>
-    a.dueDate.localeCompare(b.dueDate)
-    || a.memberName.localeCompare(b.memberName)
-    || a.id.localeCompare(b.id));
+  return [...rows].sort((a, b) => compareDuesBalances(a, b, "due-date"));
 }
 
 function markPaid(row: DuesRow, paid: boolean, today: string): DuesRow {

@@ -31,6 +31,7 @@ function newChargeRow(member: BulkFeeMember, amount: number, dueDate: string, no
     amountOwed: amount,
     assessedAmount: amount,
     paidAmount: 0,
+    paymentPlan: null,
     dueDate,
     notes,
     discordUserId: "",

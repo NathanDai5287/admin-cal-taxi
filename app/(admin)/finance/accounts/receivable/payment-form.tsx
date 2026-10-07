@@ -1,19 +1,31 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { addDuesPayment } from "./actions";
 import type { DuesRow } from "./dues-board";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
+import { defaultDuesPaymentAmount } from "@/lib/reimbursements/dues-payment-plan";
 
 export function DuesPaymentForm({ row, today, onRecorded }: { row: DuesRow; today: string; onRecorded: (message: string) => void }) {
-  const [amount, setAmount] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    // React resets action forms during commit, when synthetic events are disabled.
+    const preserveEntry = (event: Event) => event.preventDefault();
+    form.addEventListener("reset", preserveEntry);
+    return () => form.removeEventListener("reset", preserveEntry);
+  }, []);
+  // A null override follows refreshed plan terms and balances until the user edits it.
+  const [amountOverride, setAmount] = useState<string | null>(null);
+  const amount = amountOverride ?? defaultDuesPaymentAmount(row);
   const [requestId, setRequestId] = useState(row.paymentRequestId);
   const [state, action, pending] = useActionState(async (previous: Parameters<typeof addDuesPayment>[0], data: FormData) => {
     const result = await addDuesPayment(previous, data);
     if (result.status === "success") {
       onRecorded(`Payment of ${formatMoney(Number(data.get("paymentAmount")))} recorded for ${row.memberName}.`);
-      setAmount("");
+      setAmount(null);
       setRequestId(crypto.randomUUID());
     }
     return result;
@@ -22,7 +34,7 @@ export function DuesPaymentForm({ row, today, onRecorded }: { row: DuesRow; toda
   const remainingCents = Math.round(row.amountOwed * 100);
   const valid = Number.isFinite(cents) && cents > 0 && cents <= remainingCents;
 
-  return <form action={action} className="dues-payment-entry" aria-label={`Record payment for ${row.memberName}`}>
+  return <form ref={formRef} action={action} className="dues-payment-entry" aria-label={`Record payment for ${row.memberName}`}>
     <input type="hidden" name="id" value={row.id} />
     <input type="hidden" name="requestId" value={requestId} />
     <div className="field">

@@ -10,9 +10,11 @@ import {
   type DuesActionState,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { DuesPaymentForm } from "./payment-form";
+import { DuesPaymentPlanForm } from "./payment-plan-form";
 import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
+import { compareDuesBalances, paymentPlanFrequencyLabel } from "@/lib/reimbursements/dues-payment-plan";
 
 type Filter = "outstanding" | "overdue" | "paid" | "all";
 const initialDuesActionState = { status: "idle" as const, message: "", sequence: 0 };
@@ -143,7 +145,7 @@ export function DuesLedger({
       if (!normalizedQuery) return true;
       return [row.memberName, row.notes]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
-    }).sort((a, b) => (sort === "name" ? a.memberName.localeCompare(b.memberName) : sort === "amount" ? b.amountOwed - a.amountOwed : a.dueDate.localeCompare(b.dueDate)) || a.memberName.localeCompare(b.memberName) || a.id.localeCompare(b.id));
+    }).sort((a, b) => compareDuesBalances(a, b, sort));
   }, [filter, query, sort, optimisticRows]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / 25));
   const currentPage = Math.min(page, pageCount);
@@ -321,6 +323,7 @@ export function DuesLedger({
                     {row.isOverdue ? <span className="dues-overdue-label">Overdue</span> : null}
                     {row.isPaid ? <span className="dues-paid-label">Paid</span> : null}
                   </p>
+                  {row.paymentPlan && <p className="dues-plan-label"><strong>Payment Plan</strong><span>· {formatMoney(row.paymentPlan.amount)} {paymentPlanFrequencyLabel(row.paymentPlan)}</span></p>}
                   {row.paidAmount > 0 ? (
                     <p>Paid {formatMoney(row.paidAmount)} of {formatMoney(row.assessedAmount)}</p>
                   ) : null}
@@ -344,6 +347,7 @@ export function DuesLedger({
                 <div><dt>Discord</dt><dd>{row.discordUserId ? "Linked" : "Not linked"}</dd></div>
               </dl>
               {canManage && !row.isPaid && <DuesPaymentForm row={row} today={today} onRecorded={setPaymentMessage} />}
+              {canManage && !row.isPaid && <DuesPaymentPlanForm key={`${row.paymentPlan?.frequency ?? "none"}|${row.paymentPlan?.amount ?? ""}|${row.paymentPlan?.intervalDays ?? ""}`} row={row} disabled={bulkBusy} onSaved={setPaymentMessage} />}
               {canManage && row.isPaid && <form action={submitPaidToggle}>
                 <input name="id" type="hidden" value={row.id} />
                 <input name="paid" type="hidden" value="false" />

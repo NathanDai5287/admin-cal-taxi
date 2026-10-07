@@ -513,6 +513,12 @@
   [data-brand] .dues-detail-facts dt { @apply text-muted; }
   [data-brand] .dues-detail-facts dd { @apply mt-1 font-semibold text-ink tabular-nums; }
   [data-brand] .dues-payment-entry { @apply grid gap-4 sm:grid-cols-2; }
+  [data-brand] .dues-person p.dues-plan-label { @apply text-brand; }
+  [data-brand] .dues-plan-form { @apply grid gap-3 border-t border-rule pt-4; }
+  [data-brand] .dues-plan-toggle { @apply flex items-center gap-2 text-sm font-semibold cursor-pointer; }
+  [data-brand] .dues-plan-toggle input { @apply h-4 w-4 accent-brand; }
+  [data-brand] .dues-plan-fields { @apply grid gap-4 sm:grid-cols-2; }
+  [data-brand] .dues-plan-footer { @apply flex flex-wrap items-center gap-3; }
   [data-brand] .dues-payment-result { @apply flex flex-wrap items-center justify-between gap-3 sm:col-span-2 text-sm; }
   [data-brand] .dues-text-action { @apply mt-2 text-xs text-brand font-semibold cursor-pointer hover:underline disabled:opacity-50; }
   [data-brand] .dues-pagination { @apply flex flex-wrap items-center justify-between gap-3 border-t border-rule px-4 py-3 text-xs text-muted; }

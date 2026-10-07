@@ -228,6 +228,53 @@ export async function setDuesPaid(
   return actionSuccess(paid ? "Charge marked fully paid." : "Charge reopened.");
 }
 
+const paymentPlanSchema = z.object({
+  frequency: z.enum(["weekly", "biweekly", "monthly", "custom"], { error: "Choose a payment frequency." }),
+  amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a dollar amount with at most two decimal places.")
+    .transform(Number).pipe(z.number().positive("Enter an amount greater than $0.").max(999_999_999.99, "The payment amount is too large.")),
+  intervalDays: z.coerce.number().int("Use a whole number of days.").min(1, "Enter at least one day.").max(2_147_483_647, "The interval is too large.").nullable(),
+}).refine((plan) => plan.frequency !== "custom" || plan.intervalDays !== null, {
+  message: "Enter the number of days between payments.",
+});
+
+export async function updateDuesPaymentPlan(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const version = z.object({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
+    id: formData.get("id"), updatedAt: formData.get("updatedAt"),
+  });
+  if (!version.success) return actionError("This charge could not be identified. Refresh and try again.");
+
+  const enabled = formData.get("paymentPlanEnabled") === "on";
+  const parsed = enabled ? paymentPlanSchema.safeParse({
+    frequency: formData.get("frequency"),
+    amount: formData.get("planAmount"),
+    intervalDays: formData.get("frequency") === "custom" ? formData.get("intervalDays") : null,
+  }) : null;
+  if (parsed && !parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Check the payment plan terms.");
+  const plan = parsed?.success ? parsed.data : null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_receivable_payment_plan", {
+    p_id: version.data.id,
+    p_updated_at: version.data.updatedAt,
+    p_frequency: plan?.frequency ?? null,
+    p_amount: plan?.amount ?? null,
+    p_interval_days: plan?.intervalDays ?? null,
+  });
+  if (error || !data) {
+    return actionError(error?.code === "40001"
+      ? "This charge changed in another session. Refresh and try again."
+      : error?.code === "22023"
+        ? "Payment plans can only be edited on outstanding charges. Refresh and check this balance."
+        : "The payment plan could not be saved. Please try again.");
+  }
+  revalidateDues();
+  return actionSuccess(plan ? "Payment plan saved." : "Payment plan removed.");
+}
+
 export async function addDuesPayment(
   _previousState: DuesActionState,
   formData: FormData,

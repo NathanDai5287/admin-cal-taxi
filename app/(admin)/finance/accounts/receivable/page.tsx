@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { userLabel } from "@/lib/reimbursements/user-label";
+import type { PaymentPlanFrequency } from "@/lib/reimbursements/dues-payment-plan";
 
 export const metadata: Metadata = { title: "Accounts receivable" };
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export default async function DuesPage() {
   const [receivablesResult, profilesResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
-      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at")
+      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at, payment_plan_frequency, payment_plan_amount, payment_plan_interval_days")
       .is("waived_at", null)
       .order("due_date", { ascending: true })
       .order("member_name", { ascending: true })
@@ -77,6 +78,11 @@ export default async function DuesPage() {
       isOverdue: !isPaid && row.due_date < today,
       paymentRequestId: crypto.randomUUID(),
       updatedAt: row.updated_at,
+      paymentPlan: row.payment_plan_frequency ? {
+        frequency: row.payment_plan_frequency as PaymentPlanFrequency,
+        amount: Number(row.payment_plan_amount),
+        intervalDays: row.payment_plan_interval_days,
+      } : null,
     };
   });
 

@@ -141,6 +141,19 @@ announcements.
 3. Add each member's Discord user ID to their dues balance. The announcement action
    allows only those exact user mentions and blocks automatic role or everyone mentions.
 
+### Dues payment plans
+
+Apply `supabase/migrations/20261008000000_dues_payment_plans.sql` before deploying.
+In Finance → Dues, expand an outstanding charge, enable Payment Plan, and save
+the amount per payment and frequency. Monthly is the default; weekly, every two
+weeks, and a custom interval in days are also available. Uncheck Payment Plan and
+save to remove it.
+
+Outstanding plans appear first under every sort option. Record payment prefills
+the agreed amount, capped at the remaining balance, and allows manual changes.
+Payments are still recorded manually; plans do not change due dates or overdue
+status. Plan terms are retained when a balance is paid or reopened.
+
 ## Finance organization
 
 Dues and reimbursements share `/finance`: Accounts (receivable, payable and
