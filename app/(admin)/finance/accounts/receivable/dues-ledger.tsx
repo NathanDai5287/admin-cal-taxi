@@ -339,7 +339,14 @@ export function DuesLedger({
               </div>
 
               <div className="dues-actions">
-                <Button compact disabled={row.pending} variant={row.isPaid ? "secondary" : "primary"} aria-expanded={openRowId === row.id && openDetail === "payment"} aria-controls={`dues-detail-${row.id}`} onClick={() => { setOpenRowId(openRowId === row.id && openDetail === "payment" ? null : row.id); setOpenDetail("payment"); }}>{row.isPaid || !canManage ? "View details" : openRowId === row.id && openDetail === "payment" ? "Close details" : "Record payment"}</Button>
+                <Button compact disabled={row.pending} variant={row.isPaid ? "secondary" : "primary"} aria-expanded={openRowId === row.id} aria-controls={`dues-detail-${row.id}`} onClick={() => {
+                  if (openRowId === row.id) {
+                    setOpenRowId(null);
+                  } else {
+                    setOpenRowId(row.id);
+                    setOpenDetail("payment");
+                  }
+                }}>{openRowId === row.id ? "Close Details" : "Open Details"}</Button>
               </div>
             </div>
             {openRowId === row.id && <div className="dues-charge-detail" id={`dues-detail-${row.id}`}>
