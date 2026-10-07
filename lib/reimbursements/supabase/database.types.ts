@@ -285,6 +285,28 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      chapter_receivable_notes: {
+        Row: {
+          id: string;
+          receivable_id: string;
+          body: string;
+          created_by: string | null;
+          author_name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          receivable_id: string;
+          body: string;
+          created_by?: string | null;
+          author_name: string;
+          created_at?: string;
+        };
+        Update: {
+          body?: string;
+        };
+        Relationships: [];
+      };
       chapter_receivables: {
         Row: {
           payment_plan_frequency: string | null;
@@ -633,6 +655,10 @@ export type Database = {
           p_interval_days: number | null;
         };
         Returns: boolean;
+      };
+      add_receivable_note: {
+        Args: { p_receivable_id: string; p_body: string; p_request_id: string };
+        Returns: string;
       };
       record_hosting_payment: {
         Args: { p_amount: number; p_kind: Database["public"]["Enums"]["hosting_payment_kind"]; p_order_id: string; p_paid_date: string; p_request_id: string };

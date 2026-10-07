@@ -3,6 +3,13 @@
 import { createContext, useContext, useMemo, useOptimistic, type ReactNode } from "react";
 import { compareDuesBalances, type DuesPaymentPlan } from "@/lib/reimbursements/dues-payment-plan";
 
+export type DuesBalanceNote = {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+};
+
 export type DuesRow = {
   id: string;
   memberId: string | null;
@@ -12,6 +19,8 @@ export type DuesRow = {
   paidAmount: number;
   dueDate: string;
   notes: string;
+  balanceNotes: DuesBalanceNote[];
+  noteRequestId: string;
   discordUserId: string;
   isPaid: boolean;
   isOverdue: boolean;

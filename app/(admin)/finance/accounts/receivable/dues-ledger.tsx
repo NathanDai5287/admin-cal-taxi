@@ -11,6 +11,7 @@ import {
 } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { DuesPaymentForm } from "./payment-form";
 import { DuesPaymentPlanForm } from "./payment-plan-form";
+import { DuesBalanceNotes } from "./balance-notes";
 import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { Button } from "@/components/brand/button";
 import { formatMoney } from "@/lib/reimbursements/format";
@@ -101,6 +102,7 @@ export function DuesLedger({
   const [sort, setSort] = useState("due-date");
   const [page, setPage] = useState(1);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
+  const [openDetail, setOpenDetail] = useState<"notes" | "payment">("payment");
   const [showChargeForm, setShowChargeForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
@@ -143,7 +145,7 @@ export function DuesLedger({
       if (filter === "overdue" && !row.isOverdue) return false;
       if (filter === "paid" && !row.isPaid) return false;
       if (!normalizedQuery) return true;
-      return [row.memberName, row.notes]
+      return [row.memberName, row.notes, ...row.balanceNotes.map((note) => note.body)]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     }).sort((a, b) => compareDuesBalances(a, b, sort));
   }, [filter, query, sort, optimisticRows]);
@@ -316,7 +318,7 @@ export function DuesLedger({
                   type="checkbox"
                 />}
                 <div className="min-w-0">
-                  <h3><button className="dues-member-button" type="button" aria-expanded={openRowId === row.id} aria-controls={`dues-detail-${row.id}`} onClick={() => setOpenRowId(openRowId === row.id ? null : row.id)}>{row.memberName}</button></h3>
+                  <h3><button className="dues-member-button" type="button" aria-label={`View ${row.balanceNotes.length} ${row.balanceNotes.length === 1 ? "note" : "notes"} for ${row.memberName}`} aria-expanded={openRowId === row.id && openDetail === "notes"} aria-controls={`dues-detail-${row.id}`} onClick={() => { setOpenRowId(openRowId === row.id && openDetail === "notes" ? null : row.id); setOpenDetail("notes"); }}><span className="dues-member-name">{row.memberName}</span><span className="dues-note-count">{row.balanceNotes.length} {row.balanceNotes.length === 1 ? "note" : "notes"}</span></button></h3>
                   {row.notes.trim() ? <p className="dues-note">{row.notes}</p> : null}
                   <p>
                     Due {formatDate(row.dueDate)}
@@ -336,10 +338,15 @@ export function DuesLedger({
               </div>
 
               <div className="dues-actions">
-                <Button compact disabled={row.pending} variant={row.isPaid ? "secondary" : "primary"} aria-expanded={openRowId === row.id} aria-controls={`dues-detail-${row.id}`} onClick={() => setOpenRowId(openRowId === row.id ? null : row.id)}>{row.isPaid || !canManage ? "View details" : openRowId === row.id ? "Close details" : "Record payment"}</Button>
+                <Button compact disabled={row.pending} variant={row.isPaid ? "secondary" : "primary"} aria-expanded={openRowId === row.id && openDetail === "payment"} aria-controls={`dues-detail-${row.id}`} onClick={() => { setOpenRowId(openRowId === row.id && openDetail === "payment" ? null : row.id); setOpenDetail("payment"); }}>{row.isPaid || !canManage ? "View details" : openRowId === row.id && openDetail === "payment" ? "Close details" : "Record payment"}</Button>
               </div>
             </div>
             {openRowId === row.id && <div className="dues-charge-detail" id={`dues-detail-${row.id}`}>
+              <div className="dues-detail-switch" role="group" aria-label="Balance details">
+                <button type="button" aria-pressed={openDetail === "notes"} aria-controls={`dues-notes-${row.id}`} onClick={() => setOpenDetail("notes")}>Notes ({row.balanceNotes.length})</button>
+                <button type="button" aria-pressed={openDetail === "payment"} aria-controls={`dues-payment-${row.id}`} onClick={() => setOpenDetail("payment")}>Payments &amp; plan</button>
+              </div>
+              {openDetail === "notes" ? <div id={`dues-notes-${row.id}`}><DuesBalanceNotes row={row} canManage={canManage} disabled={bulkBusy} /></div> : <div id={`dues-payment-${row.id}`} className="dues-payment-details">
               <dl className="dues-detail-facts">
                 <div><dt>Total charge</dt><dd>{formatMoney(row.assessedAmount)}</dd></div>
                 <div><dt>Paid to date</dt><dd>{formatMoney(row.paidAmount)}</dd></div>
@@ -355,6 +362,7 @@ export function DuesLedger({
                 <p className="mb-2 text-xs text-muted">Reopening reverses all recorded payments on this charge and restores its full balance.</p>
                 <Button compact disabled={row.pending} type="submit" variant="secondary">Reopen balance</Button>
               </form>}
+              </div>}
             </div>}
             </article>
             ))}

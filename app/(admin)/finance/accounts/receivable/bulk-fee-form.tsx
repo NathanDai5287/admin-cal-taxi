@@ -34,6 +34,8 @@ function newChargeRow(member: BulkFeeMember, amount: number, dueDate: string, no
     paymentPlan: null,
     dueDate,
     notes,
+    balanceNotes: [],
+    noteRequestId: crypto.randomUUID(),
     discordUserId: "",
     isPaid: false,
     isOverdue: dueDate < today,

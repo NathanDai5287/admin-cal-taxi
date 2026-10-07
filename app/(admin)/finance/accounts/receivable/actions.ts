@@ -275,6 +275,31 @@ export async function updateDuesPaymentPlan(
   return actionSuccess(plan ? "Payment plan saved." : "Payment plan removed.");
 }
 
+export async function addDuesBalanceNote(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const parsed = z.object({
+    id: z.string().uuid(),
+    body: z.string().trim().min(1, "Write a note first.").max(2000, "Keep the note under 2,000 characters."),
+    requestId: z.string().uuid(),
+  }).safeParse({ id: formData.get("id"), body: formData.get("body"), requestId: formData.get("requestId") });
+  if (!parsed.success) return actionError(parsed.error.issues[0]?.message ?? "Check the note and try again.");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("add_receivable_note", {
+    p_receivable_id: parsed.data.id,
+    p_body: parsed.data.body,
+    p_request_id: parsed.data.requestId,
+  });
+  if (error || !data) return actionError(error?.code === "40001"
+    ? "This balance is no longer available. Refresh and try again."
+    : "The note could not be saved. Your text is still here; please try again.");
+  revalidatePath("/finance/accounts/receivable");
+  return actionSuccess("Note added.");
+}
+
 export async function addDuesPayment(
   _previousState: DuesActionState,
   formData: FormData,

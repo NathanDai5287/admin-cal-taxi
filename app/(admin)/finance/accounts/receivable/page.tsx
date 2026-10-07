@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { ChargeMembersForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
-import { DuesBoard } from "@/app/(admin)/finance/accounts/receivable/dues-board";
+import { DuesBoard, type DuesBalanceNote } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -26,7 +26,7 @@ function currentPacificDate() {
 export default async function DuesPage() {
   await requireAdmin();
   const supabase = createAdminClient();
-  const [receivablesResult, profilesResult] = await Promise.all([
+  const [receivablesResult, profilesResult, notesResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
       .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at, payment_plan_frequency, payment_plan_amount, payment_plan_interval_days")
@@ -43,6 +43,12 @@ export default async function DuesPage() {
       .order("full_name", { ascending: true })
       .order("id", { ascending: true })
       .range(from, to)),
+    loadAllPages((from, to) => supabase
+      .from("chapter_receivable_notes")
+      .select("id, receivable_id, body, author_name, created_at")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to)),
   ]);
 
   if (receivablesResult.error) {
@@ -50,6 +56,16 @@ export default async function DuesPage() {
   }
   if (profilesResult.error) {
     throw new Error(`Unable to load members: ${profilesResult.error.message}`);
+  }
+  if (notesResult.error) {
+    throw new Error(`Unable to load balance notes: ${notesResult.error.message}`);
+  }
+
+  const notesByBalance = new Map<string, DuesBalanceNote[]>();
+  for (const note of notesResult.data) {
+    const notes = notesByBalance.get(note.receivable_id) ?? [];
+    notes.push({ id: note.id, body: note.body, authorName: note.author_name, createdAt: note.created_at });
+    notesByBalance.set(note.receivable_id, notes);
   }
 
   const members = (profilesResult.data ?? []).map((profile) => ({
@@ -73,6 +89,8 @@ export default async function DuesPage() {
       paidAmount: paid,
       dueDate: row.due_date,
       notes: row.notes,
+      balanceNotes: notesByBalance.get(row.id) ?? [],
+      noteRequestId: crypto.randomUUID(),
       discordUserId: row.discord_user_id,
       isPaid,
       isOverdue: !isPaid && row.due_date < today,

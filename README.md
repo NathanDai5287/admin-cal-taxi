@@ -154,6 +154,15 @@ the agreed amount, capped at the remaining balance, and allows manual changes.
 Payments are still recorded manually; plans do not change due dates or overdue
 status. Plan terms are retained when a balance is paid or reopened.
 
+### Balance notes
+
+Apply `supabase/migrations/20261009000000_dues_balance_notes.sql` before deploying.
+The count beside each member's name shows the notes for that specific balance.
+Click the name to view the history and add a note, including on fully paid balances.
+Each entry retains its author and timestamp; existing charge reasons stay separate.
+Notes appear newest first and can be found through the balance search. The
+Payments & plan control returns to payment recording and payment-plan settings.
+
 ## Finance organization
 
 Dues and reimbursements share `/finance`: Accounts (receivable, payable and

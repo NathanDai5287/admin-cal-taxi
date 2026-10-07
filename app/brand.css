@@ -507,8 +507,25 @@
   [data-brand] .dues-sort { @apply flex items-center gap-2; }
   [data-brand] .dues-sort select { @apply border border-rule bg-surface p-2 text-ink; }
   [data-brand] .dues-charge.selected { @apply bg-brand-light; }
-  [data-brand] .dues-member-button { @apply text-left cursor-pointer hover:underline; }
+  [data-brand] .dues-member-button { @apply inline-flex max-w-full items-center gap-2 text-left cursor-pointer hover:underline; }
+  [data-brand] .dues-member-name { @apply truncate; }
+  [data-brand] .dues-note-count { @apply shrink-0 text-[11px] font-medium text-muted tabular-nums; }
   [data-brand] .dues-charge-detail { @apply border-t border-rule bg-canvas p-4 grid gap-4; }
+  [data-brand] .dues-detail-switch { @apply flex flex-wrap gap-1 border-b border-rule; }
+  [data-brand] .dues-detail-switch button { @apply cursor-pointer border-b-2 border-transparent px-3 py-2 text-xs font-semibold text-muted hover:text-ink; }
+  [data-brand] .dues-detail-switch button[aria-pressed="true"] { @apply border-brand text-brand; }
+  [data-brand] .dues-payment-details { @apply grid gap-4; }
+  [data-brand] .dues-balance-notes { @apply grid gap-4; }
+  [data-brand] .dues-balance-notes h4 { @apply text-sm font-semibold text-ink; }
+  [data-brand] .dues-balance-notes h4 span { @apply text-muted; }
+  [data-brand] .dues-note-form { @apply grid gap-2; }
+  [data-brand] .dues-note-form textarea { @apply min-h-24 resize-y; }
+  [data-brand] .dues-note-footer { @apply flex flex-wrap items-center gap-3; }
+  [data-brand] .dues-note-history { @apply grid divide-y divide-rule; }
+  [data-brand] .dues-note-history li { @apply py-4 first:pt-0; }
+  [data-brand] .dues-note-meta { @apply mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted; }
+  [data-brand] .dues-note-meta strong { @apply font-semibold text-ink; }
+  [data-brand] .dues-note-history li > p { @apply whitespace-pre-wrap break-words text-sm text-ink; overflow-wrap: anywhere; }
   [data-brand] .dues-detail-facts { @apply grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs; }
   [data-brand] .dues-detail-facts dt { @apply text-muted; }
   [data-brand] .dues-detail-facts dd { @apply mt-1 font-semibold text-ink tabular-nums; }
