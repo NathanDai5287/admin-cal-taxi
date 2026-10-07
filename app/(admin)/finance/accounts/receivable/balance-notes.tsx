@@ -15,6 +15,27 @@ function BalanceNote({ note, balanceId, canManage, disabled }: {
   const [mode, setMode] = useState<"edit" | "delete" | null>(null);
   const [body, setBody] = useState(note.body);
   const [originalBody, setOriginalBody] = useState(note.body);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !menuRef.current?.contains(event.target)) setMenuOpen(false);
+    };
+    const dismissEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", dismissOutside);
+    document.addEventListener("keydown", dismissEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside);
+      document.removeEventListener("keydown", dismissEscape);
+    };
+  }, [menuOpen]);
   const [state, action, pending] = useActionState(async (previous: Parameters<typeof manageDuesBalanceNote>[0], data: FormData) => {
     const result = await manageDuesBalanceNote(previous, data);
     if (result.status === "success") setMode(null);
@@ -22,15 +43,29 @@ function BalanceNote({ note, balanceId, canManage, disabled }: {
   }, { status: "idle" as const, message: "", sequence: 0 });
   const busy = pending || disabled;
   const begin = (next: "edit" | "delete") => {
+    setMenuOpen(false);
     setBody(note.body);
     setOriginalBody(note.body);
     setMode(next);
   };
 
   return <li>
-    <div className="dues-note-meta"><strong>{note.authorName}</strong><time dateTime={note.createdAt}>{dateFormat.format(new Date(note.createdAt))}</time></div>
+    <div className="dues-note-header">
+      <div className="dues-note-meta"><strong>{note.authorName}</strong><time dateTime={note.createdAt}>{dateFormat.format(new Date(note.createdAt))}</time></div>
+      {canManage && !mode && <div className="dues-note-menu" ref={menuRef} onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+      }}>
+        <button ref={menuButtonRef} className="dues-note-menu-trigger" type="button" disabled={busy} aria-label={`Actions for note by ${note.authorName}`} aria-expanded={menuOpen} aria-controls={`note-actions-${note.id}`} onClick={() => setMenuOpen(!menuOpen)}>
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="10" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="16" cy="10" r="1.5" /></svg>
+        </button>
+        {menuOpen && <div id={`note-actions-${note.id}`} className="dues-note-menu-options" role="group" aria-label="Note actions">
+          <button type="button" disabled={busy} onClick={() => begin("edit")}>Edit</button>
+          <button type="button" disabled={busy} onClick={() => begin("delete")}>Delete</button>
+        </div>}
+      </div>}
+    </div>
     {mode !== "edit" && <p>{note.body}</p>}
-    {canManage && (mode ? <form action={action} className="dues-note-form mt-3" onReset={(event) => event.preventDefault()}>
+    {canManage && mode && <form action={action} className="dues-note-form mt-3" onReset={(event) => event.preventDefault()}>
       <input name="id" type="hidden" value={balanceId} />
       <input name="noteId" type="hidden" value={note.id} />
       <input name="originalBody" type="hidden" value={originalBody} />
@@ -43,10 +78,7 @@ function BalanceNote({ note, balanceId, canManage, disabled }: {
         <Button compact type="submit" variant={mode === "delete" ? "danger" : "primary"} disabled={busy || (mode === "edit" && !body.trim())}>{pending ? "Saving…" : mode === "edit" ? "Save changes" : "Delete note"}</Button>
         <Button compact variant="secondary" disabled={pending} onClick={() => setMode(null)}>Cancel</Button>
       </div>
-    </form> : <div className="dues-note-footer mt-2">
-      <Button compact variant="text" disabled={busy} onClick={() => begin("edit")} aria-label={`Edit note by ${note.authorName}`}>Edit</Button>
-      <Button compact variant="text" disabled={busy} onClick={() => begin("delete")} aria-label={`Delete note by ${note.authorName}`}>Delete</Button>
-    </div>)}
+    </form>}
     <div aria-live="polite" className={`dues-action-feedback ${state.status}`}>{state.message}</div>
   </li>;
 }
