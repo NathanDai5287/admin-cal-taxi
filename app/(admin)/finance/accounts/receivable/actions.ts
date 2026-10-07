@@ -303,6 +303,38 @@ export async function addDuesBalanceNote(
   return actionSuccess("Note added.");
 }
 
+export async function manageDuesBalanceNote(
+  _previousState: DuesActionState,
+  formData: FormData,
+): Promise<DuesActionState> {
+  await requireAdmin("/");
+  const parsed = z.object({
+    id: z.string().uuid(),
+    noteId: z.string().uuid(),
+    originalBody: z.string().min(1).max(2000),
+    operation: z.enum(["edit", "delete"]),
+  }).safeParse({
+    id: formData.get("id"), noteId: formData.get("noteId"),
+    originalBody: formData.get("originalBody"), operation: formData.get("operation"),
+  });
+  if (!parsed.success) return actionError("This note could not be identified. Refresh and try again.");
+  const body = parsed.data.operation === "edit"
+    ? z.string().trim().min(1, "Write a note first.").max(2000, "Keep the note under 2,000 characters.").safeParse(formData.get("body"))
+    : null;
+  if (body && !body.success) return actionError(body.error.issues[0]?.message ?? "Check the note and try again.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("manage_receivable_note", {
+    p_receivable_id: parsed.data.id, p_note_id: parsed.data.noteId,
+    p_original_body: parsed.data.originalBody, p_action: parsed.data.operation,
+    p_body: body?.success ? body.data : null,
+  });
+  if (error || !data) return actionError(error?.code === "40001"
+    ? "This note or balance changed in another session. Refresh and try again."
+    : "The note could not be changed. Please try again.");
+  revalidatePath("/finance/accounts/receivable");
+  return actionSuccess(parsed.data.operation === "edit" ? "Note updated." : "Note deleted.");
+}
+
 export async function addDuesPayment(
   _previousState: DuesActionState,
   formData: FormData,

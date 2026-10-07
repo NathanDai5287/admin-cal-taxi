@@ -670,6 +670,16 @@ export type Database = {
         Args: { p_receivable_id: string; p_body: string; p_request_id: string };
         Returns: string;
       };
+      manage_receivable_note: {
+        Args: {
+          p_receivable_id: string;
+          p_note_id: string;
+          p_original_body: string;
+          p_action: string;
+          p_body?: string | null;
+        };
+        Returns: string;
+      };
       record_hosting_payment: {
         Args: { p_amount: number; p_kind: Database["public"]["Enums"]["hosting_payment_kind"]; p_order_id: string; p_paid_date: string; p_request_id: string };
         Returns: string;

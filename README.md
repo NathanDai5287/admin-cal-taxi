@@ -166,6 +166,10 @@ Apply `supabase/migrations/20261009000000_dues_balance_notes.sql` before deployi
 The count beside each member's name shows the notes for that specific balance.
 Click the name to view the history and add a note, including on fully paid balances.
 Each entry retains its author and timestamp; existing charge reasons stay separate.
+Apply `supabase/migrations/20261011000000_dues_balance_note_management.sql`
+to let administrators edit or delete any balance note. Editing keeps the original
+author and timestamp; deletion requires confirmation. Stale changes are rejected
+so another administrator's edits cannot be overwritten or deleted accidentally.
 Notes appear newest first and can be found through the balance search. The
 Payments tab contains payment entry and read-only history with each recorded
 date and amount, newest payment date first. Negative events are labeled Payment
