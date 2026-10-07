@@ -17,13 +17,13 @@ export function PayableDetailView({ detail }: { detail: PayableDetailData }) {
   return (
     <ReviewStatusProvider initialDenialReason={detail.denialReason} reimbursementId={detail.id} status={detail.status}>
       <RefreshWhile active={!processingComplete} />
+      <Link className="back-link mb-4 inline-flex" href="/finance/accounts/payable">← All reimbursements</Link>
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
         <div>
           <p className="page-eyebrow">Submission review</p>
           <h1 className="page-title">{detail.name}</h1>
           <p className="page-lede">Submitted {formatReimbursementDate(detail.submittedAt, true)}</p>
         </div>
-        <Link className="back-link" href="/finance/accounts/payable">← All reimbursements</Link>
       </div>
 
       <div className="review-grid">

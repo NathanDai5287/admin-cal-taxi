@@ -13,7 +13,7 @@
     "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs scripts/dues-payments-database.test.mjs scripts/dues-payment-plans.test.mjs scripts/dues-payment-plans-database.test.mjs scripts/dues-balance-notes-database.test.mjs",
     "test:members": "node --test scripts/academic-calendar.test.mjs scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs",
     "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs scripts/manual-expense-receipt.test.mjs",
-    "test:review": "node --test scripts/review-decisions.test.mjs",
+    "test:review": "node --test scripts/review-decisions.test.mjs scripts/completed-category-review.test.mjs scripts/completed-category-approval-database.test.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

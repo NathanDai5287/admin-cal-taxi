@@ -5,7 +5,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
 import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
-import { formatStatus } from "@/lib/reimbursements/format";
+import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
+import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/format";
 
 type ReviewStatusState = {
   change: (status: "approved" | "denied", denialReason?: string) => Promise<boolean>;
@@ -27,6 +28,7 @@ export function ReviewStatusProvider({ children, initialDenialReason = "", reimb
   const [denialReason, setDenialReason] = useState(initialDenialReason);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [completedCategory, setCompletedCategory] = useState<ReimbursementCategory | null>(null);
   const mutationId = useRef(0);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function ReviewStatusProvider({ children, initialDenialReason = "", reimb
     return () => window.clearTimeout(timer);
   }, [pending, serverStatus, initialDenialReason]);
 
-  async function change(next: "approved" | "denied", note = "") {
+  async function change(next: "approved" | "denied", note = "", reopenCategory?: ReimbursementCategory) {
     if (pending) return false;
     const previous = status;
     const previousReason = denialReason;
@@ -47,15 +49,21 @@ export function ReviewStatusProvider({ children, initialDenialReason = "", reimb
     setDenialReason(next === "denied" ? note : "");
     setPending(true);
     setError("");
+    let reopenRequired = false;
     try {
-      const result = await setReimbursementStatus(reimbursementId, next, next === "denied" ? note : undefined);
-      if (!result.ok) throw new Error(result.message);
+      const result = await setReimbursementStatus(reimbursementId, next, next === "denied" ? note : undefined, reopenCategory);
+      if (!result.ok) {
+        reopenRequired = Boolean(result.completedCategory && !reopenCategory);
+        if (result.completedCategory) setCompletedCategory(result.completedCategory);
+        throw new Error(result.message);
+      }
       return true;
     } catch (reason) {
       if (mutationId.current === currentMutation) {
         setStatus(previous);
         setDenialReason(previousReason);
-        setError(reason instanceof Error ? reason.message : "Unable to save the review decision.");
+        const message = reason instanceof Error ? reason.message : "Unable to save the review decision.";
+        setError(reopenRequired ? "" : message);
       }
       return false;
     } finally {
@@ -63,7 +71,14 @@ export function ReviewStatusProvider({ children, initialDenialReason = "", reimb
     }
   }
 
-  return <ReviewStatusContext.Provider value={{ change, denialReason, error, pending, status }}>{children}</ReviewStatusContext.Provider>;
+  async function reopenAndApprove() {
+    if (completedCategory && await change("approved", "", completedCategory)) setCompletedCategory(null);
+  }
+
+  return <ReviewStatusContext.Provider value={{ change, denialReason, error, pending, status }}>
+    {children}
+    <ReopenApprovalDialog category={completedCategory} error={error} pending={pending} onCancel={() => setCompletedCategory(null)} onConfirm={reopenAndApprove} />
+  </ReviewStatusContext.Provider>;
 }
 
 function useReviewStatus() {

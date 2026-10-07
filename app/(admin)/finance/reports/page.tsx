@@ -6,7 +6,7 @@ import Form from "next/form";
 
 import { SpendingByCategory } from "@/components/finance/spending-by-category";
 import { PrefetchRoutes } from "@/components/navigation/prefetch-routes";
-import { categories, originalCategoryBudgetsFromRows, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
+import { categories, categoryBudgetsFromRows, formatCategory, formatMoney, formatStatus } from "@/lib/reimbursements/format";
 import {
   filtersToSearchParams,
   loadReportManualExpenses,
@@ -52,7 +52,7 @@ export default async function ReimbursementReportsPage({ searchParams }: { searc
 
   const memberNames = [...new Set((namesResult.data ?? []).map((row) => row.full_name))];
   const summary = summarizeApproved(rows, manualExpenses);
-  const budgets = originalCategoryBudgetsFromRows(budgetQueryResult.data);
+  const budgets = categoryBudgetsFromRows(budgetQueryResult.data);
   const overallBudget = (budgetEntriesResult.data ?? [])
     .reduce((total, entry) => total + Number(entry.amount), 0);
   const filterParams = filtersToSearchParams(filters);

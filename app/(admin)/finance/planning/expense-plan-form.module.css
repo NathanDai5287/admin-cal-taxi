@@ -47,23 +47,12 @@
   font-weight: 400;
 }
 
-.expected {
+.planned {
   width: 160px;
 }
 
-.expected input {
+.planned input {
   text-align: right;
-}
-
-.difference {
-  color: var(--color-muted);
-  white-space: nowrap;
-}
-
-.over {
-  color: var(--color-warn);
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .action {
@@ -71,13 +60,43 @@
   white-space: nowrap;
 }
 
-.action button {
+.complete {
   min-height: 44px;
+  min-width: 96px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  color: var(--color-brand);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-@media (max-width: 900px) {
+.complete:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+
+.complete:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.complete:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.error {
+  max-width: 240px;
+  margin-top: 4px;
+  color: var(--color-warn);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+
+@media (max-width: 600px) {
   .table,
   .table tbody {
     display: block;
@@ -112,7 +131,7 @@
     content: attr(data-label);
   }
 
-  .table .expected {
+  .table .planned {
     width: auto;
   }
 

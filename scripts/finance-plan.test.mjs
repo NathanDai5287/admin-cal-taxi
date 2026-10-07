@@ -250,3 +250,22 @@ test("expected expenses include overspending and later entries in completed cate
   assert.equal(later.expectedExpenses, 1200);
   assert.equal(later.actualExpenses, 1200);
 });
+
+test("current plans stay editable after completion and Socials keeps its permit forecast", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const input = {
+    ...baseInput(),
+    categoryBudgets: { rush: 1700, socials: 2500 },
+    directExpenses: [{ category: "rush", amount: 1350.91 }, { category: "socials", amount: 1004.04 }],
+    hostingOrders: [{ plannedRevenue: 0, plannedFirePermit: 125, status: "confirmed" }],
+    completedCategories: ["rush"],
+  };
+  const completed = buildPlanVsActual(input);
+  assert.equal(completed.expenseBreakdown.find((row) => row.category === "rush").planned, 1700);
+  assert.equal(completed.expectedExpenses, 3975.91);
+  const edited = buildPlanVsActual({ ...input, categoryBudgets: { rush: 1950, socials: 2500 } });
+  assert.equal(edited.expenseBreakdown.find((row) => row.category === "rush").planned, 1950);
+  assert.equal(edited.expectedExpenses, 3975.91);
+  const reopened = buildPlanVsActual({ ...input, categoryBudgets: { rush: 1950, socials: 2500 }, completedCategories: [] });
+  assert.equal(reopened.expectedExpenses, 4575);
+});

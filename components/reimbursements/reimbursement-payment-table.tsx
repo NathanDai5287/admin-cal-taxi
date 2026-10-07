@@ -10,7 +10,8 @@ import {
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
 import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
-import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
+import { formatCategory, formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
+import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import {
   InlineStatusSelect,
   type ReimbursementStatus,
@@ -61,6 +62,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const dialogRef = useRef<HTMLDialogElement>(null);
   const denialDialogRef = useRef<HTMLDialogElement>(null);
   const [denialTarget, setDenialTarget] = useState<PaymentTableRow | null>(null);
+  const [approvalTarget, setApprovalTarget] = useState<{ row: PaymentTableRow; category: ReimbursementCategory } | null>(null);
   const [denialNote, setDenialNote] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [feedback, setFeedback] = useState("");
@@ -180,7 +182,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     });
   }
 
-  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus, denialReason?: string) {
+  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus, denialReason?: string, reopenCategory?: ReimbursementCategory) {
     const key = `${row.id}:status`;
     const previousStatus = row.status;
     const previousDenialReason = row.denial_reason;
@@ -190,21 +192,29 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     setFieldPending(key, true);
 
     try {
-      const result = await setReimbursementStatus(row.id, status, denialReason);
+      const result = await setReimbursementStatus(row.id, status, denialReason, reopenCategory);
       if (!result.ok) {
         patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
-        setMutationError(result.message);
-        return;
+        if (result.completedCategory) setApprovalTarget({ row, category: result.completedCategory });
+        setMutationError(result.completedCategory && !reopenCategory ? "" : result.message);
+        return false;
       }
 
       patchRow(row.id, result.row);
       router.refresh();
+      return true;
     } catch (error) {
       patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
       setMutationError(error instanceof Error ? error.message : "Unable to change the status.");
+      return false;
     } finally {
       setFieldPending(key, false);
     }
+  }
+
+  async function reopenAndApprove() {
+    if (!approvalTarget) return;
+    if (await changeStatus(approvalTarget.row, "approved", undefined, approvalTarget.category)) setApprovalTarget(null);
   }
 
   async function changeReimbursed(row: PaymentTableRow, reimbursed: boolean) {
@@ -540,6 +550,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       {feedback && <p className="payment-feedback" role="status">{feedback}</p>}
       {mutationError && <p className="payment-dialog-error pb-3" role="alert">{mutationError}</p>}
 
+      <ReopenApprovalDialog category={approvalTarget?.category ?? null} error={mutationError} pending={Boolean(approvalTarget && pendingFields.has(`${approvalTarget.row.id}:status`))} onCancel={() => setApprovalTarget(null)} onConfirm={reopenAndApprove} />
       <dialog
         aria-labelledby="payment-review-heading"
         className="payment-review-dialog"

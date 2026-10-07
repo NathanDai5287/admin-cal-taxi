@@ -115,6 +115,11 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
       .neq("status", "pending")
       .select("id")
       .maybeSingle();
+    if (updateError?.code === "23514" && updateError.message === "Reopen the completed category before approving this reimbursement") {
+      await removeReaction(reaction, user.id);
+      console.warn("Reopen the completed category in Finance before approving this reimbursement.");
+      return;
+    }
     if (updateError) throw updateError;
     if (!updated) return;
 
