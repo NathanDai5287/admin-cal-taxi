@@ -10,6 +10,7 @@ import {
   type DuesActionState,
 } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { DuesPaymentForm } from "./payment-form";
+import { DuesPaymentHistory } from "./payment-history";
 import { DuesPaymentPlanForm } from "./payment-plan-form";
 import { DuesBalanceNotes } from "./balance-notes";
 import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
@@ -102,7 +103,7 @@ export function DuesLedger({
   const [sort, setSort] = useState("due-date");
   const [page, setPage] = useState(1);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
-  const [openDetail, setOpenDetail] = useState<"notes" | "payment">("payment");
+  const [openDetail, setOpenDetail] = useState<"notes" | "payment" | "plan">("payment");
   const [showChargeForm, setShowChargeForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
@@ -342,11 +343,19 @@ export function DuesLedger({
               </div>
             </div>
             {openRowId === row.id && <div className="dues-charge-detail" id={`dues-detail-${row.id}`}>
-              <div className="dues-detail-switch" role="group" aria-label="Balance details">
-                <button type="button" aria-pressed={openDetail === "notes"} aria-controls={`dues-notes-${row.id}`} onClick={() => setOpenDetail("notes")}>Notes ({row.balanceNotes.length})</button>
-                <button type="button" aria-pressed={openDetail === "payment"} aria-controls={`dues-payment-${row.id}`} onClick={() => setOpenDetail("payment")}>Payments &amp; plan</button>
+              <div className="dues-detail-switch" role="tablist" aria-label={`Balance details for ${row.memberName}`} onKeyDown={(event) => {
+                const tabs = ["notes", "payment", "plan"] as const;
+                const index = tabs.indexOf(openDetail);
+                const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+                if (nextIndex === null) return;
+                event.preventDefault();
+                setOpenDetail(tabs[nextIndex]);
+                event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
+              }}>
+                {(["notes", "payment", "plan"] as const).map((tab) => <button key={tab} type="button" role="tab" id={`dues-tab-${tab}-${row.id}`} tabIndex={openDetail === tab ? 0 : -1} aria-selected={openDetail === tab} aria-controls={`dues-${tab}-${row.id}`} onClick={() => setOpenDetail(tab)}>{tab === "notes" ? `Notes (${row.balanceNotes.length})` : tab === "payment" ? "Payments" : "Plan & Scheduling"}</button>)}
               </div>
-              {openDetail === "notes" ? <div id={`dues-notes-${row.id}`}><DuesBalanceNotes row={row} canManage={canManage} disabled={bulkBusy} /></div> : <div id={`dues-payment-${row.id}`} className="dues-payment-details">
+              <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-notes-${row.id}`} id={`dues-notes-${row.id}`} hidden={openDetail !== "notes"}><DuesBalanceNotes row={row} canManage={canManage} disabled={bulkBusy} /></div>
+              <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-payment-${row.id}`} id={`dues-payment-${row.id}`} hidden={openDetail !== "payment"} className="dues-payment-details">
               <dl className="dues-detail-facts">
                 <div><dt>Total charge</dt><dd>{formatMoney(row.assessedAmount)}</dd></div>
                 <div><dt>Paid to date</dt><dd>{formatMoney(row.paidAmount)}</dd></div>
@@ -354,7 +363,7 @@ export function DuesLedger({
                 <div><dt>Discord</dt><dd>{row.discordUserId ? "Linked" : "Not linked"}</dd></div>
               </dl>
               {canManage && !row.isPaid && <DuesPaymentForm row={row} today={today} onRecorded={setPaymentMessage} />}
-              {canManage && !row.isPaid && <DuesPaymentPlanForm key={`${row.paymentPlan?.frequency ?? "none"}|${row.paymentPlan?.amount ?? ""}|${row.paymentPlan?.intervalDays ?? ""}`} row={row} disabled={bulkBusy} onSaved={setPaymentMessage} />}
+              <DuesPaymentHistory payments={row.paymentHistory} />
               {canManage && row.isPaid && <form action={submitPaidToggle}>
                 <input name="id" type="hidden" value={row.id} />
                 <input name="paid" type="hidden" value="false" />
@@ -362,7 +371,10 @@ export function DuesLedger({
                 <p className="mb-2 text-xs text-muted">Reopening reverses all recorded payments on this charge and restores its full balance.</p>
                 <Button compact disabled={row.pending} type="submit" variant="secondary">Reopen balance</Button>
               </form>}
-              </div>}
+              </div>
+              <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-plan-${row.id}`} id={`dues-plan-${row.id}`} hidden={openDetail !== "plan"}>
+                <DuesPaymentPlanForm key={`${row.paymentPlan?.frequency ?? "none"}|${row.paymentPlan?.amount ?? ""}|${row.paymentPlan?.intervalDays ?? ""}|${row.paymentPlanStartDate ?? ""}`} row={row} disabled={bulkBusy || !canManage} onSaved={setPaymentMessage} />
+              </div>
             </div>}
             </article>
             ))}
@@ -390,6 +402,7 @@ export function DuesLedger({
             <label className="dues-bulk-field">
               <span><input checked={applyDueDate} name="applyDueDate" onChange={(event) => setApplyDueDate(event.target.checked)} type="checkbox" /> Due date</span>
               <input className="field-input" disabled={!applyDueDate || bulkBusy} name="dueDate" required={applyDueDate} type="date" />
+              <small className="text-muted">For payment plans, this sets the first-installment date. The next due date includes installments already covered.</small>
             </label>
             <label className="dues-bulk-field">
               <span><input checked={applyNotes} name="applyNotes" onChange={(event) => setApplyNotes(event.target.checked)} type="checkbox" /> Note or reason</span>

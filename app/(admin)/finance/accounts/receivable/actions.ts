@@ -229,6 +229,7 @@ export async function setDuesPaid(
 }
 
 const paymentPlanSchema = z.object({
+  startDate: z.iso.date("Choose a valid first-installment date.").refine((date) => date >= "0001-01-01", "Choose a valid first-installment date."),
   frequency: z.enum(["weekly", "biweekly", "monthly", "custom"], { error: "Choose a payment frequency." }),
   amount: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Enter a dollar amount with at most two decimal places.")
     .transform(Number).pipe(z.number().positive("Enter an amount greater than $0.").max(999_999_999.99, "The payment amount is too large.")),
@@ -249,6 +250,7 @@ export async function updateDuesPaymentPlan(
 
   const enabled = formData.get("paymentPlanEnabled") === "on";
   const parsed = enabled ? paymentPlanSchema.safeParse({
+    startDate: formData.get("startDate"),
     frequency: formData.get("frequency"),
     amount: formData.get("planAmount"),
     intervalDays: formData.get("frequency") === "custom" ? formData.get("intervalDays") : null,
@@ -263,12 +265,13 @@ export async function updateDuesPaymentPlan(
     p_frequency: plan?.frequency ?? null,
     p_amount: plan?.amount ?? null,
     p_interval_days: plan?.intervalDays ?? null,
+    p_start_date: plan?.startDate ?? null,
   });
   if (error || !data) {
     return actionError(error?.code === "40001"
       ? "This charge changed in another session. Refresh and try again."
       : error?.code === "22023"
-        ? "Payment plans can only be edited on outstanding charges. Refresh and check this balance."
+        ? "Check that this charge is outstanding and its schedule uses dates from year 1 through 9999."
         : "The payment plan could not be saved. Please try again.");
   }
   revalidateDues();

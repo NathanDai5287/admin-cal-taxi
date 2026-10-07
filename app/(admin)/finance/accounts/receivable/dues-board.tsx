@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useOptimistic, type ReactNode } from "react";
-import { compareDuesBalances, type DuesPaymentPlan } from "@/lib/reimbursements/dues-payment-plan";
+import { compareDuesBalances, paymentPlanDueDate, type DuesPaymentPlan } from "@/lib/reimbursements/dues-payment-plan";
 
 export type DuesBalanceNote = {
   id: string;
@@ -20,6 +20,8 @@ export type DuesRow = {
   dueDate: string;
   notes: string;
   balanceNotes: DuesBalanceNote[];
+  paymentHistory: DuesPaymentEvent[];
+  paymentPlanStartDate: string | null;
   noteRequestId: string;
   discordUserId: string;
   isPaid: boolean;
@@ -28,6 +30,14 @@ export type DuesRow = {
   updatedAt: string;
   paymentPlan: DuesPaymentPlan | null;
   pending?: boolean;
+};
+
+export type DuesPaymentEvent = {
+  id: string;
+  amount: number;
+  paidDate: string;
+  dateIsEstimated: boolean;
+  createdAt: string;
 };
 
 type BulkEditChanges = {
@@ -48,12 +58,16 @@ function sortRows(rows: DuesRow[]) {
 
 function markPaid(row: DuesRow, paid: boolean, today: string): DuesRow {
   const paidAmount = paid ? row.assessedAmount : 0;
+  const dueDate = row.paymentPlan && row.paymentPlanStartDate
+    ? paymentPlanDueDate(row.paymentPlanStartDate, row.paymentPlan, paidAmount, row.assessedAmount) ?? row.dueDate
+    : row.dueDate;
   return {
     ...row,
     paidAmount,
     amountOwed: row.assessedAmount - paidAmount,
     isPaid: paid,
-    isOverdue: !paid && row.dueDate < today,
+    dueDate,
+    isOverdue: !paid && dueDate < today,
     pending: true,
   };
 }
@@ -61,13 +75,18 @@ function markPaid(row: DuesRow, paid: boolean, today: string): DuesRow {
 function applyBulkEdit(row: DuesRow, changes: BulkEditChanges, today: string): DuesRow {
   const assessedAmount = changes.amountAssessed ?? row.assessedAmount;
   const amountOwed = Math.max(assessedAmount - row.paidAmount, 0);
-  const dueDate = changes.dueDate ?? row.dueDate;
+  const paymentPlanStartDate = changes.dueDate && (row.paymentPlan || row.paymentPlanStartDate)
+    ? changes.dueDate : row.paymentPlanStartDate;
+  const dueDate = row.paymentPlan && paymentPlanStartDate
+    ? paymentPlanDueDate(paymentPlanStartDate, row.paymentPlan, row.paidAmount, assessedAmount) ?? row.dueDate
+    : changes.dueDate ?? row.dueDate;
   const isPaid = amountOwed <= 0;
   return {
     ...row,
     assessedAmount,
     amountOwed,
     dueDate,
+    paymentPlanStartDate,
     notes: changes.notes ?? row.notes,
     isPaid,
     isOverdue: !isPaid && dueDate < today,

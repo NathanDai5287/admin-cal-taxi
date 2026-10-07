@@ -318,6 +318,7 @@ export type Database = {
           payment_plan_frequency: string | null;
           payment_plan_amount: number | null;
           payment_plan_interval_days: number | null;
+          payment_plan_start_date: string | null;
           member_id: string | null;
           id: string;
           member_name: string;
@@ -336,6 +337,7 @@ export type Database = {
           payment_plan_frequency?: string | null;
           payment_plan_amount?: number | null;
           payment_plan_interval_days?: number | null;
+          payment_plan_start_date?: string | null;
           member_id?: string | null;
           id?: string;
           member_name: string;
@@ -354,6 +356,7 @@ export type Database = {
           payment_plan_frequency?: string | null;
           payment_plan_amount?: number | null;
           payment_plan_interval_days?: number | null;
+          payment_plan_start_date?: string | null;
           member_id?: string | null;
           member_name?: string;
           amount_assessed?: number;
@@ -659,6 +662,7 @@ export type Database = {
           p_frequency: string | null;
           p_amount: number | null;
           p_interval_days: number | null;
+          p_start_date?: string | null;
         };
         Returns: boolean;
       };

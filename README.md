@@ -144,15 +144,21 @@ announcements.
 ### Dues payment plans
 
 Apply `supabase/migrations/20261008000000_dues_payment_plans.sql` before deploying.
-In Finance → Dues, expand an outstanding charge, enable Payment Plan, and save
-the amount per payment and frequency. Monthly is the default; weekly, every two
+Apply `supabase/migrations/20261010000000_dues_payment_plan_scheduling.sql` for
+automatic scheduling. In Finance → Dues, open Plan & Scheduling, enable Payment
+Plan, and save the amount, frequency, and first-installment date. Monthly is the default; weekly, every two
 weeks, and a custom interval in days are also available. Uncheck Payment Plan and
 save to remove it.
 
 Outstanding plans appear first under every sort option. Record payment prefills
 the agreed amount, capped at the remaining balance, and allows manual changes.
-Payments are still recorded manually; plans do not change due dates or overdue
-status. Plan terms are retained when a balance is paid or reopened.
+Payments are recorded manually. Each full installment covered by cumulative
+payments advances the due date from the original first-installment date. Monthly
+schedules preserve the anniversary through short months (Jan 31 → Feb 28 → Mar 31).
+Changing plan terms recalculates from the original date and total paid. Editing
+the due date sets a new first-installment date for plans. Removing a plan retains
+the latest due date and its anchor for re-enabling. Fully paid balances keep the
+final installment date; reopening recalculates the schedule after reversals.
 
 ### Balance notes
 
@@ -161,7 +167,10 @@ The count beside each member's name shows the notes for that specific balance.
 Click the name to view the history and add a note, including on fully paid balances.
 Each entry retains its author and timestamp; existing charge reasons stay separate.
 Notes appear newest first and can be found through the balance search. The
-Payments & plan control returns to payment recording and payment-plan settings.
+Payments tab contains payment entry and read-only history with each recorded
+date and amount, newest payment date first. Negative events are labeled Payment
+reversal; legacy aggregate payments keep their Estimated date label. Notes,
+Payments, and Plan & Scheduling are available on fully paid balances too.
 
 ## Finance organization
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { ChargeMembersForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
 import { DuesAnnouncement } from "@/app/(admin)/finance/accounts/receivable/dues-announcement";
-import { DuesBoard, type DuesBalanceNote } from "@/app/(admin)/finance/accounts/receivable/dues-board";
+import { DuesBoard, type DuesBalanceNote, type DuesPaymentEvent } from "@/app/(admin)/finance/accounts/receivable/dues-board";
 import { DuesLedger } from "@/app/(admin)/finance/accounts/receivable/dues-ledger";
 import { formatMoney } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -26,10 +26,10 @@ function currentPacificDate() {
 export default async function DuesPage() {
   await requireAdmin();
   const supabase = createAdminClient();
-  const [receivablesResult, profilesResult, notesResult] = await Promise.all([
+  const [receivablesResult, profilesResult, notesResult, paymentsResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("chapter_receivables")
-      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at, payment_plan_frequency, payment_plan_amount, payment_plan_interval_days")
+      .select("id, member_id, member_name, amount_assessed, amount_paid, due_date, notes, discord_user_id, updated_at, payment_plan_frequency, payment_plan_amount, payment_plan_interval_days, payment_plan_start_date")
       .is("waived_at", null)
       .order("due_date", { ascending: true })
       .order("member_name", { ascending: true })
@@ -49,6 +49,13 @@ export default async function DuesPage() {
       .order("created_at", { ascending: false })
       .order("id", { ascending: true })
       .range(from, to)),
+    loadAllPages((from, to) => supabase
+      .from("chapter_dues_payment_events")
+      .select("id, receivable_id, amount, paid_date, date_is_estimated, created_at")
+      .order("paid_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to)),
   ]);
 
   if (receivablesResult.error) {
@@ -59,6 +66,16 @@ export default async function DuesPage() {
   }
   if (notesResult.error) {
     throw new Error(`Unable to load balance notes: ${notesResult.error.message}`);
+  }
+  if (paymentsResult.error) {
+    throw new Error(`Unable to load payment history: ${paymentsResult.error.message}`);
+  }
+
+  const paymentsByBalance = new Map<string, DuesPaymentEvent[]>();
+  for (const payment of paymentsResult.data) {
+    const payments = paymentsByBalance.get(payment.receivable_id) ?? [];
+    payments.push({ id: payment.id, amount: Number(payment.amount), paidDate: payment.paid_date, dateIsEstimated: payment.date_is_estimated, createdAt: payment.created_at });
+    paymentsByBalance.set(payment.receivable_id, payments);
   }
 
   const notesByBalance = new Map<string, DuesBalanceNote[]>();
@@ -90,6 +107,8 @@ export default async function DuesPage() {
       dueDate: row.due_date,
       notes: row.notes,
       balanceNotes: notesByBalance.get(row.id) ?? [],
+      paymentHistory: paymentsByBalance.get(row.id) ?? [],
+      paymentPlanStartDate: row.payment_plan_start_date,
       noteRequestId: crypto.randomUUID(),
       discordUserId: row.discord_user_id,
       isPaid,
