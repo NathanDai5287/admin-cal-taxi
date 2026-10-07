@@ -6,6 +6,7 @@ import { Button } from "@/components/brand/button";
 import { categories, formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
 
 import { saveReimbursementBudgets, type ExpensePlanState } from "./actions";
+import styles from "./expense-plan-form.module.css";
 
 const initialState: ExpensePlanState = { status: "idle", message: "" };
 
@@ -29,24 +30,31 @@ export function ExpensePlanForm({ budgets, completedCategories, expenses }: {
   const [state, formAction, pending] = useActionState(saveReimbursementBudgets, initialState);
 
   return (
-    <form action={formAction} onKeyDown={saveForecastOnEnter} className="card-body border-t border-rule pt-5">
-      <p className="mb-5 text-xs leading-relaxed text-muted">Mark complete when spending is finished. Expected expenses will use actual spending. Mark complete and Reopen also save your changes. Fire permits add to open Socials forecasts.</p>
-      <fieldset disabled={pending} className="grid min-w-0 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <form action={formAction} onKeyDown={saveForecastOnEnter} className="card-body border-t border-rule">
+      <fieldset disabled={pending} className="min-w-0">
         <legend className="sr-only">Category forecasts and completion</legend>
-        {categories.map(([category, label]) => (
-          <ExpenseCategoryField
-            key={category}
-            category={category}
-            label={label}
-            budget={budgets[category] ?? null}
-            completed={completedCategories.includes(category)}
-            expense={expenses.find((expense) => expense.category === category)!}
-          />
-        ))}
+        <table className={styles.table}>
+          <caption className="sr-only">Expense forecasts compared with original plans and actual spending</caption>
+          <thead><tr><th scope="col">Category</th><th scope="col">Original plan</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Difference</th><th scope="col"><span className="sr-only">Action</span></th></tr></thead>
+          <tbody>
+            {categories.map(([category, label]) => (
+              <ExpenseCategoryField
+                key={category}
+                category={category}
+                label={label.toLowerCase()}
+                budget={budgets[category] ?? null}
+                completed={completedCategories.includes(category)}
+                expense={expenses.find((expense) => expense.category === category)!}
+              />
+            ))}
+          </tbody>
+        </table>
       </fieldset>
-      <div className="mt-5 flex min-h-[44px] flex-wrap items-center justify-between gap-5 border-t border-rule pt-4">
-        <div aria-live="polite">
-          {state.message ? <p className={state.status === "success" ? "form-message success" : "form-message"}>{state.message}</p> : null}
+      <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-4 pt-4">
+        <div className="max-w-xl text-xs leading-relaxed text-muted">
+          <p>Completed categories use actual spending. Actions also save your changes.</p>
+          <p>Fire permits add to the Socials plan and its open forecast.</p>
+          <div aria-live="polite">{state.message ? <p className={state.status === "success" ? "form-message success" : "form-message"}>{state.message}</p> : null}</div>
         </div>
         <Button variant="primary" type="submit" disabled={pending}>{pending ? "Saving…" : "Save expected expenses"}</Button>
       </div>
@@ -63,22 +71,24 @@ function ExpenseCategoryField({ category, label, budget, completed, expense }: {
 }) {
   const [expected, setExpected] = useState(budget?.toString() ?? "");
   const difference = expense.actual - expense.planned;
-  const comparison = difference === 0 ? "On plan" : `${formatMoney(Math.abs(difference))} ${difference > 0 ? "over" : "under"} plan`;
+  const comparison = difference === 0 ? "On plan" : `${formatMoney(Math.abs(difference))} ${difference > 0 ? "over" : "under"}`;
 
   return (
-    <div className="field min-w-0">
-      <label className="field-label" htmlFor={`budget-${category}`}>{label}{completed ? " · Completed" : ""} expected expense</label>
-      <input name={category} type="hidden" value={expected} />
-      {completed ? <input name={`completed-${category}`} type="hidden" value="on" /> : null}
-      <div className="money-input">
-        <span>$</span>
-        <input className="field-input" id={`budget-${category}`} min="0" placeholder="No plan" step="0.01" type="number" value={completed ? expense.actual : expected} readOnly={completed} onChange={(event) => setExpected(event.target.value)} aria-describedby={`plan-${category}`} />
-      </div>
-      <p className="text-xs text-muted" id={`plan-${category}`}>Original plan {formatMoney(expense.planned)} · Actual {formatMoney(expense.actual)}</p>
-      <div className="flex min-h-[44px] flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-muted">{comparison}</span>
-        <Button compact variant="secondary" type="submit" name={completed ? "reopen-category" : "complete-category"} value={category} aria-label={`${completed ? "Reopen" : "Mark complete"} ${label}`}>{completed ? "Reopen" : "Mark complete"}</Button>
-      </div>
-    </div>
+    <tr>
+      <th scope="row"><span className={styles.category}>{label}</span>{completed ? <span className={styles.status}>Completed</span> : null}</th>
+      <td data-label="Original plan">{formatMoney(expense.planned)}</td>
+      <td data-label="Expected" className={styles.expected}>
+        <input name={category} type="hidden" value={expected} />
+        {completed ? <><input name={`completed-${category}`} type="hidden" value="on" /><span>{formatMoney(expense.actual)}</span></> : (
+          <div className="money-input">
+            <span>$</span>
+            <input className="field-input" id={`budget-${category}`} aria-label={`Expected expense for ${label}`} min="0" placeholder="No plan" step="0.01" type="number" value={expected} onChange={(event) => setExpected(event.target.value)} />
+          </div>
+        )}
+      </td>
+      <td data-label="Actual">{formatMoney(expense.actual)}</td>
+      <td data-label="Difference" className={difference > 0 ? styles.over : styles.difference}>{comparison}</td>
+      <td className={styles.action}><Button variant="text" type="submit" name={completed ? "reopen-category" : "complete-category"} value={category} aria-label={`${completed ? "Reopen" : "Mark complete"} ${label}`}>{completed ? "Reopen" : "Mark complete"}</Button></td>
+    </tr>
   );
 }

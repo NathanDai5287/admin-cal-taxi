@@ -1,0 +1,130 @@
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--color-rule);
+  text-align: right;
+}
+
+.table th:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.table th:last-child,
+.table td:last-child {
+  padding-right: 0;
+}
+
+.table thead th {
+  padding-block: 16px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table tbody th {
+  font-weight: 600;
+}
+
+.category {
+  display: block;
+  text-transform: capitalize;
+}
+
+.status {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.expected {
+  width: 160px;
+}
+
+.expected input {
+  text-align: right;
+}
+
+.difference {
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.over {
+  color: var(--color-warn);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.action {
+  width: 128px;
+  white-space: nowrap;
+}
+
+.action button {
+  min-height: 44px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .table,
+  .table tbody {
+    display: block;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 24px;
+    padding-block: 16px;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .table th,
+  .table td {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .table td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-muted);
+    font-size: 12px;
+    font-weight: 400;
+    content: attr(data-label);
+  }
+
+  .table .expected {
+    width: auto;
+  }
+
+  .table .action {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    align-self: start;
+    justify-self: end;
+  }
+
+  .action::before {
+    display: none;
+  }
+}
