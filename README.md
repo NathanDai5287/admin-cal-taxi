@@ -1,5 +1,7 @@
 # admin-cal-taxi
 
+**Interactive portfolio demo:** [`/demo`](https://admin.cal.taxi/demo) — no login, fictional data, browser-local changes, and a reset button. See [demo workflows and isolation](docs/demo.md).
+
 Internal Next.js tools for cal.taxi, including rush administration, hosting documents,
 and chapter finances.
 

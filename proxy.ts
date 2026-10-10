@@ -22,6 +22,9 @@ const PUBLIC_HOSTNAMES = new Set([
 export default async function proxy(request: NextRequest) {
   const hostname = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const { pathname } = request.nextUrl;
+  // The portfolio sandbox has no server data or authentication dependencies.
+  // Match the route boundary exactly; never bypass auth for live app routes.
+  if (pathname === "/demo" || pathname.startsWith("/demo/")) return NextResponse.next();
   if (pathname.startsWith("/api/email-tracking/")) return NextResponse.next();
 
   if (PUBLIC_HOSTNAMES.has(hostname)) {
