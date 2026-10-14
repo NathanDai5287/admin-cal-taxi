@@ -84,8 +84,9 @@ The Nu News tools do everything the `/nu-news` editor does (see [docs/nu-news.md
 - `list_nu_news_issues`, `get_nu_news_issue`, `get_nu_news_pdf_url`: read issues, with links to view their photos, and get a link to a PDF.
 - `create_nu_news_issue`, `update_nu_news_issue`: start an issue and change its details, intro, and donation text.
 - `add_nu_news_article`, `update_nu_news_article`, `remove_nu_news_article`: manage articles and their order.
+- `prepare_nu_news_photo_upload`: get a signed link, then upload one prepared JPEG straight to Storage with an HTTP `PUT` (for example with `curl`).
 - `set_nu_news_title_photo`, `set_nu_news_headshot`, `add_nu_news_gallery_photo`, `update_nu_news_gallery_photo`,
-  `remove_nu_news_gallery_photo`, `set_nu_news_photo_focus`: manage photos, their order, and their focus points.
+  `remove_nu_news_gallery_photo`, `set_nu_news_photo_focus`: attach uploaded photos, and manage their order and focus points.
 - `make_nu_news_preview`, `finalize_nu_news_issue`: make the DRAFT preview with its photo warnings, then lock the issue.
 
 Production setup also requires these Supabase Auth settings:

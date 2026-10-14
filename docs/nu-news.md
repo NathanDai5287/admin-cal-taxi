@@ -47,15 +47,16 @@ create an issue, enter the text, add and order articles and photos, set focus po
 make the preview, read the photo warnings, and finalize.
 
 - The agent must copy each author's text exactly. The PDF prints it as entered.
-- The agent sends one photo at a time, and the site does not change it. The site accepts
-  only a JPEG of at most 3 MB and 2200 pixels on the long side, upright, with no metadata
-  (no EXIF, XMP, IPTC, or comments). It refuses other photos and tells the agent what to
-  fix. Agent photos go through a Vercel function, so they must stay under its 4.5 MB
-  request limit.
+- The agent uploads one photo at a time straight to Storage through a signed upload link
+  (for example with `curl`), then attaches it. The site does not change the photo. It
+  accepts only a JPEG of at most 5 MB and 2200 pixels on the long side, upright, with no
+  metadata (no EXIF, XMP, IPTC, or comments). It deletes other photos and tells the agent
+  what to fix.
 - To finalize, the agent must send the issue's season as confirmation. Finalizing stays
   off while something is missing. Tell the agent to finalize only after you read the
   preview.
 - The links that the agent gets to a preview, a final PDF, or a photo expire after 10 minutes.
+  Photo upload links expire after 2 hours.
 - Each call writes a record in the MCP audit log.
 
 ## Photos

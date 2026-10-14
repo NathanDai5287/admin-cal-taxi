@@ -2,11 +2,10 @@ import { Buffer } from "node:buffer";
 
 import { PHOTO_LONG_EDGE_PX } from "@/lib/nu-news/issue";
 
-export const MAX_MCP_PHOTO_MB = 3;
+export const MAX_MCP_PHOTO_MB = 5;
 
-const jpegDataUrl = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/;
 const maxPhotoBytes = MAX_MCP_PHOTO_MB * 1024 * 1024;
-const prepareAgain = `Turn the photo upright, remove all its metadata (EXIF, XMP, IPTC, comments), make it at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, save it as a JPEG, and send it again.`;
+const prepareAgain = `Turn the photo upright, remove all its metadata (EXIF, XMP, IPTC, comments), make it at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, save it as a JPEG, and upload it again.`;
 
 // Marker codes from ITU-T T.81 (JPEG), Table B.1.
 const START_OF_SCAN = 0xda;
@@ -34,10 +33,7 @@ function* headerSegments(bytes: Buffer) {
   }
 }
 
-export function decodeNuNewsPhoto(value: string) {
-  const match = jpegDataUrl.exec(value);
-  if (!match) throw new Error("The photo must be a JPEG data URL: data:image/jpeg;base64,...");
-  const bytes = Buffer.from(match[1], "base64");
+export function checkNuNewsPhoto(bytes: Buffer) {
   if (!bytes.length || bytes.length > maxPhotoBytes) throw new Error(`The photo must be a non-empty JPEG up to ${MAX_MCP_PHOTO_MB} MB.`);
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) throw new Error("The photo data is not a JPEG.");
 
@@ -48,5 +44,4 @@ export function decodeNuNewsPhoto(value: string) {
   const height = frame.body.readUInt16BE(1);
   const width = frame.body.readUInt16BE(3);
   if (Math.max(width, height) > PHOTO_LONG_EDGE_PX) throw new Error(`The photo is ${width} × ${height} pixels. ${prepareAgain}`);
-  return bytes;
 }

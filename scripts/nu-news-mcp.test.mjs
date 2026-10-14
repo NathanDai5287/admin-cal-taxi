@@ -17,17 +17,17 @@ const testModules = {
   },
 };
 const bundle = await build({
-  stdin: { contents: 'export { createFinanceServer } from "./lib/mcp/server.ts"; export { decodeNuNewsPhoto } from "./lib/mcp/nu-news-photo.ts";', resolveDir: process.cwd() },
+  stdin: { contents: 'export { createFinanceServer } from "./lib/mcp/server.ts";', resolveDir: process.cwd() },
   bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [testModules],
 });
 const temporary = path.join(process.cwd(), "node_modules/.nu-news-mcp-test.mjs");
 await writeFile(temporary, bundle.outputFiles[0].text);
-const { createFinanceServer, decodeNuNewsPhoto } = await import(`file://${temporary.replaceAll("\\", "/")}`);
+const { createFinanceServer } = await import(`file://${temporary.replaceAll("\\", "/")}`);
 await unlink(temporary);
 
 const NU_NEWS_TOOLS = [
   "list_nu_news_issues", "get_nu_news_issue", "create_nu_news_issue", "update_nu_news_issue",
-  "add_nu_news_article", "update_nu_news_article", "remove_nu_news_article",
+  "add_nu_news_article", "update_nu_news_article", "remove_nu_news_article", "prepare_nu_news_photo_upload",
   "set_nu_news_title_photo", "set_nu_news_headshot", "add_nu_news_gallery_photo", "update_nu_news_gallery_photo",
   "remove_nu_news_gallery_photo", "set_nu_news_photo_focus", "make_nu_news_preview", "finalize_nu_news_issue", "get_nu_news_pdf_url",
 ];
@@ -51,7 +51,6 @@ const withSize = (bytes, width, height) => {
   resized.writeUInt16BE(width, frame + 7);
   return resized;
 };
-const dataUrl = (bytes, type = "image/jpeg") => `data:${type};base64,${bytes.toString("base64")}`;
 const signedUrl = (name, seconds = 600) => `https://storage.test/${name}?expires=${seconds}`;
 
 // A 360 × 480 camera JPEG with EXIF, IPTC, and an ICC profile; the prepared copy keeps only the ICC profile.
@@ -68,6 +67,7 @@ function fakeSupabase(adminId) {
     mcp_audit_log: [],
   };
   const files = new Map();
+  const uploadUrls = new Map();
   const newIssue = () => ({
     issue_date: "2026-10-14", location: "Berkeley, CA", intro: { heading: "", body: "" }, articles: [], cover: null, gallery: [],
     preview_made_at: null, finalized_at: null, finalized_by: null, finalized_by_name: null, final_pdf_path: null,
@@ -121,6 +121,17 @@ function fakeSupabase(adminId) {
       files.set(name, Buffer.from(bytes));
       return { data: { path: name }, error: null };
     },
+    async createSignedUploadUrl(name) {
+      if (files.has(name)) return { data: null, error: { message: "The resource already exists" } };
+      const token = randomUUID();
+      const signedUrl = `https://storage.test/upload/sign/${name}?token=${token}`;
+      uploadUrls.set(signedUrl, name);
+      return { data: { signedUrl, token, path: name }, error: null };
+    },
+    async remove(names) {
+      for (const name of names) files.delete(name);
+      return { data: [], error: null };
+    },
     async download(name) {
       return files.has(name) ? { data: new Blob([files.get(name)]), error: null } : { data: null, error: new Error("Object not found") };
     },
@@ -131,7 +142,8 @@ function fakeSupabase(adminId) {
       return { data: names.map((name) => ({ path: name, signedUrl: files.has(name) ? signedUrl(name, seconds) : null })), error: null };
     },
   };
-  return { tables, files, from: (table) => new Query(table), storage: { from: () => bucket } };
+  const putToUploadUrl = (url, bytes) => files.set(uploadUrls.get(url), Buffer.from(bytes));
+  return { tables, files, putToUploadUrl, from: (table) => new Query(table), storage: { from: () => bucket } };
 }
 
 function connect({ isMcpAdmin = true } = {}) {
@@ -160,7 +172,12 @@ function connect({ isMcpAdmin = true } = {}) {
     assert.equal(result.isError, true, `${name} was not refused`);
     assert.match(result.content[0].text, message);
   }
-  return { admin, adminId, request, ok, refused };
+  async function uploaded(issueId, bytes) {
+    const { path, uploadUrl } = await ok("prepare_nu_news_photo_upload", { issueId, requestId: randomUUID() });
+    admin.putToUploadUrl(uploadUrl, bytes);
+    return path;
+  }
+  return { admin, adminId, request, ok, refused, uploaded };
 }
 
 test("Nu News tools are listed with safety hints and the workflow", async () => {
@@ -175,7 +192,9 @@ test("Nu News tools are listed with safety hints and the workflow", async () => 
   assert.match(tools.get("create_nu_news_issue").description, /make_nu_news_preview.*finalize_nu_news_issue/);
   assert.match(tools.get("add_nu_news_article").description, /exactly as given: never rewrite/);
   assert.match(tools.get("get_nu_news_issue").description, /viewUrl to look at it.*set_nu_news_photo_focus\. The signed link expires after 10 minutes\./);
-  assert.match(tools.get("set_nu_news_title_photo").description, /JPEG up to 3 MB, at most 2200 pixels on the long side, upright, with no metadata/);
+  assert.match(tools.get("prepare_nu_news_photo_upload").description, /exif_transpose.*curl -sS --fail-with-body -X PUT -H 'content-type: image\/jpeg' --data-binary @photo\.jpg '<uploadUrl>'/);
+  assert.match(tools.get("set_nu_news_title_photo").description, /JPEG up to 5 MB, at most 2200 pixels on the long side, upright, with no metadata/);
+  assert.deepEqual(tools.get("set_nu_news_title_photo").inputSchema.required, ["issueId", "path"]);
   assert.deepEqual(tools.get("finalize_nu_news_issue").inputSchema.required, ["issueId", "confirmSeason"]);
   assert.deepEqual(tools.get("remove_nu_news_article").inputSchema.required, ["issueId", "articleId", "confirm"]);
 });
@@ -190,7 +209,7 @@ test("only active administrators with an OAuth grant can use Nu News tools", asy
 });
 
 test("an agent can create, fill, preview, and finalize a whole issue", async () => {
-  const { admin, adminId, ok, refused } = connect();
+  const { admin, adminId, ok, refused, uploaded } = connect();
   const lastDonate = { heading: "HOW TO DONATE", body: "Zelle: calthetaxi@gmail.com" };
   admin.tables.nu_news_issues.push({ id: randomUUID(), season: "Spring 2026", issue_date: "2026-04-01", location: "Oakland, CA", donate: lastDonate, created_at: "2026-04-01", finalized_at: "2026-04-02" });
 
@@ -210,13 +229,25 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
   await refused("remove_nu_news_article", { issueId, articleId: extraArticle }, /confirm/);
   await ok("remove_nu_news_article", { issueId, articleId: extraArticle, confirm: true });
 
-  const title = await ok("set_nu_news_title_photo", { issueId, photoDataUrl: dataUrl(prepared), requestId: randomUUID() });
-  const headshot = await ok("set_nu_news_headshot", { issueId, articleId, photoDataUrl: dataUrl(prepared), requestId: randomUUID() });
+  const photoRequest = randomUUID();
+  const upload = await ok("prepare_nu_news_photo_upload", { issueId, requestId: photoRequest });
+  assert.deepEqual(
+    [upload.path, upload.method, upload.headers, upload.expiresInSeconds],
+    [`${issueId}/${photoRequest}.jpg`, "PUT", { "content-type": "image/jpeg" }, 7200],
+  );
+  assert.match(upload.uploadUrl, new RegExp(`/upload/sign/${upload.path}\\?token=${upload.token}$`));
+  assert.equal(upload.curlExample, `curl -sS --fail-with-body -X PUT -H 'content-type: image/jpeg' --data-binary @photo.jpg '${upload.uploadUrl}'`);
+  admin.putToUploadUrl(upload.uploadUrl, prepared);
+  await refused("prepare_nu_news_photo_upload", { issueId, requestId: photoRequest }, new RegExp(`already uploaded a photo with this requestId, use path ${upload.path}`));
+
+  const title = await ok("set_nu_news_title_photo", { issueId, path: upload.path });
+  assert.deepEqual(await ok("set_nu_news_title_photo", { issueId, path: upload.path }), title);
+  const headshot = await ok("set_nu_news_headshot", { issueId, articleId, path: await uploaded(issueId, prepared) });
   const [first, second] = [
-    await ok("add_nu_news_gallery_photo", { issueId, photoDataUrl: dataUrl(prepared), requestId: randomUUID() }),
-    await ok("add_nu_news_gallery_photo", { issueId, photoDataUrl: dataUrl(prepared), requestId: randomUUID() }),
+    await ok("add_nu_news_gallery_photo", { issueId, path: await uploaded(issueId, prepared) }),
+    await ok("add_nu_news_gallery_photo", { issueId, path: await uploaded(issueId, withSize(prepared, 2200, 1650)) }),
   ];
-  assert.match(title.src, new RegExp(`^${issueId}/[0-9a-f-]{36}\\.jpg$`));
+  assert.equal(title.src, upload.path);
   assert.ok(admin.files.get(title.src).equals(prepared));
   await ok("update_nu_news_gallery_photo", { issueId, src: first.src, donate: true });
   await ok("update_nu_news_gallery_photo", { issueId, src: second.src, donate: true, feature: true, position: 1 });
@@ -255,7 +286,8 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
   const filesBefore = admin.files.size;
   await refused("update_nu_news_issue", { issueId, season: "Fall 2026 (fixed)" }, new RegExp(FINAL_ISSUE));
   await refused("update_nu_news_article", { issueId, articleId, body: "Rewritten" }, new RegExp(FINAL_ISSUE));
-  await refused("set_nu_news_title_photo", { issueId, photoDataUrl: dataUrl(prepared), requestId: randomUUID() }, new RegExp(FINAL_ISSUE));
+  await refused("prepare_nu_news_photo_upload", { issueId, requestId: randomUUID() }, new RegExp(FINAL_ISSUE));
+  await refused("set_nu_news_title_photo", { issueId, path: first.src }, new RegExp(FINAL_ISSUE));
   await refused("set_nu_news_photo_focus", { issueId, src: title.src, x: 0, y: 0 }, new RegExp(FINAL_ISSUE));
   await refused("make_nu_news_preview", { issueId }, /Only a draft issue has a preview/);
   await refused("finalize_nu_news_issue", { issueId, confirmSeason: "Fall 2026" }, new RegExp(FINAL_ISSUE));
@@ -272,19 +304,34 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
   assert.ok(audited.some((row) => row.tool_name === "finalize_nu_news_issue" && row.target_id === issueId));
 });
 
-test("photo uploads accept only prepared JPEGs", async () => {
-  assert.ok(decodeNuNewsPhoto(dataUrl(prepared)).equals(prepared));
-  assert.ok(decodeNuNewsPhoto(dataUrl(withSize(prepared, 2200, 1650))));
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(Buffer.from("iVBORw0KGgoAAAANSUhEUg==", "base64"), "image/png")), /must be a JPEG data URL/);
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(Buffer.from("iVBORw0KGgoAAAANSUhEUg==", "base64"))), /not a JPEG/);
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(Buffer.concat([prepared, Buffer.alloc(3 * 1024 * 1024)]))), /up to 3 MB/);
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(withSize(prepared, 3024, 4032))), /3024 × 4032 pixels\. Turn the photo upright.*at most 2200 pixels/);
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(rotated)), /has metadata\. Turn the photo upright, remove all its metadata/);
-  assert.throws(() => decodeNuNewsPhoto(dataUrl(camera)), /has metadata/);
-
-  const { admin, ok, refused } = connect();
+test("attaching refuses and deletes uploaded photos that are not prepared JPEGs", async () => {
+  const { admin, ok, refused, uploaded } = connect();
   const { id: issueId } = await ok("create_nu_news_issue", { requestId: randomUUID() });
-  await refused("add_nu_news_gallery_photo", { issueId, photoDataUrl: dataUrl(rotated), requestId: randomUUID() }, /has metadata/);
-  await refused("set_nu_news_headshot", { issueId, articleId: randomUUID(), photoDataUrl: dataUrl(prepared), requestId: randomUUID() }, /no article with that ID/);
-  assert.equal(admin.files.size, 0);
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUg==", "base64");
+  const refusals = [
+    [rotated, /has metadata\. Turn the photo upright, remove all its metadata.*upload it again\.$/],
+    [camera, /has metadata/],
+    [png, /not a JPEG/],
+    [Buffer.concat([prepared, Buffer.alloc(5 * 1024 * 1024)]), /non-empty JPEG up to 5 MB/],
+    [withSize(prepared, 3024, 4032), /3024 × 4032 pixels\. Turn the photo upright.*at most 2200 pixels/],
+  ];
+  for (const [bytes, message] of refusals) {
+    const path = await uploaded(issueId, bytes);
+    await refused("add_nu_news_gallery_photo", { issueId, path }, message);
+    assert.equal(admin.files.has(path), false);
+  }
+  assert.deepEqual((await ok("get_nu_news_issue", { issueId })).gallery, []);
+
+  const { id: otherIssueId } = await ok("create_nu_news_issue", { requestId: randomUUID() });
+  const otherPhoto = await uploaded(otherIssueId, prepared);
+  admin.files.set(`${issueId}/preview.pdf`, Buffer.from("%PDF-"));
+  for (const path of [otherPhoto, `${issueId}/preview.pdf`, `${issueId}/../${otherPhoto}`]) {
+    await refused("set_nu_news_title_photo", { issueId, path }, /not a photo path of this issue/);
+  }
+  assert.ok(admin.files.has(otherPhoto) && admin.files.has(`${issueId}/preview.pdf`));
+  await refused("set_nu_news_title_photo", { issueId, path: `${issueId}/${randomUUID()}.jpg` }, /No photo is uploaded at this path/);
+
+  const headshot = await uploaded(issueId, prepared);
+  await refused("set_nu_news_headshot", { issueId, articleId: randomUUID(), path: headshot }, /no article with that ID/);
+  assert.ok(admin.files.has(headshot));
 });

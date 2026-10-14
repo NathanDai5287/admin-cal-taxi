@@ -12,9 +12,9 @@ import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
 import { isCalendarDate } from "@/lib/mcp/finance";
 import {
-  MCP_LINK_SECONDS, addDraftPhoto, createIssue, editDraft, finalizeConfirmedDraft, finalizerFor, issueStatus, issueWithPhotoLinks,
-  pdfLink, previewDraft, withArticleChanges, withFocus, withGalleryChanges, withGalleryPhoto, withHeadshot,
-  withNewArticle, withoutArticle, withoutGalleryPhoto, withTitlePhoto,
+  MCP_LINK_SECONDS, UPLOAD_LINK_SECONDS, addDraftPhoto, createIssue, curlUpload, editDraft, finalizeConfirmedDraft, finalizerFor,
+  issueStatus, issueWithPhotoLinks, pdfLink, preparePhotoUpload, previewDraft, withArticleChanges, withFocus, withGalleryChanges,
+  withGalleryPhoto, withHeadshot, withNewArticle, withoutArticle, withoutGalleryPhoto, withTitlePhoto,
 } from "@/lib/mcp/nu-news";
 import { MAX_MCP_PHOTO_MB } from "@/lib/mcp/nu-news-photo";
 import { decodeMcpReceipt } from "@/lib/mcp/receipt";
@@ -435,15 +435,17 @@ async function authorizeNuNewsCall(supabase: Supabase, caller: McpCaller, toolNa
 }
 
 const NU_NEWS_WORKFLOW = "Workflow: create_nu_news_issue; fill it with update_nu_news_issue and add_nu_news_article; "
-  + "upload the title photo, each author's headshot, and gallery photos; make_nu_news_preview and read the PDF; "
+  + "add the title photo, each author's headshot, and gallery photos: for each one, prepare_nu_news_photo_upload, upload the JPEG "
+  + "to its uploadUrl (for example with curl), then attach its path; make_nu_news_preview and read the PDF; "
   + "fix photo warnings with set_nu_news_photo_focus; when missingItems is empty and the user approves, finalize_nu_news_issue. "
   + "The PDF prints each author's text exactly as given: never rewrite, correct, or shorten it.";
 const EXACT_TEXT = "Copy each author's text exactly as given: never rewrite, correct, shorten, or reformat it. "
   + "In body, each non-empty line becomes a paragraph. "
   + "closing is the sign-off: each line prints on its own line, for example \"YITB,\" then the name.";
-const PHOTO_RULES = `Send one photo per call as a data:image/jpeg;base64,... URL: a JPEG up to ${MAX_MCP_PHOTO_MB} MB, `
-  + `at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, upright, with no metadata (no EXIF, XMP, IPTC, or comments). `
-  + "Other photos are refused with the steps to fix them. The photo's src uses the requestId.";
+const PHOTO_RULES = `a JPEG up to ${MAX_MCP_PHOTO_MB} MB, at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, upright, `
+  + "with no metadata (no EXIF, XMP, IPTC, or comments)";
+const ATTACH_PHOTO = "Pass the path from prepare_nu_news_photo_upload after you upload the photo to its uploadUrl. "
+  + `The photo must be ${PHOTO_RULES}. Other photos are refused and deleted, with the steps to fix them. The photo's src is its path.`;
 const LINK_LIFETIME = `The signed link expires after ${MCP_LINK_SECONDS / 60} minutes.`;
 
 function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpCaller) {
@@ -458,7 +460,7 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
   const articleId = z.uuid().describe("The article ID from get_nu_news_issue.");
   const src = z.string().describe("The photo's src from get_nu_news_issue.");
   const position = z.int().min(1).optional().describe("Move it to this place in the list. 1 is first.");
-  const photoDataUrl = z.string().max(4_200_000).describe(`A data:image/jpeg;base64,... URL up to ${MAX_MCP_PHOTO_MB} MB.`);
+  const path = z.string().describe("The path from prepare_nu_news_photo_upload, after the photo is uploaded.");
   const articleFields = issueSchema.shape.articles.element
     .pick({ title: true, author: true, roster: true, body: true, closing: true })
     .partial();
@@ -527,30 +529,37 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
     issueId, (issue) => withoutArticle(issue, articleId),
   )));
 
-  server.registerTool("set_nu_news_title_photo", {
-    description: `Upload the title photo of a draft issue, replacing any previous one. ${PHOTO_RULES}`,
-    inputSchema: z.object({ issueId, photoDataUrl, requestId }),
+  server.registerTool("prepare_nu_news_photo_upload", {
+    description: `Prepare the upload of one photo to a draft issue. First prepare the photo: ${PHOTO_RULES}. `
+      + "For example, with Python Pillow: im = ImageOps.exif_transpose(Image.open(src)).convert(\"RGB\"); "
+      + `im.thumbnail((${PHOTO_LONG_EDGE_PX}, ${PHOTO_LONG_EDGE_PX})); im.save(dst, "JPEG", quality=82). `
+      + "Then upload the JPEG bytes to uploadUrl with one HTTP PUT and the header content-type: image/jpeg: "
+      + `${curlUpload("<uploadUrl>")}. Then pass path to set_nu_news_title_photo, set_nu_news_headshot, or add_nu_news_gallery_photo. `
+      + `Use a new requestId for each photo. The upload link expires after ${UPLOAD_LINK_SECONDS / 3600} hours.`,
+    inputSchema: z.object({ issueId, requestId }),
     annotations: { ...writeAnnotations, idempotentHint: true },
-  }, authorized("set_nu_news_title_photo", async ({ issueId, photoDataUrl, requestId }) => (
-    addDraftPhoto(issueId, requestId, photoDataUrl, withTitlePhoto)
-  )));
+  }, authorized("prepare_nu_news_photo_upload", async ({ issueId, requestId }) => preparePhotoUpload(issueId, requestId)));
+
+  server.registerTool("set_nu_news_title_photo", {
+    description: `Set the title photo of a draft issue, replacing any previous one. ${ATTACH_PHOTO}`,
+    inputSchema: z.object({ issueId, path }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("set_nu_news_title_photo", async ({ issueId, path }) => addDraftPhoto(issueId, path, withTitlePhoto)));
 
   server.registerTool("set_nu_news_headshot", {
-    description: `Upload an article author's headshot, replacing any previous one. ${PHOTO_RULES}`,
-    inputSchema: z.object({ issueId, articleId, photoDataUrl, requestId }),
+    description: `Set an article author's headshot, replacing any previous one. ${ATTACH_PHOTO}`,
+    inputSchema: z.object({ issueId, articleId, path }),
     annotations: { ...writeAnnotations, idempotentHint: true },
-  }, authorized("set_nu_news_headshot", async ({ issueId, articleId, photoDataUrl, requestId }) => addDraftPhoto(
-    issueId, requestId, photoDataUrl, (issue, src) => withHeadshot(issue, articleId, src),
+  }, authorized("set_nu_news_headshot", async ({ issueId, articleId, path }) => addDraftPhoto(
+    issueId, path, (issue, src) => withHeadshot(issue, articleId, src),
   )));
 
   server.registerTool("add_nu_news_gallery_photo", {
     description: "Add a photo at the end of a draft issue's photo list. Photos fill the empty space at the bottom of article pages in order, "
-      + `one to three per row, then the Photo Gallery pages. ${PHOTO_RULES}`,
-    inputSchema: z.object({ issueId, photoDataUrl, requestId }),
+      + `one to three per row, then the Photo Gallery pages. ${ATTACH_PHOTO}`,
+    inputSchema: z.object({ issueId, path }),
     annotations: { ...writeAnnotations, idempotentHint: true },
-  }, authorized("add_nu_news_gallery_photo", async ({ issueId, photoDataUrl, requestId }) => (
-    addDraftPhoto(issueId, requestId, photoDataUrl, withGalleryPhoto)
-  )));
+  }, authorized("add_nu_news_gallery_photo", async ({ issueId, path }) => addDraftPhoto(issueId, path, withGalleryPhoto)));
 
   server.registerTool("update_nu_news_gallery_photo", {
     description: "Change a gallery photo's options or move it to another position. feature is Full width: the photo waits for the gallery "

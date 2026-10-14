@@ -12,9 +12,10 @@ import { loadIssue, pdfUrl, photoUrls, type StoredIssue } from "@/lib/nu-news/st
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { userLabel } from "@/lib/reimbursements/user-label";
 
-import { decodeNuNewsPhoto } from "./nu-news-photo";
+import { checkNuNewsPhoto } from "./nu-news-photo";
 
 export const MCP_LINK_SECONDS = 600;
+export const UPLOAD_LINK_SECONDS = 2 * 60 * 60;
 
 type Position = { position?: number };
 type ArticleChanges = Partial<Omit<NuNewsArticle, "id">> & Position;
@@ -52,18 +53,45 @@ export async function editDraft(issueId: string, change: (issue: NuNewsIssue) =>
   return save(issueId, change(await loadDraft(issueId)));
 }
 
-export async function addDraftPhoto(
-  issueId: string,
-  photoId: string,
-  photoDataUrl: string,
-  place: (issue: NuNewsIssue, src: string) => NuNewsIssue,
-) {
-  const bytes = decodeNuNewsPhoto(photoDataUrl);
-  const src = photoPath(issueId, photoId);
-  const placed = place(await loadDraft(issueId), src);
-  const { error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).upload(src, bytes, { contentType: "image/jpeg", upsert: true });
-  if (error) throw new Error("The photo could not be stored. Try again.");
-  return { src, ...await save(issueId, placed) };
+export const curlUpload = (uploadUrl: string) => (
+  `curl -sS --fail-with-body -X PUT -H 'content-type: image/jpeg' --data-binary @photo.jpg '${uploadUrl}'`
+);
+
+export async function preparePhotoUpload(issueId: string, requestId: string) {
+  await loadDraft(issueId);
+  const path = photoPath(issueId, requestId);
+  const { data, error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).createSignedUploadUrl(path);
+  if (error) throw new Error(`The upload could not be prepared. If you already uploaded a photo with this requestId, use path ${path}; otherwise try again.`);
+  return {
+    path,
+    uploadUrl: data.signedUrl,
+    token: data.token,
+    method: "PUT",
+    headers: { "content-type": "image/jpeg" },
+    expiresInSeconds: UPLOAD_LINK_SECONDS,
+    curlExample: curlUpload(data.signedUrl),
+  };
+}
+
+const isUploadOf = (issueId: string, path: string) => new RegExp(`^${issueId}/[0-9a-f-]{36}\\.jpg$`, "i").test(path);
+
+async function checkUploadedPhoto(path: string) {
+  const storage = createAdminClient().storage.from(NU_NEWS_BUCKET);
+  const { data, error } = await storage.download(path);
+  if (error) throw new Error("No photo is uploaded at this path. Upload it to the uploadUrl from prepare_nu_news_photo_upload first.");
+  try {
+    checkNuNewsPhoto(Buffer.from(await data.arrayBuffer()));
+  } catch (refusal) {
+    await storage.remove([path]);
+    throw refusal;
+  }
+}
+
+export async function addDraftPhoto(issueId: string, path: string, place: (issue: NuNewsIssue, src: string) => NuNewsIssue) {
+  if (!isUploadOf(issueId, path)) throw new Error("This is not a photo path of this issue. Use the path from prepare_nu_news_photo_upload.");
+  const placed = place(await loadDraft(issueId), path);
+  await checkUploadedPhoto(path);
+  return { src: path, ...await save(issueId, placed) };
 }
 
 function articleIndex(issue: NuNewsIssue, articleId: string) {
