@@ -39,6 +39,10 @@ and the site makes the PDF. The PDF prints each author's writing exactly as ente
 A final issue can never change: there are no new versions, corrections, or copies. Check
 the preview carefully before you finalize.
 
+To remove a draft that you do not need, select **Delete draft** at the top of its page (or
+ask an agent) and type its season. This deletes its text, photos, and preview, and you
+cannot undo it. A final issue can never be deleted.
+
 ## Using an agent
 
 An administrator can also ask an AI agent to do every step above. Connect the agent to

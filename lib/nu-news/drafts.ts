@@ -21,6 +21,8 @@ export const FINAL_ISSUE = "This issue is final and can no longer change.";
 const issueId = z.uuid();
 const IMMUTABLE = "22023";
 const BUILD_FAILED = "The PDF could not be made. Upload any missing photos again, then try again.";
+const NOT_DELETED = "The draft could not be deleted. Try again.";
+const MAX_FILES_PER_REMOVE = 1000;
 
 const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
@@ -125,4 +127,24 @@ export async function finalizeDraft(id: string, finalizer: Finalizer): Promise<A
     return { ok: false, message: "The issue changed while it was being finalized. Review it and try again." };
   }
   return { ok: true };
+}
+
+export async function deleteDraft(id: string, confirmSeason: string): Promise<ActionResult<{ removedFiles: string[] }>> {
+  const issue = await loadIssue(issueId.parse(id));
+  if (!issue) return { ok: false, message: "No Nu News issue has that ID." };
+  if (issue.finalized_at) return { ok: false, message: FINAL_ISSUE };
+  if (confirmSeason !== issue.season) return { ok: false, message: "The season to confirm must match the issue's season exactly." };
+
+  const admin = createAdminClient();
+  const storage = admin.storage.from(NU_NEWS_BUCKET);
+  const listed = await storage.list(issue.id, { limit: MAX_FILES_PER_REMOVE });
+  if (listed.error) return { ok: false, message: NOT_DELETED };
+  const deleted = await admin.from("nu_news_issues").delete().eq("id", issue.id);
+  if (deleted.error?.code === IMMUTABLE) return { ok: false, message: FINAL_ISSUE };
+  if (deleted.error) return { ok: false, message: NOT_DELETED };
+
+  const removedFiles = listed.data.map((file) => `${issue.id}/${file.name}`);
+  const removed = removedFiles.length ? await storage.remove(removedFiles) : null;
+  if (removed?.error) return { ok: false, message: "The draft is deleted, but its photos and preview could not be removed." };
+  return { ok: true, removedFiles };
 }

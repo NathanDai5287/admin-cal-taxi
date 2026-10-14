@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { createDraft, finalizeDraft, makeDraftPreview, saveDraft, type ActionResult } from "@/lib/nu-news/drafts";
+import { createDraft, deleteDraft, finalizeDraft, makeDraftPreview, saveDraft, type ActionResult } from "@/lib/nu-news/drafts";
 import { NU_NEWS_BUCKET, photoPath, type NuNewsIssue } from "@/lib/nu-news/issue";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -43,6 +43,13 @@ export async function makePreview(id: string) {
 export async function finalizeIssue(id: string): Promise<ActionResult> {
   const { userId, email, profile } = await requireAdmin("/");
   const result = await finalizeDraft(id, { userId, name: userLabel(profile.full_name, email) });
+  if (result.ok) revalidatePath("/nu-news", "layout");
+  return result;
+}
+
+export async function deleteIssue(id: string, confirmSeason: string) {
+  await requireAdmin("/");
+  const result = await deleteDraft(id, confirmSeason);
   if (result.ok) revalidatePath("/nu-news", "layout");
   return result;
 }

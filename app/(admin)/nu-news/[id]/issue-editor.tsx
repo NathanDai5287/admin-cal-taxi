@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { finalizeIssue, makePreview, saveIssue } from "@/app/(admin)/nu-news/actions";
+import { deleteIssue, finalizeIssue, makePreview, saveIssue } from "@/app/(admin)/nu-news/actions";
 import { Button } from "@/components/brand/button";
 import type { CropWarning } from "@/lib/nu-news/crop-warnings";
 import { CENTER_FOCUS, HEADSHOT_FOCUS, missingItems, newArticle, type NuNewsArticle, type NuNewsIssue } from "@/lib/nu-news/issue";
@@ -138,6 +138,18 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
     });
   }
 
+  function deleteDraft() {
+    const { season } = savedIssue;
+    const typed = window.prompt(`Delete the ${season} draft? This removes its text, photos and preview. You cannot undo this.\n\nType ${season} to confirm.`);
+    if (typed === null) return;
+    return run("Deleting…", async () => {
+      const result = await deleteIssue(issueId, typed);
+      if (!result.ok) return { text: result.message, success: false };
+      router.push("/nu-news");
+      return { text: "The draft is deleted.", success: true };
+    });
+  }
+
   function addArticle() {
     change({ articles: [...issue.articles, newArticle(crypto.randomUUID())] });
   }
@@ -149,10 +161,13 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
 
   return (
     <div className="grid gap-6">
-      <div>
-        <Link className="back-link" href="/nu-news">← All issues</Link>
-        <h1 className="page-title">{issue.season || "Untitled issue"}</h1>
-        <p className="page-lede">Paste each author’s writing exactly as they sent it. The PDF prints it without changes.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Link className="back-link" href="/nu-news">← All issues</Link>
+          <h1 className="page-title">{issue.season || "Untitled issue"}</h1>
+          <p className="page-lede">Paste each author’s writing exactly as they sent it. The PDF prints it without changes.</p>
+        </div>
+        <Button variant="danger" compact disabled={busy} onClick={deleteDraft}>Delete draft</Button>
       </div>
 
       <Section title="Issue details">

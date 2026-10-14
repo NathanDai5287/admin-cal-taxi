@@ -30,9 +30,10 @@ const NU_NEWS_TOOLS = [
   "add_nu_news_article", "update_nu_news_article", "remove_nu_news_article", "prepare_nu_news_photo_upload",
   "set_nu_news_title_photo", "set_nu_news_headshot", "add_nu_news_gallery_photo", "update_nu_news_gallery_photo",
   "remove_nu_news_gallery_photo", "set_nu_news_photo_focus", "make_nu_news_preview", "finalize_nu_news_issue", "get_nu_news_pdf_url",
+  "delete_nu_news_draft",
 ];
 const READ_ONLY = ["list_nu_news_issues", "get_nu_news_issue", "get_nu_news_pdf_url"];
-const DESTRUCTIVE = ["remove_nu_news_article", "remove_nu_news_gallery_photo", "finalize_nu_news_issue"];
+const DESTRUCTIVE = ["remove_nu_news_article", "remove_nu_news_gallery_photo", "finalize_nu_news_issue", "delete_nu_news_draft"];
 const FINAL_ISSUE = "This issue is final and can no longer change.";
 
 const segmentOffset = (bytes, marker) => {
@@ -84,6 +85,7 @@ function fakeSupabase(adminId) {
     select() { return this; }
     insert(values) { this.action = "insert"; this.values = values; return this; }
     update(values) { this.action = "update"; this.values = values; return this; }
+    delete() { this.action = "delete"; return this; }
     eq(column, value) { this.filters.push([column, value]); return this; }
     order(column, { ascending }) { this.sorts.push([column, ascending ? 1 : -1]); return this; }
     limit(count) { this.count = count; return this; }
@@ -99,10 +101,13 @@ function fakeSupabase(adminId) {
         return this.answer([row]);
       }
       const matched = rows.filter((row) => this.filters.every(([column, value]) => row[column] === value));
+      if (this.action !== "select" && matched.some((row) => row.finalized_at)) {
+        return { data: null, error: { code: "22023", message: "Finalized Nu News issues are immutable" } };
+      }
       if (this.action === "update") {
-        if (matched.some((row) => row.finalized_at)) return { data: null, error: { code: "22023", message: "Finalized Nu News issues are immutable" } };
         for (const row of matched) Object.assign(row, structuredClone(this.values), { updated_at: String(++version) });
       }
+      if (this.action === "delete") tables[this.table] = rows.filter((row) => !matched.includes(row));
       const sorted = [...matched].sort((a, b) => this.sorts.reduce((order, [column, direction]) => order || direction * String(a[column]).localeCompare(String(b[column])), 0));
       return this.answer(sorted.slice(0, this.count));
     }
@@ -127,6 +132,10 @@ function fakeSupabase(adminId) {
       const signedUrl = `https://storage.test/upload/sign/${name}?token=${token}`;
       uploadUrls.set(signedUrl, name);
       return { data: { signedUrl, token, path: name }, error: null };
+    },
+    async list(folder) {
+      const names = [...files.keys()].filter((name) => name.startsWith(`${folder}/`)).map((name) => name.slice(folder.length + 1));
+      return { data: [...new Set(names.map((name) => name.split("/")[0]))].map((name) => ({ name })), error: null };
     },
     async remove(names) {
       for (const name of names) files.delete(name);
@@ -196,14 +205,18 @@ test("Nu News tools are listed with safety hints and the workflow", async () => 
   assert.match(tools.get("set_nu_news_title_photo").description, /JPEG up to 5 MB, at most 2200 pixels on the long side, upright, with no metadata/);
   assert.deepEqual(tools.get("set_nu_news_title_photo").inputSchema.required, ["issueId", "path"]);
   assert.deepEqual(tools.get("finalize_nu_news_issue").inputSchema.required, ["issueId", "confirmSeason"]);
+  assert.deepEqual(tools.get("delete_nu_news_draft").inputSchema.required, ["issueId", "confirmSeason"]);
+  assert.match(tools.get("delete_nu_news_draft").description, /only on drafts: final issues can never be deleted/);
   assert.deepEqual(tools.get("remove_nu_news_article").inputSchema.required, ["issueId", "articleId", "confirm"]);
 });
 
 test("only active administrators with an OAuth grant can use Nu News tools", async () => {
   const { admin, refused } = connect({ isMcpAdmin: false });
-  admin.tables.nu_news_issues.push({ id: randomUUID(), season: "Fall 2026" });
+  const issueId = randomUUID();
+  admin.tables.nu_news_issues.push({ id: issueId, season: "Fall 2026" });
   await refused("list_nu_news_issues", {}, /An active administrator OAuth grant is required/);
   await refused("create_nu_news_issue", { requestId: randomUUID() }, /An active administrator OAuth grant is required/);
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" }, /An active administrator OAuth grant is required/);
   assert.equal(admin.tables.nu_news_issues.length, 1);
   assert.equal(admin.tables.mcp_audit_log.length, 0);
 });
@@ -291,6 +304,7 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
   await refused("set_nu_news_photo_focus", { issueId, src: title.src, x: 0, y: 0 }, new RegExp(FINAL_ISSUE));
   await refused("make_nu_news_preview", { issueId }, /Only a draft issue has a preview/);
   await refused("finalize_nu_news_issue", { issueId, confirmSeason: "Fall 2026" }, new RegExp(FINAL_ISSUE));
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" }, new RegExp(FINAL_ISSUE));
   assert.equal(admin.files.size, filesBefore);
 
   assert.match((await ok("get_nu_news_pdf_url", { issueId })).pdfUrl, /\/final\//);
@@ -334,4 +348,31 @@ test("attaching refuses and deletes uploaded photos that are not prepared JPEGs"
   const headshot = await uploaded(issueId, prepared);
   await refused("set_nu_news_headshot", { issueId, articleId: randomUUID(), path: headshot }, /no article with that ID/);
   assert.ok(admin.files.has(headshot));
+});
+
+test("an agent can delete a draft with its photos and preview, and nothing else", async () => {
+  const { admin, adminId, ok, refused, uploaded } = connect();
+  const fall2026 = { season: "Fall 2026", issueDate: "2026-10-14", location: "Berkeley, CA" };
+  const { id: issueId } = await ok("create_nu_news_issue", { ...fall2026, requestId: randomUUID() });
+  const { id: otherIssueId } = await ok("create_nu_news_issue", { ...fall2026, requestId: randomUUID() });
+  const title = await ok("set_nu_news_title_photo", { issueId, path: await uploaded(issueId, prepared) });
+  const unattached = await uploaded(issueId, prepared);
+  const otherPhoto = await uploaded(otherIssueId, prepared);
+  await ok("make_nu_news_preview", { issueId });
+  const issueFiles = [title.src, unattached, `${issueId}/preview.pdf`].sort();
+
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2025" }, /must match the issue's season exactly/);
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "fall 2026" }, /must match the issue's season exactly/);
+  assert.ok(admin.tables.nu_news_issues.some((issue) => issue.id === issueId));
+  assert.ok(issueFiles.every((name) => admin.files.has(name)));
+
+  const deleted = await ok("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" });
+  assert.deepEqual([deleted.issueId, deleted.status, deleted.removedFiles.sort()], [issueId, "deleted", issueFiles]);
+  assert.deepEqual([...admin.files.keys()], [otherPhoto]);
+  assert.deepEqual(admin.tables.nu_news_issues.map((issue) => issue.id), [otherIssueId]);
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" }, /No Nu News issue has that ID/);
+  assert.ok(admin.tables.mcp_audit_log.some((row) => row.tool_name === "delete_nu_news_draft" && row.target_id === issueId && row.user_id === adminId));
+
+  const { id: emptyIssueId } = await ok("create_nu_news_issue", { season: "Spring 2027", issueDate: "2027-03-01", requestId: randomUUID() });
+  assert.deepEqual((await ok("delete_nu_news_draft", { issueId: emptyIssueId, confirmSeason: "Spring 2027" })).removedFiles, []);
 });

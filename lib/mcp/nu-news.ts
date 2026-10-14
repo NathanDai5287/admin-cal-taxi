@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  FINAL_ISSUE, createDraft, finalizeDraft, makeDraftPreview, saveDraft, type Finalizer, type NewIssueDetails,
+  FINAL_ISSUE, createDraft, deleteDraft, finalizeDraft, makeDraftPreview, saveDraft, type Finalizer, type NewIssueDetails,
 } from "@/lib/nu-news/drafts";
 import {
   CENTER_FOCUS, HEADSHOT_FOCUS, NU_NEWS_BUCKET, missingItems, newArticle, photoPath, photoSources, updateGalleryPhoto,
@@ -192,6 +192,12 @@ export async function finalizeConfirmedDraft(issueId: string, confirmSeason: str
     finalPdfSha256: issue.final_pdf_sha256,
     finalPdfUrl: await pdfUrl(issue, MCP_LINK_SECONDS),
   };
+}
+
+export async function deleteConfirmedDraft(issueId: string, confirmSeason: string) {
+  const result = await deleteDraft(issueId, confirmSeason);
+  if (!result.ok) throw new Error(result.message);
+  return { issueId, status: "deleted", removedFiles: result.removedFiles };
 }
 
 export async function pdfLink(issueId: string) {

@@ -12,7 +12,7 @@ import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
 import { isCalendarDate } from "@/lib/mcp/finance";
 import {
-  MCP_LINK_SECONDS, UPLOAD_LINK_SECONDS, addDraftPhoto, createIssue, curlUpload, editDraft, finalizeConfirmedDraft, finalizerFor,
+  MCP_LINK_SECONDS, UPLOAD_LINK_SECONDS, addDraftPhoto, createIssue, curlUpload, deleteConfirmedDraft, editDraft, finalizeConfirmedDraft, finalizerFor,
   issueStatus, issueWithPhotoLinks, pdfLink, preparePhotoUpload, previewDraft, withArticleChanges, withFocus, withGalleryChanges,
   withGalleryPhoto, withHeadshot, withNewArticle, withoutArticle, withoutGalleryPhoto, withTitlePhoto,
 } from "@/lib/mcp/nu-news";
@@ -610,6 +610,14 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
   }, authorized("finalize_nu_news_issue", async ({ issueId, confirmSeason }) => (
     finalizeConfirmedDraft(issueId, confirmSeason, await finalizerFor(caller.userId))
   )));
+
+  server.registerTool("delete_nu_news_draft", {
+    description: "Permanently delete a draft issue, like Delete draft on the site: its text, its photos, and its preview PDF. "
+      + "It works only on drafts: final issues can never be deleted. Call it only after the user asks to delete this draft. "
+      + "Set confirmSeason to the issue's season exactly. Returns the removed files.",
+    inputSchema: z.object({ issueId, confirmSeason: z.string() }),
+    annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
+  }, authorized("delete_nu_news_draft", async ({ issueId, confirmSeason }) => deleteConfirmedDraft(issueId, confirmSeason)));
 
   server.registerTool("get_nu_news_pdf_url", {
     description: `Get a link to the final PDF of a final issue, or to the latest preview PDF of a draft issue. ${LINK_LIFETIME}`,
