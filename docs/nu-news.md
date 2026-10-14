@@ -39,6 +39,25 @@ and the site makes the PDF. The PDF prints each author's writing exactly as ente
 A final issue can never change: there are no new versions, corrections, or copies. Check
 the preview carefully before you finalize.
 
+## Using an agent
+
+An administrator can also ask an AI agent to do every step above. Connect the agent to
+the site's MCP server first (see "Connect an AI client" in the README). The agent can
+create an issue, enter the text, add and order articles and photos, set focus points,
+make the preview, read the photo warnings, and finalize.
+
+- The agent must copy each author's text exactly. The PDF prints it as entered.
+- The agent sends one photo at a time, and the site does not change it. The site accepts
+  only a JPEG of at most 3 MB and 2200 pixels on the long side, upright, with no metadata
+  (no EXIF, XMP, IPTC, or comments). It refuses other photos and tells the agent what to
+  fix. Agent photos go through a Vercel function, so they must stay under its 4.5 MB
+  request limit.
+- To finalize, the agent must send the issue's season as confirmation. Finalizing stays
+  off while something is missing. Tell the agent to finalize only after you read the
+  preview.
+- The links that the agent gets to a preview or final PDF expire after 10 minutes.
+- Each call writes a record in the MCP audit log.
+
 ## Photos
 
 The browser converts HEIC photos to JPEG, turns them upright, removes their metadata,

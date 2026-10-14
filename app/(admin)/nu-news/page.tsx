@@ -2,20 +2,15 @@ import Link from "next/link";
 
 import { Button } from "@/components/brand/button";
 import { createIssue } from "@/app/(admin)/nu-news/actions";
+import { listIssues } from "@/lib/nu-news/store";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
-import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 export default async function NuNewsPage() {
   await requireAdmin("/");
-  const { data: issues, error } = await createAdminClient()
-    .from("nu_news_issues")
-    .select("id, season, issue_date, finalized_at")
-    .order("issue_date", { ascending: false })
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(`Unable to load Nu News issues: ${error.message}`);
+  const issues = await listIssues();
 
   return (
     <div className="grid gap-6">

@@ -1,8 +1,7 @@
 import { preparePhotoUpload } from "@/app/(admin)/nu-news/actions";
-import { NU_NEWS_BUCKET } from "@/lib/nu-news/issue";
+import { NU_NEWS_BUCKET, PHOTO_LONG_EDGE_PX } from "@/lib/nu-news/issue";
 import { receiptFormat } from "@/lib/reimbursements/receipt-upload";
 
-const LONG_EDGE_PX = 2_200;
 const JPEG_QUALITY = 0.82;
 
 async function browserReadable(file: File): Promise<Blob> {
@@ -13,7 +12,7 @@ async function browserReadable(file: File): Promise<Blob> {
 
 async function shrunkJpeg(file: File) {
   const bitmap = await createImageBitmap(await browserReadable(file), { imageOrientation: "from-image" });
-  const scale = Math.min(1, LONG_EDGE_PX / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, PHOTO_LONG_EDGE_PX / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);

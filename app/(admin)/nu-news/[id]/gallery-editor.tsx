@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@/components/brand/button";
-import { CENTER_FOCUS, type NuNewsGalleryPhoto } from "@/lib/nu-news/issue";
+import { CENTER_FOCUS, updateGalleryPhoto, type NuNewsGalleryPhoto } from "@/lib/nu-news/issue";
+import { moved } from "@/lib/nu-news/moved";
 
-import { moved } from "./moved";
 import { FocusPicker, PHOTO_ACCEPT, photoElementId } from "./photo-field";
 
 type GalleryEditorProps = {
@@ -15,8 +15,7 @@ type GalleryEditorProps = {
 };
 
 export function GalleryEditor({ photos, previews, busy, onChange, onUpload }: GalleryEditorProps) {
-  const update = (index: number, changes: Partial<NuNewsGalleryPhoto>) => onChange(photos.map((photo, i) => (i === index ? { ...photo, ...changes } : photo)));
-  const chooseDonatePhoto = (index: number, chosen: boolean) => onChange(photos.map((photo, i) => ({ ...photo, donate: chosen && i === index })));
+  const update = (index: number, changes: Partial<NuNewsGalleryPhoto>) => onChange(updateGalleryPhoto(photos, index, changes));
 
   return (
     <div className="grid gap-4">
@@ -54,7 +53,7 @@ export function GalleryEditor({ photos, previews, busy, onChange, onUpload }: Ga
                 <span>Full width</span>
               </label>
               <label className="check-row">
-                <input type="checkbox" checked={photo.donate} onChange={(event) => chooseDonatePhoto(index, event.target.checked)} />
+                <input type="checkbox" checked={photo.donate} onChange={(event) => update(index, { donate: event.target.checked })} />
                 <span>Donate photo</span>
               </label>
               <div className="flex items-center gap-1.5">

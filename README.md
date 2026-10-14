@@ -67,7 +67,7 @@ performs receipt total extraction in the background. Submissions move from
 
 ## Connect an AI client
 
-The MCP server lets active administrators read and manage finance, reimbursement, and member records.
+The MCP server lets active administrators read and manage finance, reimbursement, member, and Nu News records.
 It does not accept pasted API keys or long-lived personal tokens.
 
 1. Add `https://admin.cal.taxi/api/mcp` as a remote HTTP MCP server in your client.
@@ -75,9 +75,18 @@ It does not accept pasted API keys or long-lived personal tokens.
 3. Review the client name and permissions, then select **Allow access**.
 4. Open `https://admin.cal.taxi/connections` to review or remove connected clients.
 
-The server provides read and write tools for finance, reimbursements, and members.
+The server provides read and write tools for finance, reimbursements, members, and Nu News.
 Each call verifies an active administrator and writes a secret-free audit record.
 Destructive tools require explicit confirmation, and create or payment tools accept retry-safe request IDs.
+
+The Nu News tools do everything the `/nu-news` editor does (see [docs/nu-news.md](docs/nu-news.md#using-an-agent)):
+
+- `list_nu_news_issues`, `get_nu_news_issue`, `get_nu_news_pdf_url`: read issues and get a link to a PDF.
+- `create_nu_news_issue`, `update_nu_news_issue`: start an issue and change its details, intro, and donation text.
+- `add_nu_news_article`, `update_nu_news_article`, `remove_nu_news_article`: manage articles and their order.
+- `set_nu_news_title_photo`, `set_nu_news_headshot`, `add_nu_news_gallery_photo`, `update_nu_news_gallery_photo`,
+  `remove_nu_news_gallery_photo`, `set_nu_news_photo_focus`: manage photos, their order, and their focus points.
+- `make_nu_news_preview`, `finalize_nu_news_issue`: make the DRAFT preview with its photo warnings, then lock the issue.
 
 Production setup also requires these Supabase Auth settings:
 

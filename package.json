@@ -17,11 +17,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:mcp": "node --test scripts/mcp.test.mjs",
+    "test:mcp": "node --test scripts/mcp.test.mjs scripts/nu-news-mcp.test.mjs",
     "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs",
     "test:public-site": "node --test scripts/public-site-routing.test.mjs scripts/public-site-images.test.mjs",
     "test:venue": "node --test scripts/venue-inquiries.test.mjs",
-    "test:nu-news": "node --test scripts/nu-news.test.mjs scripts/nu-news-database.test.mjs",
+    "test:nu-news": "node --test scripts/nu-news.test.mjs scripts/nu-news-database.test.mjs scripts/nu-news-mcp.test.mjs",
     "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh"
   },
   "dependencies": {

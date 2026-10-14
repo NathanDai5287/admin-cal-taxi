@@ -11,9 +11,18 @@ import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
 import { isCalendarDate } from "@/lib/mcp/finance";
+import {
+  MCP_PDF_LINK_SECONDS, addDraftPhoto, createIssue, editDraft, finalizeConfirmedDraft, finalizerFor, issueStatus, issueView,
+  loadExistingIssue, pdfLink, previewDraft, withArticleChanges, withFocus, withGalleryChanges, withGalleryPhoto, withHeadshot,
+  withNewArticle, withoutArticle, withoutGalleryPhoto, withTitlePhoto,
+} from "@/lib/mcp/nu-news";
+import { MAX_MCP_PHOTO_MB } from "@/lib/mcp/nu-news-photo";
 import { decodeMcpReceipt } from "@/lib/mcp/receipt";
+import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
+import { listIssues } from "@/lib/nu-news/store";
 
 type Supabase = import("@supabase/supabase-js").SupabaseClient<Database>;
+type McpCaller = { userId: string; clientId: string };
 
 function requiredEnvironment() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -57,6 +66,7 @@ const writeAnnotations = {
   idempotentHint: false,
   openWorldHint: false,
 };
+const readAnnotations = { ...writeAnnotations, readOnlyHint: true, idempotentHint: true };
 
 async function read(supabase: Supabase, resource: string) {
   const { data, error } = await supabase.rpc("mcp_admin_read", { p_resource: resource });
@@ -125,7 +135,7 @@ async function storeMcpReceipt(receiptDataUrl: string, requestId: string) {
   return path;
 }
 
-function createFinanceServer(supabase: Supabase) {
+export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   const server = new McpServer({ name: "cal.taxi administration", version: "2.0.0" });
 
   server.registerTool(
@@ -409,7 +419,193 @@ function createFinanceServer(supabase: Supabase) {
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
   }, async ({ chargeIds, confirm }) => write(supabase, "bulk_set_charges_paid", { chargeIds }, { confirmed: confirm }));
 
+  registerNuNewsTools(server, supabase, caller);
   return server;
+}
+
+type NuNewsTarget = { issueId?: string; requestId?: string };
+
+async function authorizeNuNewsCall(supabase: Supabase, caller: McpCaller, toolName: string, { issueId, requestId }: NuNewsTarget) {
+  const { data: isMcpAdmin, error } = await supabase.rpc("is_mcp_admin");
+  if (error || !isMcpAdmin) throw new Error("An active administrator OAuth grant is required");
+  const audit = await createAdminClient().from("mcp_audit_log").insert({
+    user_id: caller.userId, client_id: caller.clientId, tool_name: toolName, target_id: issueId, request_id: requestId,
+  });
+  if (audit.error) throw new Error("The Nu News call could not be recorded.");
+}
+
+const NU_NEWS_WORKFLOW = "Workflow: create_nu_news_issue; fill it with update_nu_news_issue and add_nu_news_article; "
+  + "upload the title photo, each author's headshot, and gallery photos; make_nu_news_preview and read the PDF; "
+  + "fix photo warnings with set_nu_news_photo_focus; when missingItems is empty and the user approves, finalize_nu_news_issue. "
+  + "The PDF prints each author's text exactly as given: never rewrite, correct, or shorten it.";
+const EXACT_TEXT = "Copy each author's text exactly as given: never rewrite, correct, shorten, or reformat it. "
+  + "In body, each non-empty line becomes a paragraph. "
+  + "closing is the sign-off: each line prints on its own line, for example \"YITB,\" then the name.";
+const PHOTO_RULES = `Send one photo per call as a data:image/jpeg;base64,... URL: a JPEG up to ${MAX_MCP_PHOTO_MB} MB, `
+  + `at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, upright, with no metadata (no EXIF, XMP, IPTC, or comments). `
+  + "Other photos are refused with the steps to fix them. The photo's src uses the requestId.";
+const LINK_LIFETIME = `The signed link expires after ${MCP_PDF_LINK_SECONDS / 60} minutes.`;
+
+function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpCaller) {
+  const authorized = <Input extends NuNewsTarget>(toolName: string, run: (input: Input) => Promise<unknown>) => (
+    async (input: Input) => {
+      await authorizeNuNewsCall(supabase, caller, toolName, input);
+      return jsonResult(await run(input));
+    }
+  );
+
+  const issueId = z.uuid().describe("The issue ID from list_nu_news_issues or create_nu_news_issue.");
+  const articleId = z.uuid().describe("The article ID from get_nu_news_issue.");
+  const src = z.string().describe("The photo's src from get_nu_news_issue.");
+  const position = z.int().min(1).optional().describe("Move it to this place in the list. 1 is first.");
+  const photoDataUrl = z.string().max(4_200_000).describe(`A data:image/jpeg;base64,... URL up to ${MAX_MCP_PHOTO_MB} MB.`);
+  const articleFields = issueSchema.shape.articles.element
+    .pick({ title: true, author: true, roster: true, body: true, closing: true })
+    .partial();
+
+  server.registerTool("list_nu_news_issues", {
+    description: "List Nu News newsletter issues, newest first, with season, issue date, draft or final status, preview time, "
+      + `and who finalized each and when. ${NU_NEWS_WORKFLOW}`,
+    inputSchema: z.object({}),
+    annotations: readAnnotations,
+  }, authorized("list_nu_news_issues", async () => ({
+    issues: (await listIssues()).map((issue) => ({ ...issue, status: issueStatus(issue) })),
+  })));
+
+  server.registerTool("get_nu_news_issue", {
+    description: "Get one Nu News issue: details, intro, articles with IDs, photos with src and focus [x, y], donation text, status, "
+      + "missingItems that block finalizing, and preview_made_at (null means no preview exists).",
+    inputSchema: z.object({ issueId }),
+    annotations: readAnnotations,
+  }, authorized("get_nu_news_issue", async ({ issueId }) => issueView(await loadExistingIssue(issueId))));
+
+  server.registerTool("create_nu_news_issue", {
+    description: "Create a draft Nu News issue, like New issue on the site: it copies the location and the donation text from the most recent issue. "
+      + `The season defaults to the current semester and the date to today. Articles and photos start empty. ${NU_NEWS_WORKFLOW}`,
+    inputSchema: z.object({
+      season: issueSchema.shape.season.optional(), issueDate: date.optional(), location: issueSchema.shape.location.optional(), requestId,
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("create_nu_news_issue", async ({ requestId, issueDate, ...details }) => (
+    createIssue(requestId, { ...details, issue_date: issueDate })
+  )));
+
+  server.registerTool("update_nu_news_issue", {
+    description: "Change a draft issue's season, issue date, location, intro, or How to Donate section. Send only the fields to change; "
+      + "intro and donate each replace both their heading and body. In each body, each non-empty line becomes one paragraph or donation item.",
+    inputSchema: z.object({
+      issueId, season: issueSchema.shape.season.optional(), issueDate: date.optional(), location: issueSchema.shape.location.optional(),
+      intro: issueSchema.shape.intro.optional(), donate: issueSchema.shape.donate.optional(),
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("update_nu_news_issue", async ({ issueId, issueDate, ...changes }) => editDraft(
+    issueId, (issue) => ({ ...issue, ...changes, issue_date: issueDate ?? issue.issue_date }),
+  )));
+
+  server.registerTool("add_nu_news_article", {
+    description: `Add an article at the end of a draft issue. The article ID is the requestId. The sign-off defaults to "YITB,". ${EXACT_TEXT}`,
+    inputSchema: articleFields.extend({ issueId, requestId }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("add_nu_news_article", async ({ issueId, requestId, ...fields }) => ({
+    articleId: requestId, ...await editDraft(issueId, (issue) => withNewArticle(issue, requestId, fields)),
+  })));
+
+  server.registerTool("update_nu_news_article", {
+    description: `Change an article's title, author, roster number, body, or sign-off (closing), or move it to another position. ${EXACT_TEXT}`,
+    inputSchema: articleFields.extend({ issueId, articleId, position }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("update_nu_news_article", async ({ issueId, articleId, ...changes }) => editDraft(
+    issueId, (issue) => withArticleChanges(issue, articleId, changes),
+  )));
+
+  server.registerTool("remove_nu_news_article", {
+    description: "Remove an article, its text, and its headshot from a draft issue. Set confirm to true after the user approves.",
+    inputSchema: z.object({ issueId, articleId, confirm: z.literal(true) }),
+    annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
+  }, authorized("remove_nu_news_article", async ({ issueId, articleId }) => editDraft(
+    issueId, (issue) => withoutArticle(issue, articleId),
+  )));
+
+  server.registerTool("set_nu_news_title_photo", {
+    description: `Upload the title photo of a draft issue, replacing any previous one. ${PHOTO_RULES}`,
+    inputSchema: z.object({ issueId, photoDataUrl, requestId }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("set_nu_news_title_photo", async ({ issueId, photoDataUrl, requestId }) => (
+    addDraftPhoto(issueId, requestId, photoDataUrl, withTitlePhoto)
+  )));
+
+  server.registerTool("set_nu_news_headshot", {
+    description: `Upload an article author's headshot, replacing any previous one. ${PHOTO_RULES}`,
+    inputSchema: z.object({ issueId, articleId, photoDataUrl, requestId }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("set_nu_news_headshot", async ({ issueId, articleId, photoDataUrl, requestId }) => addDraftPhoto(
+    issueId, requestId, photoDataUrl, (issue, src) => withHeadshot(issue, articleId, src),
+  )));
+
+  server.registerTool("add_nu_news_gallery_photo", {
+    description: "Add a photo at the end of a draft issue's photo list. Photos fill the empty space at the bottom of article pages in order, "
+      + `one to three per row, then the Photo Gallery pages. ${PHOTO_RULES}`,
+    inputSchema: z.object({ issueId, photoDataUrl, requestId }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("add_nu_news_gallery_photo", async ({ issueId, photoDataUrl, requestId }) => (
+    addDraftPhoto(issueId, requestId, photoDataUrl, withGalleryPhoto)
+  )));
+
+  server.registerTool("update_nu_news_gallery_photo", {
+    description: "Change a gallery photo's options or move it to another position. feature is Full width: the photo waits for the gallery "
+      + "and gets its own row there. donate is Donate photo: the photo goes above How to Donate, and only one photo can have it.",
+    inputSchema: z.object({ issueId, src, feature: z.boolean().optional(), donate: z.boolean().optional(), position }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("update_nu_news_gallery_photo", async ({ issueId, src, ...changes }) => editDraft(
+    issueId, (issue) => withGalleryChanges(issue, src, changes),
+  )));
+
+  server.registerTool("remove_nu_news_gallery_photo", {
+    description: "Remove a photo from a draft issue's photo list.",
+    inputSchema: z.object({ issueId, src }),
+    annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
+  }, authorized("remove_nu_news_gallery_photo", async ({ issueId, src }) => editDraft(
+    issueId, (issue) => withoutGalleryPhoto(issue, src),
+  )));
+
+  server.registerTool("set_nu_news_photo_focus", {
+    description: "Choose the spot of a title photo, headshot, or gallery photo that stays in view when the photo is cropped. "
+      + "Use it to fix photo warnings from make_nu_news_preview.",
+    inputSchema: z.object({
+      issueId, src,
+      x: z.number().min(0).max(1).describe("0 is the left edge and 1 the right edge."),
+      y: z.number().min(0).max(1).describe("0 is the top edge and 1 the bottom edge."),
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("set_nu_news_photo_focus", async ({ issueId, src, x, y }) => editDraft(
+    issueId, (issue) => withFocus(issue, src, [x, y]),
+  )));
+
+  server.registerTool("make_nu_news_preview", {
+    description: "Make the preview PDF of a draft issue, with a DRAFT mark on every page. It replaces the previous preview and needs the "
+      + "title photo and every headshot. Returns a link to the PDF, photoWarnings (photos that lose more than 30% when cropped: fix them "
+      + "with set_nu_news_photo_focus or a better-shaped photo; warnings do not block finalizing), and the missingItems that block finalizing. "
+      + LINK_LIFETIME,
+    inputSchema: z.object({ issueId }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, authorized("make_nu_news_preview", async ({ issueId }) => previewDraft(issueId)));
+
+  server.registerTool("finalize_nu_news_issue", {
+    description: "Permanently finalize a draft issue: make the PDF without the DRAFT mark and lock the issue, its photos, and its PDF forever. "
+      + "There are no corrections, new versions, or copies afterwards. Call it only after the user has read the latest preview and approved. "
+      + "Set confirmSeason to the issue's season exactly. It is refused while missingItems is not empty. "
+      + `Returns the final PDF's SHA-256 and a link to it. ${LINK_LIFETIME}`,
+    inputSchema: z.object({ issueId, confirmSeason: z.string() }),
+    annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
+  }, authorized("finalize_nu_news_issue", async ({ issueId, confirmSeason }) => (
+    finalizeConfirmedDraft(issueId, confirmSeason, await finalizerFor(caller.userId))
+  )));
+
+  server.registerTool("get_nu_news_pdf_url", {
+    description: `Get a link to the final PDF of a final issue, or to the latest preview PDF of a draft issue. ${LINK_LIFETIME}`,
+    inputSchema: z.object({ issueId }),
+    annotations: readAnnotations,
+  }, authorized("get_nu_news_pdf_url", async ({ issueId }) => pdfLink(issueId)));
 }
 
 export function createMcpRouteHandler() {
@@ -421,8 +617,10 @@ export function createMcpRouteHandler() {
   return protectedResource(withSupabase<Database>(
     { auth: "user", env: environment },
     async (request, context) => {
+      const claims = context.jwtClaims!;
+      const caller = { userId: claims.sub, clientId: String(claims.client_id) };
       const handler = createMcpHandler(
-        () => createFinanceServer(context.supabase),
+        () => createFinanceServer(context.supabase, caller),
         { onerror: (error) => console.error("MCP request failed", error) },
       );
       return handler.fetch(request);

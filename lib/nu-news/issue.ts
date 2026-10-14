@@ -13,6 +13,7 @@ export const DEFAULT_DONATE = {
 export type Focus = [x: number, y: number];
 export const CENTER_FOCUS: Focus = [0.5, 0.5];
 export const HEADSHOT_FOCUS: Focus = [0.5, 0.4];
+export const PHOTO_LONG_EDGE_PX = 2_200;
 
 const fraction = z.number().min(0).max(1);
 const photo = z.object({
@@ -45,6 +46,17 @@ export type NuNewsPhoto = z.infer<typeof photo>;
 export type NuNewsGalleryPhoto = NuNewsIssue["gallery"][number];
 
 export const previewPath = (issueId: string) => `${issueId}/preview.pdf`;
+export const photoPath = (issueId: string, photoId: string) => `${issueId}/${photoId}.jpg`;
+
+export const newArticle = (id: string): NuNewsArticle => ({ id, title: "", author: "", roster: "", body: "", closing: "YITB,", headshot: null });
+
+export function updateGalleryPhoto(gallery: NuNewsGalleryPhoto[], index: number, changes: Partial<NuNewsGalleryPhoto>) {
+  const onlyDonatePhoto = changes.donate === true;
+  return gallery.map((photo, i) => {
+    if (i === index) return { ...photo, ...changes };
+    return onlyDonatePhoto ? { ...photo, donate: false } : photo;
+  });
+}
 
 export function pdfFileName(season: string) {
   return `nu-news-${season.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.pdf`;

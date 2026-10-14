@@ -7,13 +7,13 @@ import { useState } from "react";
 import { finalizeIssue, makePreview, saveIssue } from "@/app/(admin)/nu-news/actions";
 import { Button } from "@/components/brand/button";
 import type { CropWarning } from "@/lib/nu-news/crop-warnings";
-import { CENTER_FOCUS, HEADSHOT_FOCUS, missingItems, type NuNewsArticle, type NuNewsIssue } from "@/lib/nu-news/issue";
+import { CENTER_FOCUS, HEADSHOT_FOCUS, missingItems, newArticle, type NuNewsArticle, type NuNewsIssue } from "@/lib/nu-news/issue";
+import { moved } from "@/lib/nu-news/moved";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
 
 import { ArticleEditor } from "./article-editor";
 import { Field, Section } from "./field";
 import { GalleryEditor } from "./gallery-editor";
-import { moved } from "./moved";
 import { PhotoField, photoElementId } from "./photo-field";
 import { uploadPhoto } from "./upload-photo";
 
@@ -139,8 +139,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
   }
 
   function addArticle() {
-    const article = { id: crypto.randomUUID(), title: "", author: "", roster: "", body: "", closing: "YITB,", headshot: null };
-    change({ articles: [...issue.articles, article] });
+    change({ articles: [...issue.articles, newArticle(crypto.randomUUID())] });
   }
 
   function removeArticle(article: NuNewsArticle) {

@@ -469,7 +469,9 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          id?: string;
           season: string;
+          issue_date?: string;
           location?: string;
           donate: Json;
         };
@@ -675,6 +677,7 @@ export type Database = {
         Returns: boolean;
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      is_mcp_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       mcp_budget_categories: { Args: Record<PropertyKey, never>; Returns: Json };
       mcp_admin_read: { Args: { p_resource: string }; Returns: Json };
       mcp_admin_write: {
