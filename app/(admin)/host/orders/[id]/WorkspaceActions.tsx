@@ -14,11 +14,10 @@ import { Button } from "@/components/brand/button";
  * field-by-field instead of corrupting the whole workspace.
  */
 
-import { beginDraft, notifyDraftSelected } from "@/lib/host-draft-storage";
+import { beginDraft } from "@/lib/host-draft-storage";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 export { sharedStateFromSnapshot } from "@/lib/host-state-model";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Order } from "@/lib/host-orders-types";
 import {
@@ -38,8 +37,21 @@ export default function WorkspaceActions({
   showDuplicate?: boolean;
   compact?: boolean;
 }) {
-  const router = useRouter();
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
+  const [error, setError] = useState("");
+
+  function openWorkspace(data: SharedState, action: "load" | "duplicate", orderVersion?: string) {
+    setError("");
+    setBusy(action);
+    try {
+      beginDraft(data, orderVersion);
+    } catch {
+      setBusy(null);
+      setError("Could not save the editing draft in this browser. Check that browser storage is available, then try again.");
+      return;
+    }
+    window.location.assign("/host");
+  }
 
   function stateFromOrder(): SharedState {
     const next = sharedStateFromSnapshot(order.snapshot);
@@ -60,18 +72,13 @@ export default function WorkspaceActions({
       "Edit this order in a separate draft? Changes are saved only when you select Save changes or approve new signing links. Existing signing links stay active during preview.",
     );
     if (!ok) return;
-    setBusy("load");
     const next = stateFromOrder();
-    const draftId = beginDraft({
+    openWorkspace({
       ...next,
       currentOrderId: order.id,
       orderDraftIntent: "edit",
-      // Remember the order's identity so the documents step can warn if the
-      // workspace's organization/date later diverges from it.
       loadedOrderIdentity: `${order.clubName}|${order.eventDate}`,
-    }, order.updatedAt);
-    notifyDraftSelected(draftId);
-    router.push("/host");
+    }, "load", order.updatedAt);
   }
 
   function duplicateAsNewEvent() {
@@ -81,9 +88,8 @@ export default function WorkspaceActions({
       "generates as a brand-new rental rather than appending to the original.",
     );
     if (!ok) return;
-    setBusy("duplicate");
     const next = stateFromOrder();
-    const draftId = beginDraft({
+    openWorkspace({
       ...next,
       currentOrderId: "",
       orderDraftIntent: "",
@@ -93,11 +99,7 @@ export default function WorkspaceActions({
       chapterSignerEmail: "",
       eventDate: "",
       lastDepositInvoiceNumber: "",
-    });
-    notifyDraftSelected(draftId);
-    // Back to step 1, not the documents step: the event date was deliberately
-    // cleared, and every document is blocked until a new one is entered.
-    router.push("/host");
+    }, "duplicate");
   }
 
   return (
@@ -119,6 +121,7 @@ export default function WorkspaceActions({
       >
         {busy === "duplicate" ? "Duplicating…" : "Duplicate event"}
       </Button>}
+      {error && <p role="alert" className="text-[13px] text-warn">{error}</p>}
     </>
   );
 }
