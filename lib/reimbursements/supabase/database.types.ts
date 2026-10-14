@@ -447,6 +447,51 @@ export type Database = {
           },
         ];
       };
+      nu_news_issues: {
+        Row: {
+          id: string;
+          season: string;
+          issue_date: string;
+          location: string;
+          intro: Json;
+          articles: Json;
+          cover_src: string | null;
+          gallery: Json;
+          donate: Json;
+          preview_made_at: string | null;
+          finalized_at: string | null;
+          finalized_by: string | null;
+          finalized_by_name: string | null;
+          final_pdf_path: string | null;
+          final_pdf_sha256: string | null;
+          final_inputs: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          season: string;
+          location?: string;
+          donate: Json;
+        };
+        Update: {
+          season?: string;
+          issue_date?: string;
+          location?: string;
+          intro?: Json;
+          articles?: Json;
+          cover_src?: string | null;
+          gallery?: Json;
+          donate?: Json;
+          preview_made_at?: string;
+          finalized_at?: string;
+          finalized_by?: string;
+          finalized_by_name?: string;
+          final_pdf_path?: string;
+          final_pdf_sha256?: string;
+          final_inputs?: Json;
+        };
+        Relationships: [];
+      };
       mcp_audit_log: {
         Row: {
           id: number;

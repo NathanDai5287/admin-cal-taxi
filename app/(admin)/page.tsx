@@ -36,6 +36,11 @@ const ADMIN_APPS = [
     description: "Accreditation questions, source citations, and paths to evidence and document creation",
   }] : []),
   {
+    href: "/nu-news",
+    label: "Nu News",
+    description: "Semester newsletter: writing, photos, previews, and the final PDF",
+  },
+  {
     href: "/users",
     label: "Members & invites",
     description: "Invite members and manage who has access",
