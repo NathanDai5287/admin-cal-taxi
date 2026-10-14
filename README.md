@@ -193,7 +193,8 @@ whole-site snapshot/restore plan.
 
 `/nu-news` makes the semester newsletter PDF: admins enter the writing and photos, make
 previews, and finalize the issue, which then never changes. Apply
-`supabase/migrations/20261014000000_nu_news.sql` once; until then the page shows a setup
+`supabase/migrations/20261014000000_nu_news.sql`, then
+`20261014120000_nu_news_cover_focus.sql`, once each; until then the page shows a setup
 message. See [Nu News](docs/nu-news.md).
 
 ## Accreditation reports

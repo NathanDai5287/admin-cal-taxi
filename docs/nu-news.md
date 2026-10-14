@@ -62,9 +62,11 @@ the service role:
 
 ## Setup
 
-Apply `supabase/migrations/20261014000000_nu_news.sql` once, in the Supabase SQL editor
-or with `npx supabase db push`. It only adds objects: the `nu_news_issues` table, the
-private `nu-news` bucket, admin-only policies, and the two guard triggers. Until it runs,
+Apply `supabase/migrations/20261014000000_nu_news.sql`, then
+`supabase/migrations/20261014120000_nu_news_cover_focus.sql`, once each, in the Supabase
+SQL editor or with `npx supabase db push`. The first adds the `nu_news_issues` table, the
+private `nu-news` bucket, admin-only policies, and the two guard triggers. The second
+gives the title photo a focus point (`cover_src` becomes `cover`). Until the first runs,
 `/nu-news` shows a setup message and the rest of the site is unaffected.
 
 The template, fonts, and assets are in `lib/nu-news/`. Run `npm run test:nu-news` after

@@ -5,7 +5,7 @@ create table public.nu_news_issues (
   location text not null default 'Berkeley, CA',
   intro jsonb not null default '{"heading": "", "body": ""}',
   articles jsonb not null default '[]',
-  cover jsonb,
+  cover_src text,
   gallery jsonb not null default '[]',
   donate jsonb not null,
   preview_made_at timestamptz,

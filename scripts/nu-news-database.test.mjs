@@ -5,8 +5,9 @@ import test from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 
 const DONATE = JSON.stringify({ heading: "HOW TO DONATE", body: "Zelle: calthetaxi@gmail.com" });
+const migration = (name) => readFile(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8");
 
-async function database(t) {
+async function database(t, beforeCoverFocus = async () => {}) {
   const db = new PGlite();
   t.after(() => db.close());
   await db.exec(`
@@ -31,7 +32,9 @@ async function database(t) {
   const admin = randomUUID();
   const member = randomUUID();
   await db.query("insert into public.profiles values ($1, 'admin'), ($2, 'member')", [admin, member]);
-  await db.exec(await readFile(new URL("../supabase/migrations/20261014000000_nu_news.sql", import.meta.url), "utf8"));
+  await db.exec(await migration("20261014000000_nu_news.sql"));
+  await beforeCoverFocus(db, admin);
+  await db.exec(await migration("20261014120000_nu_news_cover_focus.sql"));
   const as = async (role, user) => {
     await db.exec(`reset role; set role ${role}`);
     await db.query("select set_config('test.user_id', $1, false)", [user ?? ""]);
@@ -112,4 +115,23 @@ test("a finalized issue, its PDF, and its photos never change", async (t) => {
 
   const { id: draft } = (await db.query("insert into public.nu_news_issues (season, donate, cover) values ('Spring 2027', $1, $2) returning id", [DONATE, JSON.stringify({ src: photo, focus: [0.5, 0.5] })])).rows[0];
   await db.query("update public.nu_news_issues set season = 'Spring 2027 draft' where id = $1", [draft]);
+});
+
+test("the cover focus migration keeps existing covers, including a finalized issue's", async (t) => {
+  const draft = randomUUID();
+  const final = randomUUID();
+  let finalUpdatedAt;
+  const { db } = await database(t, async (db, admin) => {
+    await db.query("insert into public.nu_news_issues (id, season, donate, cover_src) values ($1, 'Draft', $3, 'a/cover.jpg'), ($2, 'Final', $3, 'b/cover.jpg')", [draft, final, DONATE]);
+    await db.query(`update public.nu_news_issues set finalized_at = now(), finalized_by = $2, finalized_by_name = 'Taylor Admin',
+      final_pdf_path = 'b/final/1.pdf', final_pdf_sha256 = $3, final_inputs = '{}' where id = $1`, [final, admin, "a".repeat(64)]);
+    finalUpdatedAt = (await db.query("select updated_at from public.nu_news_issues where id = $1", [final])).rows[0].updated_at;
+  });
+
+  const rows = (await db.query("select id, cover, updated_at from public.nu_news_issues order by season")).rows;
+  assert.deepEqual(rows.map((row) => row.cover), [{ src: "a/cover.jpg", focus: [0.5, 0.5] }, { src: "b/cover.jpg", focus: [0.5, 0.5] }]);
+  assert.deepEqual(rows.find((row) => row.id === final).updated_at, finalUpdatedAt);
+  assert.equal((await db.query("select count(*)::int as count from information_schema.columns where table_name = 'nu_news_issues' and column_name = 'cover_src'")).rows[0].count, 0);
+  await assert.rejects(db.query("update public.nu_news_issues set season = 'Changed' where id = $1", [final]), /Finalized Nu News issues are immutable/);
+  await db.query("update public.nu_news_issues set season = 'Draft 2' where id = $1", [draft]);
 });
