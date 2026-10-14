@@ -1,7 +1,8 @@
+import { orderPaymentSchedule } from './host-payment-schedule';
 import type { Order, DocumentKind } from './host-orders-types';
 import { sharedStateFromSnapshot } from './host-state-model';
 import { savedPricing } from './host-saved-pricing';
-import { addDaysIso, formatDateISO, todayIso } from './host-format';
+import { formatDateISO, todayIso } from './host-format';
 import { DOCUMENT_ORDER, buildContractPayload, buildDepositPayload, buildRentalPayload, buildCreditMemoPayload, missingFields, mintContractNumber } from './host-documents';
 import { buildLineItems } from '../app/(admin)/host/documents/build-line-items';
 
@@ -17,11 +18,12 @@ export function defaultDocuments(order: Order, depositNumber?: string) {
     overrides: { ...saved.overrides, finalPrice: true, depositAmount: true },
   };
   const issueDate = todayIso();
+  const schedule = orderPaymentSchedule(order);
   const invoiceNumber = depositNumber || saved.lastDepositInvoiceNumber || mintContractNumber(data.clubs[0] ?? "partner", order.eventDate).replace(/^CTR-/, "DEP-");
   const fields = {
     contract: { sign: saved.contractPresign },
-    deposit: { amount: data.depositAmount, issueDate, dueDate: addDaysIso(order.eventDate, -7), invoiceNumber },
-    rental: { items: buildLineItems(savedPricing(order.snapshot.pricingBreakdown), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: addDaysIso(order.eventDate, 2), invoiceNumber: "" },
+    deposit: { amount: data.depositAmount, issueDate, dueDate: schedule.depositDueDate, invoiceNumber },
+    rental: { items: buildLineItems(savedPricing(order.snapshot.pricingBreakdown), order.rentalPrice ?? 0, formatDateISO(order.eventDate)), issueDate, dueDate: schedule.rentalDueDate, invoiceNumber: "" },
     creditMemo: { amount: data.depositAmount, issueDate, originalInvoice: invoiceNumber, refundMethod: "", refundDescription: "", memoNumber: "" },
   };
   const payloads = {

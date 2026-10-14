@@ -26,6 +26,7 @@ export function readDraft(id: string): SharedState | null {
     const value = JSON.parse(localStorage.getItem(draftKey(id)) ?? "null");
     if (!value || typeof value !== "object") return null;
     const clean = sharedStateFromSnapshot(value);
+    if (!value.currentOrderId && !value.rentalPaymentTiming) clean.rentalPaymentTiming = "day_before";
     return { ...clean, currentOrderId: typeof value.currentOrderId === "string" ? value.currentOrderId : "",
       loadedOrderIdentity: typeof value.loadedOrderIdentity === "string" ? value.loadedOrderIdentity : "",
       orderCreateRequestKey: typeof value.orderCreateRequestKey === "string" ? value.orderCreateRequestKey : "",
@@ -41,6 +42,7 @@ export function activeDraft(): string {
     const old = JSON.parse(localStorage.getItem(LEGACY) ?? "null");
     if (old && typeof old === "object") {
       data = sharedStateFromSnapshot(old);
+      if (!old.currentOrderId) data.rentalPaymentTiming = "day_before";
       if (!old.overrides) {
         for (const key of ["finalPrice", "depositAmount", "maxGuests"] as const) {
           data.overrides[key] = data[key].trim() !== "";

@@ -83,7 +83,7 @@ export default function WorkspaceActions({
 
   function duplicateAsNewEvent() {
     const ok = window.confirm(
-      "Duplicate this order as a new event? Pricing and contract terms are copied over, " +
+      "Duplicate this order as a new event? Pricing and event details are copied over, " +
       "but the event date, order link, and invoice numbering all start fresh so this " +
       "generates as a brand-new rental rather than appending to the original.",
     );
@@ -92,6 +92,7 @@ export default function WorkspaceActions({
     openWorkspace({
       ...next,
       currentOrderId: "",
+      rentalPaymentTiming: "day_before",
       orderDraftIntent: "",
       loadedOrderIdentity: "",
       contractSigners: [],

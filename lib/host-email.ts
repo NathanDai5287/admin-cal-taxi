@@ -9,13 +9,14 @@ import { currentRevision, contractWasSent, eventToday, type EmailKind } from "./
 import { hostingEmail } from "./host-email-template";
 import { loadWorkflow, registerSigning, ensureHostingForecast, workflowDb } from "./host-workflow";
 import { createAdminClient } from "./reimbursements/supabase/admin";
+import { orderInvoiceDueDate, orderPaymentSchedule } from "./host-payment-schedule";
 import { defaultDocuments } from "./host-order-documents";
 import type { Order } from "./host-orders-types";
 import { renderDepositReceiptPdf } from "./host-deposit-receipt-pdf";
 
 type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; depositReceiptStyle?: number; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
@@ -87,6 +88,15 @@ async function invoicePdf(order: Order, kind: "deposit_invoice" | "rental_invoic
   if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) throw new Error("Invoice generation failed. No email was sent.");
   return { filename: `${kind.replaceAll("_", "-")}-${order.id}.pdf`, content: Buffer.from(await response.arrayBuffer()).toString("base64") };
 }
+async function updatedInvoicePreview(order: Order, row: DeliveryRow, kind: "deposit_invoice" | "rental_invoice"): Promise<FrozenEmail> {
+  const invoiceDueDate = orderInvoiceDueDate(order, kind);
+  const invoiceAmount = kind === "deposit_invoice" ? order.depositAmount ?? undefined : order.rentalPrice ?? undefined;
+  const message = hostingEmail({ kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, invoiceAmount, invoiceDueDate, replyTo: row.payload.body.reply_to });
+  const sameDate = row.payload.invoiceDueDate === invoiceDueDate || row.payload.body.text.includes(`is due ${invoiceDueDate}`);
+  if (sameDate && message.html === row.payload.body.html && message.text === row.payload.body.text) return row.payload;
+  const attachments = sameDate ? row.payload.body.attachments : [await invoicePdf(order, kind)];
+  return { ...row.payload, invoiceDueDate, body: { ...row.payload.body, ...message, attachments } };
+}
 function preview(row: DeliveryRow): EmailPreview {
   return { id: row.id, recipient: row.recipient, subject: row.payload.body.subject, html: row.payload.body.html, attachments: row.payload.body.attachments.map(a => a.filename), status: row.status };
 }
@@ -116,6 +126,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (payments.total < (order.rentalPrice ?? Infinity)) throw new Error("Record full rental payment before confirming the deposit return.");
     const refund = input.refund;
     if (!refund || !Number.isFinite(refund.amount) || refund.amount <= 0 || refund.amount > (order.depositAmount ?? 0) || !/^\d{4}-\d{2}-\d{2}$/.test(refund.date) || refund.date > eventToday() || !refund.method.trim() || refund.method.length > 120) throw new Error("Enter the amount, date, and method of the deposit you actually returned.");
+    if (!workflow.refund && order.snapshot.rentalPaymentTiming === "day_before" && refund.date < orderPaymentSchedule(order).eventEndDate) throw new Error("The deposit return date must be on or after the event ends.");
     if (workflow.refund && hash(workflow.refund) !== hash(refund)) throw new Error("A different deposit return was already confirmed. Check the existing record before sending.");
   }
   const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "deposit_receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
@@ -134,9 +145,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
       let payload = row.payload;
       if (row.status === "queued" && !row.attempted_at) {
         if (invoice) {
-          const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : order.rentalPrice ?? undefined;
-          const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, invoiceAmount, replyTo: row.payload.body.reply_to });
-          if (message.html !== row.payload.body.html || message.text !== row.payload.body.text) payload = { ...row.payload, body: { ...row.payload.body, ...message } };
+          payload = await updatedInvoicePreview(order, row, input.kind as "deposit_invoice" | "rental_invoice");
         } else if (row.payload.depositReceiptStyle !== 1) {
           payload = { ...row.payload, depositReceiptStyle: 1, body: { ...row.payload.body, attachments: [depositReceiptAttachment(order, payments.rows, row.payload.body.reply_to)] } };
         }
@@ -161,10 +170,14 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
       detail = `Deposit payments received: $${payments.total.toFixed(2)}. Remaining deposit: $${Math.max((order.depositAmount ?? 0) - payments.total, 0).toFixed(2)}.`;
       attachments = [depositReceiptAttachment(order, payments.rows, sender.replyTo)];
     } else {
-      attachments = legacyRows[0]?.payload.body.attachments ?? [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
+      const invoiceDueDate = orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice");
+      const legacy = legacyRows[0]?.payload;
+      const sameDate = legacy && (legacy.invoiceDueDate === invoiceDueDate || legacy.body.text.includes(`is due ${invoiceDueDate}`));
+      attachments = sameDate ? legacy.body.attachments : [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
     }
-    const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, replyTo: sender.replyTo });
-    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}) };
+    const invoiceDueDate = invoice ? orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice") : undefined;
+    const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, invoiceDueDate, replyTo: sender.replyTo });
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}) };
     const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
     if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
     const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
