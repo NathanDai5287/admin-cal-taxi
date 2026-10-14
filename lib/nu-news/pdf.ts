@@ -38,7 +38,7 @@ export function newsletterInput(issue: NuNewsIssue) {
   return { content, data };
 }
 
-export function renderNuNewsPdf(issue: NuNewsIssue, photosBySrc: Map<string, Buffer>, mark: "draft" | "final") {
+export function renderNuNewsPdf(issue: NuNewsIssue, photosBySrc: Map<string, Buffer>) {
   const templateDir = path.join(process.cwd(), "lib/nu-news");
   const fontDir = path.join(templateDir, "fonts");
   const fontBlobs = readdirSync(fontDir).filter((name) => name.endsWith(".ttf")).map((name) => readFileSync(path.join(fontDir, name)));
@@ -48,7 +48,7 @@ export function renderNuNewsPdf(issue: NuNewsIssue, photosBySrc: Map<string, Buf
   const { content, data } = newsletterInput(issue);
   const compiled = compiler.compile({
     mainFilePath: path.join(templateDir, "nunews.typ"),
-    inputs: { content: JSON.stringify(content), data: JSON.stringify(data), draft: String(mark === "draft") },
+    inputs: { content: JSON.stringify(content), data: JSON.stringify(data) },
   });
   const document = compiled.result;
   if (!document) throw new Error(`Typst could not build Nu News: ${JSON.stringify(compiled.takeError()?.shortDiagnostics)}`);

@@ -89,7 +89,7 @@ test("a finalized issue, its PDF, and its photos never change", async (t) => {
   await assert.rejects(finalize(`finalized_at = now(), finalized_by = '${admin}', finalized_by_name = 'Taylor', final_pdf_path = '${finalPdf}', final_pdf_sha256 = 'not-a-checksum', final_inputs = '{}'`), /check constraint/);
   await finalize(`cover = jsonb_build_object('src', '${photo}', 'focus', jsonb_build_array(0.5, 0.42)), finalized_at = now(), finalized_by = '${admin}', finalized_by_name = 'Taylor Admin',
     final_pdf_path = '${finalPdf}', final_pdf_sha256 = '${"a".repeat(64)}',
-    final_inputs = jsonb_build_object('content', '{}'::jsonb, 'data', '{}'::jsonb, 'draft', false, 'photos', jsonb_build_object('${photo}', '${"b".repeat(64)}'))`);
+    final_inputs = jsonb_build_object('content', '{}'::jsonb, 'data', '{}'::jsonb, 'photos', jsonb_build_object('${photo}', '${"b".repeat(64)}'))`);
 
   const immutable = /Finalized Nu News issues are immutable/;
   await assert.rejects(db.query("update public.nu_news_issues set intro = '{\"heading\": \"Edited\", \"body\": \"\"}' where id = $1", [id]), immutable);

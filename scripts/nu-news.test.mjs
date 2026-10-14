@@ -22,16 +22,16 @@ await unlink(temporary);
 const fixtureDir = "scripts/fixtures/nu-news";
 const issue = JSON.parse(await readFile(path.join(fixtureDir, "issue.json"), "utf8"));
 const photos = new Map(await Promise.all(photoSources(issue).map(async (src) => [src, await readFile(path.join(fixtureDir, src))])));
-const { pdf, placements } = renderNuNewsPdf(issue, photos, "final");
+const { pdf, placements } = renderNuNewsPdf(issue, photos);
 
 const squash = (text) => text.replace(/[\s­]/g, "");
 const withoutFooter = (text) => text.replace("Nu News · FALL 2026", "").replace(/\d+\s*$/, "");
 
-async function pageTexts(bytes, options = []) {
+async function pageTexts(bytes) {
   const directory = await mkdtemp(path.join(tmpdir(), "nu-news-text-"));
   try {
     await writeFile(path.join(directory, "issue.pdf"), bytes);
-    const { stdout } = await run("pdftotext", ["-enc", "UTF-8", ...options, path.join(directory, "issue.pdf"), "-"]);
+    const { stdout } = await run("pdftotext", ["-enc", "UTF-8", path.join(directory, "issue.pdf"), "-"]);
     return stdout.split("\f").slice(0, -1);
   } finally {
     await rm(directory, { recursive: true });
@@ -56,7 +56,7 @@ const texts = await pageTexts(pdf);
 const pageWith = (needle, from = 1) => texts.findIndex((text, index) => index >= from && squash(text).includes(squash(needle)));
 
 test("the same issue always gives the same PDF bytes", () => {
-  assert.ok(pdf.equals(renderNuNewsPdf(issue, photos, "final").pdf));
+  assert.ok(pdf.equals(renderNuNewsPdf(issue, photos).pdf));
 });
 
 test("pages follow the approved order: cover, articles, donate, gallery", async () => {
@@ -108,19 +108,10 @@ test("Typst markup in author text prints as plain text", async () => {
     intro: { ...issue.intro, heading: "#strong[Intro] $y$" },
     articles: [{ ...first, title: "#emph[Title] *x*", body: `${markup.join("\n")}\n${first.body}` }, ...rest],
   };
-  const printed = squash((await pageTexts(renderNuNewsPdf(marked, photos, "final").pdf)).join(""));
+  const printed = squash((await pageTexts(renderNuNewsPdf(marked, photos).pdf)).join(""));
   for (const words of [...markup, "#strong[Intro] $y$", "#emph[Title] *x*"]) {
     assert.ok(printed.includes(squash(words)), `not literal: ${words}`);
   }
-});
-
-test("a preview has a DRAFT mark on every page and the final PDF has none", async () => {
-  const includeRotatedText = ["-raw"];
-  const previewTexts = await pageTexts(renderNuNewsPdf(issue, photos, "draft").pdf, includeRotatedText);
-  const finalTexts = await pageTexts(pdf, includeRotatedText);
-  assert.equal(previewTexts.length, finalTexts.length);
-  assert.ok(previewTexts.every((text) => text.includes("DRAFT")));
-  assert.ok(finalTexts.every((text) => !text.includes("DRAFT")));
 });
 
 test("a typst CLI build of the same input has the same pages and text", async (t) => {
@@ -136,7 +127,7 @@ test("a typst CLI build of the same input has the same pages and text", async (t
   const { content, data } = newsletterInput(issue);
   await run("typst", [
     "compile", "--root", workspace, "--font-path", path.join(workspace, "fonts"), "--ignore-system-fonts",
-    "--input", `content=${JSON.stringify(content)}`, "--input", `data=${JSON.stringify(data)}`, "--input", "draft=false",
+    "--input", `content=${JSON.stringify(content)}`, "--input", `data=${JSON.stringify(data)}`,
     path.join(workspace, "nunews.typ"), path.join(workspace, "cli.pdf"),
   ]);
   assert.deepEqual(await pageTexts(await readFile(path.join(workspace, "cli.pdf"))), texts);
@@ -177,7 +168,7 @@ test("focus points reach the template and move the crop", () => {
   assert.deepEqual(data.cover, { src: "photos/cover.jpg", focus: [0.5, 0.42] });
   assert.deepEqual(data.headshots[issue.articles[2].id], issue.articles[2].headshot);
   assert.deepEqual(data.gallery[3].focus, [0.5, 0.6]);
-  const coverAt = (focus) => renderNuNewsPdf({ ...issue, cover: { ...issue.cover, focus } }, photos, "final").pdf;
+  const coverAt = (focus) => renderNuNewsPdf({ ...issue, cover: { ...issue.cover, focus } }, photos).pdf;
   assert.ok(!coverAt([0.5, 0]).equals(coverAt([0.5, 1])));
 });
 

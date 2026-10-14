@@ -592,7 +592,7 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
   )));
 
   server.registerTool("make_nu_news_preview", {
-    description: "Make the preview PDF of a draft issue, with a DRAFT mark on every page. It replaces the previous preview and needs the "
+    description: "Make the preview PDF of a draft issue. It replaces the previous preview and needs the "
       + "title photo and every headshot. Returns a link to the PDF, photoWarnings (photos that lose more than 30% when cropped: fix them "
       + "with set_nu_news_photo_focus or a better-shaped photo; warnings do not block finalizing), and the missingItems that block finalizing. "
       + LINK_LIFETIME,
@@ -601,7 +601,7 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
   }, authorized("make_nu_news_preview", async ({ issueId }) => previewDraft(issueId)));
 
   server.registerTool("finalize_nu_news_issue", {
-    description: "Permanently finalize a draft issue: make the PDF without the DRAFT mark and lock the issue, its photos, and its PDF forever. "
+    description: "Permanently finalize a draft issue: make the final PDF and lock the issue, its photos, and its PDF forever. "
       + "There are no corrections, new versions, or copies afterwards. Call it only after the user has read the latest preview and approved. "
       + "Set confirmSeason to the issue's season exactly. It is refused while missingItems is not empty. "
       + `Returns the final PDF's SHA-256 and a link to it. ${LINK_LIFETIME}`,

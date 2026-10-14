@@ -24,16 +24,16 @@ and the site makes the PDF. The PDF prints each author's writing exactly as ente
    in view when the photo is cropped. A dot marks the spot; the arrow keys move it and
    **Reset focus** puts it back in the middle (a little above the middle for headshots).
 6. **How to donate:** check the text. Each line is one item.
-7. Select **Save**, then **Make preview**. The preview opens below the buttons and has a
-   DRAFT mark. Make a new preview after each change; it replaces the previous preview.
+7. Select **Save**, then **Make preview**. The preview opens below the buttons. Make a
+   new preview after each change; it replaces the previous preview.
    **Photo warnings** then lists any title photo, headshot, or donate page photo that
    loses more than 30% of its width or height, for example "Sam Patel’s headshot loses
    44% of its height". Click a warning to go to the photo, then move its focus point or
    use a better-shaped photo. Warnings do not stop you from finalizing.
 8. **Before you finalize** lists what is still missing, for example "No title photo" or
    "Alex Rivera has no headshot". **Finalize** stays off until the list is empty.
-9. Select **Finalize** and confirm. The site makes the PDF without the DRAFT mark and
-   stores it permanently. The issue then shows who finalized it and when, and a
+9. Select **Finalize** and confirm. The site makes the final PDF and stores it
+   permanently. The issue then shows who finalized it and when, and a
    **Download PDF** button.
 
 A final issue can never change: there are no new versions, corrections, or copies. Check

@@ -69,10 +69,10 @@ async function downloadPhotos(issue: NuNewsIssue) {
   })));
 }
 
-async function buildPdf(issue: NuNewsIssue, mark: "draft" | "final") {
+async function buildPdf(issue: NuNewsIssue) {
   try {
     const photos = await downloadPhotos(issue);
-    return { photos, ...renderNuNewsPdf(issue, photos, mark) };
+    return { photos, ...renderNuNewsPdf(issue, photos) };
   } catch (error) {
     console.error("Nu News PDF generation failed", error);
     return null;
@@ -83,7 +83,7 @@ export async function makeDraftPreview(id: string): Promise<ActionResult<{ madeA
   const issue = await loadIssue(issueId.parse(id));
   if (!issue || issue.finalized_at) return { ok: false, message: "Only a draft issue has a preview." };
   if (!canPreview(issue)) return { ok: false, message: "Add the title photo and every headshot to make a preview." };
-  const built = await buildPdf(issue, "draft");
+  const built = await buildPdf(issue);
   if (!built) return { ok: false, message: BUILD_FAILED };
 
   const admin = createAdminClient();
@@ -101,7 +101,7 @@ export async function finalizeDraft(id: string, finalizer: Finalizer): Promise<A
   if (!issue || issue.finalized_at) return { ok: false, message: "This issue is already final." };
   const missing = missingItems(issue);
   if (missing.length) return { ok: false, message: `Still missing: ${missing.join("; ")}.` };
-  const built = await buildPdf(issue, "final");
+  const built = await buildPdf(issue);
   if (!built) return { ok: false, message: BUILD_FAILED };
 
   const admin = createAdminClient();
@@ -118,7 +118,7 @@ export async function finalizeDraft(id: string, finalizer: Finalizer): Promise<A
       finalized_by_name: finalizer.name,
       final_pdf_path: finalPdfPath,
       final_pdf_sha256: sha256(built.pdf),
-      final_inputs: { ...newsletterInput(issue), draft: false, photos: photoChecksums },
+      final_inputs: { ...newsletterInput(issue), photos: photoChecksums },
     })
     .eq("id", issue.id)
     .eq("updated_at", issue.updated_at)

@@ -87,7 +87,7 @@ The Nu News tools do everything the `/nu-news` editor does (see [docs/nu-news.md
 - `prepare_nu_news_photo_upload`: get a signed link, then upload one prepared JPEG straight to Storage with an HTTP `PUT` (for example with `curl`).
 - `set_nu_news_title_photo`, `set_nu_news_headshot`, `add_nu_news_gallery_photo`, `update_nu_news_gallery_photo`,
   `remove_nu_news_gallery_photo`, `set_nu_news_photo_focus`: attach uploaded photos, and manage their order and focus points.
-- `make_nu_news_preview`, `finalize_nu_news_issue`: make the DRAFT preview with its photo warnings, then lock the issue.
+- `make_nu_news_preview`, `finalize_nu_news_issue`: make the preview with its photo warnings, then lock the issue.
 - `delete_nu_news_draft`: delete a draft with its photos and preview, after the season is confirmed. Final issues can never be deleted.
 
 Production setup also requires these Supabase Auth settings:

@@ -646,13 +646,7 @@
 
 // ---------- document ----------
 
-// A preview mark on every page: a faint diagonal word over the content.
-#let draft-mark = place(center + horizon, rotate(-40deg, text(
-  font: sans, stretch: 75%, weight: 800, size: 170pt, tracking: 0.04em,
-  fill: colors.muted.transparentize(80%), stroke: 1.5pt + colors.paper.transparentize(45%),
-)[DRAFT]))
-
-#let newsletter(content: none, data: none, draft: false) = {
+#let newsletter(content: none, data: none) = {
   let issue = content.issue
   set document(title: "Nu News · " + issue.season, author: issue.chapter, date: none)
   set page(
@@ -662,7 +656,6 @@
     footer: page-footer(issue),
     footer-descent: 0.3in,
   )
-  set page(foreground: draft-mark) if draft
   set block(spacing: 0pt)
   set par(spacing: 0pt)
   set text(font: serif, size: body-size, fill: colors.ink, lang: "en", hyphenate: true)
