@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   DEFAULT_DONATE, NU_NEWS_BUCKET, canPreview, issueSchema, missingItems, photoSources, previewPath, type NuNewsIssue,
 } from "@/lib/nu-news/issue";
+import { cropWarnings, type CropWarning } from "@/lib/nu-news/crop-warnings";
 import { newsletterInput, renderNuNewsPdf } from "@/lib/nu-news/pdf";
 import { loadIssue } from "@/lib/nu-news/store";
 import { requireAdmin } from "@/lib/reimbursements/auth";
@@ -85,14 +86,14 @@ async function downloadPhotos(issue: NuNewsIssue) {
 async function buildPdf(issue: NuNewsIssue, mark: "draft" | "final") {
   try {
     const photos = await downloadPhotos(issue);
-    return { photos, pdf: renderNuNewsPdf(issue, photos, mark) };
+    return { photos, ...renderNuNewsPdf(issue, photos, mark) };
   } catch (error) {
     console.error("Nu News PDF generation failed", error);
     return null;
   }
 }
 
-export async function makePreview(id: string): Promise<ActionResult<{ madeAt: string }>> {
+export async function makePreview(id: string): Promise<ActionResult<{ madeAt: string; warnings: CropWarning[] }>> {
   await requireAdmin("/");
   const issue = await loadIssue(issueId.parse(id));
   if (!issue || issue.finalized_at) return { ok: false, message: "Only a draft issue has a preview." };
@@ -107,7 +108,7 @@ export async function makePreview(id: string): Promise<ActionResult<{ madeAt: st
   const { error } = await admin.from("nu_news_issues").update({ preview_made_at: madeAt }).eq("id", issue.id);
   if (error) return { ok: false, message: "The preview could not be recorded. Try again." };
 
-  return { ok: true, madeAt };
+  return { ok: true, madeAt, warnings: cropWarnings(issue, built.placements) };
 }
 
 export async function finalizeIssue(id: string): Promise<ActionResult> {

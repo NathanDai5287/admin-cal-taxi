@@ -98,6 +98,7 @@
     }
     let dx = calc.min(0pt, calc.max(width - shown-width, width / 2 - focus.at(0) * shown-width))
     let dy = calc.min(0pt, calc.max(height - shown-height, height / 2 - focus.at(1) * shown-height))
+    [#metadata((src: src, width: width / 1pt, height: height / 1pt, aspect: aspect))<nunews-photo>]
     box(width: width, height: height, clip: true, place(
       top + left, dx: dx, dy: dy,
       image(src, width: shown-width, height: shown-height),

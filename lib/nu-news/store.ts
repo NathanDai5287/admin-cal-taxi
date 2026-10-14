@@ -24,7 +24,7 @@ export async function nuNewsIsSetUp() {
 export async function loadIssue(id: string) {
   const { data, error } = await createAdminClient()
     .from("nu_news_issues")
-    .select("id, season, issue_date, location, intro, articles, cover_src, gallery, donate, updated_at, preview_made_at, finalized_at, finalized_by_name, final_pdf_path")
+    .select("id, season, issue_date, location, intro, articles, cover, gallery, donate, updated_at, preview_made_at, finalized_at, finalized_by_name, final_pdf_path")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Unable to load the Nu News issue: ${error.message}`);

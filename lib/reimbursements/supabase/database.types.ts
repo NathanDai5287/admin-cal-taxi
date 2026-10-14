@@ -455,7 +455,7 @@ export type Database = {
           location: string;
           intro: Json;
           articles: Json;
-          cover_src: string | null;
+          cover: Json | null;
           gallery: Json;
           donate: Json;
           preview_made_at: string | null;
@@ -479,7 +479,7 @@ export type Database = {
           location?: string;
           intro?: Json;
           articles?: Json;
-          cover_src?: string | null;
+          cover?: Json | null;
           gallery?: Json;
           donate?: Json;
           preview_made_at?: string;

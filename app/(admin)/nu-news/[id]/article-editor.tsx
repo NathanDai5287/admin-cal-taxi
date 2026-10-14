@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/brand/button";
-import type { NuNewsArticle } from "@/lib/nu-news/issue";
+import { HEADSHOT_FOCUS, type NuNewsArticle } from "@/lib/nu-news/issue";
 
 import { Field } from "./field";
 import { PhotoField } from "./photo-field";
@@ -40,7 +40,16 @@ export function ArticleEditor({ article, position, count, headshotPreview, busy,
           <input className="field-input" value={article.roster} onChange={(event) => onChange({ roster: event.target.value })} />
         </Field>
       </div>
-      <PhotoField label="Headshot" preview={headshotPreview} disabled={busy} onUpload={onHeadshot} />
+      <PhotoField
+        label="Headshot"
+        photo={article.headshot}
+        preview={headshotPreview}
+        defaultFocus={HEADSHOT_FOCUS}
+        pickerClassName="w-28"
+        disabled={busy}
+        onUpload={onHeadshot}
+        onChange={(headshot) => onChange({ headshot })}
+      />
       <Field label="Article text" hint="Paste the text exactly as the author wrote it. Each line becomes a paragraph. Empty lines are ignored.">
         <textarea className="field-textarea min-h-[280px]" value={article.body} onChange={(event) => onChange({ body: event.target.value })} />
       </Field>

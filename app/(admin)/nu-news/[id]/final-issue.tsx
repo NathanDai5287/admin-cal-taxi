@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { NuNewsIssue } from "@/lib/nu-news/issue";
+import type { NuNewsIssue, NuNewsPhoto } from "@/lib/nu-news/issue";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
 
 import { Section } from "./field";
@@ -24,7 +24,7 @@ function Value({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export function FinalIssue({ issueId, issue, photoUrls, finalizedAt, finalizedBy }: FinalIssueProps) {
-  const photo = (src: string | null) => (src ? photoUrls[src] : undefined);
+  const photoUrl = (photo: NuNewsPhoto | null) => (photo ? photoUrls[photo.src] : undefined);
 
   return (
     <div className="grid gap-6">
@@ -51,7 +51,7 @@ export function FinalIssue({ issueId, issue, photoUrls, finalizedAt, finalizedBy
       </Section>
 
       <Section title="Cover">
-        <Thumbnail src={photo(issue.cover_src)} alt="Title photo" className="h-48 w-72 border border-rule" />
+        <Thumbnail src={photoUrl(issue.cover)} alt="Title photo" className="h-48 w-72 border border-rule" />
         <Value label="Intro heading">{issue.intro.heading}</Value>
         <Value label="Intro text">{issue.intro.body}</Value>
       </Section>
@@ -60,7 +60,7 @@ export function FinalIssue({ issueId, issue, photoUrls, finalizedAt, finalizedBy
         {issue.articles.map((article) => (
           <article key={article.id} className="card-plain grid gap-4 p-5">
             <div className="flex items-center gap-4">
-              <Thumbnail src={photo(article.headshot)} alt={`${article.author} headshot`} className="h-24 w-20 border border-rule" />
+              <Thumbnail src={photoUrl(article.headshot)} alt={`${article.author} headshot`} className="h-24 w-20 border border-rule" />
               <div>
                 <h3 className="m-0 text-[17px] font-bold text-ink">{article.title}</h3>
                 <p className="m-0 mt-1 text-[13px] text-muted">{article.author} · {article.roster}</p>
@@ -76,7 +76,7 @@ export function FinalIssue({ issueId, issue, photoUrls, finalizedAt, finalizedBy
         <ol className="m-0 grid list-none gap-3 p-0 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           {issue.gallery.map((galleryPhoto, index) => (
             <li key={galleryPhoto.src} className="grid gap-1">
-              <Thumbnail src={photo(galleryPhoto.src)} alt={`Gallery photo ${index + 1}`} className="aspect-[4/3] w-full" />
+              <Thumbnail src={photoUrl(galleryPhoto)} alt={`Gallery photo ${index + 1}`} className="aspect-[4/3] w-full" />
               <span className="text-[12px] text-muted">
                 {[String(index + 1), galleryPhoto.feature && "Full width", galleryPhoto.donate && "Donate photo"].filter(Boolean).join(" · ")}
               </span>

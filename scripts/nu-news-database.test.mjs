@@ -84,7 +84,7 @@ test("a finalized issue, its PDF, and its photos never change", async (t) => {
   const finalize = (fields) => db.query(`update public.nu_news_issues set ${fields} where id = $1`, [id]);
   await assert.rejects(finalize("finalized_at = now()"), /check constraint/);
   await assert.rejects(finalize(`finalized_at = now(), finalized_by = '${admin}', finalized_by_name = 'Taylor', final_pdf_path = '${finalPdf}', final_pdf_sha256 = 'not-a-checksum', final_inputs = '{}'`), /check constraint/);
-  await finalize(`cover_src = '${photo}', finalized_at = now(), finalized_by = '${admin}', finalized_by_name = 'Taylor Admin',
+  await finalize(`cover = jsonb_build_object('src', '${photo}', 'focus', jsonb_build_array(0.5, 0.42)), finalized_at = now(), finalized_by = '${admin}', finalized_by_name = 'Taylor Admin',
     final_pdf_path = '${finalPdf}', final_pdf_sha256 = '${"a".repeat(64)}',
     final_inputs = jsonb_build_object('content', '{}'::jsonb, 'data', '{}'::jsonb, 'draft', false, 'photos', jsonb_build_object('${photo}', '${"b".repeat(64)}'))`);
 
@@ -103,13 +103,13 @@ test("a finalized issue, its PDF, and its photos never change", async (t) => {
     await assert.rejects(db.query("delete from storage.objects where name = $1", [photo]), permanent);
     await assert.rejects(db.query("update public.nu_news_issues set season = 'Spring 2027' where id = $1", [id]), immutable);
   }
-  const issue = (await db.query("select season, cover_src, final_pdf_path from public.nu_news_issues where id = $1", [id])).rows[0];
+  const issue = (await db.query("select season, cover ->> 'src' as cover_src, final_pdf_path from public.nu_news_issues where id = $1", [id])).rows[0];
   assert.deepEqual(issue, { season: "Fall 2026", cover_src: photo, final_pdf_path: finalPdf });
 
   await db.query("delete from storage.objects where name = any($1)", [[draftPhoto, `${id}/preview.pdf`]]);
   assert.deepEqual((await db.query("select name, version from storage.objects order by name")).rows.map((row) => row.name).sort(), [finalPdf, photo].sort());
   assert.equal((await db.query("select version from storage.objects where name = $1", [finalPdf])).rows[0].version, "v1");
 
-  const { id: draft } = (await db.query("insert into public.nu_news_issues (season, donate, cover_src) values ('Spring 2027', $1, $2) returning id", [DONATE, photo])).rows[0];
+  const { id: draft } = (await db.query("insert into public.nu_news_issues (season, donate, cover) values ('Spring 2027', $1, $2) returning id", [DONATE, JSON.stringify({ src: photo, focus: [0.5, 0.5] })])).rows[0];
   await db.query("update public.nu_news_issues set season = 'Spring 2027 draft' where id = $1", [draft]);
 });

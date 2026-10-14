@@ -10,7 +10,15 @@ export const DEFAULT_DONATE = {
   ].join("\n"),
 };
 
-const photoSrc = z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/);
+export type Focus = [x: number, y: number];
+export const CENTER_FOCUS: Focus = [0.5, 0.5];
+export const HEADSHOT_FOCUS: Focus = [0.5, 0.4];
+
+const fraction = z.number().min(0).max(1);
+const photo = z.object({
+  src: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.jpg$/),
+  focus: z.tuple([fraction, fraction]),
+});
 
 export const issueSchema = z.object({
   season: z.string().trim().min(1, "Enter the season, for example Fall 2026.").max(60),
@@ -24,16 +32,17 @@ export const issueSchema = z.object({
     roster: z.string().max(60),
     body: z.string().max(40_000),
     closing: z.string().max(1_000),
-    headshot: photoSrc.nullable(),
+    headshot: photo.nullable(),
   })).max(12),
-  cover_src: photoSrc.nullable(),
-  gallery: z.array(z.object({ src: photoSrc, feature: z.boolean(), donate: z.boolean() })).max(80),
+  cover: photo.nullable(),
+  gallery: z.array(photo.extend({ feature: z.boolean(), donate: z.boolean() })).max(80),
   donate: z.object({ heading: z.string().max(120), body: z.string().max(3_000) }),
 });
 
 export type NuNewsIssue = z.infer<typeof issueSchema>;
 export type NuNewsArticle = NuNewsIssue["articles"][number];
-export type NuNewsPhoto = NuNewsIssue["gallery"][number];
+export type NuNewsPhoto = z.infer<typeof photo>;
+export type NuNewsGalleryPhoto = NuNewsIssue["gallery"][number];
 
 export const previewPath = (issueId: string) => `${issueId}/preview.pdf`;
 
@@ -42,12 +51,13 @@ export function pdfFileName(season: string) {
 }
 
 export function photoSources(issue: NuNewsIssue) {
-  return [issue.cover_src, ...issue.articles.map((article) => article.headshot), ...issue.gallery.map((photo) => photo.src)]
-    .filter((src): src is string => src !== null);
+  return [issue.cover, ...issue.articles.map((article) => article.headshot), ...issue.gallery]
+    .filter((photo) => photo !== null)
+    .map((photo) => photo.src);
 }
 
 export function canPreview(issue: NuNewsIssue) {
-  return Boolean(issue.cover_src) && issue.articles.every((article) => article.headshot);
+  return Boolean(issue.cover) && issue.articles.every((article) => article.headshot);
 }
 
 function missingInArticle(article: NuNewsArticle, index: number) {
@@ -62,7 +72,7 @@ function missingInArticle(article: NuNewsArticle, index: number) {
 
 export function missingItems(issue: NuNewsIssue) {
   return [
-    !issue.cover_src && "No title photo",
+    !issue.cover && "No title photo",
     !issue.intro.heading.trim() && "No intro heading",
     !issue.intro.body.trim() && "No intro text",
     !issue.articles.length && "No articles",

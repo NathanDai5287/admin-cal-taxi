@@ -6,14 +6,15 @@ import { useState } from "react";
 
 import { finalizeIssue, makePreview, saveIssue } from "@/app/(admin)/nu-news/actions";
 import { Button } from "@/components/brand/button";
-import { missingItems, type NuNewsArticle, type NuNewsIssue } from "@/lib/nu-news/issue";
+import type { CropWarning } from "@/lib/nu-news/crop-warnings";
+import { CENTER_FOCUS, HEADSHOT_FOCUS, missingItems, type NuNewsArticle, type NuNewsIssue } from "@/lib/nu-news/issue";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
 
 import { ArticleEditor } from "./article-editor";
 import { Field, Section } from "./field";
 import { GalleryEditor } from "./gallery-editor";
 import { moved } from "./moved";
-import { PhotoField } from "./photo-field";
+import { PhotoField, photoElementId } from "./photo-field";
 import { uploadPhoto } from "./upload-photo";
 
 type Notice = { text: string; success: boolean };
@@ -26,6 +27,24 @@ type IssueEditorProps = {
 };
 
 const failure = (error: unknown) => ({ text: error instanceof Error ? error.message : "Something went wrong. Try again.", success: false });
+
+function PhotoWarnings({ warnings }: { warnings: CropWarning[] }) {
+  return (
+    <ul className="m-0 grid list-disc gap-1 pl-5 text-[13.5px] text-caution">
+      {warnings.map((warning) => (
+        <li key={warning.src}>
+          <button
+            type="button"
+            className="cursor-pointer text-left underline-offset-4 hover:underline"
+            onClick={() => document.getElementById(photoElementId(warning.src))?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          >
+            {warning.text}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function MissingItems({ items }: { items: string[] }) {
   if (!items.length) return <p className="m-0 text-[13.5px] text-ok">Nothing is missing. Make a preview, read it, then finalize.</p>;
@@ -44,6 +63,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
   const [progress, setProgress] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [previewMadeAt, setPreviewMadeAt] = useState(initialPreviewMadeAt);
+  const [warnings, setWarnings] = useState<CropWarning[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const busy = progress !== "";
   const unsaved = issue !== savedIssue;
@@ -101,6 +121,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
     const result = await makePreview(issueId);
     if (!result.ok) return { text: result.message, success: false };
     setPreviewMadeAt(result.madeAt);
+    setWarnings(result.warnings);
     setShowPreview(true);
     return { text: "The preview is ready.", success: true };
   });
@@ -152,12 +173,16 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
       <Section title="Cover">
         <PhotoField
           label="Title photo"
-          preview={issue.cover_src ? previews[issue.cover_src] : undefined}
+          photo={issue.cover}
+          preview={issue.cover ? previews[issue.cover.src] : undefined}
+          defaultFocus={CENTER_FOCUS}
+          pickerClassName="w-56"
           disabled={busy}
           onUpload={async (file) => {
             const [src] = await upload([file]);
-            if (src) change({ cover_src: src });
+            if (src) change({ cover: { src, focus: CENTER_FOCUS } });
           }}
+          onChange={(cover) => change({ cover })}
         />
         <Field label="Intro heading">
           <input className="field-input" value={issue.intro.heading} placeholder="Happy Fall!" onChange={(event) => change({ intro: { ...issue.intro, heading: event.target.value } })} />
@@ -174,14 +199,14 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
             article={article}
             position={index + 1}
             count={issue.articles.length}
-            headshotPreview={article.headshot ? previews[article.headshot] : undefined}
+            headshotPreview={article.headshot ? previews[article.headshot.src] : undefined}
             busy={busy}
             onChange={(changes) => changeArticle(article.id, changes)}
             onMove={(offset) => change({ articles: moved(issue.articles, index, offset) })}
             onRemove={() => removeArticle(article)}
             onHeadshot={async (file) => {
               const [src] = await upload([file]);
-              if (src) changeArticle(article.id, { headshot: src });
+              if (src) changeArticle(article.id, { headshot: { src, focus: HEADSHOT_FOCUS } });
             }}
           />
         ))}
@@ -198,7 +223,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
           onChange={(gallery) => change({ gallery })}
           onUpload={async (files) => {
             const sources = await upload(files);
-            setIssue((current) => ({ ...current, gallery: [...current.gallery, ...sources.map((src) => ({ src, feature: false, donate: false }))] }));
+            setIssue((current) => ({ ...current, gallery: [...current.gallery, ...sources.map((src) => ({ src, focus: CENTER_FOCUS, feature: false, donate: false }))] }));
           }}
         />
       </Section>
@@ -211,6 +236,13 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
           <textarea className="field-textarea min-h-[120px]" value={issue.donate.body} onChange={(event) => change({ donate: { ...issue.donate, body: event.target.value } })} />
         </Field>
       </Section>
+
+      {warnings.length ? (
+        <Section title="Photo warnings">
+          <p className="m-0 text-[13px] text-muted">From the last preview. These photos lose a large part when cropped. Warnings do not stop you from finalizing.</p>
+          <PhotoWarnings warnings={warnings} />
+        </Section>
+      ) : null}
 
       <Section title="Before you finalize">
         <MissingItems items={missing} />

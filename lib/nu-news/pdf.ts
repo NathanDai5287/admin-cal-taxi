@@ -4,6 +4,7 @@ import { NodeCompiler, PdfStandard } from "@myriaddreamin/typst-ts-node-compiler
 
 import { formatDateISO } from "@/lib/host-format";
 
+import type { PhotoPlacement } from "./crop-warnings";
 import type { NuNewsIssue } from "./issue";
 
 const paragraphs = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean);
@@ -29,8 +30,8 @@ export function newsletterInput(issue: NuNewsIssue) {
   };
   const data = {
     logo: "assets/unicorn-shield.png",
-    cover: { src: issue.cover_src },
-    headshots: Object.fromEntries(issue.articles.map((article) => [article.id, { src: article.headshot }])),
+    cover: issue.cover,
+    headshots: Object.fromEntries(issue.articles.map((article) => [article.id, article.headshot])),
     zelle: { qr: "assets/zelle-qr.svg", payload: "assets/zelle-qr-payload.txt" },
     gallery: issue.gallery,
   };
@@ -45,8 +46,16 @@ export function renderNuNewsPdf(issue: NuNewsIssue, photosBySrc: Map<string, Buf
   for (const [src, bytes] of photosBySrc) compiler.mapShadow(path.join(templateDir, src), bytes);
 
   const { content, data } = newsletterInput(issue);
-  return compiler.pdf(
-    { mainFilePath: path.join(templateDir, "nunews.typ"), inputs: { content: JSON.stringify(content), data: JSON.stringify(data), draft: String(mark === "draft") } },
-    { pdfStandard: PdfStandard.V_1_7, pdfTags: true },
-  );
+  const compiled = compiler.compile({
+    mainFilePath: path.join(templateDir, "nunews.typ"),
+    inputs: { content: JSON.stringify(content), data: JSON.stringify(data), draft: String(mark === "draft") },
+  });
+  const document = compiled.result;
+  if (!document) throw new Error(`Typst could not build Nu News: ${JSON.stringify(compiled.takeError()?.shortDiagnostics)}`);
+
+  const placements: PhotoPlacement[] = compiler.query(document, { selector: "<nunews-photo>", field: "value" });
+  return {
+    pdf: compiler.pdf(document, { pdfStandard: PdfStandard.V_1_7, pdfTags: true }),
+    placements: placements.map((placement) => ({ ...placement, src: placement.src.replace(/^\//, "") })),
+  };
 }

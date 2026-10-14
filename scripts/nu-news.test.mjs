@@ -10,19 +10,19 @@ import { PDFDocument, PDFName } from "pdf-lib";
 
 const run = promisify(execFile);
 const result = await build({
-  stdin: { contents: 'export * from "./lib/nu-news/pdf.ts"; export * from "./lib/nu-news/issue.ts";', resolveDir: process.cwd() },
+  stdin: { contents: 'export * from "./lib/nu-news/pdf.ts"; export * from "./lib/nu-news/issue.ts"; export * from "./lib/nu-news/crop-warnings.ts";', resolveDir: process.cwd() },
   bundle: true, write: false, format: "esm", platform: "node", packages: "external",
 });
 const temporary = path.join(process.cwd(), "node_modules/.nu-news-test.mjs");
 await writeFile(temporary, result.outputFiles[0].text);
-const { renderNuNewsPdf, newsletterInput, photoSources, canPreview, missingItems, DEFAULT_DONATE } = await import(`file://${temporary.replaceAll("\\", "/")}`);
+const { renderNuNewsPdf, newsletterInput, photoSources, canPreview, missingItems, cropWarnings, croppedShare, DEFAULT_DONATE } = await import(`file://${temporary.replaceAll("\\", "/")}`);
 await unlink(temporary);
 
 // Fall 2026 issue with fictional contact lines. Photos are flat shapes with the real photos' sizes.
 const fixtureDir = "scripts/fixtures/nu-news";
 const issue = JSON.parse(await readFile(path.join(fixtureDir, "issue.json"), "utf8"));
 const photos = new Map(await Promise.all(photoSources(issue).map(async (src) => [src, await readFile(path.join(fixtureDir, src))])));
-const pdf = renderNuNewsPdf(issue, photos, "final");
+const { pdf, placements } = renderNuNewsPdf(issue, photos, "final");
 
 const squash = (text) => text.replace(/[\s­]/g, "");
 const withoutFooter = (text) => text.replace("Nu News · FALL 2026", "").replace(/\d+\s*$/, "");
@@ -56,7 +56,7 @@ const texts = await pageTexts(pdf);
 const pageWith = (needle, from = 1) => texts.findIndex((text, index) => index >= from && squash(text).includes(squash(needle)));
 
 test("the same issue always gives the same PDF bytes", () => {
-  assert.ok(pdf.equals(renderNuNewsPdf(issue, photos, "final")));
+  assert.ok(pdf.equals(renderNuNewsPdf(issue, photos, "final").pdf));
 });
 
 test("pages follow the approved order: cover, articles, donate, gallery", async () => {
@@ -108,7 +108,7 @@ test("Typst markup in author text prints as plain text", async () => {
     intro: { ...issue.intro, heading: "#strong[Intro] $y$" },
     articles: [{ ...first, title: "#emph[Title] *x*", body: `${markup.join("\n")}\n${first.body}` }, ...rest],
   };
-  const printed = squash((await pageTexts(renderNuNewsPdf(marked, photos, "final"))).join(""));
+  const printed = squash((await pageTexts(renderNuNewsPdf(marked, photos, "final").pdf)).join(""));
   for (const words of [...markup, "#strong[Intro] $y$", "#emph[Title] *x*"]) {
     assert.ok(printed.includes(squash(words)), `not literal: ${words}`);
   }
@@ -116,7 +116,7 @@ test("Typst markup in author text prints as plain text", async () => {
 
 test("a preview has a DRAFT mark on every page and the final PDF has none", async () => {
   const includeRotatedText = ["-raw"];
-  const previewTexts = await pageTexts(renderNuNewsPdf(issue, photos, "draft"), includeRotatedText);
+  const previewTexts = await pageTexts(renderNuNewsPdf(issue, photos, "draft").pdf, includeRotatedText);
   const finalTexts = await pageTexts(pdf, includeRotatedText);
   assert.equal(previewTexts.length, finalTexts.length);
   assert.ok(previewTexts.every((text) => text.includes("DRAFT")));
@@ -147,7 +147,7 @@ test("editor text becomes template paragraphs", () => {
   const { content, data } = newsletterInput(draft);
   assert.deepEqual(content.intro.paragraphs, ["First line", "Second line"]);
   assert.equal(content.issue.date, "October 14, 2026");
-  assert.equal(data.headshots[issue.articles[0].id].src, issue.articles[0].headshot);
+  assert.deepEqual(data.headshots[issue.articles[0].id], issue.articles[0].headshot);
   assert.deepEqual(content.donate.items, DEFAULT_DONATE.body.split("\n"));
 });
 
@@ -157,7 +157,7 @@ test("the check lists what is missing in plain words", () => {
   const [first, second] = issue.articles;
   const unfinished = {
     ...issue,
-    cover_src: null,
+    cover: null,
     intro: { heading: " ", body: "" },
     articles: [{ ...first, headshot: null, body: "\n" }, { ...second, author: "", title: "" }],
     donate: { ...issue.donate, body: "" },
@@ -170,4 +170,29 @@ test("the check lists what is missing in plain words", () => {
   ]);
   assert.equal(canPreview(unfinished), false);
   assert.deepEqual(missingItems({ ...issue, articles: [] }), ["No articles"]);
+});
+
+test("focus points reach the template and move the crop", () => {
+  const { data } = newsletterInput(issue);
+  assert.deepEqual(data.cover, { src: "photos/cover.jpg", focus: [0.5, 0.42] });
+  assert.deepEqual(data.headshots[issue.articles[2].id], issue.articles[2].headshot);
+  assert.deepEqual(data.gallery[3].focus, [0.5, 0.6]);
+  const coverAt = (focus) => renderNuNewsPdf({ ...issue, cover: { ...issue.cover, focus } }, photos, "final").pdf;
+  assert.ok(!coverAt([0.5, 0]).equals(coverAt([0.5, 1])));
+});
+
+test("photos that lose more than 30% of a side get a plain warning", () => {
+  assert.equal(Math.round(croppedShare({ width: 72, height: 72, aspect: 240 / 428 }).share * 100), 44);
+  assert.equal(croppedShare({ width: 72, height: 72, aspect: 240 / 428 }).dimension, "height");
+  assert.equal(croppedShare({ width: 70, height: 100, aspect: 1 }).dimension, "width");
+
+  const warnings = cropWarnings(issue, placements);
+  assert.deepEqual(warnings.map((warning) => warning.src), ["photos/cover.jpg", issue.articles[2].headshot.src]);
+  assert.match(warnings[0].text, /^The title photo loses \d+% of its height\. Set its focus point or use a wider photo\.$/);
+  assert.equal(warnings[1].text, "Sam Patel’s headshot loses 44% of its height. Set its focus point or use a wider photo.");
+  assert.deepEqual(cropWarnings(issue, [{ src: "photos/gallery-20.svg", width: 70, height: 100, aspect: 1 }]), []);
+  assert.deepEqual(cropWarnings(issue, [{ src: "photos/gallery-20.svg", width: 69, height: 100, aspect: 1 }]).map((warning) => warning.text), [
+    "The donate page photo loses 31% of its width. Set its focus point or use a taller photo.",
+  ]);
+  assert.deepEqual(missingItems(issue), [], "warnings never block finalizing");
 });

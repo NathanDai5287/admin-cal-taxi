@@ -1,21 +1,21 @@
 "use client";
 
 import { Button } from "@/components/brand/button";
-import type { NuNewsPhoto } from "@/lib/nu-news/issue";
+import { CENTER_FOCUS, type NuNewsGalleryPhoto } from "@/lib/nu-news/issue";
 
 import { moved } from "./moved";
-import { PHOTO_ACCEPT, Thumbnail } from "./photo-field";
+import { FocusPicker, PHOTO_ACCEPT, photoElementId } from "./photo-field";
 
 type GalleryEditorProps = {
-  photos: NuNewsPhoto[];
+  photos: NuNewsGalleryPhoto[];
   previews: Record<string, string>;
   busy: boolean;
-  onChange: (photos: NuNewsPhoto[]) => void;
+  onChange: (photos: NuNewsGalleryPhoto[]) => void;
   onUpload: (files: File[]) => void;
 };
 
 export function GalleryEditor({ photos, previews, busy, onChange, onUpload }: GalleryEditorProps) {
-  const update = (index: number, changes: Partial<NuNewsPhoto>) => onChange(photos.map((photo, i) => (i === index ? { ...photo, ...changes } : photo)));
+  const update = (index: number, changes: Partial<NuNewsGalleryPhoto>) => onChange(photos.map((photo, i) => (i === index ? { ...photo, ...changes } : photo)));
   const chooseDonatePhoto = (index: number, chosen: boolean) => onChange(photos.map((photo, i) => ({ ...photo, donate: chosen && i === index })));
 
   return (
@@ -40,8 +40,15 @@ export function GalleryEditor({ photos, previews, busy, onChange, onUpload }: Ga
       {photos.length ? (
         <ol className="m-0 grid list-none gap-3 p-0 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((photo, index) => (
-            <li key={photo.src} className="card-plain grid gap-2 p-2">
-              <Thumbnail src={previews[photo.src]} alt={`Gallery photo ${index + 1}`} className="aspect-[4/3] w-full" />
+            <li key={photo.src} id={photoElementId(photo.src)} className="card-plain grid content-start gap-2 p-2">
+              <FocusPicker
+                src={previews[photo.src]}
+                label={`Gallery photo ${index + 1}`}
+                focus={photo.focus}
+                defaultFocus={CENTER_FOCUS}
+                className="w-full"
+                onFocus={(focus) => update(index, { focus })}
+              />
               <label className="check-row">
                 <input type="checkbox" checked={photo.feature} onChange={(event) => update(index, { feature: event.target.checked })} />
                 <span>Full width</span>
