@@ -50,9 +50,9 @@ export async function pdfUrl(issue: StoredIssue, expiresInSeconds: number) {
   return data?.signedUrl ?? null;
 }
 
-export async function photoUrls(srcs: string[]): Promise<Record<string, string>> {
+export async function photoUrls(srcs: string[], expiresInSeconds: number): Promise<Record<string, string>> {
   if (!srcs.length) return {};
-  const { data, error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).createSignedUrls(srcs, 3_600);
+  const { data, error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).createSignedUrls(srcs, expiresInSeconds);
   if (error) throw new Error(`Unable to sign Nu News photos: ${error.message}`);
   return Object.fromEntries(data.map((file) => [file.path, file.signedUrl]));
 }

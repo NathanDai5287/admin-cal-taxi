@@ -52,6 +52,7 @@ const withSize = (bytes, width, height) => {
   return resized;
 };
 const dataUrl = (bytes, type = "image/jpeg") => `data:${type};base64,${bytes.toString("base64")}`;
+const signedUrl = (name, seconds = 600) => `https://storage.test/${name}?expires=${seconds}`;
 
 // A 360 × 480 camera JPEG with EXIF, IPTC, and an ICC profile; the prepared copy keeps only the ICC profile.
 const camera = await readFile("scripts/fixtures/nu-news/photos/cover.jpg");
@@ -124,7 +125,10 @@ function fakeSupabase(adminId) {
       return files.has(name) ? { data: new Blob([files.get(name)]), error: null } : { data: null, error: new Error("Object not found") };
     },
     async createSignedUrl(name, seconds) {
-      return files.has(name) ? { data: { signedUrl: `https://storage.test/${name}?expires=${seconds}` }, error: null } : { data: null, error: { message: "Object not found" } };
+      return files.has(name) ? { data: { signedUrl: signedUrl(name, seconds) }, error: null } : { data: null, error: { message: "Object not found" } };
+    },
+    async createSignedUrls(names, seconds) {
+      return { data: names.map((name) => ({ path: name, signedUrl: files.has(name) ? signedUrl(name, seconds) : null })), error: null };
     },
   };
   return { tables, files, from: (table) => new Query(table), storage: { from: () => bucket } };
@@ -170,6 +174,7 @@ test("Nu News tools are listed with safety hints and the workflow", async () => 
   }
   assert.match(tools.get("create_nu_news_issue").description, /make_nu_news_preview.*finalize_nu_news_issue/);
   assert.match(tools.get("add_nu_news_article").description, /exactly as given: never rewrite/);
+  assert.match(tools.get("get_nu_news_issue").description, /viewUrl to look at it.*set_nu_news_photo_focus\. The signed link expires after 10 minutes\./);
   assert.match(tools.get("set_nu_news_title_photo").description, /JPEG up to 3 MB, at most 2200 pixels on the long side, upright, with no metadata/);
   assert.deepEqual(tools.get("finalize_nu_news_issue").inputSchema.required, ["issueId", "confirmSeason"]);
   assert.deepEqual(tools.get("remove_nu_news_article").inputSchema.required, ["issueId", "articleId", "confirm"]);
@@ -220,9 +225,12 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
 
   const draft = await ok("get_nu_news_issue", { issueId });
   assert.deepEqual(draft.articles.map((article) => [article.id, article.body, article.closing]), [[articleId, body, "YITB,"]]);
-  assert.deepEqual(draft.articles[0].headshot, { src: headshot.src, focus: [0.5, 0.2] });
-  assert.deepEqual(draft.cover, { src: title.src, focus: [0.5, 0.5] });
-  assert.deepEqual(draft.gallery.map((photo) => [photo.src, photo.feature, photo.donate]), [[second.src, true, true], [first.src, false, false]]);
+  assert.deepEqual(draft.articles[0].headshot, { src: headshot.src, focus: [0.5, 0.2], viewUrl: signedUrl(headshot.src) });
+  assert.deepEqual(draft.cover, { src: title.src, focus: [0.5, 0.5], viewUrl: signedUrl(title.src) });
+  assert.deepEqual(
+    draft.gallery.map((photo) => [photo.src, photo.feature, photo.donate, photo.viewUrl]),
+    [[second.src, true, true, signedUrl(second.src)], [first.src, false, false, signedUrl(first.src)]],
+  );
   assert.deepEqual(draft.missingItems, ["No intro heading", "No intro text"]);
   assert.equal(draft.preview_made_at, null);
 
@@ -254,6 +262,8 @@ test("an agent can create, fill, preview, and finalize a whole issue", async () 
   assert.equal(admin.files.size, filesBefore);
 
   assert.match((await ok("get_nu_news_pdf_url", { issueId })).pdfUrl, /\/final\//);
+  const finalIssue = await ok("get_nu_news_issue", { issueId });
+  assert.deepEqual([finalIssue.cover.viewUrl, finalIssue.articles[0].headshot.viewUrl], [signedUrl(title.src), signedUrl(headshot.src)]);
   const listed = (await ok("list_nu_news_issues", {})).issues;
   assert.deepEqual(listed.map((issue) => [issue.season, issue.status]), [["Fall 2026", "final"], ["Spring 2026", "final"]]);
   assert.equal(listed[0].finalized_by_name, "Taylor Admin");

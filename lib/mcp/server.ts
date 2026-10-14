@@ -12,8 +12,8 @@ import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
 import { isCalendarDate } from "@/lib/mcp/finance";
 import {
-  MCP_PDF_LINK_SECONDS, addDraftPhoto, createIssue, editDraft, finalizeConfirmedDraft, finalizerFor, issueStatus, issueView,
-  loadExistingIssue, pdfLink, previewDraft, withArticleChanges, withFocus, withGalleryChanges, withGalleryPhoto, withHeadshot,
+  MCP_LINK_SECONDS, addDraftPhoto, createIssue, editDraft, finalizeConfirmedDraft, finalizerFor, issueStatus, issueWithPhotoLinks,
+  pdfLink, previewDraft, withArticleChanges, withFocus, withGalleryChanges, withGalleryPhoto, withHeadshot,
   withNewArticle, withoutArticle, withoutGalleryPhoto, withTitlePhoto,
 } from "@/lib/mcp/nu-news";
 import { MAX_MCP_PHOTO_MB } from "@/lib/mcp/nu-news-photo";
@@ -444,7 +444,7 @@ const EXACT_TEXT = "Copy each author's text exactly as given: never rewrite, cor
 const PHOTO_RULES = `Send one photo per call as a data:image/jpeg;base64,... URL: a JPEG up to ${MAX_MCP_PHOTO_MB} MB, `
   + `at most ${PHOTO_LONG_EDGE_PX} pixels on the long side, upright, with no metadata (no EXIF, XMP, IPTC, or comments). `
   + "Other photos are refused with the steps to fix them. The photo's src uses the requestId.";
-const LINK_LIFETIME = `The signed link expires after ${MCP_PDF_LINK_SECONDS / 60} minutes.`;
+const LINK_LIFETIME = `The signed link expires after ${MCP_LINK_SECONDS / 60} minutes.`;
 
 function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpCaller) {
   const authorized = <Input extends NuNewsTarget>(toolName: string, run: (input: Input) => Promise<unknown>) => (
@@ -473,11 +473,12 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
   })));
 
   server.registerTool("get_nu_news_issue", {
-    description: "Get one Nu News issue: details, intro, articles with IDs, photos with src and focus [x, y], donation text, status, "
-      + "missingItems that block finalizing, and preview_made_at (null means no preview exists).",
+    description: "Get one Nu News issue: details, intro, articles with IDs, photos with src, focus [x, y], and viewUrl, donation text, "
+      + "status, missingItems that block finalizing, and preview_made_at (null means no preview exists). "
+      + `Download a photo's viewUrl to look at it before you choose its focus point with set_nu_news_photo_focus. ${LINK_LIFETIME}`,
     inputSchema: z.object({ issueId }),
     annotations: readAnnotations,
-  }, authorized("get_nu_news_issue", async ({ issueId }) => issueView(await loadExistingIssue(issueId))));
+  }, authorized("get_nu_news_issue", ({ issueId }) => issueWithPhotoLinks(issueId)));
 
   server.registerTool("create_nu_news_issue", {
     description: "Create a draft Nu News issue, like New issue on the site: it copies the location and the donation text from the most recent issue. "

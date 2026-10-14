@@ -17,7 +17,7 @@ export default async function NuNewsIssuePage({ params }: { params: Promise<{ id
   const stored = z.uuid().safeParse(id).success ? await loadIssue(id) : null;
   if (!stored) notFound();
 
-  const photos = await photoUrls(photoSources(stored));
+  const photos = await photoUrls(photoSources(stored), 3_600);
   if (stored.finalized_at && stored.finalized_by_name) {
     return <FinalIssue issueId={stored.id} issue={stored} photoUrls={photos} finalizedAt={stored.finalized_at} finalizedBy={stored.finalized_by_name} />;
   }

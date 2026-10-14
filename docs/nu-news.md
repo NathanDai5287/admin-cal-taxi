@@ -55,7 +55,7 @@ make the preview, read the photo warnings, and finalize.
 - To finalize, the agent must send the issue's season as confirmation. Finalizing stays
   off while something is missing. Tell the agent to finalize only after you read the
   preview.
-- The links that the agent gets to a preview or final PDF expire after 10 minutes.
+- The links that the agent gets to a preview, a final PDF, or a photo expire after 10 minutes.
 - Each call writes a record in the MCP audit log.
 
 ## Photos

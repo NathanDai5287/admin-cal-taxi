@@ -8,13 +8,13 @@ import {
   type Focus, type NuNewsArticle, type NuNewsGalleryPhoto, type NuNewsIssue, type NuNewsPhoto,
 } from "@/lib/nu-news/issue";
 import { moved } from "@/lib/nu-news/moved";
-import { loadIssue, pdfUrl, type StoredIssue } from "@/lib/nu-news/store";
+import { loadIssue, pdfUrl, photoUrls, type StoredIssue } from "@/lib/nu-news/store";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { userLabel } from "@/lib/reimbursements/user-label";
 
 import { decodeNuNewsPhoto } from "./nu-news-photo";
 
-export const MCP_PDF_LINK_SECONDS = 600;
+export const MCP_LINK_SECONDS = 600;
 
 type Position = { position?: number };
 type ArticleChanges = Partial<Omit<NuNewsArticle, "id">> & Position;
@@ -22,9 +22,9 @@ type GalleryChanges = Partial<Pick<NuNewsGalleryPhoto, "feature" | "donate">> & 
 
 export const issueStatus = (issue: { finalized_at: string | null }) => (issue.finalized_at ? "final" : "draft");
 
-export const issueView = (issue: StoredIssue) => ({ ...issue, status: issueStatus(issue), missingItems: missingItems(issue) });
+const issueView = (issue: StoredIssue) => ({ ...issue, status: issueStatus(issue), missingItems: missingItems(issue) });
 
-export async function loadExistingIssue(issueId: string) {
+async function loadExistingIssue(issueId: string) {
   const issue = await loadIssue(issueId);
   if (!issue) throw new Error("No Nu News issue has that ID.");
   return issue;
@@ -137,7 +137,7 @@ export async function previewDraft(issueId: string) {
   return {
     issueId,
     previewMadeAt: result.madeAt,
-    previewPdfUrl: await pdfUrl(issue, MCP_PDF_LINK_SECONDS),
+    previewPdfUrl: await pdfUrl(issue, MCP_LINK_SECONDS),
     photoWarnings: result.warnings,
     missingItems: missingItems(issue),
   };
@@ -162,13 +162,25 @@ export async function finalizeConfirmedDraft(issueId: string, confirmSeason: str
     finalizedAt: issue.finalized_at,
     finalizedBy: issue.finalized_by_name,
     finalPdfSha256: issue.final_pdf_sha256,
-    finalPdfUrl: await pdfUrl(issue, MCP_PDF_LINK_SECONDS),
+    finalPdfUrl: await pdfUrl(issue, MCP_LINK_SECONDS),
   };
 }
 
 export async function pdfLink(issueId: string) {
   const issue = await loadExistingIssue(issueId);
-  const url = await pdfUrl(issue, MCP_PDF_LINK_SECONDS);
+  const url = await pdfUrl(issue, MCP_LINK_SECONDS);
   if (!url) throw new Error("This issue has no PDF yet. Make a preview first.");
   return { issueId, status: issueStatus(issue), pdfUrl: url };
+}
+
+export async function issueWithPhotoLinks(issueId: string) {
+  const issue = await loadExistingIssue(issueId);
+  const urls = await photoUrls(photoSources(issue), MCP_LINK_SECONDS);
+  const linked = <Photo extends NuNewsPhoto>(photo: Photo) => ({ ...photo, viewUrl: urls[photo.src] });
+  return {
+    ...issueView(issue),
+    cover: issue.cover && linked(issue.cover),
+    articles: issue.articles.map((article) => ({ ...article, headshot: article.headshot && linked(article.headshot) })),
+    gallery: issue.gallery.map(linked),
+  };
 }

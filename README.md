@@ -81,7 +81,7 @@ Destructive tools require explicit confirmation, and create or payment tools acc
 
 The Nu News tools do everything the `/nu-news` editor does (see [docs/nu-news.md](docs/nu-news.md#using-an-agent)):
 
-- `list_nu_news_issues`, `get_nu_news_issue`, `get_nu_news_pdf_url`: read issues and get a link to a PDF.
+- `list_nu_news_issues`, `get_nu_news_issue`, `get_nu_news_pdf_url`: read issues, with links to view their photos, and get a link to a PDF.
 - `create_nu_news_issue`, `update_nu_news_issue`: start an issue and change its details, intro, and donation text.
 - `add_nu_news_article`, `update_nu_news_article`, `remove_nu_news_article`: manage articles and their order.
 - `set_nu_news_title_photo`, `set_nu_news_headshot`, `add_nu_news_gallery_photo`, `update_nu_news_gallery_photo`,
