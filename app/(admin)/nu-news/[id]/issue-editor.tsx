@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -56,6 +58,7 @@ function MissingItems({ items }: { items: string[] }) {
 }
 
 export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMadeAt }: IssueEditorProps) {
+  const canWrite = useAppWriteAccess();
   const router = useRouter();
   const [issue, setIssue] = useState(initialIssue);
   const [savedIssue, setSavedIssue] = useState(initialIssue);
@@ -160,7 +163,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
   }
 
   return (
-    <div className="nu-news-editor grid gap-6">
+    <fieldset disabled={!canWrite} className="nu-news-editor grid gap-6">
       <div className="nu-news-heading flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link className="back-link" href="/nu-news">← All issues</Link>
@@ -285,6 +288,6 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
       {showPreview && previewMadeAt ? (
         <iframe className="h-[960px] w-full border border-rule bg-surface" src={`${pdfHref}?made=${encodeURIComponent(previewMadeAt)}`} title="Nu News preview" />
       ) : null}
-    </div>
+    </fieldset>
   );
 }

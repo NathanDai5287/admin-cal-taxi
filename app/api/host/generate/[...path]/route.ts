@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { BackendConfigError, backendKey, backendOrigin } from "@/lib/host-backend";
 
 // Browser calls to /api/host/generate/* are proxied to the Flask PDF backend.
@@ -18,7 +18,7 @@ export async function POST(
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (session.profile.role !== "admin") {
+  if (!hasAppAccess(session, "host", "write")) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

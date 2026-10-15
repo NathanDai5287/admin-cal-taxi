@@ -83,7 +83,7 @@ const bundled = await build({
       export const state = { db: null, providers: null };
       export async function policyClient() { return state.db; }
       export function getAccreditationProviders() { return state.providers; }
-      export async function requireAdmin() {}
+      export async function requireAppAccess() {}
       export async function extractSource() { throw new Error("Unexpected attachment extraction"); }
     ` }));
     build.onResolve({ filter: /^@\/lib\/policy\/tools$/ }, () => ({ path: "clock", namespace: "clock" }));

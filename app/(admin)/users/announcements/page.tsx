@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { MemberAnnouncementComposer, type AnnouncementMember } from "@/app/(admin)/users/announcements/member-announcement-composer";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { userLabel } from "@/lib/reimbursements/user-label";
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Discord messages" };
 export const dynamic = "force-dynamic";
 
 export default async function MemberAnnouncementsPage() {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const admin = createAdminClient();
   const { data, error } = await loadAllPages((from, to) => admin
     .from("profiles")

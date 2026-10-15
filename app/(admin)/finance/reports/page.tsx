@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { ButtonLink, Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -29,7 +29,7 @@ function formatMonth(month: string) {
 }
 
 export default async function ReimbursementReportsPage({ searchParams }: { searchParams: PageSearchParams }) {
-  const [, rawSearchParams] = await Promise.all([requireAdmin(), searchParams]);
+  const [, rawSearchParams] = await Promise.all([requireAppAccess("finance"), searchParams]);
   const filters = parseReportFilters(rawSearchParams);
   const supabase = createAdminClient();
   const [namesResult, budgetQueryResult, budgetEntriesResult, rows, manualExpenses] = await Promise.all([

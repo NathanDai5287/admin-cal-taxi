@@ -1,4 +1,4 @@
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { buildFinancialReport, type IncomeSource } from "@/lib/reimbursements/financial-report";
 import { renderFinancialReportPdf } from "@/lib/reimbursements/financial-report-pdf";
 import { categoryBudgetsFromRows, type ReimbursementCategory } from "@/lib/reimbursements/format";
@@ -15,7 +15,7 @@ function downloadName(termLabel: string) {
 
 export async function GET(request: Request) {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "admin") {
+  if (!session || !hasAppAccess(session, "finance")) {
     return new Response("Forbidden", { status: 403 });
   }
 

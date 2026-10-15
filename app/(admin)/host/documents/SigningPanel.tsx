@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, ButtonLink } from "@/components/brand/button";
 import { cleanClubs, normalizeOrgName } from "@/lib/host-clubs";
@@ -55,6 +57,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
   reviewOnOpen?: boolean;
   representativeAction?: ReactNode;
 }) {
+  const canWrite = useAppWriteAccess();
   const [revisions, setRevisions] = useState<SigningRevision[]>(initialRevisions ?? []);
   const [historyLoaded, setHistoryLoaded] = useState(initialRevisions !== undefined || !orderId);
   const [preview, setPreview] = useState<SigningRevision | null>(null);
@@ -85,7 +88,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
     function reload() { listSigningAction(orderId).then(async rows => {
       if (!active) return;
       const activeIndex = rows.findIndex(row => row.state === "awaiting_signatures" || row.state === "preparing_completed_copy");
-      if (activeIndex >= 0) {
+      if (canWrite && activeIndex >= 0) {
         rows[activeIndex] = await syncSigningAction(orderId, rows[activeIndex].id).catch(() => rows[activeIndex]);
       }
       if (active) {
@@ -99,10 +102,11 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
     reload();
     window.addEventListener("focus", reload);
     return () => { active = false; window.removeEventListener("focus", reload); };
-  }, [orderId]);
+  }, [canWrite, orderId]);
 
 
   async function prepare() {
+    if (!canWrite) return;
     if (invalid) { setError(invalid); return; }
     const approvedPayload = currentPayload;
     setBusy(true); setError("");
@@ -238,7 +242,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
       </>}
       {activeRevision && <p className="field-hint">Existing signing links stay active while you prepare and review a replacement.</p>}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Button type="button" variant="primary" disabled={busy || !!invalid || historyChanged} onClick={prepare}>{busy ? "Preparing contract…" : "Review contract"}</Button>
+      <Button type="button" variant="primary" disabled={!canWrite || busy || !!invalid || historyChanged} onClick={prepare}>{busy ? "Preparing contract…" : "Review contract"}</Button>
       {invalid && <span className="text-[12px] text-muted">{invalid}</span>}
       {historyChanged && <span className="text-[12px] text-warn">Signing history changed elsewhere. Reload the page before preparing a revision.</span>}
       </div>
@@ -250,7 +254,7 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
       </div>
       <a className="text-[13px] font-semibold text-brand underline" href={`/api/host/signing/files/${preview.order_id}/${preview.id}/original`} target="_blank" rel="noopener noreferrer">Open full contract PDF</a>
       <iframe title="Contract signing preview" className="h-[540px] w-full border border-rule bg-surface" src={`/api/host/signing/files/${preview.order_id}/${preview.id}/original`} />
-      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Approving…" : "Approve contract"}</Button><p className="field-hint">Approval saves this contract and opens email review. Emails are sent only when you select Send.</p></div>
+      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={!canWrite || busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Approving…" : "Approve contract"}</Button><p className="field-hint">Approval saves this contract and opens email review. Emails are sent only when you select Send.</p></div>
       {previewPayload !== currentPayload && <p className="text-[12px] text-warn">Details changed after preview. Prepare a new revision.</p>}
     </div>}
     {error && <p role="alert" className="text-[13px] text-warn">{error}</p>}
@@ -261,8 +265,8 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
           <p className={`mt-1.5 text-[14px] font-semibold ${revision.state === "signed" ? "text-ok" : revision.state === "failed" ? "text-warn" : "text-ink"}`}>{revision.state.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase())}</p>
           <p className="mt-1 text-[12px] tabular-nums text-muted">{revision.signedCount} of {revision.totalCount} signed</p>
         </div>
-        {(revision.state === "awaiting_signatures" || revision.state === "preparing_completed_copy") && <Button type="button" variant="secondary" compact disabled={busy} onClick={() => refresh(revision)}>Refresh progress</Button>}
-        {(["activating", "created", "creating", "creation_uncertain"].includes(revision.state)) && <Button type="button" variant="secondary" compact disabled={busy} onClick={() => recover(revision)}>Check and resume request</Button>}
+        {(revision.state === "awaiting_signatures" || revision.state === "preparing_completed_copy") && <Button type="button" variant="secondary" compact disabled={!canWrite || busy} onClick={() => refresh(revision)}>Refresh progress</Button>}
+        {(["activating", "created", "creating", "creation_uncertain"].includes(revision.state)) && <Button type="button" variant="secondary" compact disabled={!canWrite || busy} onClick={() => recover(revision)}>Check and resume request</Button>}
       </div>
       {revision.files.original && revision.state !== "signed" && <a className="text-[13px] font-semibold text-brand underline" href={`/api/host/signing/files/${revision.order_id}/${revision.id}/original`}>View current contract: unsigned original</a>}
       {revision.state === "awaiting_signatures" && <div className="flex flex-wrap items-center gap-3"><p className="text-[13px]">Agreement approved. Send invitations and track progress from the event timeline.</p><ButtonLink href={`/host/orders/${revision.order_id}`} variant="primary" compact>Open event timeline</ButtonLink></div>}

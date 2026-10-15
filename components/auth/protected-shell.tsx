@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 
 import { AuthPill } from "@/components/auth/auth-pill";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export async function ProtectedShell({
   children,
@@ -22,10 +22,11 @@ export async function ProtectedShell({
         email: session.email,
         avatarUrl: session.avatarUrl,
         role: session.profile.role,
+        canSubmit: hasAppAccess(session, "submit"),
       }
     : null;
   const showPolicy = process.env.POLICY_ASSISTANT_ENABLED === "true" &&
-    (session?.profile.role === "admin" || process.env.POLICY_ASSISTANT_MEMBERS_ENABLED === "true");
+    hasAppAccess(session, "policy");
 
   return (
     <>

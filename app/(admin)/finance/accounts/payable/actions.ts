@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export type ReimbursedMutationResult =
@@ -19,7 +19,7 @@ export async function setReimbursementPaid(
   id: string,
   reimbursed: boolean,
 ): Promise<ReimbursedMutationResult> {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
 
   const parsed = z.object({ id: z.uuid(), reimbursed: z.boolean() }).safeParse({ id, reimbursed });
   if (!parsed.success) {
@@ -59,7 +59,7 @@ export type BulkReimbursementResult =
 export async function markReimbursementsPaid(
   reimbursementIds: string[],
 ): Promise<BulkReimbursementResult> {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
 
   const parsed = z.array(z.uuid()).min(1).safeParse(reimbursementIds);
 

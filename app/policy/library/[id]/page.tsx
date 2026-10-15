@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { requirePolicyMember } from "@/lib/policy/server";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 export default async function ReviewPolicy({ params }: { params: Promise<{ id: string }> }) {
-  await requirePolicyMember(); await requireAdmin("/");
+  await requirePolicyMember(); await requireAppAccess("policy");
   const { id } = await params;
   const db = createAccreditationAdminClient();
   const [doc, chunks] = await Promise.all([db.from("policy_documents").select("*").eq("id", id).single(), db.from("policy_chunks").select("ordinal,content,locator,embedding_profile").eq("source_id", id).order("ordinal")]);

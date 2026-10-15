@@ -4,7 +4,7 @@ import { Button, ButtonLink } from "../../components/brand/button";
 import Nav from "../../components/host/Nav";
 import { HostWorkspaceBoundary } from "../../lib/host-shared-state";
 import { beginDraft, notifyDraftSelected } from "../../lib/host-draft-storage";
-import EventPage from "../../app/(admin)/host/page";
+import EventPage from "../../components/host/HostHome";
 import PricingPage from "../../app/(admin)/host/pricing/page";
 import ContractPage from "../../app/(admin)/host/contract/page";
 import DocumentsPage from "../../app/(admin)/host/documents/page";
@@ -64,7 +64,7 @@ function App() {
     </aside>
     <Nav />
     <HostWorkspaceBoundary><main className="max-w-[1080px] mx-auto px-6 py-8">
-      {pathname === "/host" && <EventPage />}
+      {pathname === "/host" && <EventPage contacts={[]} />}
       {pathname === "/host/pricing" && <PricingPage />}
       {pathname === "/host/contract" && <ContractPage />}
       {pathname === "/host/documents" && <DocumentsPage />}
@@ -72,7 +72,7 @@ function App() {
       {order && <div className="space-y-7">
         <OrderDetailHeader order={order} status={deriveStatus(order)} actions={<WorkspaceActions order={order} />} />
         <HostingFinancePanel key={JSON.stringify(finance)} orderId={order.id} financeOrder={finance.included ? { status: "confirmed", plannedRevenue: order.rentalPrice ?? 0, plannedFirePermit: 125 } : null} payments={finance.payments} depositTotal={order.depositAmount ?? 0} previewRevenue={order.rentalPrice ?? 0} previewFirePermit={125} today="2026-10-02" />
-        <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" emailConfigured depositPaid={finance.payments.filter(p => p.kind === "deposit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
+        <OrderTimeline order={order} revisions={revisions} workflow={previewWorkflow(id)} today="2026-10-04" previewReplyTo="hosting@example.test" emailConfigured depositPaid={finance.payments.filter(p => p.kind === "deposit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} rentalPaid={finance.payments.filter(p => p.kind === "revenue" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitPaid={finance.payments.filter(p=>p.kind==="fire_permit" && !p.reversedAt).reduce((n,p)=>n+p.amount,0)} permitTotal={125} />
         <OrderSupportingDetails order={order} revisions={revisions} signingContract={contractDownload(revisions)} />
       </div>}
       {pathname.startsWith("/preview-sign/") && <p>This is a local demonstration link. Use “Simulate one signature” on the sample order to preview progress.</p>}

@@ -9,12 +9,12 @@ import { validateSourceFile } from "@/lib/accreditation/extract";
 import { isRetryableAiError } from "@/lib/accreditation/gemini";
 import { processDocument } from "@/lib/accreditation/processing";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { policyEnabled } from "@/lib/policy/server";
 
 async function policyAdmin() {
   if (!policyEnabled()) throw new Error("Policy features are disabled.");
-  return requireAdmin("/");
+  return requireAppAccess("policy", "write");
 }
 const metadata = z.object({ title: z.string().trim().min(1).max(200), authority: z.string().trim().min(1).max(200), document_type: z.enum(["policy", "bylaws", "rules", "guidelines"]), version_label: z.string().trim().min(1).max(100), effective_from: z.iso.date(), effective_until: z.union([z.iso.date(), z.literal("")]).transform((s) => s || null) }).refine((m) => !m.effective_until || m.effective_until >= m.effective_from);
 function finish(message: string): never { revalidatePath("/policy", "layout"); redirect(`/policy/library?message=${encodeURIComponent(message)}`); }

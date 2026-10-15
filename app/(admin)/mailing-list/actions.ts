@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { contactSchema, MAX_IMPORT_ROWS, type ContactInput } from "@/lib/mailing-list/contacts";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 type Result = { ok: boolean; message: string };
 
 export async function exportContactEmails(): Promise<{ ok: true; emails: string; count: number } | { ok: false; message: string }> {
-  await requireAdmin("/");
+  await requireAppAccess("mailing-list");
   const client = createAdminClient();
   // Export the whole mailing list, independent of the table's search and pagination.
   const { data, error } = await loadAllPages((from, to) => client.from("mailing_list_contacts")
@@ -21,7 +21,7 @@ export async function exportContactEmails(): Promise<{ ok: true; emails: string;
 }
 
 export async function saveContact(input: ContactInput, id?: string): Promise<Result> {
-  await requireAdmin("/");
+  await requireAppAccess("mailing-list", "write");
   const parsed = contactSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
   if (id !== undefined && !z.uuid().safeParse(id).success) return { ok: false, message: "This contact could not be found. Refresh the list." };
@@ -36,7 +36,7 @@ export async function saveContact(input: ContactInput, id?: string): Promise<Res
 }
 
 export async function importContacts(input: ContactInput[]): Promise<Result> {
-  await requireAdmin("/");
+  await requireAppAccess("mailing-list", "write");
   const parsed = z.array(contactSchema).min(1).max(MAX_IMPORT_ROWS).safeParse(input);
   if (!parsed.success) return { ok: false, message: "Check the import preview and use up to 10,000 valid contacts." };
   const { data, error } = await createAdminClient().rpc("import_mailing_list_contacts", { contacts: parsed.data });
@@ -47,7 +47,7 @@ export async function importContacts(input: ContactInput[]): Promise<Result> {
 }
 
 export async function deleteContact(id: string): Promise<Result> {
-  await requireAdmin("/");
+  await requireAppAccess("mailing-list", "write");
   if (!z.uuid().safeParse(id).success) return { ok: false, message: "This contact could not be found." };
   const { error } = await createAdminClient().from("mailing_list_contacts").delete().eq("id", id);
   if (error) return { ok: false, message: "The contact could not be removed. Please try again." };

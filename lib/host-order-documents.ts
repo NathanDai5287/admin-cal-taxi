@@ -11,6 +11,7 @@ export function defaultDocuments(order: Order, depositNumber?: string) {
   const saved = sharedStateFromSnapshot(order.snapshot);
   const data = {
     ...saved,
+    currentOrderId: order.id,
     clubs: saved.clubs.length ? saved.clubs : [order.clubName],
     eventDate: order.eventDate,
     finalPrice: String(order.rentalPrice ?? ""),

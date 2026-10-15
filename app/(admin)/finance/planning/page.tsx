@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { ExpensePlanForm } from "@/app/(admin)/finance/planning/expense-plan-form";
 import { buildPlanVsActual } from "@/lib/finance/plan-vs-actual";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { categoryBudgetsFromRows, formatMoney } from "@/lib/reimbursements/format";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Plan vs actual" };
 export const dynamic = "force-dynamic";
 
 export default async function PlanningPage() {
-  await requireAdmin();
+  await requireAppAccess("finance");
   const supabase = createAdminClient();
   const settingsResult = await supabase.from("chapter_financial_settings")
     .select("term_label, term_start, term_end, academic_terms(label, starts_on, ends_on)")

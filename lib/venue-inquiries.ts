@@ -3,7 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import type { VenueInquiryInput } from "@/lib/venue-inquiry";
 
 const RATE_LIMIT_WINDOW_MINUTES = 15;
@@ -65,7 +65,7 @@ export async function saveVenueInquiry(input: VenueInquiryInput, source: string)
 }
 
 export async function listVenueInquiries(): Promise<VenueInquiry[]> {
-  await requireAdmin("/");
+  await requireAppAccess("host");
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("venue_inquiries")

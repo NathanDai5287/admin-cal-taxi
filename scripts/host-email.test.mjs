@@ -13,7 +13,7 @@ const result = await build({ stdin: { contents: 'export * from "./lib/host-email
 const { writeFile, unlink } = await import("node:fs/promises");
 const output = path.join(root, "node_modules/.host-email-test.mjs"); await writeFile(output, result.outputFiles[0].text);
 const { state, prepareHostingEmail, deliverHostingEmails, hostingEmailDraft } = await import(`file://${output.replaceAll("\\", "/")}`); await unlink(output);
-process.env.RESEND_API_KEY = "test-only"; process.env.HOST_EMAIL_REPLY_TO = "host@example.test";
+process.env.RESEND_API_KEY = "test-only";
 const request = { orderId: state.order.id, revisionId: state.revision.id, expectedUpdatedAt: state.order.updatedAt, kind: "reminder", recipients: ["one@example.test"] };
 test("reminders preserve envelope identity, refresh progress, and never leak another person's link", async () => {
   state.rows = []; state.cancelled = false; state.revision.recipients[0].status = "NOT_SIGNED";
@@ -68,7 +68,7 @@ test("both shared invoices include all six club representatives, including signe
     };
     for (const kind of ["deposit_invoice", "rental_invoice"]) {
       const previews = await prepareHostingEmail({ ...request, kind, recipients: ["club0@example.test"] });
-      const draft = hostingEmailDraft(state.order, state.revision, kind, 0, process.env.HOST_EMAIL_REPLY_TO);
+      const draft = hostingEmailDraft(state.order, state.revision, kind, 0, state.treasurerEmail);
       assert.deepEqual(draft.map(p => [p.recipient, p.html]), previews.map(p => [p.recipient, p.html]));
       assert.equal(previews.length, 1);
       assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
@@ -129,7 +129,7 @@ test("deposit receipts require a received deposit and reject an undone payment a
   assert.equal(previews.length, 1);
   assert.match(previews[0].html, /Deposit payments received: \$300\.00/);
   assert.match(previews[0].attachments[0], /deposit-payment-receipt.*\.pdf/);
-  const draft = hostingEmailDraft(state.order, state.revision, "deposit_receipt", 0, process.env.HOST_EMAIL_REPLY_TO, undefined, 300);
+  const draft = hostingEmailDraft(state.order, state.revision, "deposit_receipt", 0, state.treasurerEmail, undefined, 300);
   assert.equal(draft[0].html, previews[0].html);
   state.deposits[0].reversed_at = "2026-10-04";
   globalThis.fetch = async () => { throw Error("Must not email a stale deposit receipt"); };
@@ -234,6 +234,30 @@ test("early rental payment does not allow returning a deposit before an overnigh
   } finally { state.order = originalOrder; state.rows = []; state.rentals = []; }
 });
 
+test("new messages use the managed treasurer and stored messages retain their reply address", async () => {
+  state.rows = [];
+  state.cancelled = false;
+  state.revision.state = "awaiting_signatures";
+  state.revision.recipients[0].status = "NOT_SIGNED";
+  state.treasurerEmail = "new-treasurer@example.test";
+  const previews = await prepareHostingEmail(request);
+  assert.equal(state.rows[0].payload.body.reply_to, state.treasurerEmail);
+  state.treasurerEmail = "";
+  const reopened = await prepareHostingEmail(request);
+  assert.equal(reopened[0].id, previews[0].id);
+  assert.equal(reopened[0].replyTo, "new-treasurer@example.test");
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push(JSON.parse(init.body));
+    return Response.json({ id: "managed-contact-test" });
+  };
+  const delivered = await deliverHostingEmails(state.order.id, previews.map(preview => preview.id));
+  assert.equal(delivered.sent, 1);
+  assert.equal(sent[0].reply_to, "new-treasurer@example.test");
+  state.rows = [];
+  await assert.rejects(prepareHostingEmail(request), /Assign a treasurer with an email in Users/);
+  state.treasurerEmail = "host@example.test";
+});
 
 test("rental invoice labels update only unattempted previews and preserve amounts and delivery identity", async () => {
   const originalOrder = structuredClone(state.order);

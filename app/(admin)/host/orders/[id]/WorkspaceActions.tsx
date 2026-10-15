@@ -1,4 +1,6 @@
 "use client";
+
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 import { Button } from "@/components/brand/button";
 
 /**
@@ -41,6 +43,7 @@ export default function WorkspaceActions({
   compact?: boolean;
   variant?: "primary" | "secondary";
 }) {
+  const canWrite = useAppWriteAccess();
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
   const [error, setError] = useState("");
 
@@ -121,7 +124,7 @@ export default function WorkspaceActions({
         type="button"
         variant={variant}
         compact={compact}
-        disabled={busy !== null}
+        disabled={!canWrite || busy !== null}
         onClick={loadIntoWorkspace}
       >
         {busy === "load" ? "Loading…" : loadLabel}
@@ -129,7 +132,7 @@ export default function WorkspaceActions({
       {showDuplicate && <Button
         type="button"
         variant="secondary"
-        disabled={busy !== null}
+        disabled={!canWrite || busy !== null}
         onClick={duplicateAsNewEvent}
       >
         {busy === "duplicate" ? "Duplicating…" : "Duplicate event"}

@@ -1,9 +1,10 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import { notFound, redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import "./ask-policy.css";
 
 export const metadata = { title: { default: "Ask Policy", template: "%s · Ask Policy" } };
@@ -12,7 +13,7 @@ export default async function AskPolicyLayout({ children }: { children: React.Re
   if (!accreditationEnabled()) notFound();
   const session = await getSessionProfile();
   if (!session) redirect("/");
-  if (session.profile.role !== "admin") return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
+  if (!hasAppAccess(session, "ask-policy")) return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
 
   return (
     <div data-brand className="ask-policy-shell min-h-screen bg-page">
@@ -22,10 +23,10 @@ export default async function AskPolicyLayout({ children }: { children: React.Re
         subtitle="Accreditation assistant"
         tabs={[
           { href: "/ask-policy", label: "Chat" },
-          { href: "/ask-policy/evidence", label: "Add evidence" },
+          ...(session.appAccess.accreditation === "write" ? [{ href: "/ask-policy/evidence", label: "Add evidence" }] : []),
         ]}
       />
-      <main className="ask-policy-main mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-6">{children}</main>
+      <main className="ask-policy-main mx-auto max-w-[1500px] px-3 py-4 sm:px-6 sm:py-6"><AppAccessBoundary access={session.appAccess["ask-policy"]}>{children}</AppAccessBoundary></main>
     </div>
   );
 }

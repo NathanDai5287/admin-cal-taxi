@@ -1,7 +1,7 @@
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { MAX_CHAT_ATTACHMENT_TOTAL_BYTES } from "@/lib/accreditation/chat";
 import { runAccreditationChat } from "@/lib/accreditation/chat-service";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   const session = await getSessionProfile();
   if (!session) return jsonError("Sign in to use the assistant.", 401);
-  if (session.profile.role !== "admin") return jsonError("This area is restricted to administrators.", 403);
+  if (!hasAppAccess(session, "ask-policy", "write")) return jsonError("This area is restricted to administrators.", 403);
   if (!accreditationEnabled()) return jsonError("Accreditation is disabled.", 404);
 
   const contentLength = Number(request.headers.get("content-length") ?? 0);

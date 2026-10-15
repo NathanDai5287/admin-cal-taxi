@@ -11,7 +11,7 @@ import { buildPolicyToolContext, clockQuestionIntent, describeClock, getPolicyCl
 export type QuestionResult = { answer?: PolicyAnswer; chunks?: PolicyChunk[]; error?: string; date?: string };
 const inputSchema = z.object({ question: z.string().trim().min(5).max(4000), date: z.iso.date() });
 export async function askPolicy(_previous: QuestionResult, form: FormData): Promise<QuestionResult> {
-  const session = await requirePolicyMember();
+  const session = await requirePolicyMember("write");
   const clock = getPolicyClock();
   const input = inputSchema.safeParse({ question: form.get("question"), date: form.get("date") || clock.local_date });
   if (!input.success) return { error: "Enter a question (5–4,000 characters) and a valid date." };

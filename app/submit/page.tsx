@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { SubmitForm } from "@/app/submit/submit-form";
 import { AccessDenied } from "@/components/auth/access-denied";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export default async function SubmitPage() {
     redirect("/login");
   }
 
-  if (session.profile.role === "none") {
+  if (!hasAppAccess(session, "submit")) {
     return <AccessDenied />;
   }
 
@@ -35,7 +35,7 @@ export default async function SubmitPage() {
           <span className="card-title">New reimbursement</span>
         </div>
         <div className="card-body border-t border-rule pt-5">
-          <SubmitForm />
+          <fieldset disabled={session.appAccess.submit !== "write"}><SubmitForm /></fieldset>
         </div>
       </section>
     </>

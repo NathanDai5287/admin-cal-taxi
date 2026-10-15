@@ -155,11 +155,11 @@ function fakeSupabase(adminId) {
   return { tables, files, putToUploadUrl, from: (table) => new Query(table), storage: { from: () => bucket } };
 }
 
-function connect({ isMcpAdmin = true } = {}) {
+function connect({ isMcpAdmin = true, access = "write" } = {}) {
   const adminId = randomUUID();
   const admin = fakeSupabase(adminId);
   globalThis.nuNewsTestAdmin = admin;
-  const user = { rpc: async (name) => ({ data: name === "is_mcp_admin" && isMcpAdmin, error: null }) };
+  const user = { rpc: async (name, args) => ({ data: name === "has_mcp_app_access" && args.app_key === "nu-news" && isMcpAdmin && (access === "write" || args.required_access === access), error: null }) };
   const handler = createMcpHandler(() => createFinanceServer(user, { userId: adminId, clientId: "test-client" }));
 
   async function request(method, params) {
@@ -210,13 +210,13 @@ test("Nu News tools are listed with safety hints and the workflow", async () => 
   assert.deepEqual(tools.get("remove_nu_news_article").inputSchema.required, ["issueId", "articleId", "confirm"]);
 });
 
-test("only active administrators with an OAuth grant can use Nu News tools", async () => {
+test("Nu News tools reject OAuth callers without app access", async () => {
   const { admin, refused } = connect({ isMcpAdmin: false });
   const issueId = randomUUID();
   admin.tables.nu_news_issues.push({ id: issueId, season: "Fall 2026" });
-  await refused("list_nu_news_issues", {}, /An active administrator OAuth grant is required/);
-  await refused("create_nu_news_issue", { requestId: randomUUID() }, /An active administrator OAuth grant is required/);
-  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" }, /An active administrator OAuth grant is required/);
+  await refused("list_nu_news_issues", {}, /Nu News (read|write) access is required/);
+  await refused("create_nu_news_issue", { requestId: randomUUID() }, /Nu News (read|write) access is required/);
+  await refused("delete_nu_news_draft", { issueId, confirmSeason: "Fall 2026" }, /Nu News (read|write) access is required/);
   assert.equal(admin.tables.nu_news_issues.length, 1);
   assert.equal(admin.tables.mcp_audit_log.length, 0);
 });
@@ -375,4 +375,15 @@ test("an agent can delete a draft with its photos and preview, and nothing else"
 
   const { id: emptyIssueId } = await ok("create_nu_news_issue", { season: "Spring 2027", issueDate: "2027-03-01", requestId: randomUUID() });
   assert.deepEqual((await ok("delete_nu_news_draft", { issueId: emptyIssueId, confirmSeason: "Spring 2027" })).removedFiles, []);
+});
+
+test("read-only OAuth clients can list issues but cannot preview, upload, or change them", async () => {
+  const { admin, ok, refused } = connect({ access: "read" });
+  await ok("list_nu_news_issues", {});
+  const issueId = randomUUID();
+  await refused("create_nu_news_issue", { requestId: randomUUID() }, /Nu News write access is required/);
+  await refused("make_nu_news_preview", { issueId }, /Nu News write access is required/);
+  await refused("prepare_nu_news_photo_upload", { issueId, requestId: randomUUID() }, /Nu News write access is required/);
+  assert.equal(admin.tables.nu_news_issues.length, 0);
+  assert.equal(admin.files.size, 0);
 });

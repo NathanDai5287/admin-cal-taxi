@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import {
   reportDuesInsertFailure,
   reportDuesProfilePreflightFailure,
@@ -75,7 +75,7 @@ export async function addDuesFees(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("finance", "write");
   const memberIds = [...new Set(formData.getAll("memberId").filter(
     (value): value is string => typeof value === "string",
   ))];
@@ -141,7 +141,7 @@ export async function updateDuesBalance(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = entrySchema.extend({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
     id: formData.get("id"),
     updatedAt: formData.get("updatedAt"),
@@ -206,7 +206,7 @@ export async function setDuesPaid(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = z.object({
     id: z.string().uuid(),
     paid: z.enum(["true", "false"]),
@@ -242,7 +242,7 @@ export async function updateDuesPaymentPlan(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const version = z.object({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
     id: formData.get("id"), updatedAt: formData.get("updatedAt"),
   });
@@ -282,7 +282,7 @@ export async function addDuesBalanceNote(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = z.object({
     id: z.string().uuid(),
     body: z.string().trim().min(1, "Write a note first.").max(2000, "Keep the note under 2,000 characters."),
@@ -307,7 +307,7 @@ export async function manageDuesBalanceNote(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = z.object({
     id: z.string().uuid(),
     noteId: z.string().uuid(),
@@ -339,7 +339,7 @@ export async function addDuesPayment(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = z.object({
     id: z.string().uuid(),
     paymentAmount: z.coerce.number().positive().max(999_999_999.99),
@@ -405,7 +405,7 @@ export async function waiveDuesBalance(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = z.object({ id: z.string().uuid(), updatedAt: z.string().datetime({ offset: true }) }).safeParse({
     id: formData.get("id"),
     updatedAt: formData.get("updatedAt"),
@@ -440,7 +440,7 @@ export async function bulkSetDuesPaid(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = readBalanceVersions(formData);
   if (!parsed.success) return actionError("Select at least one charge.");
 
@@ -460,7 +460,7 @@ export async function bulkWaiveDuesBalances(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = readBalanceVersions(formData);
   if (!parsed.success) return actionError("Select at least one charge.");
 
@@ -498,7 +498,7 @@ export async function bulkUpdateDuesBalances(
   _previousState: DuesActionState,
   formData: FormData,
 ): Promise<DuesActionState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const versions = formData.getAll("balanceVersion").filter(
     (value): value is string => typeof value === "string",
   );
@@ -564,7 +564,7 @@ export async function sendDuesAnnouncement(
   _previousState: DuesAnnouncementState,
   formData: FormData,
 ): Promise<DuesAnnouncementState> {
-  await requireAdmin("/");
+  await requireAppAccess("finance", "write");
   const parsed = announcementSchema.safeParse({
     message: formData.get("message"),
     recipientIds: formData.getAll("recipientId"),

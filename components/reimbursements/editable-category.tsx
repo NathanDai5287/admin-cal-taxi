@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useEffect, useState, useTransition } from "react";
 
 import { updateCategory } from "@/app/(admin)/finance/review/actions";
@@ -17,6 +19,7 @@ export function EditableCategory({
   category: ReimbursementCategory;
   id: string;
 }) {
+  const canWrite = useAppWriteAccess();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(category);
   const [error, setError] = useState("");
@@ -32,7 +35,7 @@ export function EditableCategory({
     return (
       <span className="inline-flex items-center gap-2 flex-wrap">
         <span>{formatCategory(value)}</span>
-        <Button disabled={pending} variant="text" onClick={() => setEditing(true)} type="button">
+        <Button disabled={!canWrite || pending} variant="text" onClick={() => setEditing(true)} type="button">
           {pending ? "Saving…" : "Change"}
         </Button>
       </span>
@@ -65,7 +68,7 @@ export function EditableCategory({
         autoFocus
         className="field-input !w-auto"
         defaultValue={value}
-        disabled={pending}
+        disabled={!canWrite || pending}
         name="category"
         required
       >
@@ -73,13 +76,13 @@ export function EditableCategory({
           <option key={value} value={value}>{label}</option>
         ))}
       </select>
-      <Button variant="primary" compact disabled={pending} type="submit">
+      <Button variant="primary" compact disabled={!canWrite || pending} type="submit">
         {pending ? "Saving…" : "Save"}
       </Button>
       <Button
         variant="secondary"
         compact
-        disabled={pending}
+        disabled={!canWrite || pending}
         onClick={() => setEditing(false)}
         type="button"
       >

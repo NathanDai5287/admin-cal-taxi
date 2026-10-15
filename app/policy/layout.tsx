@@ -1,8 +1,9 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import { AppNav } from "@/components/brand/app-nav";
 import { ProtectedShell } from "@/components/auth/protected-shell";
 import { requirePolicyMember } from "@/lib/policy/server";
 
 export default async function PolicyLayout({ children }: { children: React.ReactNode }) {
   const session = await requirePolicyMember();
-  return <ProtectedShell><div data-brand className="min-h-screen"><AppNav homeHref="/policy" title="Theta Xi" subtitle="Policy" tabs={[{ href: "/policy", label: "Ask a question" }, { href: "/policy/history", label: "Question history" }, ...(session.profile.role === "admin" ? [{ href: "/policy/library", label: "Policy library" }] : [])]} /><main className="mx-auto max-w-[1080px] px-6 py-8">{children}</main></div></ProtectedShell>;
+  return <ProtectedShell><div data-brand className="min-h-screen"><AppNav homeHref="/policy" title="Theta Xi" subtitle="Policy" tabs={[{ href: "/policy", label: "Ask a question" }, { href: "/policy/history", label: "Question history" }, ...(session.appAccess.policy === "write" ? [{ href: "/policy/library", label: "Policy library" }] : [])]} /><main className="mx-auto max-w-[1080px] px-6 py-8"><AppAccessBoundary access={session.appAccess.policy}>{children}</AppAccessBoundary></main></div></ProtectedShell>;
 }

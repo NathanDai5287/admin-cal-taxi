@@ -1,4 +1,5 @@
 import "server-only";
+import { personContactEmail } from "./people";
 import { prepareTrackedEmail, recordEmailProvider } from "./email-tracking";
 import { createHash } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -19,16 +20,27 @@ type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
 type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalInvoiceStyle?: number; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
-export type EmailPreview = { id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
+export type EmailPreview = { replyTo?: string; id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const termsHash = (order: Order) => hash({ clubName: order.clubName, eventDate: order.eventDate, rentalPrice: order.rentalPrice, depositAmount: order.depositAmount, snapshot: order.snapshot });
 export function hostEmailConfigured() {
-  return !!process.env.RESEND_API_KEY && !!process.env.HOST_EMAIL_REPLY_TO;
+  return !!process.env.RESEND_API_KEY;
 }
-function config() {
+export async function hostingReplyTo() {
+  const { data, error } = await createAdminClient().from("profiles")
+    .select("email, contact_email")
+    .is("removed_at", null)
+    .contains("executive_roles", ["treasurer"])
+    .maybeSingle();
+  if (error) throw new Error("Unable to load the hosting reply address.");
+  return data ? personContactEmail(data) : "";
+}
+async function config() {
   if (!hostEmailConfigured()) throw new Error("Hosting email is not configured yet.");
-  return { from: process.env.HOST_EMAIL_FROM || "Theta Xi Hosting <host@cal.taxi>", replyTo: process.env.HOST_EMAIL_REPLY_TO!.trim() };
+  const replyTo = await hostingReplyTo();
+  if (!replyTo) throw new Error("Assign a treasurer with an email in Users before preparing a hosting email.");
+  return { from: process.env.HOST_EMAIL_FROM || "Theta Xi Hosting <host@cal.taxi>", replyTo };
 }
 async function context(orderId: string, revisionId: string, refresh: boolean) {
   const [order, revisions, workflow] = await Promise.all([getOrderFresh(orderId), listSigning(orderId), loadWorkflow(orderId)]);
@@ -60,7 +72,7 @@ async function exactFile(revision: SigningRevision, kind: "original" | "complete
   const response = await signingFile(revision.order_id, revision.id, kind);
   return { filename: `hosting-contract-r${revision.revision}-${kind}.pdf`, content: Buffer.from(await response.arrayBuffer()).toString("base64") };
 }
-async function statementPdf(order: Order, title: string, lines: string[]): Promise<Attachment> {
+async function statementPdf(order: Order, title: string, lines: string[], replyTo: string): Promise<Attachment> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -68,7 +80,7 @@ async function statementPdf(order: Order, title: string, lines: string[]): Promi
   // Standard-font PDFs explicitly replace unsupported characters rather than
   // crash or silently truncate a receipt. Emails retain the original Unicode.
   const ascii = (s: string) => s.normalize("NFKD").replace(/[^\x20-\x7e]/g, "?");
-  for (const [i, line] of ["Theta Xi Hosting", title, order.clubName, `Event: ${order.eventDate}`, `Order: ${order.id}`, "", ...lines, "", "Theta Xi - Nu Chapter", "2639 Durant Ave, Berkeley, CA 94704", process.env.HOST_EMAIL_REPLY_TO || ""].entries()) {
+  for (const [i, line] of ["Theta Xi Hosting", title, order.clubName, `Event: ${order.eventDate}`, `Order: ${order.id}`, "", ...lines, "", "Theta Xi - Nu Chapter", "2639 Durant Ave, Berkeley, CA 94704", replyTo].entries()) {
     const words = ascii(line).split(/\s+/); let row = "";
     for (const word of words) {
       if (row && font.widthOfTextAtSize(`${row} ${word}`, 11) > 510) { if (y < 55) { page = pdf.addPage([612, 792]); y = 735; } page.drawText(row, { x: 50, y, size: 11, font }); y -= 19; row = word; } else row += (row ? " " : "") + word;
@@ -102,13 +114,12 @@ async function updatedInvoicePreview(order: Order, row: DeliveryRow, kind: "depo
   return { ...row.payload, invoiceDueDate, ...(kind === "rental_invoice" ? { rentalInvoiceStyle: 2 } : {}), body: { ...row.payload.body, ...message, attachments } };
 }
 function preview(row: DeliveryRow): EmailPreview {
-  return { id: row.id, recipient: row.recipient, subject: row.payload.body.subject, html: row.payload.body.html, attachments: row.payload.body.attachments.map(a => a.filename), status: row.status };
+  return { replyTo: row.payload.body.reply_to, id: row.id, recipient: row.recipient, subject: row.payload.body.subject, html: row.payload.body.html, attachments: row.payload.body.attachments.map(a => a.filename), status: row.status };
 }
 function depositReceiptAttachment(order: Order, payments: { id: string; amount: number; paid_date: string }[], contact: string): Attachment {
   return { filename: `deposit-payment-receipt-${order.id}.pdf`, content: Buffer.from(renderDepositReceiptPdf(order, payments, eventToday(), contact)).toString("base64") };
 }
 export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPreview[]> {
-  const sender = config();
   // Preview uses archived state; delivery still synchronizes Documenso and
   // checks current terms, payments and recipients immediately before sending.
   const { order, revision, workflow } = await context(input.orderId, input.revisionId, false);
@@ -167,6 +178,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (legacy.error) throw new Error("Unable to verify previous invoice deliveries.");
     const legacyRows = (legacy.data ?? []) as DeliveryRow[];
     if (legacyRows.some(row => row.status !== "queued" || row.attempted_at)) throw new Error("This invoice has individual delivery history. It will not be resent as a new group email.");
+    const sender = await config();
     const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : input.kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined;
     let detail = ""; let attachments: Attachment[];
     if (input.kind === "deposit_receipt") {
@@ -193,6 +205,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   if (existing.error) throw new Error("Unable to load saved previews.");
   const saved = (existing.data ?? []) as DeliveryRow[];
   if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
+  const sender = await config();
   const money = (n: number) => `$${n.toFixed(2)}`;
   let attachments: Attachment[] = []; let detail = "";
   if (input.kind === "invitation") attachments = [await exactFile(revision, "original")];
@@ -200,12 +213,12 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   if (input.kind === "receipt") {
     if (payments.total <= 0) throw new Error("Record a rental payment before sending a receipt.");
     detail = `Rental payments received: ${money(payments.total)}. Remaining rental fee: ${money(Math.max((order.rentalPrice ?? 0) - payments.total, 0))}.`;
-    attachments = [await statementPdf(order, "Rental payment receipt", [detail, ...payments.rows.map(r => `${r.paid_date}: ${money(Number(r.amount))} (record ${r.id})`), "This receipt covers the recorded rental payments listed above. The refundable deposit is separate."])];
+    attachments = [await statementPdf(order, "Rental payment receipt", [detail, ...payments.rows.map(r => `${r.paid_date}: ${money(Number(r.amount))} (record ${r.id})`), "This receipt covers the recorded rental payments listed above. The refundable deposit is separate."], sender.replyTo)];
   }
   if (input.kind === "refund") {
     const refund = input.refund!;
     detail = `Deposit returned: ${money(refund.amount)} on ${refund.date} via ${refund.method}.`;
-    attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: ${money(order.depositAmount ?? 0)}.`, "Return information recorded by the hosting administrator."])];
+    attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: ${money(order.depositAmount ?? 0)}.`, "Return information recorded by the hosting administrator."], sender.replyTo)];
   }
   const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
     const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo: sender.replyTo });

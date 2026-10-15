@@ -24,7 +24,7 @@ import {
   type OrderPatch,
 } from "@/lib/host-orders";
 import type { Order, OrderDocument, OrderStatus } from "@/lib/host-orders-types";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
@@ -42,7 +42,7 @@ function failed(err: unknown): { ok: false; error: string } {
 /** Save the current workspace as a new order. */
 export async function saveOrderAction(input: NewOrder): Promise<ActionResult<Order>> {
   // Layouts don't wrap server-action POSTs — every action must check the role.
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     const order = await createOrder(input);
     revalidatePath("/host/orders");
@@ -57,7 +57,7 @@ export async function addDocumentAction(
   orderId: string,
   doc: Omit<OrderDocument, "id">,
 ): Promise<ActionResult<Order>> {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     const order = await addDocument(orderId, doc);
     revalidatePath("/host/orders");
@@ -72,7 +72,7 @@ export async function updateOrderAction(
   orderId: string,
   patch: OrderPatch,
 ): Promise<ActionResult<Order>> {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     const order = await updateOrder(orderId, patch);
     revalidatePath("/host/orders");
@@ -84,7 +84,7 @@ export async function updateOrderAction(
 }
 
 export async function getOrderAction(orderId: string): Promise<ActionResult<Order>> {
-  await requireAdmin("/");
+  await requireAppAccess("host");
   try {
     const order = await getOrderFresh(orderId);
     return order ? { ok: true, data: order } : failed(new Error("Order not found."));
@@ -104,7 +104,7 @@ export async function setOrderStatusAction(
 }
 
 export async function confirmHostingContractAction(orderId: string) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   const id = z.string().min(1).max(200).safeParse(orderId);
   if (!id.success) return failed(new Error("Choose a valid hosting order."));
 
@@ -177,7 +177,7 @@ export async function confirmHostingContractAction(orderId: string) {
 }
 
 export async function cancelHostingContractAction(orderId: string) {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   const id = z.string().min(1).max(200).safeParse(orderId);
   if (!id.success) return failed(new Error("Choose a valid hosting order."));
   const { data, error } = await createAdminClient().from("hosting_finance_orders")
@@ -202,7 +202,7 @@ const hostingPaymentSchema = z.object({
 });
 
 export async function recordHostingPaymentAction(input: z.infer<typeof hostingPaymentSchema>) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   const parsed = hostingPaymentSchema.safeParse(input);
   if (!parsed.success) return failed(new Error("Enter a valid payment date and amount."));
 
@@ -222,7 +222,7 @@ export async function recordHostingPaymentAction(input: z.infer<typeof hostingPa
 }
 
 export async function reverseHostingPaymentAction(paymentId: string) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   const id = z.string().uuid().safeParse(paymentId);
   if (!id.success) return failed(new Error("Choose a valid hosting payment."));
 
@@ -249,7 +249,7 @@ export async function undoHostingPaymentStatusAction(input: {
   kind: "revenue" | "fire_permit";
   paymentIds: string[];
 }) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   const parsed = z.object({
     orderId: z.string().min(1).max(200),
     kind: z.enum(["revenue", "fire_permit"]),
@@ -279,7 +279,7 @@ export async function setOrderNotesAction(
 }
 
 export async function deleteOrderAction(orderId: string): Promise<ActionResult<null>> {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   const finance = await createAdminClient().from("hosting_finance_orders")
     .select("order_id")
     .eq("order_id", orderId)

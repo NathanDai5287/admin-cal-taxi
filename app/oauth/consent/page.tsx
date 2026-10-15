@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 export const metadata = { title: "Connect an AI client" };
@@ -21,8 +21,8 @@ export default async function OAuthConsentPage({
     const next = `/oauth/consent?authorization_id=${encodeURIComponent(authorizationId)}`;
     redirect(`/reimbursements/login?next=${encodeURIComponent(next)}`);
   }
-  if (session.profile.role !== "admin") {
-    return <ConsentMessage title="Administrator access required">Only active administrators can connect app data.</ConsentMessage>;
+  if (!hasAppAccess(session, "connections", "write")) {
+    return <ConsentMessage title="Connection access required">You need write access to Connected AI clients.</ConsentMessage>;
   }
 
   const supabase = await createClient();
@@ -37,11 +37,11 @@ export default async function OAuthConsentPage({
       <section className="card">
         <div className="card-header">
           <span className="card-title">Connect {data.client.name}</span>
-          <span className="card-subtitle">Administrator access</span>
+          <span className="card-subtitle">Your app access</span>
         </div>
         <div className="card-body grid gap-5 border-t border-rule pt-5">
           <p className="m-0 text-[13.5px] leading-relaxed text-muted">
-            This client can read and change finance, reimbursement, and member records as you.
+            This client uses your current app permissions. It can change records only in apps where you have write access.
           </p>
           <dl className="grid gap-3 text-[13px]">
             <div><dt className="font-bold text-ink">Client</dt><dd className="mt-1 text-muted">{data.client.name}</dd></div>

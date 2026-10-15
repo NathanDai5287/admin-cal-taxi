@@ -1,9 +1,10 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import { notFound, redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const metadata = { title: { default: "Accreditation", template: "%s · Accreditation" } };
 
@@ -11,7 +12,7 @@ export default async function AccreditationLayout({ children }: { children: Reac
   if (!accreditationEnabled()) notFound();
   const session = await getSessionProfile();
   if (!session) redirect("/");
-  if (session.profile.role !== "admin") return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
+  if (!hasAppAccess(session, "accreditation")) return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
   return (
     <div data-brand className="accreditation-shell min-h-screen">
       <AppNav
@@ -24,7 +25,7 @@ export default async function AccreditationLayout({ children }: { children: Reac
           { href: "/accreditation/templates", label: "Templates" },
         ]}
       />
-      <main className="max-w-[1180px] mx-auto px-6 py-8">{children}</main>
+      <main className="max-w-[1180px] mx-auto px-6 py-8"><AppAccessBoundary access={session.appAccess.accreditation}>{children}</AppAccessBoundary></main>
     </div>
   );
 }

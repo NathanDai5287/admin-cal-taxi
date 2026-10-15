@@ -11,7 +11,7 @@
     "discord-bot": "node --env-file-if-exists=.env.local scripts/discord-bot.mjs",
     "test:accreditation": "node --test scripts/accreditation.test.mjs scripts/accreditation-chat.test.mjs scripts/accreditation-chat-dates.test.mjs scripts/accreditation-template-drafting.test.mjs scripts/accreditation-template-context.test.mjs",
     "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs scripts/dues-payments-database.test.mjs scripts/dues-payment-plans.test.mjs scripts/dues-payment-plans-database.test.mjs scripts/dues-balance-notes-database.test.mjs scripts/dues-scheduling-database.test.mjs",
-    "test:members": "node --test scripts/academic-calendar.test.mjs scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs",
+    "test:members": "node --test scripts/academic-calendar.test.mjs scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs scripts/managed-people-database.test.mjs scripts/invite-reconciliation.test.mjs",
     "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs scripts/manual-expense-receipt.test.mjs",
     "test:review": "node --test scripts/review-decisions.test.mjs scripts/completed-category-review.test.mjs scripts/completed-category-approval-database.test.mjs",
     "build": "next build",
@@ -23,7 +23,8 @@
     "test:venue": "node --test scripts/venue-inquiries.test.mjs",
     "test:mailing-list": "node --test scripts/mailing-list.test.mjs scripts/mailing-list-database.test.mjs scripts/mailing-list-actions.test.mjs",
     "test:nu-news": "node --test scripts/nu-news.test.mjs scripts/nu-news-database.test.mjs scripts/nu-news-mcp.test.mjs",
-    "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh"
+    "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh",
+    "test:access": "node --test scripts/app-access.test.mjs scripts/role-app-access-database.test.mjs scripts/mailing-list-actions.test.mjs scripts/nu-news-mcp.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",

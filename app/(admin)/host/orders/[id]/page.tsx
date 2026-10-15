@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { ButtonLink } from "@/components/brand/button";
 /**
  * /host/orders/[id] — a single archived rental.
@@ -20,7 +21,7 @@ import { listSigning, type SigningRevision } from "@/lib/host-signing";
 import OrderTimeline from "./OrderTimeline";
 import OrderSupportingDetails from "./OrderSupportingDetails";
 import { loadWorkflow, workflowDb } from "@/lib/host-workflow";
-import { hostEmailConfigured } from "@/lib/host-email";
+import { hostEmailConfigured, hostingReplyTo } from "@/lib/host-email";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import { hostingPlanFromOrder } from "@/lib/finance/hosting";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -40,6 +41,7 @@ export default async function OrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await requireAppAccess("host");
   const { id } = await params;
 
   if (!ordersConfigured()) {
@@ -94,6 +96,7 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
+  const replyTo = await hostingReplyTo();
   const status = deriveStatus(order);
   const workflow = await loadWorkflow(id);
   const planPreview = hostingPlanFromOrder(order);
@@ -117,8 +120,8 @@ export default async function OrderDetailPage({
     <div key={order.id} className="space-y-7">
       <OrderDetailHeader order={order} status={status} actions={
         <>
-          <WorkspaceActions order={order} />
-          {!signing.failed && !signing.revisions.some(r => !!r.envelope_id) && <DeleteOrderButton orderId={order.id} />}
+          {session.appAccess.host === "write" && <WorkspaceActions order={order} />}
+          {session.appAccess.host === "write" && !signing.failed && !signing.revisions.some(r => !!r.envelope_id) && <DeleteOrderButton orderId={order.id} />}
         </>
       } />
 
@@ -144,7 +147,7 @@ export default async function OrderDetailPage({
         today={today}
       />
 
-      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={process.env.HOST_EMAIL_REPLY_TO} signingUnavailable={signing.failed}
+      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
         depositPaid={depositPaid}
         rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}

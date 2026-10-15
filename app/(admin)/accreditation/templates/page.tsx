@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { Button } from "@/components/brand/button";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { startTemplateSubmission, uploadTemplate } from "../actions";
@@ -28,6 +29,7 @@ function displayStatus(template: Record<string, unknown>) {
 }
 
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ template?: string; family?: string; result?: string }> }) {
+  await requireAppAccess("accreditation");
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [familiesResult, templatesResult] = await Promise.all([

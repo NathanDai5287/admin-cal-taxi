@@ -1,65 +1,22 @@
-"use client";
-import { Button } from "@/components/brand/button";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
+import HostHome from "@/components/host/HostHome";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
+import { createClient } from "@/lib/reimbursements/supabase/server";
+import { personContactEmail } from "@/lib/people";
 
-import ContactsForm from "@/components/host/ContactsForm";
-import SharedDataForm from "@/components/host/SharedDataForm";
-import { StepIndicator, StepNav } from "@/components/host/StepNav";
-import { cleanClubs } from "@/lib/host-clubs";
-import { useSharedData } from "@/lib/host-shared-state";
-
-export default function HostHome() {
-  const { hydrated, data, clear } = useSharedData();
-
-  // Block forward progression until the renter is identified.
-  const ready =
-    hydrated && cleanClubs(data.clubs).length > 0 && data.eventDate.trim() !== "";
-
-  function handleClear() {
-    if (typeof window === "undefined") return;
-    if (window.confirm("Clear every saved field across the app? This cannot be undone.")) {
-      clear();
-    }
-  }
-
-  return (
-    <div className="space-y-10">
-      {/* ── Step indicator + page heading ── */}
-      <div>
-        <StepIndicator current="home" />
-        <h1 className="page-title mt-6">Event &amp; people</h1>
-        <p className="page-lede">
-          Add the organizations, their representatives, the event date, and guest count.
-          You can finish representative details before creating signing links.
-        </p>
-      </div>
-
-      <SharedDataForm />
-
-      <ContactsForm />
-
-      {!ready && hydrated && (
-        <p className="text-[12.5px] text-muted -mt-6">
-          Fill in at least one organization and the event date to continue.
-        </p>
-      )}
-
-      <StepNav current="home" nextDisabled={!ready} />
-
-      {/* ── Clear data — kept on this page only since it's the entry point ── */}
-      <div className="pt-2 flex items-center justify-between border-t border-rule">
-        <p className="text-[12px] text-muted max-w-md leading-relaxed pt-4">
-          Saved fields persist across reloads in your browser&rsquo;s local storage. Clearing wipes
-          contract drafts, pricing selections, and shared event details.
-        </p>
-        <Button
-          type="button"
-          onClick={handleClear}
-          disabled={!hydrated}
-          variant="text" className="mt-4 disabled:opacity-50"
-        >
-          Clear Saved Data
-        </Button>
-      </div>
-    </div>
-  );
+export default async function HostPage() {
+  await requireAppAccess("host");
+  const supabase = await createClient();
+  const { data, error } = await loadAllPages((from, to) => supabase.from("profiles")
+    .select("id, full_name, email, contact_email, phone, executive_roles")
+    .is("removed_at", null)
+    .order("full_name").order("id").range(from, to));
+  if (error) throw new Error("Unable to load hosting contacts.");
+  const contacts = data.map(person => ({
+    id: person.id,
+    name: person.full_name,
+    contact: personContactEmail(person) || person.phone,
+    executiveRoles: person.executive_roles,
+  }));
+  return <HostHome contacts={contacts} />;
 }

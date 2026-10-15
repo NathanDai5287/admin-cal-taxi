@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -33,6 +34,7 @@ export default async function ReportWorkspace({
   params: Promise<{ runId: string }>;
   searchParams: Promise<{ result?: string }>;
 }) {
+  await requireAppAccess("accreditation");
   const [{ runId }, query] = await Promise.all([params, searchParams]);
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs")

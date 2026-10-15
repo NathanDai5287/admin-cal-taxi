@@ -143,13 +143,13 @@ test("only administrators can read venue inquiries through browser database role
   await db.close();
 });
 
-test("server inquiry readers enforce administrator access", async () => {
+test("server inquiry readers enforce Host access", async () => {
   const source = await readFile(
     new URL("../lib/venue-inquiries.ts", import.meta.url),
     "utf8",
   );
 
-  assert.match(source, /listVenueInquiries[\s\S]+?await requireAdmin\("\/"\)/);
+  assert.match(source, /listVenueInquiries[\s\S]+?await requireAppAccess\("host"\)/);
 });
 
 test("public pages do not expose a nonexistent contact email", async () => {

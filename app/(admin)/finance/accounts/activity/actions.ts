@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { categoryValues } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -35,7 +35,7 @@ export async function addManualExpense(
   _previousState: ActivityActionState,
   formData: FormData,
 ): Promise<ActivityActionState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = manualExpenseSchema.safeParse({
     category: formData.get("category"),
     amount: formData.get("amount"),
@@ -80,7 +80,7 @@ export async function addManualExpense(
 }
 
 export async function deleteManualExpense(formData: FormData) {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
   const parsed = z.string().uuid().safeParse(formData.get("id"));
   if (!parsed.success) return { ok: false, message: "Choose a valid expense." } as const;
 
@@ -111,7 +111,7 @@ export async function addIncomeEntry(
   _previousState: ActivityActionState,
   formData: FormData,
 ): Promise<ActivityActionState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = incomeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionError("Enter a date, description, and positive amount.");
   const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
@@ -128,7 +128,7 @@ export async function addDonationForecast(
   _previousState: ActivityActionState,
   formData: FormData,
 ): Promise<ActivityActionState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = incomeSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return actionError("Enter a date, description, and positive amount.");
   const { error } = await createAdminClient().from("reimbursement_budget_entries").insert({
@@ -146,7 +146,7 @@ export async function addDonationForecast(
 }
 
 export async function deleteDonationForecast(formData: FormData) {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, message: "Choose a valid donation forecast." } as const;
   const { error } = await createAdminClient().from("reimbursement_budget_entries")
@@ -161,7 +161,7 @@ export async function deleteDonationForecast(formData: FormData) {
 }
 
 export async function deleteIncomeEntry(formData: FormData) {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
   const id = z.string().uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, message: "Choose a valid income entry." } as const;
   const { error } = await createAdminClient().from("reimbursement_budget_entries").delete().eq("id", id.data).eq("kind", "income");
@@ -175,7 +175,7 @@ export async function saveOpeningCash(
   _previousState: ActivityActionState,
   formData: FormData,
 ): Promise<ActivityActionState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const amount = z.coerce.number().min(0).max(999_999_999.99).safeParse(formData.get("openingCash"));
   if (!amount.success) return actionError("Unable to save opening cash. Check the amount and try again.");
   const { error } = await createAdminClient().from("chapter_financial_settings")

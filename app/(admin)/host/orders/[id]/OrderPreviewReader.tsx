@@ -57,7 +57,7 @@ export default function OrderPreviewReader({ email, emails, contacts = [], index
             {emails.length > 1 ? <label htmlFor={recipientId} className="pt-1 text-muted">To</label> : <span className="text-muted">To</span>}
             {emails.length > 1 ? <select id={recipientId} className="field-input !min-h-8 !py-1 !text-[12px]" value={index} disabled={busy} onChange={e => onIndex(Number(e.target.value))}>{emails.map((p, i) => <option key={p.id || p.recipient} value={i}>{recipientName(p.recipient)}{recipientName(p.recipient) !== p.recipient ? ` · ${p.recipient}` : ""}{p.status === "sent" ? " · already sent" : ""}</option>)}</select>
               : <ul aria-label="Email recipients" className="flex flex-wrap gap-x-2 gap-y-0.5">{email.recipient.split(", ").map((address, i, recipients) => <li key={address} title={address} className="[overflow-wrap:anywhere]"><span>{recipientName(address)}</span>{recipientName(address) !== address && <span className="sr-only"> &lt;{address}&gt;</span>}{i < recipients.length - 1 && <span className="text-muted">,</span>}</li>)}</ul>}
-            <span className="text-muted">Reply-to</span><p className="[overflow-wrap:anywhere]">{replyTo}</p>
+            <span className="text-muted">Reply-to</span><p className="[overflow-wrap:anywhere]">{email.replyTo ?? replyTo}</p>
             <span className="text-muted">Subject</span><p className="leading-relaxed text-muted [overflow-wrap:anywhere]">{email.subject}</p>
           </div>
         </>}

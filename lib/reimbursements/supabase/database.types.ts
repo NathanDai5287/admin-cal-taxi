@@ -1,3 +1,5 @@
+import type { ExecutiveRole, Membership } from "@/lib/people";
+
 export type Json =
   | string
   | number
@@ -9,6 +11,12 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      role_app_access: {
+        Row: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
+        Insert: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
+        Update: { access_level?: "none" | "read" | "write" };
+        Relationships: [];
+      };
       mailing_list_contacts: {
         Row: { id: string; first_name: string; last_name: string; email: string; phone: string; phone_digits: string; contact_key: string; created_at: string; updated_at: string };
         Insert: { id?: string; first_name: string; last_name?: string; email?: string; phone?: string };
@@ -416,6 +424,10 @@ export type Database = {
           id: string;
           full_name: string;
           email: string;
+          contact_email: string;
+          phone: string;
+          membership: Membership | null;
+          executive_roles: ExecutiveRole[];
           role: Database["public"]["Enums"]["app_role"];
           removed_at: string | null;
           has_signed_in: boolean;
@@ -427,6 +439,10 @@ export type Database = {
           id: string;
           full_name?: string;
           email?: string;
+          contact_email?: string;
+          phone?: string;
+          membership?: Membership | null;
+          executive_roles?: ExecutiveRole[];
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
@@ -435,8 +451,13 @@ export type Database = {
           created_at?: string;
         };
         Update: {
+          id?: string;
           full_name?: string;
           email?: string;
+          contact_email?: string;
+          phone?: string;
+          membership?: Membership | null;
+          executive_roles?: ExecutiveRole[];
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
@@ -621,6 +642,27 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_my_app_access: {
+        Args: Record<string, never>;
+        Returns: { app_key: string; access_level: "none" | "read" | "write" }[];
+      };
+      has_app_access: { Args: { app_key: string; required_access?: string }; Returns: boolean };
+      has_mcp_app_access: { Args: { app_key: string; required_access?: string }; Returns: boolean };
+      admin_set_role_app_access: {
+        Args: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
+        Returns: undefined;
+      };
+      admin_update_person: {
+        Args: {
+          target_user_id: string;
+          person_name: string;
+          person_contact_email: string;
+          person_phone: string;
+          person_membership: Membership | null;
+          person_executive_roles: ExecutiveRole[];
+        };
+        Returns: undefined;
+      };
       import_mailing_list_contacts: { Args: { contacts: Json }; Returns: number };
       mcp_create_reimbursement: {
         Args: {

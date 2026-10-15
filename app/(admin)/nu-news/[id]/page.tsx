@@ -5,14 +5,14 @@ import { FinalIssue } from "@/app/(admin)/nu-news/[id]/final-issue";
 import { IssueEditor } from "@/app/(admin)/nu-news/[id]/issue-editor";
 import { photoSources } from "@/lib/nu-news/issue";
 import { loadIssue, photoUrls } from "@/lib/nu-news/store";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 // The preview and finalize actions on this page use this limit. Each downloads the photos, makes the PDF, and uploads it.
 export const maxDuration = 60;
 
 export default async function NuNewsIssuePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAdmin("/");
+  await requireAppAccess("nu-news");
   const { id } = await params;
   const stored = z.uuid().safeParse(id).success ? await loadIssue(id) : null;
   if (!stored) notFound();

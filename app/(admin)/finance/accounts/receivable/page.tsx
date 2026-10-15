@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import type { Metadata } from "next";
 
 import { ChargeMembersForm } from "@/app/(admin)/finance/accounts/receivable/bulk-fee-form";
@@ -24,7 +24,7 @@ function currentPacificDate() {
 }
 
 export default async function DuesPage() {
-  await requireAdmin();
+  const session = await requireAppAccess("finance");
   const supabase = createAdminClient();
   const [receivablesResult, profilesResult, notesResult, paymentsResult] = await Promise.all([
     loadAllPages((from, to) => supabase
@@ -157,10 +157,10 @@ export default async function DuesPage() {
       </section>
 
       <DuesBoard rows={rows} today={today}>
-        <DuesLedger mode="manage" today={today} chargeForm={<ChargeMembersForm members={members} today={today} />} />
+        <DuesLedger mode={session.appAccess.finance === "write" ? "manage" : "view"} today={today} chargeForm={<ChargeMembersForm members={members} today={today} />} />
       </DuesBoard>
 
-      <DuesAnnouncement
+      {session.appAccess.finance === "write" && <DuesAnnouncement
         channelConfigured={Boolean(process.env.DISCORD_ANNOUNCEMENT_CHANNEL_ID?.trim())}
         recipients={outstandingRows
           .filter((row) => /^\d{15,22}$/.test(row.discordUserId))
@@ -171,7 +171,7 @@ export default async function DuesPage() {
             discordUserId: row.discordUserId,
           }))}
         unlinkedCount={outstandingRows.filter((row) => !/^\d{15,22}$/.test(row.discordUserId)).length}
-      />
+      />}
     </div>
   );
 }

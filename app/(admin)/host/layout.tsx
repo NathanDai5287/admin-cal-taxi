@@ -1,3 +1,4 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -5,7 +6,7 @@ import { AccessDenied } from "@/components/auth/access-denied";
 import Nav from "@/components/host/Nav";
 import { HostRouteRefresh } from "@/components/host/HostRouteRefresh";
 import { HostWorkspaceBoundary } from "@/lib/host-shared-state";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const metadata: Metadata = {
   title: "Host — cal.taxi admin",
@@ -29,8 +30,8 @@ export default async function HostLayout({
       <HostWorkspaceBoundary>
         <Nav />
         <main className="max-w-[1080px] mx-auto px-6 py-8">
-          {session.profile.role === "admin" ? (
-            children
+          {hasAppAccess(session, "host") ? (
+            <AppAccessBoundary access={session.appAccess.host}>{children}</AppAccessBoundary>
           ) : (
             <AccessDenied showSubmitLink={session.profile.role === "member"} />
           )}

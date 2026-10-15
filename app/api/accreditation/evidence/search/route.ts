@@ -7,7 +7,7 @@ import {
 } from "@/lib/accreditation/evidence-list";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ function json(body: unknown, status = 200) {
 export async function GET(request: Request) {
   if (!accreditationEnabled()) return json({ error: "Evidence is unavailable." }, 404);
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "admin") return json({ error: "Access denied." }, 403);
+  if (!session || !(hasAppAccess(session, "accreditation") || hasAppAccess(session, "ask-policy"))) return json({ error: "Access denied." }, 403);
 
   const params = new URL(request.url).searchParams;
   const parsed = searchSchema.safeParse({

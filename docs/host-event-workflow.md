@@ -43,13 +43,13 @@ Sent events enter the forecast automatically. An existing confirmed forecast kee
 
 ## Email setup and recovery
 
-The configured sender is `Theta Xi Hosting <host@cal.taxi>` with Reply-To `nathan.dai@berkeley.edu`. Domain verification and production environment configuration were completed during this implementation session. No actual setup emails were sent, so this is not evidence of live recipient delivery.
+The sender uses `HOST_EMAIL_FROM`. New messages use the current treasurer’s contact email from Users. Stored messages retain their original reply address.
 
 | Server variable | Purpose |
 | --- | --- |
 | `RESEND_API_KEY` | Server-only Resend API access. |
 | `HOST_EMAIL_FROM` | Verified sender; defaults to `Theta Xi Hosting <host@cal.taxi>`. |
-| `HOST_EMAIL_REPLY_TO` | Required reply destination. |
+| Treasurer in Users | Required contact email for new hosting messages. |
 | `HOST_BACKEND_ORIGIN`, `HOST_BACKEND_KEY` | Existing authenticated order, signing, and PDF archive. |
 | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` | Workflow database connection and server-only privileged access. |
 | `DOCUMENSO_WEBHOOK_SECRET` | Existing authenticated signing webhook. |

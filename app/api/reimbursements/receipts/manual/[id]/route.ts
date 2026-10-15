@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const [session, { id }] = await Promise.all([getSessionProfile(), params]);
-  if (!session || session.profile.role !== "admin") return new Response("Forbidden", { status: 403 });
+  if (!session || !hasAppAccess(session, "finance", "read")) return new Response("Forbidden", { status: 403 });
   if (!z.uuid().safeParse(id).success) return new Response("Not found", { status: 404 });
 
   const admin = createAdminClient();

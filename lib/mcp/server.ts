@@ -318,6 +318,8 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     }),
     annotations: { ...writeAnnotations, idempotentHint: true },
   }, async ({ receiptDataUrl, requestId, ...input }) => {
+    const permission = await supabase.rpc("has_mcp_app_access", { app_key: "finance", required_access: "write" });
+    if (permission.error || !permission.data) throw new Error("Finance write access is required.");
     const receiptPath = await storeMcpReceipt(receiptDataUrl, requestId);
     const { data, error } = await supabase.rpc("mcp_create_reimbursement", {
       p_member_id: input.memberId,
@@ -426,8 +428,10 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
 type NuNewsTarget = { issueId?: string; requestId?: string };
 
 async function authorizeNuNewsCall(supabase: Supabase, caller: McpCaller, toolName: string, { issueId, requestId }: NuNewsTarget) {
-  const { data: isMcpAdmin, error } = await supabase.rpc("is_mcp_admin");
-  if (error || !isMcpAdmin) throw new Error("An active administrator OAuth grant is required");
+  const readTools = ["list_nu_news_issues", "get_nu_news_issue", "get_nu_news_pdf_url"];
+  const requiredAccess = readTools.includes(toolName) ? "read" : "write";
+  const { data: allowed, error } = await supabase.rpc("has_mcp_app_access", { app_key: "nu-news", required_access: requiredAccess });
+  if (error || !allowed) throw new Error(`Nu News ${requiredAccess} access is required.`);
   const audit = await createAdminClient().from("mcp_audit_log").insert({
     user_id: caller.userId, client_id: caller.clientId, tool_name: toolName, target_id: issueId, request_id: requestId,
   });

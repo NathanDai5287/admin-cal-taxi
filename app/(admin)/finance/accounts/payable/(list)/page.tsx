@@ -2,14 +2,14 @@ import { ReimbursementPaymentTable } from "@/components/reimbursements/reimburse
 import { PreloadReceipts } from "@/components/reimbursements/preload-receipts";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatMoney } from "@/lib/reimbursements/format";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls";
 
 export const metadata = { title: "Accounts payable" };
 export const dynamic = "force-dynamic";
 export default async function PayablePage() {
-  await requireAdmin();
+  await requireAppAccess("finance");
   const supabase = createAdminClient();
   const { data, error } = await loadAllPages((from, to) => supabase.from("reimbursements")
     .select("id, user_id, full_name, amount, category, status, merchant, description, receipt_date, receipt_path, receipt_total, failure_reason, denial_reason, payment_method, reimbursed, submitted_at, updated_at")

@@ -10,7 +10,7 @@ function signingActions({ cancelledAt = null, statusOverride = null, orderExists
   const calls = [];
   const revision = { id: "revision_existing", order_id: "order_existing" };
   const modules = {
-    "@/lib/reimbursements/auth": { requireAdmin: async () => ({}) },
+    "@/lib/reimbursements/auth": { requireAppAccess: async () => ({}) },
     "@/lib/host-orders": { getOrderFresh: async () => orderExists ? { statusOverride } : null },
     "@/lib/host-workflow": { loadWorkflow: async () => ({ cancelledAt }), registerSigning: async () => {} },
     "@/lib/host-signing": {

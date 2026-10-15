@@ -20,7 +20,7 @@ export async function previewHostingEmailAction(input: EmailRequest) {
   const revision = data.revisions[input.orderId].find(r => r.id === input.revisionId)!;
   const payments = data.finance[input.orderId]?.payments.filter(p => !p.reversedAt) ?? [];
   const total = (kind: "revenue" | "deposit") => payments.filter(p => p.kind === kind).reduce((n,p) => n+p.amount,0);
-  const result: EmailPreview[] = hostingEmailDraft(order, revision, input.kind, total("revenue"), "nathan.dai@berkeley.edu", input.refund, total("deposit"))
+  const result: EmailPreview[] = hostingEmailDraft(order, revision, input.kind, total("revenue"), "hosting@example.test", input.refund, total("deposit"))
     .filter(p => p.recipient.includes(", ") || !input.recipients?.length || input.recipients.includes(p.recipient))
     .map(p => ({ ...p, id: crypto.randomUUID(), attachments: input.kind === "reminder" ? [] : ["illustrative-document.pdf"], status: "queued" }));
   const workflow = previewWorkflow(order.id); for (const row of result) workflow.deliveries.unshift({ id: row.id, revision_id: revision.id, kind: input.kind, recipient: row.recipient, status: "queued", sent_at: null, created_at: new Date().toISOString(), error: null });

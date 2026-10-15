@@ -1,4 +1,5 @@
 "use client";
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 import { Button, ButtonLink } from "@/components/brand/button";
 
 /**
@@ -62,6 +63,7 @@ function toNum(s: string): number | null {
 type GeneratedMap = Partial<Record<DocumentKind, Omit<OrderDocument, "id">>>;
 
 export default function DocumentsPage() {
+  const canWrite = useAppWriteAccess();
   const { hydrated, draftId, isCurrent, data, update, bulk, finishOrder } = useSharedData();
   const router = useRouter();
 
@@ -567,7 +569,7 @@ export default function DocumentsPage() {
             <Button
               type="button"
               onClick={() => { void saveAndFinish(); }}
-              disabled={saveBusy || !hydrated || !canSave}
+              disabled={!canWrite || saveBusy || !hydrated || !canSave}
               variant="secondary"
               compact
               className="min-w-0 flex-1 sm:flex-none"
