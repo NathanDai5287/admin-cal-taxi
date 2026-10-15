@@ -1,0 +1,19 @@
+.page { max-width: 1220px; margin: 0 auto; padding: clamp(32px, 5vw, 72px) clamp(20px, 4vw, 56px); color: var(--public-ink, #101014); }
+.heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 32px; border-bottom: 1px solid #d8d8db; }
+.heading h1 { font-size: clamp(44px, 7vw, 80px); font-weight: 750; letter-spacing: -.035em; line-height: 1; margin: 0 0 16px; }
+.heading p { margin: 0; font-size: 18px; }
+.download { display: inline-flex; align-items: center; justify-content: space-between; gap: 32px; padding: 18px 24px; min-height: 56px; color: white; background: #075985; font-weight: 650; text-decoration: none; }
+.download:hover { background: #063a58; }
+.download:focus-visible, .reader a:focus-visible { outline: 3px solid #075985; outline-offset: 4px; }
+.reader { margin-top: 32px; }
+.reader iframe { width: 100%; height: min(85vh, 1000px); min-height: 480px; border: 1px solid #d8d8db; background: #f5f5f7; }
+.reader p { font-size: 14px; line-height: 1.6; }
+.reader a { color: #075985; text-underline-offset: 3px; }
+.stories { max-width: 72ch; margin: 64px auto 0; line-height: 1.8; }
+.stories h2 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 24px; }
+.stories article { border-top: 1px solid #d8d8db; padding-top: 32px; margin-top: 40px; }
+.stories h3 { margin: 0; font-size: 26px; line-height: 1.3; font-weight: 650; }
+.byline { margin: 12px 0 24px; color: #606066; }
+.intro { font-weight: 650; }
+.text { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .download { width: 100%; } .reader iframe { min-height: 360px; height: 65vh; } .stories { margin-top: 40px; } }

@@ -20,6 +20,7 @@ import { MAX_MCP_PHOTO_MB } from "@/lib/mcp/nu-news-photo";
 import { decodeMcpReceipt } from "@/lib/mcp/receipt";
 import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
 import { listIssues } from "@/lib/nu-news/store";
+import { registerMailingTools } from "@/lib/mcp/mailing-list";
 
 type Supabase = import("@supabase/supabase-js").SupabaseClient<Database>;
 type McpCaller = { userId: string; clientId: string };
@@ -422,6 +423,14 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async ({ chargeIds, confirm }) => write(supabase, "bulk_set_charges_paid", { chargeIds }, { confirmed: confirm }));
 
   registerNuNewsTools(server, supabase, caller);
+  registerMailingTools(server, async (toolName, targetId) => {
+    const app = toolName === "publish_nu_news_link" ? "nu-news" : "mailing-list";
+    const level = ["list_mailing_lists", "get_mailing_list", "list_broadcasts", "get_broadcast", "get_broadcast_analytics"].includes(toolName) ? "read" : "write";
+    const { data: allowed, error } = await supabase.rpc("has_mcp_app_access", { app_key: app, required_access: level });
+    if (error || !allowed) throw new Error(`${app} ${level} access is required.`);
+    const audit = await createAdminClient().from("mcp_audit_log").insert({ user_id: caller.userId, client_id: caller.clientId, tool_name: toolName, target_id: targetId });
+    if (audit.error) throw new Error("The mailing list call could not be recorded.");
+  });
   return server;
 }
 

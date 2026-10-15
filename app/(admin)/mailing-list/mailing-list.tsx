@@ -80,7 +80,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
     }
   }
 
-  const pageHref = (value: number) => `/mailing-list?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(value) })}`;
+  const pageHref = (value: number) => `/mailing-list?${new URLSearchParams({ tab: "contacts", ...(search ? { q: search } : {}), page: String(value) })}`;
 
   return <div className="grid min-w-0 gap-6">
     <div className="flex flex-wrap items-end justify-between gap-4">
@@ -188,12 +188,13 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
     <section className="card min-w-0" aria-labelledby="contacts-title">
       <div className="card-header flex flex-wrap items-center justify-between gap-4"><h2 className="card-title" id="contacts-title">{search ? "Search results" : "Contacts"} <span className="ml-2 font-normal text-muted">{count.toLocaleString()}</span></h2>
         <form action="/mailing-list" className="flex w-full gap-2 sm:w-auto">
+          <input type="hidden" name="tab" value="contacts" />
           <label className="sr-only" htmlFor="contact-search">Search names, emails, or phone numbers</label>
           <input id="contact-search" name="q" type="search" className="field-input min-w-0 flex-1 sm:w-64" defaultValue={search} key={search} placeholder="Search name, email, phone" maxLength={100} />
           <Button type="submit" variant="secondary" compact>Search</Button>
         </form>
       </div>
-      {!contacts.length ? <div className="card-body border-t border-rule py-10"><p className="m-0 font-bold">{search ? "No contacts match your search." : "Your mailing list starts here."}</p><p className="mt-2 mb-0 text-sm text-muted">{search ? <Link href="/mailing-list" className="text-brand underline">Clear search</Link> : "Add a person above, or import a list to get started."}</p></div> : <>
+      {!contacts.length ? <div className="card-body border-t border-rule py-10"><p className="m-0 font-bold">{search ? "No contacts match your search." : "Your mailing list starts here."}</p><p className="mt-2 mb-0 text-sm text-muted">{search ? <Link href="/mailing-list?tab=contacts" className="text-brand underline">Clear search</Link> : "Add a person above, or import a list to get started."}</p></div> : <>
         <div className="table-scroll border-t border-rule"><table className="data-table"><caption className="sr-only">Mailing list contacts</caption>
           <thead><tr><th>First name</th><th>Last name</th><th>Email</th><th>Phone</th><th><span className="sr-only">Actions</span></th></tr></thead>
           <tbody>{contacts.map((contact) => <tr key={contact.id}>
@@ -203,7 +204,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
             <td>{removing === contact.id ? <div className="flex flex-wrap items-center gap-2"><span className="text-sm">Remove {contact.first_name}?</span><Button compact variant="danger" disabled={pending} onClick={() => run(async () => { const result = await deleteContact(contact.id); setNotice(result); if (result.ok) { setEmailExport(null); setCopyStatus(""); setRemoving(null); if (editing?.id === contact.id) { setEditing(null); setDraft(BLANK); } router.refresh(); } })}>Remove</Button><Button compact variant="secondary" disabled={pending} onClick={() => setRemoving(null)}>Keep</Button></div> : <div className="flex gap-2"><Button compact variant="secondary" disabled={!canWrite || pending} onClick={() => edit(contact)} aria-label={`Edit ${contact.first_name} ${contact.last_name}`}>Edit</Button><Button compact variant="text" disabled={!canWrite || pending} onClick={() => setRemoving(contact.id)} aria-label={`Remove ${contact.first_name} ${contact.last_name}`}>Remove</Button></div>}</td>
           </tr>)}</tbody>
         </table></div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule px-6 py-4 text-sm"><p className="m-0 tabular-nums">{((page - 1) * 50 + 1).toLocaleString()}–{Math.min(page * 50, count).toLocaleString()} of {count.toLocaleString()}{search && <> · <Link className="text-brand underline" href="/mailing-list">Clear search</Link></>}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule px-6 py-4 text-sm"><p className="m-0 tabular-nums">{((page - 1) * 50 + 1).toLocaleString()}–{Math.min(page * 50, count).toLocaleString()} of {count.toLocaleString()}{search && <> · <Link className="text-brand underline" href="/mailing-list?tab=contacts">Clear search</Link></>}</p>
           {pages > 1 && <nav aria-label="Contact pages" className="flex items-center gap-4">{page > 1 && <Link className="py-2 text-brand underline" href={pageHref(page - 1)}>Previous</Link>}<span className="tabular-nums">Page {page} of {pages}</span>{page < pages && <Link className="py-2 text-brand underline" href={pageHref(page + 1)}>Next</Link>}</nav>}
         </div>
       </>}

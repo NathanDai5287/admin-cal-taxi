@@ -11,10 +11,34 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      newsletter_events: {
+        Row: { id: number; issue_id: string; broadcast_id: string | null; kind: string; visitor_id: string; occurred_at: string };
+        Insert: { issue_id: string; broadcast_id?: string | null; kind: string; visitor_id: string };
+        Update: never;
+        Relationships: [];
+      };
       role_app_access: {
         Row: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
         Insert: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
         Update: { access_level?: "none" | "read" | "write" };
+        Relationships: [];
+      };
+      nu_news_publications: {
+        Row: { issue_id: string; published_at: string };
+        Insert: { issue_id: string };
+        Update: { issue_id?: string };
+        Relationships: [];
+      };
+      mailing_lists: {
+        Row: { id: string; name: string; recipients: Json; created_at: string; updated_at: string };
+        Insert: { id?: string; name: string; recipients: Json };
+        Update: { name?: string; recipients?: Json };
+        Relationships: [];
+      };
+      mailing_broadcasts: {
+        Row: { id: string; name: string; list_id: string | null; newsletter_id: string | null; subject: string; body: string; reply_to: string; postal_address: string; status: string; segment_id: string | null; import_id: string | null; resend_id: string | null; recipient_count: number; sender: string; error: string | null; created_at: string; updated_at: string; finalized_at: string | null };
+        Insert: { id?: string; name: string; list_id?: string | null; newsletter_id?: string | null; subject?: string; body?: string; reply_to?: string; postal_address?: string };
+        Update: { name?: string; list_id?: string | null; newsletter_id?: string | null; subject?: string; body?: string; reply_to?: string; postal_address?: string; status?: string; segment_id?: string | null; import_id?: string | null; resend_id?: string | null; recipient_count?: number; sender?: string; error?: string | null };
         Relationships: [];
       };
       mailing_list_contacts: {
