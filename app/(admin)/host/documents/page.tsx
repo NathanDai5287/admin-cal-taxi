@@ -19,7 +19,8 @@ import { StepIndicator, StepNav } from "@/components/host/StepNav";
 import { ApiCallError, downloadPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
 import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
-import { addDaysIso, formatDateISO, todayIso } from "@/lib/host-format";
+import { formatDateISO, todayIso } from "@/lib/host-format";
+import { paymentSchedule } from "@/lib/host-payment-schedule";
 import { orderSnapshot as snapshotFor } from "@/lib/host-order-snapshot";
 import { draftOrderVersion, setDraftOrderVersion } from "@/lib/host-draft-storage";
 import { useSharedData } from "@/lib/host-shared-state";
@@ -71,18 +72,19 @@ export default function DocumentsPage() {
     const finalNum = parseFloat(effective(data, "finalPrice"));
     return Number.isFinite(finalNum) && finalNum > 0 ? finalNum : breakdown?.total ?? 0;
   })();
+  const schedule = paymentSchedule(data);
   const eventDateReadable = data.eventDate ? formatDateISO(data.eventDate) : "";
 
   const [deposit, setDeposit] = useState<DepositFields>(() => ({
     amount: effective(data, "depositAmount"),
     issueDate: todayIso(),
-    dueDate: data.eventDate ? addDaysIso(data.eventDate, -7) : "",
+    dueDate: schedule.depositDueDate,
     invoiceNumber: "",
   }));
   const [rental, setRental] = useState<RentalFields>(() => ({
     items: buildLineItems(breakdown, rentalTarget, eventDateReadable),
     issueDate: todayIso(),
-    dueDate: data.eventDate ? addDaysIso(data.eventDate, 2) : "",
+    dueDate: schedule.rentalDueDate,
     invoiceNumber: "",
   }));
   const [creditMemo, setCreditMemo] = useState<CreditMemoFields>(() => ({
@@ -112,16 +114,15 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!hydrated || depositDueEdited || !data.eventDate) return;
-    const dueDate = addDaysIso(data.eventDate, -7);
+    const dueDate = schedule.depositDueDate;
     setDeposit(f => f.dueDate === dueDate ? f : { ...f, dueDate });
-  }, [hydrated, depositDueEdited, data.eventDate]);
+  }, [hydrated, depositDueEdited, data.eventDate, schedule.depositDueDate]);
 
-  // Rental: due date ← event date + 2 days.
   useEffect(() => {
     if (!hydrated || rentalDueEdited || !data.eventDate) return;
-    const computed = addDaysIso(data.eventDate, 2);
+    const computed = schedule.rentalDueDate;
     if (computed) setRental(f => f.dueDate === computed ? f : { ...f, dueDate: computed });
-  }, [hydrated, rentalDueEdited, data.eventDate]);
+  }, [hydrated, rentalDueEdited, data.eventDate, schedule.rentalDueDate]);
 
   // Rental: line items ← buildLineItems(live breakdown, negotiated total).
   // The breakdown is computed from the current guests + selections on every
@@ -605,6 +606,9 @@ export default function DocumentsPage() {
             eventDate={hydrated ? data.eventDate : ""}
             depositAmount={hydrated ? effective(data, "depositAmount") : ""}
             rentalAmount={hydrated ? Number(effectiveRentalPrice(data)) : 0}
+            depositDueDate={deposit.dueDate}
+            rentalDueDate={rental.dueDate}
+            rentalPaymentTiming={data.rentalPaymentTiming}
           />
         }
       >

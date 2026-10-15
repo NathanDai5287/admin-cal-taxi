@@ -30,7 +30,7 @@ await writeFile(path.join(output, "taxi-icon.png"), await readFile(path.join(roo
 await writeFile(path.join(output, "index.html"), '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Host: local preview</title><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
 const pdf = await PDFDocument.create(); const font = await pdf.embedFont(StandardFonts.Helvetica);
 let page = pdf.addPage([612, 792]);
-for (const [index, text] of ["LOCAL PREVIEW: illustrative contract PDF", "No live order or signing request is connected.", "Oct 16, 2026 event: rental fee $1,400; deposit $300.", "Deposit due Oct 9; rental fee due Oct 18.", "Theta Xi chapter signature: preserved when auto-sign is enabled.", "Production uses the approved generator PDF, not this sample."].entries()) page.drawText(text, { x: 45, y: 730 - index * 30, size: 12, font });
+for (const [index, text] of ["LOCAL PREVIEW: illustrative contract PDF", "No live order or signing request is connected.", "Oct 16, 2026 event: rental fee $1,400; deposit $300.", "Deposit due Oct 9; rental fee due Oct 15.", "Theta Xi chapter signature: preserved when auto-sign is enabled.", "Production uses the approved generator PDF, not this sample."].entries()) page.drawText(text, { x: 45, y: 730 - index * 30, size: 12, font });
 for (const name of ["Alex Rivera", "Jordan Chen", "Sam Patel", "Casey Morgan", "Taylor Lee"]) {
   page = pdf.addPage([612, 792]); page.drawText(`Representative: ${name}`, { x: 45, y: 720, size: 16, font });
   page.drawText("Signature: __________________________________", { x: 45, y: 610, size: 13, font });

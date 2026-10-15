@@ -6,7 +6,9 @@ import DocumentRow, { type RowState } from "@/components/host/DocumentRow";
 import DocumentsSection from "@/components/host/DocumentsSection";
 import { ApiCallError, downloadPdf, fetchStoredPdf, fetchGeneratedPdf, type PdfFile } from "@/lib/host-api";
 import { DOCUMENT_META, DOCUMENT_ORDER } from "@/lib/host-documents";
-import { addDaysIso, formatDateISO } from "@/lib/host-format";
+import { formatDateISO } from "@/lib/host-format";
+import { sharedStateFromSnapshot } from "@/lib/host-state-model";
+import { orderInvoiceDueDate } from "@/lib/host-payment-schedule";
 import { defaultDocuments } from "@/lib/host-order-documents";
 import { contractDownload, type StoredContractDownload } from "@/lib/host-contract-download";
 import type { DocumentKind, Order, OrderDocument } from "@/lib/host-orders-types";
@@ -195,7 +197,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
         {errors[kind] && <p role="status" className="mt-1 text-[12px] text-warn">{errors[kind]}</p>}
       </li>;
     })}</ul>
-    <div className="mt-3"><PaymentMessagePanel compact eventDate={order.eventDate} depositAmount={String(order.depositAmount ?? "")} rentalAmount={Number(order.rentalPrice ?? 0)} /></div>
+    <div className="mt-3"><PaymentMessagePanel compact eventDate={order.eventDate} depositAmount={String(order.depositAmount ?? "")} rentalAmount={Number(order.rentalPrice ?? 0)} depositDueDate={orderInvoiceDueDate(order, "deposit_invoice")} rentalDueDate={orderInvoiceDueDate(order, "rental_invoice")} rentalPaymentTiming={sharedStateFromSnapshot(order.snapshot).rentalPaymentTiming} /></div>
   </section>;
 
   return (
@@ -217,6 +219,9 @@ export default function OrderDocuments({ order, signingContract = null, signingL
         eventDate={order.eventDate}
         depositAmount={String(order.depositAmount ?? "")}
         rentalAmount={Number(order.rentalPrice ?? 0)}
+        depositDueDate={orderInvoiceDueDate(order, "deposit_invoice")}
+        rentalDueDate={orderInvoiceDueDate(order, "rental_invoice")}
+        rentalPaymentTiming={sharedStateFromSnapshot(order.snapshot).rentalPaymentTiming}
       />}
     >
       {DOCUMENT_ORDER.filter(kind => kind !== "contract").map((kind, index) => {
@@ -229,7 +234,7 @@ export default function OrderDocuments({ order, signingContract = null, signingL
           subtitle={DOCUMENT_META[kind].subtitle}
           state={stateFor(kind)}
           summary={rowSummary(kind, doc, order) ?? (kind === "credit_memo" ? fmtUSD(order.depositAmount ?? 0)
-            : `${fmtUSD(kind === "deposit_invoice" ? order.depositAmount ?? 0 : order.rentalPrice ?? 0)} · due ${formatDateISO(addDaysIso(order.eventDate, kind === "deposit_invoice" ? -7 : 2))}`)}
+            : `${fmtUSD(kind === "deposit_invoice" ? order.depositAmount ?? 0 : order.rentalPrice ?? 0)} · due ${formatDateISO(orderInvoiceDueDate(order, kind))}`)}
           onDownload={() => { void download(kind); }}
           busy={!!busy[kind]}
           error={errors[kind]}

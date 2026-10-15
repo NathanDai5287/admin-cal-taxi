@@ -48,7 +48,7 @@ export const DOCUMENT_META: Record<DocumentKind, DocumentMeta> = {
   rental_invoice: {
     kind: "rental_invoice",
     label: "Rental Payment Invoice",
-    subtitle: "Itemized, issued after the event",
+    subtitle: "Itemized, due under the hosting contract",
     endpoint: "/api/host/generate/invoice/rental",
   },
   credit_memo: {
@@ -132,6 +132,7 @@ export function buildContractPayload(
 
   return withClubs({
     date:       formatDateISO(d.eventDate),
+    rental_payment_timing: d.rentalPaymentTiming,
     start_time: d.startTime,
     end_time:   d.endTime,
     price:      effectiveRentalPrice(d),
@@ -160,6 +161,7 @@ export function buildDepositPayload(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = withClubs({
     event_date: formatDateISO(d.eventDate),
+    rental_payment_timing: d.rentalPaymentTiming,
     amount:     f.amount,
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
@@ -176,6 +178,7 @@ export function buildRentalPayload(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = withClubs({
     event_date: formatDateISO(d.eventDate),
+    rental_payment_timing: d.rentalPaymentTiming,
     issue_date: formatDateISO(f.issueDate),
     due_date:   formatDateISO(f.dueDate),
     line_items: f.items.map(it => ({ description: it.description, amount: it.amount })),

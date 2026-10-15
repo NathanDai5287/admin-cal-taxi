@@ -1,3 +1,4 @@
+import { orderInvoiceDueDate } from "./host-payment-schedule";
 import { hostingEmail } from "./host-email-template";
 import type { EmailKind } from "./host-event";
 import type { EmailPreview, EmailRequest } from "./host-email";
@@ -13,7 +14,7 @@ export function hostingEmailDraft(order: Order, revision: SigningRevision, kind:
   if (kind === "deposit_invoice" || kind === "rental_invoice" || kind === "deposit_receipt") {
     const emails = [...new Set(revision.recipients.filter(p => renters.has(p.email.toLowerCase())).map(p => p.email.toLowerCase()))];
     if (!emails.length) return [];
-    return [{ id: "", recipient: emails.join(", "), ...hostingEmail({ kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount: kind === "deposit_invoice" ? order.depositAmount ?? undefined : kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined, replyTo }), attachments: [], status: "draft" }];
+    return [{ id: "", recipient: emails.join(", "), ...hostingEmail({ kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceDueDate: kind === "deposit_receipt" ? undefined : orderInvoiceDueDate(order, kind), invoiceAmount: kind === "deposit_invoice" ? order.depositAmount ?? undefined : kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined, replyTo }), attachments: [], status: "draft" }];
   }
   return revision.recipients.filter(p => signing ? p.status !== "SIGNED" : kind === "completed" || renters.has(p.email.toLowerCase())).map(person => ({
     id: "", recipient: person.email, ...hostingEmail({ kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo }), attachments: [], status: "draft",

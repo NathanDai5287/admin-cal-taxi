@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { SharedState } from "@/lib/host-state-model";
 import { Button } from "@/components/brand/button";
-import { addDaysIso } from "@/lib/host-format";
 
 const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
 
@@ -22,6 +22,9 @@ type Props = {
   eventDate: string;
   depositAmount: string;
   rentalAmount: number;
+  depositDueDate: string;
+  rentalDueDate: string;
+  rentalPaymentTiming: SharedState["rentalPaymentTiming"];
   compact?: boolean;
 };
 
@@ -29,22 +32,26 @@ function paymentMessage({
   eventDate,
   depositAmount,
   rentalAmount,
+  depositDueDate,
+  rentalDueDate,
+  rentalPaymentTiming,
 }: Props): string | null {
   const deposit = Number(depositAmount);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) ||
       !Number.isFinite(deposit) || deposit <= 0 ||
       !Number.isFinite(rentalAmount) || rentalAmount <= 0) return null;
 
-  const depositDueDate = addDaysIso(eventDate, -7);
-  const rentalDueDate = addDaysIso(eventDate, 2);
+  const payments = [
+    { date: depositDueDate, text: `${shortDate(depositDueDate)}: ${money.format(deposit)} security deposit due.` },
+    { date: rentalDueDate, text: `${shortDate(rentalDueDate)}: ${money.format(rentalAmount)} full rental fee due.` },
+    { date: eventDate, text: `${shortDate(eventDate)}: Event at Theta Xi Fraternity House.` },
+  ].sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
 
   return [
     `Payment schedule for the ${shortDate(eventDate)} event:`,
     "",
-    `${shortDate(depositDueDate)}: ${money.format(deposit)} security deposit due, 7 days before the event.`,
-    `${shortDate(eventDate)}: Event at Theta Xi Fraternity House.`,
-    `${shortDate(rentalDueDate)}: ${money.format(rentalAmount)} full rental fee due, within 2 days after the event.`,
-    `Upon receipt of the full rental fee: The ${money.format(deposit)} security deposit is returned, subject to the hosting contract.`,
+    ...payments.map(payment => payment.text),
+    `${rentalPaymentTiming === "day_before" ? "After the event and receipt of the full rental fee" : "Upon receipt of the full rental fee"}: The ${money.format(deposit)} security deposit is returned, subject to the hosting contract.`,
     "",
     "Zelle: calthetaxi@gmail.com",
     "If you would prefer to pay by credit card or cash, please let us know.",
