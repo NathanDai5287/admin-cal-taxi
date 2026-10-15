@@ -5,6 +5,9 @@
 Internal Next.js tools for cal.taxi, including rush administration, hosting documents,
 and chapter finances.
 
+**[Mailing List](docs/mailing-list.md):** shared admin contact records, quick entry,
+search, editing, and CSV / pasted spreadsheet imports at `/mailing-list`.
+
 ## Sites
 
 - `admin.cal.taxi` — the internal tools. `/host`, `/rush`, `/finance`, and `/users` all require sign-in with a profile whose role

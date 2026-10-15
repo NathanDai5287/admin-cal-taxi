@@ -41,6 +41,11 @@ const ADMIN_APPS = [
     description: "Semester newsletter: writing, photos, previews, and the final PDF",
   },
   {
+    href: "/mailing-list",
+    label: "Mailing List",
+    description: "Contact records, quick entry, and CSV or spreadsheet imports",
+  },
+  {
     href: "/users",
     label: "Members & invites",
     description: "Invite members and manage who has access",

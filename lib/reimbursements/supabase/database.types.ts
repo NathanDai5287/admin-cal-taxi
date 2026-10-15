@@ -9,6 +9,12 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      mailing_list_contacts: {
+        Row: { id: string; first_name: string; last_name: string; email: string; phone: string; phone_digits: string; contact_key: string; created_at: string; updated_at: string };
+        Insert: { id?: string; first_name: string; last_name?: string; email?: string; phone?: string };
+        Update: { first_name?: string; last_name?: string; email?: string; phone?: string };
+        Relationships: [];
+      };
       academic_years: {
         Row: {
           id: string;
@@ -615,6 +621,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      import_mailing_list_contacts: { Args: { contacts: Json }; Returns: number };
       mcp_create_reimbursement: {
         Args: {
           p_member_id: string;
