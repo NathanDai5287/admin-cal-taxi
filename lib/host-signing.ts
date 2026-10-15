@@ -25,6 +25,7 @@ export type SigningRevision = {
   files: { original: boolean; completed: boolean; audit: boolean };
   error: string | null;
   created_at: string;
+  rentalPaymentTiming?: "day_before" | "after_conclusion";
 };
 
 export type SigningActivation = {
@@ -66,6 +67,9 @@ export async function prepareSigning(orderId: string, payload: Record<string, un
   const result = await call<{ revision: SigningRevision }>(`${base(orderId)}/prepare`, {
     method: "POST", body: { payload, requestKey, expectedLatestRevisionId },
   });
+  if (payload.rental_payment_timing === "day_before" && result.revision.rentalPaymentTiming !== "day_before") {
+    throw new Error("The contract generator needs its payment-deadline update before new contracts can be prepared. No signing links were created.");
+  }
   return result.revision;
 }
 

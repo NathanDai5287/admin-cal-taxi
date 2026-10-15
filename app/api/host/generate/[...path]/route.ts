@@ -48,12 +48,18 @@ export async function POST(
     return NextResponse.json({ error: "backend_not_configured" }, { status: 500 });
   }
 
+  const body = await request.text();
+  let requiresNewDeadline = false;
+  if (path.join("/") === "contract") {
+    try { requiresNewDeadline = JSON.parse(body).rental_payment_timing === "day_before"; }
+    catch { return NextResponse.json({ error: "invalid_input" }, { status: 400 }); }
+  }
   let upstream: Response;
   try {
     upstream = await fetch(`${origin}/api/generate/${path.join("/")}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Admin-Key": key },
-      body: await request.text(),
+      body,
       cache: "no-store",
       // Typst compiles can take a while, but not forever.
       signal: AbortSignal.timeout(120_000),
@@ -61,6 +67,11 @@ export async function POST(
   } catch (err) {
     console.error("host generate proxy upstream failure:", err);
     return NextResponse.json({ error: "backend_unreachable" }, { status: 502 });
+  }
+
+  if (upstream.ok && requiresNewDeadline && upstream.headers.get("x-rental-payment-timing") !== "day_before") {
+    await upstream.body?.cancel();
+    return NextResponse.json({ error: "payment_terms_unavailable", detail: "The contract generator needs its payment-deadline update before new contracts can be generated." }, { status: 502 });
   }
 
   // Pass the PDF (or JSON error) through, preserving the download filename.

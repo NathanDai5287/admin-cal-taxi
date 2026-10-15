@@ -4,7 +4,7 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNod
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { formatDateISO } from "@/lib/host-format";
-import { orderInvoiceDueDate, orderPaymentSchedule } from "@/lib/host-payment-schedule";
+import { orderInvoiceDueDate, orderPaymentSchedule, formatRentalDeadline } from "@/lib/host-payment-schedule";
 import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
 import type { EmailPreview } from "@/lib/host-email";
 import type { SigningRevision } from "@/lib/host-signing";
@@ -186,7 +186,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const activity = workflow.deliveries.filter(d => d.status !== "queued");
   const unsentCount = previews.filter(p => p.status !== "sent").length;
   const rentalBeforeEvent = schedule.rentalDueDate < order.eventDate;
-  const rentalContractDate = formatDateISO(schedule.rentalDueDate);
+  const rentalContractDate = formatRentalDeadline(schedule.rentalDueDate, representatives.rentalPaymentTiming);
   const rentalDeadline = rentalContractDate === rentalInvoiceDate ? `Due ${rentalContractDate}` : `Contract due ${rentalContractDate} · Invoice due ${rentalInvoiceDate}`;
   const rentalMilestones = <>
     <Milestone title="Send rental invoice" detail={rentalDeadline} done={delivered("rental_invoice")}>

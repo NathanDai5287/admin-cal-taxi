@@ -116,10 +116,11 @@ test("new and existing contracts retain their own payment dates across the hosti
     const saved = { ...order, eventDate: terms.eventDate, snapshot: orderSnapshot(terms) };
     const baseline = JSON.stringify(saved);
     const payloads = defaultDocuments(saved).payloads;
-    assert.equal(payloads.rental_invoice.due_date, expectedDate);
+    assert.equal(payloads.rental_invoice.due_date, beforeEvent ? `${expectedDate} at 11:59 p.m. Pacific Time` : expectedDate);
     assert.equal(payloads.contract.rental_payment_timing, terms.rentalPaymentTiming);
     const summary = renderToStaticMarkup(createElement(AgreementSummary, { data: terms }));
     assert.ok(summary.includes(expectedDate));
+    assert.equal(summary.includes("11:59 p.m. Pacific Time"), beforeEvent);
     const timeline = renderToStaticMarkup(createElement(OrderTimeline, { ...props, order: saved }));
     assert.ok(timeline.includes(expectedDate));
     assert.equal(timeline.indexOf("Send rental invoice") < timeline.indexOf("Event held"), beforeEvent);
@@ -128,6 +129,7 @@ test("new and existing contracts retain their own payment dates across the hosti
     const schedule = paymentSchedule(terms);
     const message = renderToStaticMarkup(createElement(PaymentMessagePanel, { eventDate: terms.eventDate, depositAmount: "300", rentalAmount: 1400, depositDueDate: schedule.depositDueDate, rentalDueDate: schedule.rentalDueDate, rentalPaymentTiming: terms.rentalPaymentTiming }));
     assert.equal(message.includes("After the event and receipt"), beforeEvent);
+    assert.equal(message.includes("11:59 p.m. Pacific Time"), beforeEvent);
     assert.equal(message.indexOf("full rental fee due") < message.indexOf("Event at Theta Xi"), beforeEvent);
     assert.equal(JSON.stringify(saved), baseline);
   }

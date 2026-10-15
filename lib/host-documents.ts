@@ -9,6 +9,7 @@
  */
 
 import { formatDateISO } from "./host-format";
+import { formatRentalDeadline } from "./host-payment-schedule";
 import { effective, effectiveRentalPrice } from "./host-derive";
 import { cleanClubs, clubsDisplay, normalizeOrgName } from "./host-clubs";
 import type { LineItem } from "@/components/host/LineItemList";
@@ -180,7 +181,7 @@ export function buildRentalPayload(
     event_date: formatDateISO(d.eventDate),
     rental_payment_timing: d.rentalPaymentTiming,
     issue_date: formatDateISO(f.issueDate),
-    due_date:   formatDateISO(f.dueDate),
+    due_date:   formatRentalDeadline(f.dueDate, d.rentalPaymentTiming),
     line_items: f.items.map(it => ({ description: it.description, amount: it.amount })),
   }, d);
   body.invoice_number = f.invoiceNumber || mintContractNumber(cleanClubs(d.clubs)[0] ?? "partner", d.eventDate).replace(/^CTR-/, "RNT-");

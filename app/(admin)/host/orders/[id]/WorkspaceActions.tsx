@@ -16,6 +16,8 @@ import { Button } from "@/components/brand/button";
 
 import { beginDraft } from "@/lib/host-draft-storage";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
+import { contractDraftPaymentTiming } from "@/lib/host-payment-schedule";
+import { listSigningAction } from "../../documents/signing-actions";
 export { sharedStateFromSnapshot } from "@/lib/host-state-model";
 
 import { useState } from "react";
@@ -69,12 +71,20 @@ export default function WorkspaceActions({
     return next;
   }
 
-  function loadIntoWorkspace() {
+  async function loadIntoWorkspace() {
     const ok = window.confirm(
       "Edit this order in a separate draft? Changes are saved only when you select Save changes or approve new signing links. Existing signing links stay active during preview.",
     );
     if (!ok) return;
     const next = stateFromOrder();
+    setBusy("load");
+    setError("");
+    try { next.rentalPaymentTiming = contractDraftPaymentTiming(order, await listSigningAction(order.id)); }
+    catch {
+      setBusy(null);
+      setError("Could not verify this contract’s payment terms. Retry opening the order.");
+      return;
+    }
     openWorkspace({
       ...next,
       currentOrderId: order.id,

@@ -43,7 +43,7 @@ function paymentMessage({
 
   const payments = [
     { date: depositDueDate, text: `${shortDate(depositDueDate)}: ${money.format(deposit)} security deposit due.` },
-    { date: rentalDueDate, text: `${shortDate(rentalDueDate)}: ${money.format(rentalAmount)} full rental fee due.` },
+    { date: rentalDueDate, text: `${shortDate(rentalDueDate)}${rentalPaymentTiming === "day_before" ? " at 11:59 p.m. Pacific Time" : ""}: ${money.format(rentalAmount)} full rental fee due.` },
     { date: eventDate, text: `${shortDate(eventDate)}: Event at Theta Xi Fraternity House.` },
   ].sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
 

@@ -11,11 +11,13 @@ export default function RentalPanel({
   onReset,
   totalDescription,
   resets,
+  deadlineHint,
 }: {
   fields: RentalFields;
   onChange: (patch: Partial<RentalFields>) => void;
   onReset: () => void;
   totalDescription: string;
+  deadlineHint?: string;
   /** Per-field reset callbacks; a set callback means the field is pinned. */
   resets?: { dueDate?: () => void };
 }) {
@@ -35,6 +37,7 @@ export default function RentalPanel({
             value={fields.dueDate}
             onChange={e => onChange({ dueDate: e.target.value })}
           />
+          {deadlineHint && <p className="field-hint">{deadlineHint}</p>}
         </Field>
       </div>
 

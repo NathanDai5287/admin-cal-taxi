@@ -20,7 +20,7 @@ import { ApiCallError, downloadPdf, fetchGeneratedPdf, type PdfFile } from "@/li
 import { effective, effectiveRentalPrice, liveBreakdown } from "@/lib/host-derive";
 import { cleanClubs, clubsDisplay } from "@/lib/host-clubs";
 import { formatDateISO, todayIso } from "@/lib/host-format";
-import { paymentSchedule } from "@/lib/host-payment-schedule";
+import { paymentSchedule, formatRentalDeadline } from "@/lib/host-payment-schedule";
 import { orderSnapshot as snapshotFor } from "@/lib/host-order-snapshot";
 import { draftOrderVersion, setDraftOrderVersion } from "@/lib/host-draft-storage";
 import { useSharedData } from "@/lib/host-shared-state";
@@ -519,7 +519,7 @@ export default function DocumentsPage() {
 
   const rentalTotal = lineItemsTotal(rental.items);
   const rentalSummary = rentalTotal > 0
-    ? `$${rentalTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${rental.dueDate ? ` · due ${formatDateISO(rental.dueDate)}` : ""}`
+    ? `$${rentalTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${rental.dueDate ? ` · due ${formatRentalDeadline(rental.dueDate, data.rentalPaymentTiming)}` : ""}`
     : undefined;
 
   const creditMemoSummary = creditMemo.amount
@@ -655,7 +655,8 @@ export default function DocumentsPage() {
           downloadVariant="secondary"
           grouped
         >
-          <RentalPanel
+            <RentalPanel
+              deadlineHint={data.rentalPaymentTiming === "day_before" ? "Payment is due at 11:59 p.m. Pacific Time on this date." : undefined}
             fields={rental}
             onChange={patch => {
               if (patch.dueDate !== undefined) setRentalDueEdited(true);

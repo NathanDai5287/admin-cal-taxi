@@ -5,6 +5,23 @@ import type { Order, OrderDocument } from "./host-orders-types";
 type EventTerms = Pick<SharedState, "eventDate" | "startTime" | "endTime" | "rentalPaymentTiming">;
 type InvoiceKind = "deposit_invoice" | "rental_invoice";
 
+export function formatRentalDeadline(date: string, timing: SharedState["rentalPaymentTiming"]): string {
+  const formatted = formatDateISO(date);
+  return timing === "day_before" && !formatted.includes("11:59")
+    ? `${formatted || "the day before the event"} at 11:59 p.m. Pacific Time` : formatted;
+}
+
+/** Adopt the new policy only while an agreement is still an unissued draft. */
+export function contractDraftPaymentTiming(
+  order: Pick<Order, "snapshot" | "documents">,
+  revisions?: { state: string; envelope_id: string | null }[],
+): SharedState["rentalPaymentTiming"] {
+  const saved = sharedStateFromSnapshot(order.snapshot).rentalPaymentTiming;
+  if (saved === "day_before" || !revisions || order.documents.some(document => document.kind === "contract") ||
+      revisions.some(revision => revision.envelope_id || !["preview", "failed", "cancelled"].includes(revision.state))) return saved;
+  return "day_before";
+}
+
 function minutesAfterMidnight(time: string) {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
@@ -30,5 +47,6 @@ export function orderInvoiceDueDate(order: Order, kind: InvoiceKind): string {
     .reduce<OrderDocument | null>((latest, document) => !latest || document.generatedAt > latest.generatedAt ? document : latest, null);
   if (typeof invoice?.payload.due_date === "string" && invoice.payload.due_date) return invoice.payload.due_date;
   const schedule = orderPaymentSchedule(order);
-  return formatDateISO(kind === "deposit_invoice" ? schedule.depositDueDate : schedule.rentalDueDate);
+  return kind === "deposit_invoice" ? formatDateISO(schedule.depositDueDate)
+    : formatRentalDeadline(schedule.rentalDueDate, sharedStateFromSnapshot(order.snapshot).rentalPaymentTiming);
 }

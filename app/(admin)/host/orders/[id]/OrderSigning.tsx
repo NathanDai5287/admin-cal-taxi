@@ -7,12 +7,14 @@ import { EMPTY_STATE, type SharedState } from "@/lib/host-shared-state";
 import type { Order } from "@/lib/host-orders-types";
 import type { SigningRevision } from "@/lib/host-signing";
 import WorkspaceActions, { sharedStateFromSnapshot } from "./WorkspaceActions";
+import { contractDraftPaymentTiming } from "@/lib/host-payment-schedule";
 
-function signingDraft(order: Order): SharedState {
+function signingDraft(order: Order, revisions?: SigningRevision[]): SharedState {
   const saved = sharedStateFromSnapshot(order.snapshot);
   const contract = order.documents.find(document => document.kind === "contract");
   return {
     ...saved,
+    rentalPaymentTiming: contractDraftPaymentTiming(order, revisions),
     clubs: saved.clubs.length ? saved.clubs : [order.clubName],
     contractPresign: typeof order.snapshot.contractPresign === "boolean" ? saved.contractPresign : contract?.payload.sign === true,
     eventDate: order.eventDate,
@@ -29,7 +31,7 @@ export default function OrderSigning({ order, revisions, reviewContract = false,
   reviewContract?: boolean;
   onApproved?: () => void;
 }) {
-  const [data, setData] = useState<SharedState>(() => signingDraft(order));
+  const [data, setData] = useState<SharedState>(() => signingDraft(order, revisions));
   const [stale, setStale] = useState(false);
   const version = useRef(order.updatedAt);
   const savedSnapshot = useRef(JSON.stringify(order.snapshot));
