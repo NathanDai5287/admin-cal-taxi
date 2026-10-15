@@ -11,7 +11,7 @@ export const contactSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required.").max(100, "First name must be 100 characters or fewer."),
   last_name: z.string().trim().max(100, "Last name must be 100 characters or fewer."),
   email: z.string().trim().toLowerCase().max(254).refine((value) => !value || z.email().safeParse(value).success, "Enter a valid email address."),
-  phone: z.string().trim().max(60).refine((value) => !value || (/^[+()\d\s.\-xext#]+$/i.test(value) && value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 20), "Enter a valid phone number, including area code."),
+  phone: z.string().trim().max(60).default("").refine((value) => !value || (/^[+()\d\s.\-xext#]+$/i.test(value) && value.replace(/\D/g, "").length >= 7 && value.replace(/\D/g, "").length <= 20), "Enter a valid phone number, including area code."),
 }).refine((value) => value.email || value.phone, { message: "Add an email address or phone number.", path: ["email"] });
 
 export function contactKey(contact: ContactInput) {

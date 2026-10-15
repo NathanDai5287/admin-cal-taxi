@@ -4,9 +4,21 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { contactSchema, MAX_IMPORT_ROWS, type ContactInput } from "@/lib/mailing-list/contacts";
 import { requireAdmin } from "@/lib/reimbursements/auth";
+import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
 type Result = { ok: boolean; message: string };
+
+export async function exportContactEmails(): Promise<{ ok: true; emails: string; count: number } | { ok: false; message: string }> {
+  await requireAdmin("/");
+  const client = createAdminClient();
+  // Export the whole mailing list, independent of the table's search and pagination.
+  const { data, error } = await loadAllPages((from, to) => client.from("mailing_list_contacts")
+    .select("email").neq("email", "").order("email").order("id").range(from, to));
+  if (error) return { ok: false, message: "Email addresses could not be exported. Please try again." };
+  const emails = [...new Set(data.map((contact) => contact.email.trim().toLowerCase()).filter(Boolean))];
+  return { ok: true, emails: emails.join(", "), count: emails.length };
+}
 
 export async function saveContact(input: ContactInput, id?: string): Promise<Result> {
   await requireAdmin("/");

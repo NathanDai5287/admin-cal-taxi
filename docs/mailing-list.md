@@ -5,9 +5,18 @@ Contacts are shared, persistent records separate from member accounts and invita
 Adding a contact does not create an account or send a message.
 
 Use **Add a person** for quick entry. First name and either email or phone are required;
-last name is optional. Successful saves clear the form for the next person. Use **Edit**
+last name is optional. Phone is optional when an email address is provided, including
+in imports with no phone column. Successful saves clear the form for the next person. Use **Edit**
 to change details, or **Remove** and confirm the specific contact to delete it.
 Search by name, email, or phone. The list displays 50 contacts per page.
+
+## Export email addresses
+
+Select **Export all emails**, then **Copy all emails**. The export includes unique,
+nonempty email addresses from the entire mailing list, regardless of the current search
+or page. Addresses are separated by commas for pasting into Gmail's **To**, **Cc**, or
+**Bcc** field. Contacts without email are skipped. If automatic clipboard access is
+unavailable, select the output and use your browser's Copy command.
 
 ## Bulk import
 

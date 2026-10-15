@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, useTransition, type FormEvent } from "react"
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { CONTACT_FIELDS, MAX_IMPORT_BYTES, guessColumns, parseContactText, previewContacts, type ColumnMap, type Contact, type ContactInput } from "@/lib/mailing-list/contacts";
-import { deleteContact, importContacts, saveContact } from "./actions";
+import { deleteContact, exportContactEmails, importContacts, saveContact } from "./actions";
 
 const LABELS = { first_name: "First name", last_name: "Last name", email: "Email", phone: "Phone" };
 const BLANK: ContactInput = { first_name: "", last_name: "", email: "", phone: "" };
@@ -19,6 +19,10 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
   const [removing, setRemoving] = useState<string | null>(null);
   const [draft, setDraft] = useState<ContactInput>(BLANK);
   const firstName = useRef<HTMLInputElement>(null);
+  const emailOutput = useRef<HTMLTextAreaElement>(null);
+  const [emailExport, setEmailExport] = useState<{ emails: string; count: number } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [source, setSource] = useState("");
   const [fileName, setFileName] = useState("");
@@ -42,6 +46,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
       const result = await saveContact(draft, editing?.id);
       setNotice(result);
       if (result.ok) {
+        setEmailExport(null); setCopyStatus("");
         setDraft(BLANK); setEditing(null); router.refresh();
         requestAnimationFrame(() => firstName.current?.focus());
       }
@@ -61,13 +66,50 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
     } catch (error) { setRows(null); setImportError(error instanceof Error ? error.message : "This list could not be read."); }
   }
 
+  async function copyEmails() {
+    if (!emailExport?.emails) return;
+    try {
+      await navigator.clipboard.writeText(emailExport.emails);
+      setCopyStatus("Email addresses copied. Paste them into Gmail’s To, Cc, or Bcc field.");
+    } catch {
+      emailOutput.current?.focus(); emailOutput.current?.select();
+      setCopyStatus("Automatic copy is unavailable. Use your browser’s Copy command to copy the selected addresses.");
+    }
+  }
+
   const pageHref = (value: number) => `/mailing-list?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(value) })}`;
 
   return <div className="grid min-w-0 gap-6">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h1 className="page-title">Mailing List</h1><p className="page-lede">Keep your contacts together. Add one person or bring in a whole list.</p></div>
-      <Button variant="secondary" aria-expanded={showImport} aria-controls="contact-import" onClick={() => setShowImport(!showImport)} disabled={pending}>{showImport ? "Close import" : "Import contacts"}</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" aria-expanded={emailExport !== null} aria-controls="email-export" disabled={pending} onClick={() => {
+          if (emailExport) { setEmailExport(null); setCopyStatus(""); return; }
+          run(async () => {
+            setExporting(true); setCopyStatus("");
+            try {
+              const result = await exportContactEmails();
+              if (result.ok) { setEmailExport(result); requestAnimationFrame(() => emailOutput.current?.focus()); }
+              else setNotice(result);
+            } finally { setExporting(false); }
+          });
+        }}>{exporting ? "Loading emails…" : emailExport ? "Close export" : "Export all emails"}</Button>
+        <Button variant="secondary" aria-expanded={showImport} aria-controls="contact-import" onClick={() => setShowImport(!showImport)} disabled={pending}>{showImport ? "Close import" : "Import contacts"}</Button>
+      </div>
     </div>
+
+    {emailExport && <section className="card" id="email-export" aria-labelledby="email-export-title">
+      <div className="card-header"><h2 className="card-title" id="email-export-title">All email addresses <span className="ml-2 font-normal text-muted">{emailExport.count.toLocaleString()}</span></h2></div>
+      <div className="card-body grid gap-4 border-t border-rule pt-5">
+        {emailExport.count ? <>
+          <p className="m-0 text-sm text-muted" id="email-export-help">Includes every email address on the mailing list, across all pages and searches. Addresses are separated by commas, ready to paste into Gmail’s To, Cc, or Bcc field. Contacts without email are skipped.</p>
+          <label className="sr-only" htmlFor="email-export-output">Comma-separated email addresses</label>
+          <textarea id="email-export-output" ref={emailOutput} className="field-input min-h-32 w-full resize-y" rows={5} readOnly value={emailExport.emails} aria-describedby="email-export-help" onFocus={(event) => event.currentTarget.select()} />
+          <div><Button disabled={pending} onClick={copyEmails}>Copy all emails</Button></div>
+          <p className="helper-text m-0" role="status">{copyStatus}</p>
+        </> : <p className="m-0 text-sm text-muted">No email addresses to export yet. Add an email address to a contact, then export again.</p>}
+      </div>
+    </section>}
 
     <div aria-live="polite" aria-atomic="true">
       {notice && <p className={`m-0 border border-rule px-4 py-3 text-sm ${notice.ok ? "bg-brand-light text-ink" : "text-warn"}`} role={notice.ok ? "status" : "alert"}>{notice.message}</p>}
@@ -78,13 +120,13 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
       <form onSubmit={submitContact} className="card-body border-t border-rule pt-5">
         <fieldset disabled={pending} className="m-0 grid min-w-0 gap-4 border-0 p-0 sm:grid-cols-2 lg:grid-cols-4">
           {CONTACT_FIELDS.map((field) => <div className="field min-w-0" key={field}>
-            <label className="field-label" htmlFor={`contact-${field}`}>{LABELS[field]}{field === "last_name" && <span className="font-normal normal-case tracking-normal text-muted"> (optional)</span>}</label>
+            <label className="field-label" htmlFor={`contact-${field}`}>{LABELS[field]}{(field === "last_name" || field === "phone") && <span className="font-normal normal-case tracking-normal text-muted"> (optional)</span>}</label>
             <input ref={field === "first_name" ? firstName : undefined} id={`contact-${field}`} name={field} className="field-input w-full min-w-0" type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} autoComplete={field === "first_name" ? "given-name" : field === "last_name" ? "family-name" : field === "phone" ? "tel" : "email"} required={field === "first_name"} maxLength={field === "email" ? 254 : field === "phone" ? 60 : 100} value={draft[field]} onChange={(event) => setDraft({ ...draft, [field]: event.target.value })} aria-describedby="contact-entry-help" />
           </div>)}
           <div className="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-4">
             <Button type="submit" disabled={pending}>{pending ? "Saving…" : editing ? "Save changes" : "Add person"}</Button>
             {editing && <Button variant="secondary" onClick={() => { setEditing(null); setDraft(BLANK); }} disabled={pending}>Cancel edit</Button>}
-            <p className="helper-text m-0" id="contact-entry-help">First name and either email or phone required.</p>
+            <p className="helper-text m-0" id="contact-entry-help">First name required. Add an email address, a phone number, or both.</p>
           </div>
         </fieldset>
       </form>
@@ -133,7 +175,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
             <div><Button disabled={pending || !preview.contacts.length} onClick={() => run(async () => {
               const result = await importContacts(preview.contacts);
               setNotice({ ...result, message: result.message + (result.ok && preview.errors.length ? ` ${preview.errors.length} invalid rows were not imported.` : "") });
-              if (result.ok) { setRows(null); setSource(""); setFileName(""); router.refresh(); }
+              if (result.ok) { setEmailExport(null); setCopyStatus(""); setRows(null); setSource(""); setFileName(""); router.refresh(); }
             })}>{pending ? "Importing…" : `Import ${preview.contacts.length.toLocaleString()} valid contacts`}</Button></div>
           </>}
         </div>}
@@ -155,7 +197,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
             <td className="max-w-48 break-words font-semibold">{contact.first_name}</td><td className="max-w-48 break-words">{contact.last_name || "—"}</td>
             <td className="max-w-64 break-words">{contact.email ? <a className="text-brand underline-offset-4 hover:underline" href={`mailto:${contact.email}`}>{contact.email}</a> : "—"}</td>
             <td className="whitespace-nowrap">{contact.phone ? <a className="text-brand underline-offset-4 hover:underline" href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a> : "—"}</td>
-            <td>{removing === contact.id ? <div className="flex flex-wrap items-center gap-2"><span className="text-sm">Remove {contact.first_name}?</span><Button compact variant="danger" disabled={pending} onClick={() => run(async () => { const result = await deleteContact(contact.id); setNotice(result); if (result.ok) { setRemoving(null); if (editing?.id === contact.id) { setEditing(null); setDraft(BLANK); } router.refresh(); } })}>Remove</Button><Button compact variant="secondary" disabled={pending} onClick={() => setRemoving(null)}>Keep</Button></div> : <div className="flex gap-2"><Button compact variant="secondary" disabled={pending} onClick={() => edit(contact)} aria-label={`Edit ${contact.first_name} ${contact.last_name}`}>Edit</Button><Button compact variant="text" disabled={pending} onClick={() => setRemoving(contact.id)} aria-label={`Remove ${contact.first_name} ${contact.last_name}`}>Remove</Button></div>}</td>
+            <td>{removing === contact.id ? <div className="flex flex-wrap items-center gap-2"><span className="text-sm">Remove {contact.first_name}?</span><Button compact variant="danger" disabled={pending} onClick={() => run(async () => { const result = await deleteContact(contact.id); setNotice(result); if (result.ok) { setEmailExport(null); setCopyStatus(""); setRemoving(null); if (editing?.id === contact.id) { setEditing(null); setDraft(BLANK); } router.refresh(); } })}>Remove</Button><Button compact variant="secondary" disabled={pending} onClick={() => setRemoving(null)}>Keep</Button></div> : <div className="flex gap-2"><Button compact variant="secondary" disabled={pending} onClick={() => edit(contact)} aria-label={`Edit ${contact.first_name} ${contact.last_name}`}>Edit</Button><Button compact variant="text" disabled={pending} onClick={() => setRemoving(contact.id)} aria-label={`Remove ${contact.first_name} ${contact.last_name}`}>Remove</Button></div>}</td>
           </tr>)}</tbody>
         </table></div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule px-6 py-4 text-sm"><p className="m-0 tabular-nums">{((page - 1) * 50 + 1).toLocaleString()}–{Math.min(page * 50, count).toLocaleString()} of {count.toLocaleString()}{search && <> · <Link className="text-brand underline" href="/mailing-list">Clear search</Link></>}</p>

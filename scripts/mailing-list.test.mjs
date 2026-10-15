@@ -55,6 +55,15 @@ test("server input validation strips unknown fields and enforces lengths and con
   assert.equal(contactSchema.safeParse({ ...input, phone: "call me later" }).success, false);
 });
 
+test("phone is optional for individual entry and CSV import with an email address", () => {
+  assert.equal(contactSchema.parse({ first_name: "Alex", last_name: "Smith", email: "alex@example.com" }).phone, "");
+  assert.equal(contactSchema.parse({ first_name: "Alex", last_name: "Smith", email: "alex@example.com", phone: "" }).phone, "");
+  const result = preview("Fname,Lname,Email\nAlex,Smith,alex@example.com");
+  assert.equal(result.contacts.length, 1);
+  assert.equal(result.contacts[0].phone, "");
+  assert.deepEqual(result.errors, []);
+});
+
 test("phone searches match different punctuation while full names keep both name tokens", () => {
   for (const phone of ["510-555-0123", "(510) 555-0123", "510.555.0123", "5105550123"]) {
     assert.deepEqual(contactSearchFilters(phone), ["phone_digits.ilike.%5105550123%"]);
