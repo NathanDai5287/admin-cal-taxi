@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { addDaysIso, formatDateISO } from "@/lib/host-format";
@@ -15,6 +15,7 @@ import { fmtUSD } from "../order-format";
 import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 import OrderPreviewReader from "./OrderPreviewReader";
 import OrderIcon from "@/components/host/OrderIcon";
+import OrderSigning from "./OrderSigning";
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
@@ -28,6 +29,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const [refund, setRefund] = useState(workflow.refund ?? { amount: order.depositAmount ?? 0, date: today, method: "" });
   const polling = useRef(false); const previewSection = useRef<HTMLElement>(null);
   const [preparing, setPreparing] = useState(false);
+  const [reviewingContract, setReviewingContract] = useState(false);
+  const [openEmails, setOpenEmails] = useState(false);
+  const approvalContinuation = useRef(false);
   const [documents] = useState(createHostingDocumentCache);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; label: string; blob?: string; scope: string } | null>(null);
   useEffect(() => () => documents.clear(), [documents]);
@@ -68,7 +72,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
 
   const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, depositPaid, today, cancelled]);
   const [previewScope, setPreviewScope] = useState("");
-  useEffect(() => { pausePolling.current = busy || (previewScope === scope && (preparing || previews.length > 0)) || pdfPreview?.scope === scope; }, [busy, preparing, previews.length, previewScope, scope, pdfPreview?.scope]);
+  useEffect(() => { pausePolling.current = reviewingContract || busy || (previewScope === scope && (preparing || previews.length > 0)) || pdfPreview?.scope === scope; }, [reviewingContract, busy, preparing, previews.length, previewScope, scope, pdfPreview?.scope]);
   const [cache] = useState(createHostingPreviewCache);
   // Undo followed by re-recording the same amount must not reuse a receipt
   // frozen against the previous payment IDs.
@@ -120,6 +124,20 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       if (token === selection.current) setMessage(error instanceof Error ? error.message : "Could not prepare the email. Please retry.");
     } finally { if (token === selection.current) setPreparing(false); }
   }
+  const reviewEmails = useEffectEvent(() => { void prepare("invitation"); });
+  useEffect(() => {
+    const continuedFromApproval = window.location.hash === "#review-emails" && !approvalContinuation.current;
+    if ((!openEmails && !continuedFromApproval) || !revision || !allowed) return;
+    approvalContinuation.current = true;
+    setOpenEmails(false);
+    reviewEmails();
+  }, [openEmails, revision, allowed]);
+
+  function reviewContract() {
+    setReviewingContract(true);
+    requestAnimationFrame(() => previewSection.current?.scrollIntoView({ block: "start" }));
+  }
+
   async function openDocument(url: string, label: string) {
     const token = ++documentSelection.current;
     setMessage("");
@@ -146,7 +164,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   async function cancel() {
     if (!window.confirm("Cancel this event? It will leave the forecast, and future hosting emails will stop. Recorded payments, contracts, and existing signing links will remain; links are not revoked.")) return;
     setBusy(true);
-    try { const result = await cancelHostingEventAction(order.id); if (result.ok) { setMessage("Event cancelled. Financial and signing history retained."); setPreviews([]); router.refresh(); } else setMessage(result.error); }
+    try { const result = await cancelHostingEventAction(order.id); if (result.ok) { setMessage("Event cancelled. Financial and signing history retained."); setPreviews([]); setReviewingContract(false); setOpenEmails(false); router.refresh(); } else setMessage(result.error); }
     catch { setMessage("Could not confirm cancellation. Reload to check the event."); }
     finally { setBusy(false); }
   }
@@ -154,7 +172,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     if (!revision) return;
     try { const result = await copyHostingSigningLinkAction(order.id, revision.id, email); if (!result.ok) { setMessage(result.error); return; } await navigator.clipboard.writeText(result.data); setMessage("Personal signing link copied."); } catch { setMessage("Clipboard unavailable. Reload and retry."); }
   }
-  const emailButton = (kind: EmailKind, label: string, enabled = true) => <button type="button" className={timelineAction} disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
+  const emailButton = (kind: EmailKind, label: string, enabled = true) => kind === "invitation" && !wasSent
+    ? <Button compact disabled={busy || preparing || !allowed || !enabled} onClick={() => prepare(kind)}>{label}</Button>
+    : <button type="button" className={timelineAction} disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
   const visiblePdf = pdfPreview?.scope === scope ? pdfPreview : null;
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
   const activity = workflow.deliveries.filter(d => d.status !== "queued");
@@ -169,11 +189,12 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
     {signingUnavailable && <p className="mb-6 text-sm text-warn">Could not verify signing history. Reload before sending documents.</p>}
     <ol aria-label="Event stages" className="ml-2 border-l border-rule">
-      <Milestone title="Prepare agreement" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision || order.documents.some(d => d.kind === "contract") }>
-        {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <p className="text-[12px] text-muted">Use Edit order to prepare and approve the contract.</p>}
+      <Milestone title="Approve contract" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision}>
+        {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <Button compact disabled={busy || reviewingContract || cancelled || signingUnavailable} onClick={reviewContract}>{reviewingContract ? "Reviewing contract…" : "Review contract"}</Button>}
       </Milestone>
-      <Milestone title="Send contract" detail={wasSent ? "Sent" : undefined} done={wasSent}>
-        {(!wasSent || hasUnsentInvitation) && emailButton("invitation", hasUnsentInvitation ? "Review remaining invitations" : "Review & send contract")}
+      <Milestone title="Send contract" detail={wasSent ? "Sent" : "Draft until sent"} done={wasSent}>
+        {!revision && <p className="text-[12px] text-muted">Approve the contract to review its emails.</p>}
+        {(!wasSent || hasUnsentInvitation) && revision && emailButton("invitation", wasSent && hasUnsentInvitation ? "Review remaining invitations" : "Review emails")}
       </Milestone>
       <Milestone title="Everyone signs" detail={revision ? `${revision.signedCount} of ${revision.totalCount} signed` : "Awaiting contract approval"} done={signed}>
         {revision && <>
@@ -230,14 +251,17 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
         {d.error && <p className="mt-1 text-warn [overflow-wrap:anywhere]">{d.error}</p>}
       </li>)}</ul>
     </section>}
-    {!cancelled && <Button className="mt-5" variant="text" compact disabled={busy} onClick={cancel}>Cancel event</Button>}
+    {!cancelled && <Button className="mt-5" variant="text" compact disabled={busy || reviewingContract} onClick={cancel}>Cancel event</Button>}
     </section>
     <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 pt-5 lg:sticky lg:top-6 lg:pt-0">
-      <OrderPreviewReader email={selected} emails={previews} contacts={revision?.recipients} index={previewIndex} onIndex={index => { ++documentSelection.current; setPdfPreview(null); setPreviewIndex(index); }} pdf={visiblePdf} replyTo={previewReplyTo} preparing={preparing} busy={busy} message={message}
+      {reviewingContract && !cancelled && !signingUnavailable ? <>
+        <div className="mb-3 flex items-center justify-between gap-3"><span className="text-[13px] text-muted">Approve, then review emails</span><Button variant="text" compact onClick={() => setReviewingContract(false)}>Close review</Button></div>
+        <OrderSigning key={order.id} order={order} revisions={revisions} reviewContract onApproved={() => { setReviewingContract(false); setOpenEmails(true); router.refresh(); }} />
+      </> : <OrderPreviewReader email={selected} emails={previews} contacts={revision?.recipients} index={previewIndex} onIndex={index => { ++documentSelection.current; setPdfPreview(null); setPreviewIndex(index); }} pdf={visiblePdf} replyTo={previewReplyTo} preparing={preparing} busy={busy} message={message}
         sendDisabled={busy || preparing || previews.some(p => !p.id) || cancelled || previews.every(p => p.status === "sent")}
         sendLabel={busy ? "Sending…" : unsentCount === 0 ? "Already sent" : unsentCount === 1 ? "Send email" : `Send ${unsentCount} emails`} onSend={() => { void send(); }}
         onClose={() => { ++selection.current; ++documentSelection.current; setPreviews([]); setPreparing(false); setPdfPreview(null); }}
-        onEmail={() => { ++documentSelection.current; setPdfPreview(null); }} onDocument={(url, label) => { void openDocument(url, label); }} onWarmDocument={url => { void documents.load(url).catch(() => {}); }} />
+        onEmail={() => { ++documentSelection.current; setPdfPreview(null); }} onDocument={(url, label) => { void openDocument(url, label); }} onWarmDocument={url => { void documents.load(url).catch(() => {}); }} />}
     </aside>
   </div>;
 }

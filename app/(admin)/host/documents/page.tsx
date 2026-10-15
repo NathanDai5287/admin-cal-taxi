@@ -490,10 +490,10 @@ export default function DocumentsPage() {
     }
   }
 
-  function finishWorkspace(orderId: string) {
+  function finishWorkspace(orderId: string, reviewEmails = false) {
     if (!isCurrent(data)) return;
     finishOrder(orderId, data);
-    router.push(`/host/orders/${orderId}`);
+    router.push(`/host/orders/${orderId}${reviewEmails ? "#review-emails" : ""}`);
   }
 
   async function saveAndFinish() {
@@ -580,7 +580,7 @@ export default function DocumentsPage() {
               </ButtonLink>
             )}
           </div>
-          <p className="field-hint">Create signing links below to save and approve the contract. Downloads alone do not approve it.</p>
+          <p className="field-hint">Review and approve the contract below, then review its emails. Downloads do not approve or send the contract.</p>
           {downloadAllReport && <p className="text-[12.5px] text-muted">{downloadAllReport}</p>}
           {!canSave && hydrated && (
             <p className="text-[12px] text-muted">Add an organization and event date before saving this order.</p>
@@ -598,7 +598,7 @@ export default function DocumentsPage() {
         </>}
         contract={<>
           <DocumentRow index={1} kind="contract" label="Hosting Contract" subtitle="Contract terms and named signature spaces" state={statusFor("contract")} summary={contractSummary} onDownload={() => generateDoc("contract")} busy={!!busy.contract} error={errors.contract ?? null} success={successes.contract ?? null} grouped downloadVariant="secondary" />
-          <SigningPanel data={data} update={update} orderId={data.currentOrderId} reviewedOrderVersion={() => draftOrderVersion(draftId)} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={finishWorkspace} />
+          <SigningPanel data={data} update={update} orderId={data.currentOrderId} reviewedOrderVersion={() => draftOrderVersion(draftId)} saveOrder={() => saveToOrders(true)} beforeSigningAction={async () => { if (!isCurrent(data)) throw new Error("This Create draft is no longer active."); }} onFinalized={orderId => finishWorkspace(orderId, true)} />
         </>}
         paymentMessage={
           <PaymentMessagePanel

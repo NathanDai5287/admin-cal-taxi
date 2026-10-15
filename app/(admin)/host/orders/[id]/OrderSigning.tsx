@@ -6,7 +6,7 @@ import { getOrderAction, updateOrderAction } from "../actions";
 import { EMPTY_STATE, type SharedState } from "@/lib/host-shared-state";
 import type { Order } from "@/lib/host-orders-types";
 import type { SigningRevision } from "@/lib/host-signing";
-import { sharedStateFromSnapshot } from "./WorkspaceActions";
+import WorkspaceActions, { sharedStateFromSnapshot } from "./WorkspaceActions";
 
 function signingDraft(order: Order): SharedState {
   const saved = sharedStateFromSnapshot(order.snapshot);
@@ -23,7 +23,12 @@ function signingDraft(order: Order): SharedState {
   };
 }
 
-export default function OrderSigning({ order, revisions }: { order: Order; revisions?: SigningRevision[] }) {
+export default function OrderSigning({ order, revisions, reviewContract = false, onApproved }: {
+  order: Order;
+  revisions?: SigningRevision[];
+  reviewContract?: boolean;
+  onApproved?: () => void;
+}) {
   const [data, setData] = useState<SharedState>(() => signingDraft(order));
   const [stale, setStale] = useState(false);
   const version = useRef(order.updatedAt);
@@ -60,8 +65,9 @@ export default function OrderSigning({ order, revisions }: { order: Order; revis
     <button type="button" className="mt-3 text-[13px] underline" onClick={() => window.location.reload()}>Reload order</button>
   </div>;
 
-  return <SigningPanel data={data} update={update} orderId={order.id} reviewedOrderVersion={() => version.current} saveOrder={saveOrder} preparationEnabled={false} initialRevisions={revisions} beforeSigningAction={checkFresh} onFinalized={async () => {
+  return <SigningPanel data={data} update={update} orderId={order.id} reviewedOrderVersion={() => version.current} saveOrder={saveOrder} preparationEnabled={reviewContract} reviewOnOpen={reviewContract} representativeAction={reviewContract ? <WorkspaceActions order={order} loadLabel="Edit representatives" variant="primary" showDuplicate={false} compact /> : undefined} initialRevisions={revisions} beforeSigningAction={checkFresh} onFinalized={async () => {
     const latest = await getOrderAction(order.id);
     if (latest.ok) { version.current = latest.data.updatedAt; savedSnapshot.current = JSON.stringify(latest.data.snapshot); setData(signingDraft(latest.data)); }
+    onApproved?.();
   }} />;
 }

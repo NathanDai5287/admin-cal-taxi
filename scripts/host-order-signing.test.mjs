@@ -40,28 +40,28 @@ test("saved order first render shows existing signer progress without editing co
   assert.match(html, /0 of 5 signed/);
   for (const person of revision.recipients) assert.ok(html.includes(person.name));
   assert.match(html, /Copy signing link/);
-  assert.doesNotMatch(html, /<input|Preview contract|Prepare replacement|Edit people/);
+  assert.doesNotMatch(html, /<input|Review contract|Prepare replacement|Edit people/);
 });
 
 test("saved order without signing history directs edits into the separate draft", () => {
   const html = renderToStaticMarkup(createElement(OrderSigning, { order, revisions: [] }));
   assert.match(html, /Use Edit order/);
-  assert.doesNotMatch(html, /<input|Preview contract|Prepare replacement/);
+  assert.doesNotMatch(html, /<input|Review contract|Prepare replacement/);
 });
 
 test("unavailable signing history never exposes the saved order editor", () => {
   const html = renderToStaticMarkup(createElement(OrderSigning, { order }));
   assert.match(html, /Loading signing status/);
-  assert.doesNotMatch(html, /<input|Preview contract|Prepare replacement/);
+  assert.doesNotMatch(html, /<input|Review contract|Prepare replacement/);
 });
 
 test("draft preparation waits for existing history but remains available for a new order", () => {
   const props = { data, update() {}, saveOrder: async () => null, reviewedOrderVersion: () => undefined };
   const existing = renderToStaticMarkup(createElement(SigningPanel, { ...props, orderId: order.id }));
   assert.match(existing, /Loading signing status/);
-  assert.doesNotMatch(existing, /Preview contract|Edit people/);
+  assert.doesNotMatch(existing, /Review contract<\/button>|Edit people/);
   const fresh = renderToStaticMarkup(createElement(SigningPanel, { ...props, orderId: "" }));
-  assert.match(fresh, /Preview contract/);
+  assert.match(fresh, /Review contract/);
   assert.match(fresh, /Edit people/);
 });
 
@@ -71,5 +71,30 @@ test("timeline first render preserves pending signer progress without exposing t
   assert.match(html, /0 of 5 signed/);
   assert.match(html, /Remind unsigned signers/);
   for (const person of pending.recipients) assert.ok(html.includes(person.name));
-  assert.doesNotMatch(html, /Edit people|Preview contract|Prepare replacement|Mark sent|Undo sent/);
+  assert.doesNotMatch(html, /Edit people|Review contract|Prepare replacement|Mark sent|Undo sent/);
+});
+
+
+test("saved draft can review its contract directly without editing its representatives", () => {
+  const html = renderToStaticMarkup(createElement(OrderSigning, { order, revisions: [], reviewContract: true }));
+  assert.match(html, /Review contract/);
+  assert.match(html, /Edit representatives/);
+  assert.doesNotMatch(html, /<input|Approve contract|Send email|Prepare replacement/);
+});
+
+test("downloaded contracts do not mark the timeline agreement as approved", () => {
+  const draft = { ...order, documents: [{ kind: "contract" }] };
+  const html = renderToStaticMarkup(createElement(OrderTimeline, { order: draft, revisions: [], workflow: { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null }, today: "2026-10-04", emailConfigured: true, rentalPaid: 0, permitPaid: 0, permitTotal: 125 }));
+  assert.match(html, /Approve contract<span class="sr-only">, pending/);
+  assert.match(html, /Review contract/);
+  assert.match(html, /Draft until sent/);
+  assert.doesNotMatch(html, /Review emails<|Send email/);
+});
+
+test("approved unsent contracts resume email review without exposing contract preparation", () => {
+  const approved = { ...revision, created_at: "2026-10-05T18:00:00Z", envelope_id: "envelope_existing" };
+  const html = renderToStaticMarkup(createElement(OrderTimeline, { order, revisions: [approved], workflow: { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null }, today: "2026-10-04", emailConfigured: true, rentalPaid: 0, permitPaid: 0, permitTotal: 125 }));
+  assert.match(html, /Review emails/);
+  assert.match(html, /Draft until sent/);
+  assert.doesNotMatch(html, /Review contract<|Prepare replacement/);
 });

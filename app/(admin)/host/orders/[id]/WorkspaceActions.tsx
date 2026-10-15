@@ -31,11 +31,13 @@ export default function WorkspaceActions({
   loadLabel = "Edit order",
   showDuplicate = true,
   compact = false,
+  variant = "secondary",
 }: {
   order: Order;
   loadLabel?: string;
   showDuplicate?: boolean;
   compact?: boolean;
+  variant?: "primary" | "secondary";
 }) {
   const [busy, setBusy] = useState<"load" | "duplicate" | null>(null);
   const [error, setError] = useState("");
@@ -106,7 +108,7 @@ export default function WorkspaceActions({
     <>
       <Button
         type="button"
-        variant="primary"
+        variant={variant}
         compact={compact}
         disabled={busy !== null}
         onClick={loadIntoWorkspace}

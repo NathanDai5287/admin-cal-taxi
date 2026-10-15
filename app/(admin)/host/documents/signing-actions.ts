@@ -4,9 +4,16 @@ import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createSigningLinks, listSigning, markSigningLinkSent, prepareSigning, reconcileSigning, syncSigning } from "@/lib/host-signing";
 import type { SigningActivation } from "@/lib/host-signing";
 import { revalidatePath } from "next/cache";
-import { registerSigning } from "@/lib/host-workflow";
+import { loadWorkflow, registerSigning } from "@/lib/host-workflow";
+import { getOrderFresh } from "@/lib/host-orders";
 
 async function admin() { await requireAdmin("/"); }
+
+async function assertEventActive(orderId: string) {
+  const [order, workflow] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId)]);
+  if (!order) throw new Error("Order not found.");
+  if (workflow.cancelledAt || order.statusOverride === "cancelled") throw new Error("This event is cancelled. Its contract cannot be approved or replaced.");
+}
 
 export async function listSigningAction(orderId: string) {
   await admin();
@@ -15,11 +22,13 @@ export async function listSigningAction(orderId: string) {
 
 export async function prepareSigningAction(orderId: string, payload: Record<string, unknown>, requestKey: string, expectedLatestRevisionId: string) {
   await admin();
+  await assertEventActive(orderId);
   return prepareSigning(orderId, payload, requestKey, expectedLatestRevisionId);
 }
 
 export async function createSigningLinksAction(orderId: string, revisionId: string, hash: string, activation: SigningActivation) {
   await admin();
+  await assertEventActive(orderId);
   const revision = await createSigningLinks(orderId, revisionId, hash, activation);
   // Routing metadata is additive; registration failure must never prompt a
   // caller to create another envelope after successful activation.
