@@ -5,6 +5,7 @@ import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import type { RoleAppAccess } from "@/lib/app-access";
 import { AccessMatrix } from "./access-matrix";
+import "./roles.css";
 
 export const metadata: Metadata = { title: "Roles" };
 export const dynamic = "force-dynamic";
@@ -20,18 +21,20 @@ export default async function RolesPage() {
         ...(session.appAccess.users !== "none" ? [{ href: "/users", label: "Users" }] : []),
         { href: "/roles", label: "Roles" },
       ]} />
-      <main className="max-w-[1440px] mx-auto px-6 py-8 grid gap-6">
-        <div>
-          <h1 className="page-title">Roles</h1>
-          <p className="page-lede">Set each role’s access to each app. Changes save automatically.</p>
-          {session.appAccess.users !== "none" && <Link className="text-brand underline underline-offset-4" href="/users">Assign roles to users</Link>}
-        </div>
-        <div className="grid gap-2 text-sm text-muted">
-          <p>None blocks access. Read allows viewing. Write allows viewing and changes.</p>
+      <main className="roles-main">
+        <header className="roles-heading">
+          <div>
+            <h1 className="page-title">Roles</h1>
+            <p className="page-lede">Set each role’s access to each app. Changes save automatically.</p>
+          </div>
+          {session.appAccess.users !== "none" && <Link className="btn-ghost roles-users-link" href="/users">Assign roles to users</Link>}
+        </header>
+        <div className="roles-guidance">
+          <p className="roles-legend"><span><strong data-access="none">None</strong> blocks access.</span><span><strong data-access="read">Read</strong> allows viewing.</span><span><strong data-access="write">Write</strong> allows viewing and changes.</span></p>
           <p>People receive the highest access from all their roles. Executive roles also include Brother and Executive member.</p>
           <p>Base member is an account role, separate from chapter membership. Administrators always have write access to every app.</p>
         </div>
-        {session.appAccess.roles !== "write" && <p className="helper-text">You have read access. You cannot change these settings.</p>}
+        {session.appAccess.roles !== "write" && <p className="roles-read-notice">You have read access. You cannot change these settings.</p>}
         <section className="card min-w-0" aria-label="Role permissions">
           <AccessMatrix permissions={data as RoleAppAccess[]} canWrite={session.appAccess.roles === "write"} />
         </section>

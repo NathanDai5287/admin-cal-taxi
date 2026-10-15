@@ -1,5 +1,7 @@
 "use client";
 
+import "./people.css";
+
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm } from "@/app/(admin)/users/actions";
@@ -152,7 +154,7 @@ function RemoveButton({ disabled, onRemove }: { disabled?: boolean; onRemove: ()
     <button
       aria-label={armed ? "Click again to confirm removal" : "Remove user"}
       className={
-        "inline-flex h-8 w-8 items-center justify-center border transition-colors duration-150 cursor-pointer " +
+        "inline-flex h-11 w-11 items-center justify-center border transition-colors duration-150 cursor-pointer " +
         (armed
           ? "bg-danger border-danger text-white text-xs font-bold"
           : "bg-surface border-rule text-muted hover:text-warn hover:border-warn") +
@@ -272,19 +274,17 @@ export function MembersTable({
   return (
     <>
       {editingMember && <PersonEditor key={editingMember.id} member={editingMember} onClose={() => setEditingId(null)} />}
-      <div className="table-scroll">
-      <table className={"data-table" + (pending ? " opacity-80" : "")}>
+      <div className="table-scroll people-table-scroll" role="region" aria-label="Users and roles" tabIndex={0}>
+      <table className={"data-table people-table" + (pending ? " opacity-80" : "")}>
         <thead>
           <tr>
             <th>Name</th>
             <th>Membership</th>
             <th>Executive positions</th>
-            <th>Contact</th>
             <th>Discord ID</th>
             <th>Member since</th>
             <th>Account role</th>
-            <th>Status</th>
-            <th></th>
+            <th><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -293,29 +293,28 @@ export function MembersTable({
             const memberPending = pendingIds.has(member.id);
             return (
               <tr key={member.id}>
-                <td>
-                  <button type="button" disabled={!canWrite} className="text-brand underline underline-offset-4 text-left disabled:text-ink disabled:no-underline" onClick={() => setEditingId(member.id)}>
+                <td className="people-identity">
+                  <button type="button" disabled={!canWrite} className="people-name" onClick={() => setEditingId(member.id)}>
                     {userLabel(member.fullName, member.email)}
                   </button>
                   {isYou ? <span className="text-muted"> (you)</span> : null}
+                  <span className="people-contact">{member.contactEmail || member.email}</span>
+                  {member.phone && <span className="people-contact">{member.phone}</span>}
+                  <span className={member.hasSignedIn ? "people-status text-ok" : "people-status text-caution"}>{member.statusLabel}</span>
                 </td>
-                <td className="whitespace-nowrap">{member.membership === "brother" ? "Brother" : member.membership === "associate_member" ? "Associate member" : "Not classified"}</td>
-                <td>
+                <td data-label="Membership" className="whitespace-nowrap">{member.membership === "brother" ? "Brother" : member.membership === "associate_member" ? "Associate member" : "Not classified"}</td>
+                <td data-label="Executive positions">
                   {member.executiveRoles.length > 0 && <span className="block text-xs text-muted">Executive member</span>}
                   {member.executiveRoles.map((office) => EXECUTIVE_ROLE_OPTIONS.find((option) => option.value === office)?.label).join(", ") || "None"}
                 </td>
-                <td>
-                  <span className="block">{member.contactEmail || member.email}</span>
-                  {member.phone && <span className="block text-muted">{member.phone}</span>}
-                </td>
-                <td>
+                <td data-label="Discord ID">
                   <DiscordMemberId
                     disabled={!canWrite || memberPending}
                     member={member}
                     onSave={(discordUserId) => changeDiscordUserId(member.id, discordUserId)}
                   />
                 </td>
-                <td>
+                <td data-label="Member since">
                   <select
                     aria-label={`Academic term for ${userLabel(member.fullName, member.email)}`}
                     className="field-input min-w-40"
@@ -331,7 +330,7 @@ export function MembersTable({
                     ))}
                   </select>
                 </td>
-                <td>
+                <td data-label="Account role">
                   <select
                     aria-label={`Account role for ${userLabel(member.fullName, member.email)}`}
                     className="field-input"
@@ -352,10 +351,7 @@ export function MembersTable({
                     <option value="admin">Administrator</option>
                   </select>
                 </td>
-                <td className="whitespace-nowrap">
-                  <span className={member.hasSignedIn ? "text-ok" : "text-caution"}>{member.statusLabel}</span>
-                </td>
-                <td>
+                <td data-label="Remove user">
                   <RemoveButton disabled={!canWrite || isYou || memberPending} onRemove={() => remove(member.id)} />
                   {errors.get(member.id) ? <span className="form-message ml-2" role="alert">{errors.get(member.id)}</span> : null}
                 </td>
