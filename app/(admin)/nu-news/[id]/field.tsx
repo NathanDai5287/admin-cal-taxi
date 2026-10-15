@@ -10,7 +10,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="card">
+    <section id={title.toLowerCase().replaceAll(" ", "-")} className="card nu-news-section">
       <div className="card-header">
         <h2 className="card-title">{title}</h2>
       </div>

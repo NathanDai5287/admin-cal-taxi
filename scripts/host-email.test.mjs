@@ -74,7 +74,7 @@ test("both shared invoices include all six club representatives, including signe
       assert.equal(previews[0].recipient, state.order.snapshot.contractSigners.map(p => p.email).join(", "));
       assert.match(previews[0].html, kind === "deposit_invoice" ? /\$300\.00 is the total across all clubs/ : /\$1400\.00 is the total across all clubs/);
       assert.match(previews[0].html, kind === "deposit_invoice" ? /deposit is due October 9, 2026/ : /rental fee is due October 18, 2026/);
-      if (kind === "deposit_invoice") assert.match(previews[0].html, /October 9, 2026, seven days before the event/);
+      if (kind === "deposit_invoice") assert.match(previews[0].html, /October 9, 2026/);
       assert.match(previews[0].html, /Include a relevant payment note\./);
       assert.doesNotMatch(previews[0].html, /Include the event date in the payment note/);
       assert.match(previews[0].html, /Zelle at calthetaxi@gmail\.com/);
@@ -181,4 +181,55 @@ test("invoice payment instructions update queued drafts without regenerating PDF
     await prepareHostingEmail(input);
     assert.equal(state.rows[0].payload.body.html, "frozen retry body");
   } finally { state.order = originalOrder; state.rows = []; }
+});
+
+
+test("invoice email and attachment keep the saved invoice date and preserve attempted deliveries", async () => {
+  const originalOrder = structuredClone(state.order);
+  try {
+    state.rows = [];
+    state.order.snapshot.rentalPaymentTiming = "day_before";
+    state.order.snapshot.startTime = "21:30";
+    state.order.snapshot.endTime = "01:00";
+    state.order.documents = [{ kind: "rental_invoice", stale: false, sourceSnapshot: {}, generatedAt: "2026-10-04", payload: { due_date: "October 15, 2026" } }];
+    const generated = [];
+    globalThis.fetch = async (_url, init) => { generated.push(JSON.parse(init.body)); return new Response("saved invoice PDF", { headers: { "Content-Type": "application/pdf" } }); };
+    const input = { ...request, kind: "rental_invoice", recipients: undefined };
+    const prepared = await prepareHostingEmail(input);
+    assert.match(prepared[0].html, /rental fee is due October 15, 2026/);
+    assert.equal(generated[0].due_date, "October 15, 2026");
+    const row = state.rows[0];
+    const frozen = structuredClone(row.payload);
+    row.attempted_at = "2026-10-04T12:00:00Z";
+    row.status = "failed";
+    state.order.documents[0].payload.due_date = "October 14, 2026";
+    await prepareHostingEmail(input);
+    assert.deepEqual(row.payload, frozen);
+    assert.equal(generated.length, 1);
+    row.status = "queued";
+    row.attempted_at = null;
+    const refreshed = await prepareHostingEmail(input);
+    assert.match(refreshed[0].html, /rental fee is due October 14, 2026/);
+    assert.equal(generated[1].due_date, "October 14, 2026");
+  } finally { state.order = originalOrder; state.rows = []; }
+});
+
+
+test("early rental payment does not allow returning a deposit before an overnight event ends", async () => {
+  const originalOrder = structuredClone(state.order);
+  try {
+    state.rows = [];
+    state.order.eventDate = "2020-10-16";
+    state.order.snapshot = { ...state.order.snapshot, eventDate: "2020-10-16", startTime: "21:30", endTime: "01:00", rentalPaymentTiming: "day_before" };
+    state.rentals = [{ id: "rental-paid", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2020-10-15", reversed_at: null }];
+    const refund = { amount: 300, date: "2020-10-16", method: "Zelle" };
+    await assert.rejects(prepareHostingEmail({ ...request, kind: "refund", refund }), /on or after the event ends/);
+    assert.equal(state.rows.length, 0);
+    state.order.snapshot.rentalPaymentTiming = "after_conclusion";
+    const legacy = await prepareHostingEmail({ ...request, kind: "refund", refund });
+    assert.match(legacy[0].html, /2020-10-16/);
+    state.order.snapshot.rentalPaymentTiming = "day_before";
+    const previews = await prepareHostingEmail({ ...request, kind: "refund", refund: { ...refund, date: "2020-10-17" } });
+    assert.match(previews[0].html, /2020-10-17/);
+  } finally { state.order = originalOrder; state.rows = []; state.rentals = []; }
 });

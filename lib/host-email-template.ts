@@ -1,10 +1,10 @@
 import { EMAIL_LABELS, type EmailKind } from "./host-event";
-import { addDaysIso, formatDateISO } from "./host-format";
+import { formatDateISO } from "./host-format";
 
 export function escapeEmail(value: string) {
   return value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
 }
-export function hostingEmail(input: { kind: EmailKind; name: string; organization: string; eventDate: string; link?: string; detail?: string; invoiceAmount?: number; replyTo: string }) {
+export function hostingEmail(input: { kind: EmailKind; name: string; organization: string; eventDate: string; invoiceDueDate?: string; link?: string; detail?: string; invoiceAmount?: number; replyTo: string }) {
   const title = EMAIL_LABELS[input.kind];
   const subject = `${title} · ${input.organization} · ${input.eventDate}`;
   const signing = input.kind === "invitation" || input.kind === "reminder";
@@ -14,8 +14,8 @@ export function hostingEmail(input: { kind: EmailKind; name: string; organizatio
   const message = input.kind === "invitation" ? "Please review and sign your hosting agreement using your personal link below."
     : input.kind === "reminder" ? "Your signature is still needed on the hosting agreement. Please use your personal link below to review and sign."
     : input.kind === "completed" ? "Everyone has signed the hosting agreement. Your completed contract and its audit trail are attached for your records."
-    : input.kind === "deposit_invoice" ? `Your deposit invoice is attached. The refundable deposit is due ${formatDateISO(addDaysIso(input.eventDate, -7))}, seven days before the event. ${sharedInvoiceMessage(input.invoiceAmount)}`
-    : input.kind === "rental_invoice" ? `Your rental invoice is attached. The rental fee is due ${formatDateISO(addDaysIso(input.eventDate, 2))}. ${sharedInvoiceMessage(input.invoiceAmount)}`
+    : input.kind === "deposit_invoice" ? `Your deposit invoice is attached. The refundable deposit is due ${formatDateISO(input.invoiceDueDate ?? "")}. ${sharedInvoiceMessage(input.invoiceAmount)}`
+    : input.kind === "rental_invoice" ? `Your rental invoice is attached. The rental fee is due ${formatDateISO(input.invoiceDueDate ?? "")}. ${sharedInvoiceMessage(input.invoiceAmount)}`
     : input.kind === "deposit_receipt" ? "Your receipt for the refundable deposit we received is attached. This payment is separate from the rental fee."
     : input.kind === "receipt" ? "Your receipt for the rental payment we received is attached. Thank you."
     : "The deposit return details are attached for your records.";

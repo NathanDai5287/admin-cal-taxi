@@ -4,8 +4,8 @@ import test from "node:test";
 import { build } from "esbuild";
 import { PGlite } from "@electric-sql/pglite";
 
-const compiled = await build({ stdin: { contents: 'export * from "./lib/host-event"; export * from "./lib/host-email-template";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node" });
-const { eventProgress, eventToday, hostingEmail, signerProgress } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+const compiled = await build({ stdin: { contents: 'export * from "./lib/host-event"; export * from "./lib/host-email-template"; export * from "./lib/host-payment-schedule"; export * from "./lib/host-state-model";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node" });
+const { eventProgress, eventToday, hostingEmail, signerProgress, paymentSchedule, EMPTY_STATE } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const workflow = { activatedAt: "2026-10-04T12:00:00Z", cancelledAt: null, deliveries: [], refund: null };
 test("invoice emails calculate calendar due dates across year boundaries and leap days", () => {
   for (const [kind, eventDate, dueDate] of [
@@ -13,8 +13,8 @@ test("invoice emails calculate calendar due dates across year boundaries and lea
     ["rental_invoice", "2028-02-27", "February 29, 2028"],
     ["rental_invoice", "2026-11-01", "November 3, 2026"],
   ]) {
-    const message = hostingEmail({ kind, name: "everyone", organization: "Club", eventDate, replyTo: "host@example.test" });
-    const due = `is due ${dueDate}${kind === "deposit_invoice" ? ", seven days before the event" : ""}.`;
+    const message = hostingEmail({ kind, name: "everyone", organization: "Club", eventDate, invoiceDueDate: kind === "deposit_invoice" ? paymentSchedule({ ...EMPTY_STATE, eventDate }).depositDueDate : paymentSchedule({ ...EMPTY_STATE, eventDate, rentalPaymentTiming: "after_conclusion" }).rentalDueDate, replyTo: "host@example.test" });
+    const due = `is due ${dueDate}.`;
     assert.ok(message.text.includes(due));
     assert.ok(message.html.includes(due));
   }
@@ -91,4 +91,13 @@ test("email claims are exclusive, retain frozen payloads, and stop ambiguous old
   assert.equal((await db.query("select status from hosting_finance_orders where order_id='ord_sent'")).rows[0].status, "cancelled");
   assert.equal((await db.query("select count(*)::int as n from hosting_finance_orders where order_id='ord_cancelled_draft'")).rows[0].n, 0);
   await db.close();
+});
+
+
+test("contract dates distinguish single-digit daytime hours from overnight endings", () => {
+  const terms = { ...EMPTY_STATE, eventDate: "2026-10-30", rentalPaymentTiming: "after_conclusion" };
+  assert.equal(paymentSchedule({ ...terms, startTime: "9:00", endTime: "23:00" }).rentalDueDate, "2026-11-01");
+  assert.equal(paymentSchedule({ ...terms, startTime: "9:00", endTime: "10:00" }).eventEndDate, "2026-10-30");
+  assert.equal(paymentSchedule({ ...terms, startTime: "21:30", endTime: "1:00" }).rentalDueDate, "2026-11-02");
+  assert.equal(paymentSchedule({ ...terms, startTime: "21:30", endTime: "1:00", rentalPaymentTiming: "day_before" }).rentalDueDate, "2026-10-29");
 });

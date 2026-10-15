@@ -1,0 +1,249 @@
+.nu-news .nu-news-main {
+  padding-block: 40px 64px;
+}
+
+.nu-news .nu-news-heading {
+  align-items: center;
+}
+
+.nu-news .page-title {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.035em;
+}
+
+.nu-news .page-lede {
+  max-width: 66ch;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.nu-news-archive {
+  border-top: 2px solid var(--color-brand);
+  border-bottom: 1px solid var(--color-rule);
+  background: var(--color-surface);
+}
+
+.nu-news-archive-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+}
+
+.nu-news-archive-header h2 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.nu-news-count {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.nu-news .nu-news-table {
+  min-width: 0;
+}
+
+.nu-news .nu-news-table th,
+.nu-news .nu-news-table td {
+  padding-inline: 24px;
+}
+
+.nu-news .nu-news-table td {
+  padding-block: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.nu-news .nu-news-table th:last-child,
+.nu-news .nu-news-table td:last-child {
+  text-align: right;
+}
+
+.nu-news-issue-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 44px;
+  width: 100%;
+  color: var(--color-brand);
+  font-size: 15px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.nu-news-issue-link svg {
+  flex-shrink: 0;
+}
+
+.nu-news-issue-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.nu-news-empty {
+  margin: 0;
+  padding: 40px 24px;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.nu-news-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  border-block: 1px solid var(--color-rule);
+}
+
+.nu-news-sections a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nu-news-sections a:hover {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.nu-news .nu-news-section {
+  scroll-margin-top: 24px;
+  border-top-width: 1px;
+}
+
+.nu-news .nu-news-section .card-header {
+  padding-block: 20px;
+}
+
+.nu-news .nu-news-section .card-title {
+  color: var(--color-ink);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  text-transform: none;
+}
+
+.nu-news .nu-news-section .card-body {
+  gap: 24px;
+  padding-top: 24px;
+}
+
+.nu-news .field-input,
+.nu-news .field-textarea {
+  min-height: 44px;
+  line-height: 1.6;
+  caret-color: var(--color-brand);
+}
+
+.nu-news-article + .nu-news-article {
+  padding-top: 28px;
+  border-top: 1px solid var(--color-rule);
+}
+
+.nu-news-actions {
+  border: 1px solid var(--color-rule);
+  border-top: 2px solid var(--color-brand);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.nu-news .nu-news-preview-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 640px) {
+  .nu-news > header > div:last-child {
+    gap: 12px;
+    padding-inline: 16px 180px;
+  }
+
+  .nu-news > header > div:last-child > span,
+  .nu-news > header .group > span:first-child {
+    display: none;
+  }
+
+  .nu-news > header .group {
+    white-space: nowrap;
+  }
+
+  .nu-news .nu-news-main {
+    padding: 28px 16px 40px;
+  }
+
+  .nu-news-create,
+  .nu-news-create .brand-button {
+    width: 100%;
+  }
+
+  .nu-news-archive-header {
+    padding: 20px 16px;
+  }
+
+  .nu-news .nu-news-table th,
+  .nu-news .nu-news-table td {
+    padding-inline: 12px;
+  }
+
+  .nu-news .nu-news-table td {
+    padding-block: 10px;
+    font-size: 12px;
+  }
+
+  .nu-news-issue-link {
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .nu-news-issue-link svg {
+    display: none;
+  }
+
+  .nu-news .nu-news-section .card-header,
+  .nu-news .nu-news-section .card-body {
+    padding-inline: 16px;
+  }
+
+  .nu-news .field-input,
+  .nu-news .field-textarea {
+    font-size: 16px;
+  }
+
+  .nu-news-sections {
+    gap: 0 20px;
+  }
+
+  .nu-news-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-inline: -16px;
+    padding-inline: 16px;
+    border-inline: 0;
+  }
+
+  .nu-news-actions .brand-button {
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .nu-news-actions .form-message,
+  .nu-news-actions .nu-news-preview-link {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+}
