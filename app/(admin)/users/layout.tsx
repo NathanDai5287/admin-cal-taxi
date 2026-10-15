@@ -28,10 +28,9 @@ export default async function UsersLayout({ children }: { children: React.ReactN
         tabs={[
           { href: "/users", label: "Users" },
           ...(hasAppAccess(session, "roles") ? [{ href: "/roles", label: "Roles" }] : []),
-          ...(session.appAccess.users === "write" ? [{ href: "/users/announcements", label: "Discord messages" }] : []),
         ]}
       />
-      <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>
+      <main className="max-w-[1440px] mx-auto px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   );
 }

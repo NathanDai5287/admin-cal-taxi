@@ -1,0 +1,149 @@
+[data-brand] .people-table-scroll:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+[data-brand] .people-table td {
+  vertical-align: top;
+  padding-block: 20px;
+}
+
+[data-brand] .people-table tbody tr:hover {
+  background: var(--color-canvas);
+}
+
+[data-brand] .people-identity {
+  min-width: 220px;
+  max-width: 300px;
+}
+
+[data-brand] .people-name {
+  min-height: 32px;
+  color: var(--color-brand);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+[data-brand] .people-name:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+[data-brand] .people-name:disabled {
+  color: var(--color-ink);
+  cursor: default;
+}
+
+[data-brand] .people-name:focus-visible,
+[data-brand] .people-table button:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+[data-brand] .people-contact {
+  display: block;
+  color: var(--color-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+[data-brand] .people-status {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+[data-brand] .people-table .field-input {
+  min-height: 44px;
+}
+
+[data-brand] .person-editor {
+  display: grid;
+  gap: 24px;
+  padding: 24px;
+  border-block: 1px solid var(--color-rule);
+  background: var(--color-canvas);
+}
+
+[data-brand] .person-office {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+[data-brand] .person-office:has(input:checked) {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+
+[data-brand] .person-office:has(input:disabled) {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+[data-brand] .person-office:has(input:focus-visible) {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  [data-brand] .people-table,
+  [data-brand] .people-table tbody,
+  [data-brand] .people-table tr,
+  [data-brand] .people-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  [data-brand] .people-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  [data-brand] .people-table tr {
+    padding: 16px;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  [data-brand] .people-table td {
+    padding: 8px 0;
+    border: 0;
+  }
+
+  [data-brand] .people-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    color: var(--color-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  [data-brand] .people-table .people-identity {
+    padding-bottom: 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  [data-brand] .people-table .people-identity::before {
+    display: none;
+  }
+
+  [data-brand] .person-editor {
+    padding: 20px 16px;
+  }
+}

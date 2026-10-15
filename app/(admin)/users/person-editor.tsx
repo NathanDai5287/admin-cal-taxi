@@ -35,11 +35,11 @@ export function PersonEditor({ member, onClose }: { member: MemberRow; onClose: 
   }
 
   return (
-    <form onSubmit={(event) => { event.preventDefault(); save(new FormData(event.currentTarget)); }} className="grid gap-5 border-t border-b border-rule p-6" aria-label={`Edit ${member.fullName || member.email}`}>
+    <form onSubmit={(event) => { event.preventDefault(); save(new FormData(event.currentTarget)); }} className="person-editor" aria-label={`Edit ${member.fullName || member.email}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="card-title">Edit person</h2>
-          <p className="helper-text">Sign-in email: {member.email}</p>
+          <p className="helper-text break-all">Sign-in email: {member.email}</p>
         </div>
         <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>Cancel</Button>
       </div>
@@ -69,10 +69,10 @@ export function PersonEditor({ member, onClose }: { member: MemberRow; onClose: 
       <fieldset disabled={pending} className="grid gap-3">
         <legend className="field-label mb-3">Executive roles</legend>
         <p className="helper-text">Only brothers can hold executive roles. These also assign the Executive member role. Multiple people can be rush chair.</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {EXECUTIVE_ROLE_OPTIONS.map(({ value, label }) => (
-            <label className="flex items-center gap-2 text-sm" key={value}>
-              <input type="checkbox" name="executiveRoles" value={value} checked={offices.includes(value)} disabled={membership !== "brother" && !offices.includes(value)} onChange={() => toggleOffice(value)} />
+            <label className="person-office" key={value}>
+              <input className="h-4 w-4 accent-brand" type="checkbox" name="executiveRoles" value={value} checked={offices.includes(value)} disabled={membership !== "brother" && !offices.includes(value)} onChange={() => toggleOffice(value)} />
               {label}
             </label>
           ))}

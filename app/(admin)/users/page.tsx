@@ -51,16 +51,16 @@ export default async function UsersPage() {
     ?? "";
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <div>
         <h1 className="page-title">Users</h1>
         <p className="page-lede">Manage contact details and assign roles. Set each role’s app access on the Roles page.</p>
-        {session.appAccess.roles !== "none" && <Link className="text-brand underline underline-offset-4" href="/roles">Manage role access</Link>}
+        {session.appAccess.roles !== "none" && <Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brand underline underline-offset-4" href="/roles">Manage role access</Link>}
       </div>
 
       {canWrite && <section className="card" aria-labelledby="invite-user-title">
         <div className="card-header">
-          <span className="card-title" id="invite-user-title">Invite people</span>
+          <h2 className="card-title" id="invite-user-title">Invite people</h2>
         </div>
         <form action={inviteUser} className="card-body border-t border-rule pt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_auto_auto_auto] items-end">
           <div className="field">
@@ -105,9 +105,9 @@ export default async function UsersPage() {
         </p>
       </section>}
 
-      <section className="card" aria-labelledby="members-title">
+      <section className="card min-w-0" aria-labelledby="members-title">
         <div className="card-header">
-          <span className="card-title" id="members-title">Users</span>
+          <h2 className="card-title" id="members-title">Users <span className="ml-2 text-muted tabular-nums">{profiles.length}</span></h2>
         </div>
         {!canWrite && <p className="helper-text px-6 pb-4">You have read access. You cannot change users or their roles.</p>}
         <MembersTable
