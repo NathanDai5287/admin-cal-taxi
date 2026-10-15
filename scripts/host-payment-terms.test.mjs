@@ -76,6 +76,7 @@ const serviceBuild = await build({
       export function backendOrigin() { return "https://backend.example.test"; }
       export function backendKey() { return "test-key"; }
       export class BackendConfigError extends Error {}
+      export function hasAppAccess() { return true; }
       export async function getSessionProfile() { return { profile: { role: "admin" } }; }
     ` }));
   } }],

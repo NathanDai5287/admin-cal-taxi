@@ -19,6 +19,8 @@ import { sharedStateFromSnapshot } from "@/lib/host-state-model";
 import OrderPreviewReader from "./OrderPreviewReader";
 import OrderIcon from "@/components/host/OrderIcon";
 import OrderSigning from "./OrderSigning";
+import OrderDateStrip from "./OrderDateStrip";
+import { relativeTimelineDate, timelineDay } from "@/lib/host-timeline";
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
@@ -191,16 +193,28 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const rentalBeforeEvent = schedule.rentalDueDate < order.eventDate;
   const rentalContractDate = formatRentalDeadline(schedule.rentalDueDate, representatives.rentalPaymentTiming);
   const rentalDeadline = rentalContractDate === rentalInvoiceDate ? `Due ${rentalContractDate}` : `Contract due ${rentalContractDate} · Invoice due ${rentalInvoiceDate}`;
+  const invoiceTiming = wasSent ? "Ready now · Contract sent" : "After contract is sent";
+  const eventDates = schedule.eventEndDate === order.eventDate ? formatDateISO(order.eventDate) : `${formatDateISO(order.eventDate)}–${formatDateISO(schedule.eventEndDate)}`;
+  const timelineDates = [
+    { label: "Now", date: today, detail: formatDateISO(today) },
+    { label: "Deposit deadline", date: depositInvoiceDate, detail: depositInvoiceDate },
+    { label: "Rental deadline", date: schedule.rentalDueDate, detail: rentalContractDate },
+    { label: "Event", date: order.eventDate, detail: eventDates },
+    ...(timelineDay(rentalInvoiceDate) !== timelineDay(schedule.rentalDueDate) ? [{ label: "Rental invoice deadline", date: rentalInvoiceDate, detail: rentalInvoiceDate }] : []),
+  ];
   const rentalMilestones = <>
-    <Milestone title="Send rental invoice" detail={rentalDeadline} done={delivered("rental_invoice")}>
+    <Milestone title="Send rental invoice" done={delivered("rental_invoice")}>
+      {!delivered("rental_invoice") && <p className="text-[12px] text-muted">{invoiceTiming}</p>}
       {emailButton("rental_invoice", delivered("rental_invoice") ? "View rental email" : "Review rental invoice", wasSent)}
     </Milestone>
-    <Milestone title="Receive rental payment" detail={`${fmtUSD(rentalPaid)} / ${fmtUSD(order.rentalPrice ?? 0)}`} done={rentalPaid >= (order.rentalPrice ?? Infinity)}>
+    <Milestone title="Receive rental payment" detail={<Deadline date={schedule.rentalDueDate} label={rentalDeadline} today={today} />} done={rentalPaid >= (order.rentalPrice ?? Infinity)}>
+      <p className="text-[12px] text-muted">{fmtUSD(rentalPaid)} / {fmtUSD(order.rentalPrice ?? 0)}</p>
       {emailButton("receipt", "Review payment receipt", rentalPaid > 0 && wasSent)}
     </Milestone>
   </>;
   return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
     <section aria-label="Event timeline" className="min-w-0">
+    <OrderDateStrip dates={timelineDates} today={today} endDate={schedule.eventEndDate} />
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
@@ -235,17 +249,19 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
           <div className="mt-1 flex flex-wrap items-center gap-x-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Signed contract</a>}{signed && revision.files.audit && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
         </>}
       </Milestone>
-      <Milestone title="Send deposit invoice" detail={`Due ${depositInvoiceDate}`} done={delivered("deposit_invoice")}>
+      <Milestone title="Send deposit invoice" done={delivered("deposit_invoice")}>
+        {!delivered("deposit_invoice") && <p className="text-[12px] text-muted">{invoiceTiming}</p>}
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
       </Milestone>
-      <Milestone title="Receive deposit" detail={`${fmtUSD(depositPaid)} / ${fmtUSD(order.depositAmount ?? 0)}`} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
+      <Milestone title="Receive deposit" detail={<Deadline date={depositInvoiceDate} label={`Due ${depositInvoiceDate}`} today={today} />} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
+        <p className="text-[12px] text-muted">{fmtUSD(depositPaid)} / {fmtUSD(order.depositAmount ?? 0)}</p>
         {emailButton("deposit_receipt", "Review deposit receipt", depositPaid > 0 && wasSent)}
       </Milestone>
       {rentalBeforeEvent && rentalMilestones}
       <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} / ${fmtUSD(permitTotal)}` : "Not required"} done={permitTotal === 0 || permitPaid >= permitTotal}>
         {permitTotal > 0 && <a className={timelineAction} href="#event-finances">Update fire permit payment</a>}
       </Milestone>
-      <Milestone title="Event held" detail={schedule.eventEndDate === order.eventDate ? formatDateISO(order.eventDate) : `${formatDateISO(order.eventDate)}–${formatDateISO(schedule.eventEndDate)}`} done={held}>
+      <Milestone title="Event held" detail={<Deadline date={order.eventDate} label={`Event dates · ${eventDates}`} today={today} />} done={held}>
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
       </Milestone>
       {!rentalBeforeEvent && rentalMilestones}
@@ -284,10 +300,13 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     </aside>
   </div>;
 }
-function Milestone({ title, detail, done, children, last = false }: { title: string; detail?: string; done: boolean; children?: ReactNode; last?: boolean }) {
+function Deadline({ date, label, today }: { date: string; label: string; today: string }) {
+  return <span className="block text-right"><span className="block">{label}</span><span className="block">{relativeTimelineDate(date, today)}</span></span>;
+}
+function Milestone({ title, detail, done, children, last = false }: { title: string; detail?: ReactNode; done: boolean; children?: ReactNode; last?: boolean }) {
   return <li className={`relative pl-5 ${last ? "pb-0" : "pb-3"}`}>
     <span aria-hidden="true" className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-surface ${done ? "border-brand text-brand" : "border-rule"}`}>{done && <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" /></svg>}</span>
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><h3 className="text-[15px] font-bold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="text-[12px] text-muted tabular-nums">{detail}</p>}</div>{children && <div className="mt-1">{children}</div>}
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><h3 className="text-[15px] font-bold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="ml-auto max-w-full text-right text-[12px] text-muted tabular-nums">{detail}</p>}</div>{children && <div className="mt-1">{children}</div>}
   </li>;
 }
 function SignatureIcon({ progress }: { progress: SignerProgress }) {
