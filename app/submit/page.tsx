@@ -25,7 +25,7 @@ export default async function SubmitPage() {
           <h1 className="page-title">Submit a reimbursement</h1>
           <p className="page-lede">
             Add the expense details and attach a photo of the receipt. The receipt
-            total is checked automatically before a treasurer reviews it.
+            total is checked automatically before an administrator reviews it.
           </p>
         </div>
       </div>

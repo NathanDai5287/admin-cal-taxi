@@ -128,6 +128,6 @@ test("the paid checkbox is only clickable for approved reimbursements", async ()
   const paymentTable = await readFile(new URL("../components/reimbursements/reimbursement-payment-table.tsx", import.meta.url), "utf8");
   const payableActions = await readFile(new URL("../app/(admin)/finance/accounts/payable/actions.ts", import.meta.url), "utf8");
 
-  assert.match(paymentTable, /disabled=\{item\.status !== "approved"/);
+  assert.match(paymentTable, /disabled=\{!canWrite \|\| item\.status !== "approved"/);
   assert.match(payableActions, /\.eq\("status", "approved"\)/);
 });

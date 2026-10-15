@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAppAccess } from "@/lib/reimbursements/auth";
+import { requireAdmin } from "@/lib/reimbursements/auth";
 import { categorySchema, categoryValues, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";
@@ -20,7 +20,7 @@ export async function setReimbursementStatus(
   denialReason?: string,
   reopenCategory?: ReimbursementCategory,
 ): Promise<StatusMutationResult> {
-  await requireAppAccess("finance", "write");
+  await requireAdmin("/");
 
   const parsed = z.object({
     id: z.uuid(),
@@ -90,7 +90,7 @@ export async function updateStatus(formData: FormData) {
 }
 
 export async function updateMerchant(formData: FormData) {
-  await requireAppAccess("finance", "write");
+  await requireAdmin("/");
 
   const parsed = z.object({
     id: z.uuid(),
@@ -114,7 +114,7 @@ export async function updateMerchant(formData: FormData) {
 }
 
 export async function updateCategory(formData: FormData) {
-  await requireAppAccess("finance", "write");
+  await requireAdmin("/");
 
   const parsed = z.object({
     id: z.uuid(),

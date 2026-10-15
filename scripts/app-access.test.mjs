@@ -16,7 +16,7 @@ const bundle = await build({
     builder.onLoad({ filter: /.*/, namespace: "mock" }, ({ path }) => ({ contents: mocks[path] }));
   } }],
 });
-const { getSessionProfile, requireAppAccess, hasAppAccess } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
+const { getSessionProfile, requireAppAccess, hasAppAccess, requireAdmin } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`);
 
 function setup({ role = "member", removed = false, access = [], error = null, signedIn = true } = {}) {
   const profile = { id: "person", full_name: "Test Person", role, removed_at: removed ? "2026-10-14" : null };
@@ -56,4 +56,13 @@ test("signed-out users cannot read or write", async () => {
   setup({ signedIn: false });
   await assert.rejects(requireAppAccess("roles"), /Redirect: \//);
   assert.equal(hasAppAccess(null, "roles"), false);
+});
+
+
+test("Finance write does not allow administrator reimbursement actions", async () => {
+  setup({ role: "member", access: [{ app_key: "finance", access_level: "write" }] });
+  assert.equal((await requireAppAccess("finance", "write")).userId, "person");
+  await assert.rejects(requireAdmin(), /restricted to administrators/);
+  setup({ role: "admin" });
+  assert.equal((await requireAdmin()).userId, "person");
 });

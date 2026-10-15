@@ -34,7 +34,7 @@ export default async function MemberReimbursementPage({ params }: { params: Prom
       <div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">{status.label}</h2><span className="font-semibold text-brand">{memberPaymentStatus(row.status, row.reimbursed)}</span></div>
       <p className="mt-2 text-sm text-muted">{status.explanation}</p>
       {row.status === "denied" && row.denial_reason && <p className="mt-2 text-sm text-ink"><span className="font-semibold">Reason for denial:</span> {row.denial_reason}</p>}
-      {row.reimbursed && <p className="mt-2 text-sm text-muted">A treasurer has marked this request as paid.</p>}
+      {row.reimbursed && <p className="mt-2 text-sm text-muted">An administrator has marked this request as paid.</p>}
       {row.status === "approved" && !row.reimbursed && <p className="mt-2 text-sm text-muted">Payment has not yet been marked as sent.</p>}
     </section>
     <section className="card mb-5 p-5"><h2 className="mb-4 font-semibold">Expense details</h2><dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">

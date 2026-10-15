@@ -97,7 +97,7 @@ export async function deleteManualExpense(formData: FormData) {
   revalidatePath("/finance/accounts");
   revalidatePath("/finance/reports");
   revalidatePath("/finance/planning");
-  if (data?.receipt_path) await supabase.storage.from("receipts").remove([data.receipt_path]);
+  if (data?.receipt_path?.startsWith("manual/")) await supabase.storage.from("receipts").remove([data.receipt_path]);
   return { ok: true } as const;
 }
 

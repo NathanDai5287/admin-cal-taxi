@@ -4,7 +4,6 @@ import {
   Events,
   GatewayIntentBits,
   Partials,
-  PermissionFlagsBits,
 } from "discord.js";
 
 const approvedEmoji = "✅";
@@ -22,7 +21,6 @@ function requiredEnvironmentVariable(name) {
 
 const botToken = requiredEnvironmentVariable("DISCORD_BOT_TOKEN");
 const channelId = requiredEnvironmentVariable("DISCORD_CHANNEL_ID");
-const reviewerRoleId = process.env.DISCORD_REVIEWER_ROLE_ID?.trim();
 const supabase = createSupabaseClient(
   requiredEnvironmentVariable("NEXT_PUBLIC_SUPABASE_URL"),
   requiredEnvironmentVariable("SUPABASE_SECRET_KEY"),
@@ -44,9 +42,14 @@ async function removeReaction(reaction, userId) {
 
 async function isReviewer(message, userId) {
   if (!message.guild) return false;
-  const member = await message.guild.members.fetch(userId);
-  return member.permissions.has(PermissionFlagsBits.ManageMessages)
-    || Boolean(reviewerRoleId && member.roles.cache.has(reviewerRoleId));
+  const { data, error } = await supabase.from("profiles")
+    .select("id")
+    .eq("discord_user_id", userId)
+    .eq("role", "admin")
+    .is("removed_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
 }
 
 async function showDecision(message, status, reviewerName) {

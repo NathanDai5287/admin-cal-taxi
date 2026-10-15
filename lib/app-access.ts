@@ -4,7 +4,7 @@ export const APP_OPTIONS = [
   { key: "host", label: "Host", href: "/host" },
   { key: "rush", label: "Rush", href: "/rush" },
   { key: "finance", label: "Finance", href: "/finance" },
-  { key: "submit", label: "Reimbursements", href: "/submit" },
+  { key: "submit", label: "Reimbursement submissions", href: "/submit" },
   { key: "accreditation", label: "Accreditation", href: "/accreditation" },
   { key: "ask-policy", label: "Ask Policy", href: "/ask-policy" },
   { key: "nu-news", label: "Nu News", href: "/nu-news" },

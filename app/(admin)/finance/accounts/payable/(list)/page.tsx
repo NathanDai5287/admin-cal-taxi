@@ -9,7 +9,8 @@ import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls
 export const metadata = { title: "Accounts payable" };
 export const dynamic = "force-dynamic";
 export default async function PayablePage() {
-  await requireAppAccess("finance");
+  const session = await requireAppAccess("finance");
+  const canManage = session.profile.role === "admin";
   const supabase = createAdminClient();
   const { data, error } = await loadAllPages((from, to) => supabase.from("reimbursements")
     .select("id, user_id, full_name, amount, category, status, merchant, description, receipt_date, receipt_path, receipt_total, failure_reason, denial_reason, payment_method, reimbursed, submitted_at, updated_at")
@@ -27,13 +28,13 @@ export default async function PayablePage() {
     <div>
       <p className="page-eyebrow">Chapter finances</p>
       <h1 className="page-title">Reimbursements to pay</h1>
-      <p className="page-lede">Review requests, approve or deny them, and record approved payouts here.</p>
+      <p className="page-lede">{canManage ? "Review requests, approve or deny them, and record approved payouts here." : "View requests and payments. Only administrators can change reimbursements."}</p>
     </div>
 
     <section className="dues-summary" aria-label="Reimbursement summary">
       <div className="dues-summary-primary"><span>Ready to pay</span><strong>{formatMoney(total)}</strong><p>Approved and awaiting payout</p></div>
       <div><span>All requests</span><strong>{rows.length}</strong><p>{rows.length === 1 ? "Reimbursement" : "Reimbursements"} submitted</p></div>
-      <div><span>Next step</span><strong className="text-[18px]!">{readyToPay.length ? "Select rows" : "Review requests"}</strong><p>{readyToPay.length ? "Choose approved requests, then confirm payments" : "Approve requests before recording payouts"}</p></div>
+      <div><span>Next step</span><strong className="text-[18px]!">{canManage ? (readyToPay.length ? "Select rows" : "Review requests") : "View requests"}</strong><p>{canManage ? (readyToPay.length ? "Choose approved requests, then confirm payments" : "Approve requests before recording payouts") : "Administrators review requests and record payments"}</p></div>
     </section>
 
     {rows.length ? <>

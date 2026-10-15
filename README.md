@@ -125,9 +125,9 @@ status to `approved`, or ❌ to set it to `denied`.
    not needed.
 3. Set `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`, and
    `REIMBURSEMENTS_WEBHOOK_SECRET` in the website environment. The worker also needs
-   the bot token, channel ID, Supabase URL, and Supabase secret key. Optionally set
-   `DISCORD_REVIEWER_ROLE_ID` on the worker. When it is omitted, only members with
-   Discord's Manage Messages permission may decide a submission.
+   the bot token, channel ID, Supabase URL, and Supabase secret key.
+   Reviewers must have an active Administrator account with their Discord user ID
+   linked on the Users page. Discord server permissions do not grant approval access.
 4. In Supabase, create a Database Webhook for the `public.reimbursements` table.
    Select both Insert and Update events, use
    `https://admin.cal.taxi/api/webhooks/reimbursements` as the POST URL, and add an

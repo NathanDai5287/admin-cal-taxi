@@ -83,9 +83,9 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   assert.equal((await db.query("update mailing_list_contacts set first_name = 'Blocked' returning id")).rows.length, 0);
   await assert.rejects(db.query("insert into mailing_list_contacts(first_name,email) values ('Blocked','blocked@example.test')"), /row-level security/);
   await signIn(db, associate);
-  assert.equal(await access(db, "submit"), false);
+  assert.equal(await access(db, "submit", "write"), true);
   assert.equal((await db.query("select * from mailing_list_contacts")).rows.length, 0);
-  await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('receipts',$1)", [`${associate}/receipt.png`]), /row-level security/);
+  await db.query("insert into storage.objects(bucket_id,name) values ('receipts',$1)", [`${associate}/default-access.png`]);
   await signIn(db, admin);
   await grant(db, "associate_member", "submit", "write");
   await grant(db, "associate_member", "users", "write");
@@ -109,7 +109,7 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   await grant(db, "associate_member", "submit", "read");
   await signIn(db, associate);
   assert.equal((await db.query("select * from reimbursements")).rows.length, 1);
-  assert.equal((await db.query("select * from storage.objects where bucket_id = 'receipts'")).rows.length, 1);
+  assert.equal((await db.query("select * from storage.objects where bucket_id = 'receipts'")).rows.length, 2);
   await assert.rejects(db.query("insert into storage.objects(bucket_id,name) values ('receipts',$1)", [`${associate}/second.png`]), /row-level security/);
   await signIn(db, admin);
   await grant(db, "associate_member", "submit", "none");
@@ -151,4 +151,73 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   assert.equal(await access(db, "submit"), false);
   await signIn(db, member, "test-oauth-client");
   await assert.rejects(db.query("select public.mcp_admin_read('reimbursements')"), /OAuth grant/);
+});
+
+test("submission access cannot change claims, while treasurers can manage other finance records", async (t) => {
+  const db = await setupDatabase(t);
+  const admin = await person(db, "admin");
+  const baseMember = await person(db, "member");
+  const brother = await person(db, "member", "brother");
+  const associate = await person(db, "none", "associate_member");
+  const treasurer = await person(db, "member", "brother", ["treasurer"]);
+  await signIn(db, baseMember);
+  assert.equal(await access(db, "submit"), false);
+  assert.equal(await access(db, "finance"), false);
+  await assert.rejects(db.query(`
+    insert into reimbursements(user_id, full_name, category, amount, description, payment_method, receipt_path)
+    values ($1, 'Base Member', 'house', 20, 'Supplies', 'Check', $2)
+  `, [baseMember, `${baseMember}/receipt.png`]), /row-level security/);
+  for (const submitter of [brother, associate, treasurer]) {
+    await signIn(db, submitter);
+    assert.equal(await access(db, "submit", "write"), true);
+    assert.equal(await access(db, "finance", "write"), submitter === treasurer);
+    await db.query(`
+      insert into reimbursements(user_id, full_name, category, amount, description, payment_method, receipt_path)
+      values ($1, 'Submitter', 'house', 20, 'Supplies', 'Check', $2)
+    `, [submitter, `${submitter}/receipt.png`]);
+    assert.equal((await db.query("update reimbursements set status = 'approved' returning id")).rows.length, 0);
+    await assert.rejects(db.query(`
+      insert into reimbursements(user_id, full_name, category, amount, description, payment_method, receipt_path, status)
+      values ($1, 'Submitter', 'house', 20, 'Supplies', 'Check', $2, 'approved')
+    `, [submitter, `${submitter}/approved.png`]), /row-level security/);
+  }
+  await signIn(db, treasurer);
+  assert.equal((await db.query("select * from reimbursements")).rows.length, 3);
+  await db.query(`
+    insert into reimbursement_manual_expenses(category, amount, description, expense_date, created_by)
+    values ('house', 10, 'Other chapter expense', current_date, $1)
+  `, [treasurer]);
+  const claim = (await db.query("select id from reimbursements where user_id = $1", [brother])).rows[0].id;
+  await signIn(db, treasurer, "test-oauth-client");
+  await assert.rejects(db.query("select mcp_admin_write('update_reimbursement', $1, null, true)", [JSON.stringify({ reimbursementId: claim, paid: true })]), /Only administrators/);
+  await assert.rejects(db.query("select mcp_create_reimbursement($1, 'house', 20, 'Supplies', 'Check', $2, false, $3)", [brother, `mcp/${randomUUID()}.png`, randomUUID()]), /administrator OAuth grant/);
+  await db.exec("reset role; set role service_role");
+  await db.query("update reimbursements set status = 'verified' where id = $1", [claim]);
+  await signIn(db, admin);
+  assert.equal((await db.query("update reimbursements set status = 'approved' where id = $1 returning id", [claim])).rows.length, 1);
+  assert.equal((await db.query("update reimbursements set reimbursed = true where id = $1 returning id", [claim])).rows.length, 1);
+  await signIn(db, admin, "test-oauth-client");
+  await db.query("select mcp_admin_write('update_reimbursement', $1, null, true)", [JSON.stringify({ reimbursementId: claim, paid: false })]);
+  await db.query("select mcp_create_reimbursement($1, 'house', 20, 'Supplies', 'Check', $2, false, $3)", [brother, `mcp/${randomUUID()}.png`, randomUUID()]);
+});
+
+
+test("Discord decisions require a linked active administrator even with service access", async (t) => {
+  const db = await setupDatabase(t);
+  const admin = await person(db, "admin");
+  const treasurer = await person(db, "member", "brother", ["treasurer"]);
+  await db.query("update profiles set discord_user_id = '111111111111111111' where id = $1", [admin]);
+  await db.query("update profiles set discord_user_id = '222222222222222222' where id = $1", [treasurer]);
+  const claim = (await db.query(`
+    insert into reimbursements(user_id, full_name, category, amount, description, payment_method, receipt_path, status)
+    values ($1, 'Submitter', 'house', 20, 'Supplies', 'Check', 'receipt.png', 'verified') returning id
+  `, [treasurer])).rows[0].id;
+  await db.exec("set role service_role");
+  const decide = (discordId) => db.query("update reimbursements set status = 'approved', discord_decided_at = clock_timestamp(), discord_reviewer_id = $1 where id = $2", [discordId, claim]);
+  await assert.rejects(decide("222222222222222222"), /Only administrators/);
+  await assert.rejects(decide("333333333333333333"), /Only administrators/);
+  await decide("111111111111111111");
+  await db.query("update profiles set removed_at = now() where id = $1", [admin]);
+  await assert.rejects(decide("111111111111111111"), /Only administrators/);
+  await db.query("update reimbursements set merchant = 'Updated by app admin' where id = $1", [claim]);
 });

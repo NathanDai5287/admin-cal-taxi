@@ -672,6 +672,10 @@ export type Database = {
       };
       has_app_access: { Args: { app_key: string; required_access?: string }; Returns: boolean };
       has_mcp_app_access: { Args: { app_key: string; required_access?: string }; Returns: boolean };
+      admin_set_app_access: {
+        Args: { app_key: string; access_level: "none" | "read" | "write" };
+        Returns: undefined;
+      };
       admin_set_role_app_access: {
         Args: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
         Returns: undefined;

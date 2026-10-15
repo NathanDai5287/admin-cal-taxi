@@ -278,7 +278,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async ({ expenseId, requestId, confirm }) => {
     const result = await mutate(supabase, "delete_expense", { expenseId }, { requestId, confirmed: confirm });
     const parsed = z.object({ receiptPath: z.string().nullable() }).parse(result);
-    if (parsed.receiptPath) {
+    if (parsed.receiptPath?.startsWith("manual/")) {
       const { error } = await createAdminClient().storage.from("receipts").remove([parsed.receiptPath]);
       if (error) throw new Error("The expense was removed, but its receipt image could not be removed.");
     }
@@ -319,8 +319,8 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     }),
     annotations: { ...writeAnnotations, idempotentHint: true },
   }, async ({ receiptDataUrl, requestId, ...input }) => {
-    const permission = await supabase.rpc("has_mcp_app_access", { app_key: "finance", required_access: "write" });
-    if (permission.error || !permission.data) throw new Error("Finance write access is required.");
+    const permission = await supabase.rpc("is_mcp_admin");
+    if (permission.error || !permission.data) throw new Error("Administrator access is required.");
     const receiptPath = await storeMcpReceipt(receiptDataUrl, requestId);
     const { data, error } = await supabase.rpc("mcp_create_reimbursement", {
       p_member_id: input.memberId,

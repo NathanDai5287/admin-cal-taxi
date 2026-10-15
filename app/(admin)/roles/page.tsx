@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AppNav } from "@/components/brand/app-nav";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
@@ -25,14 +24,11 @@ export default async function RolesPage() {
         <header className="roles-heading">
           <div>
             <h1 className="page-title">Roles</h1>
-            <p className="page-lede">Set each role’s access to each app. Changes save automatically.</p>
           </div>
-          {session.appAccess.users !== "none" && <Link className="btn-ghost roles-users-link" href="/users">Assign roles to users</Link>}
         </header>
         <div className="roles-guidance">
-          <p className="roles-legend"><span><strong data-access="none">None</strong> blocks access.</span><span><strong data-access="read">Read</strong> allows viewing.</span><span><strong data-access="write">Write</strong> allows viewing and changes.</span></p>
-          <p>People receive the highest access from all their roles. Executive roles also include Brother and Executive member.</p>
-          <p>Base member is an account role, separate from chapter membership. Administrators always have write access to every app.</p>
+          <p className="roles-legend"><span><strong data-access="none">None</strong> adds no access.</span><span><strong data-access="read">Read</strong> allows viewing.</span><span><strong data-access="write">Write</strong> allows viewing and changes.</span></p>
+          <p className="helper-text">Roles combine: Write &gt; Read &gt; None.</p>
         </div>
         {session.appAccess.roles !== "write" && <p className="roles-read-notice">You have read access. You cannot change these settings.</p>}
         <section className="card min-w-0" aria-label="Role permissions">
