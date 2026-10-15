@@ -156,7 +156,7 @@ test("rental labels omit details and combine protection into capacity without ch
   const items = buildLineItems(detailed, 2335, "October 3, 2026");
   assert.equal(sum(items), 2335);
   assert.equal(items.find(item => item.description === "Capacity fee").amount, "550.00");
-  assert.equal(items.find(item => item.description === "Alcohol").amount, "100.00");
+  assert.equal(items.find(item => item.description === "Alcohol surcharge").amount, "100.00");
   assert.ok(items.every(item => !/—|protection/i.test(item.description)));
 });
 

@@ -241,7 +241,8 @@ test("rental invoice labels update only unattempted previews and preserve amount
     state.rows = [];
     const line_items = [
       { description: "Base rental — Theta Xi Fraternity House", amount: "150.00" },
-      { description: "Capacity fee — 200 guests", amount: "1030.00" },
+      { description: "Capacity fee — 200 guests", amount: "930.00" },
+      { description: "Alcohol", amount: "100.00" },
       { description: "Property protection — Average", amount: "220.00" },
     ];
     state.order.documents = [{ kind: "rental_invoice", stale: false, sourceSnapshot: {}, generatedAt: "2026-10-04", payload: { line_items } }];
@@ -254,19 +255,20 @@ test("rental invoice labels update only unattempted previews and preserve amount
     const original = await prepareHostingEmail(input);
     assert.deepEqual(generated[0].line_items, [
       { description: "Base rental", amount: "150.00" },
-      { description: "Capacity fee", amount: "1250.00" },
+      { description: "Capacity fee", amount: "1150.00" },
+      { description: "Alcohol surcharge", amount: "100.00" },
     ]);
     assert.deepEqual(state.order.documents[0].payload.line_items, line_items);
-    delete state.rows[0].payload.rentalInvoiceStyle;
+    state.rows[0].payload.rentalInvoiceStyle = 1;
     state.rows[0].payload.body.attachments[0].content = "old detailed PDF";
     const updated = await prepareHostingEmail(input);
     assert.equal(updated[0].id, original[0].id);
-    assert.equal(state.rows[0].payload.rentalInvoiceStyle, 1);
+    assert.equal(state.rows[0].payload.rentalInvoiceStyle, 2);
     assert.equal(generated.length, 2);
     assert.notEqual(state.rows[0].payload.body.attachments[0].content, "old detailed PDF");
     await prepareHostingEmail(input);
     assert.equal(generated.length, 2);
-    delete state.rows[0].payload.rentalInvoiceStyle;
+    state.rows[0].payload.rentalInvoiceStyle = 1;
     state.rows[0].attempted_at = "2026-10-04T12:00:00Z";
     const frozen = structuredClone(state.rows[0].payload);
     for (const status of ["queued", "failed", "sent"]) {
