@@ -1,13 +1,14 @@
+import Link from "next/link";
 import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 
 import { inviteUser } from "@/app/(admin)/users/actions";
 import { MembersTable, type AcademicYearOption } from "@/app/(admin)/users/members-table";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
-export const metadata: Metadata = { title: "Members" };
+export const metadata: Metadata = { title: "Users" };
 export const dynamic = "force-dynamic";
 
 function formatDate(value: string) {
@@ -15,7 +16,7 @@ function formatDate(value: string) {
 }
 
 export default async function UsersPage() {
-  const [session, supabase] = await Promise.all([getSessionProfile(), createClient()]);
+  const [session, supabase] = await Promise.all([requireAppAccess("users"), createClient()]);
   const [profilesResult, yearsResult, termsResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("profiles")
@@ -34,6 +35,7 @@ export default async function UsersPage() {
   if (yearsResult.error || termsResult.error) {
     throw new Error(`Unable to load the academic calendar: ${yearsResult.error?.message ?? termsResult.error?.message}`);
   }
+  const canWrite = session.appAccess.users === "write";
   const profiles = profilesResult.data ?? [];
   const terms = termsResult.data ?? [];
   const academicYears: AcademicYearOption[] = (yearsResult.data ?? []).map((year) => ({
@@ -51,12 +53,12 @@ export default async function UsersPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="page-eyebrow">Chapter admin</p>
-        <h1 className="page-title">Members</h1>
-        <p className="page-lede">Manage contact details, membership, and executive positions.</p>
+        <h1 className="page-title">Users</h1>
+        <p className="page-lede">Manage contact details and assign roles. Set each role’s app access on the Roles page.</p>
+        {session.appAccess.roles !== "none" && <Link className="text-brand underline underline-offset-4" href="/roles">Manage role access</Link>}
       </div>
 
-      <section className="card" aria-labelledby="invite-user-title">
+      {canWrite && <section className="card" aria-labelledby="invite-user-title">
         <div className="card-header">
           <span className="card-title" id="invite-user-title">Invite people</span>
         </div>
@@ -88,10 +90,10 @@ export default async function UsersPage() {
             </select>
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="role">App access</label>
+            <label className="field-label" htmlFor="role">Account role</label>
             <select className="field-input" defaultValue="member" id="role" name="role">
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
+              <option value="member">Base member</option>
+              {session.profile.role === "admin" && <option value="admin">Administrator</option>}
             </select>
           </div>
           <Button variant="primary" type="submit">Invite</Button>
@@ -101,13 +103,16 @@ export default async function UsersPage() {
           member immediately, so you can assign dues before their first Google sign-in.
           When email delivery is configured, they also receive sign-in instructions.
         </p>
-      </section>
+      </section>}
 
       <section className="card" aria-labelledby="members-title">
         <div className="card-header">
-          <span className="card-title" id="members-title">Members</span>
+          <span className="card-title" id="members-title">Users</span>
         </div>
+        {!canWrite && <p className="helper-text px-6 pb-4">You have read access. You cannot change users or their roles.</p>}
         <MembersTable
+          canWrite={canWrite}
+          canAssignAdmin={session.profile.role === "admin"}
           academicYears={academicYears}
           currentUserId={session?.userId ?? ""}
           members={profiles.map((profile) => ({

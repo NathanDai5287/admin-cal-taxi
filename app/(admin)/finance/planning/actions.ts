@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { categories, categorySchema, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -42,7 +42,7 @@ export async function saveReimbursementBudgets(
   _previousState: ExpensePlanState,
   formData: FormData,
 ): Promise<ExpensePlanState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = z.record(z.string(), amountSchema).safeParse(
     Object.fromEntries(budgetKeys.map((key) => [key, formData.get(key)])),
   );
@@ -62,7 +62,7 @@ export async function saveReimbursementBudgets(
 }
 
 export async function setExpenseCategoryCompleted(category: ReimbursementCategory, completed: boolean): Promise<ExpensePlanState> {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = z.object({ category: categorySchema, completed: z.boolean() }).safeParse({ category, completed });
   if (!parsed.success) return { status: "error", message: "Choose a valid category." };
 
@@ -87,7 +87,7 @@ const budgetEntrySchema = z.object({
 });
 
 export async function addBudgetEntry(formData: FormData) {
-  const { userId } = await requireAdmin();
+  const { userId } = await requireAppAccess("finance", "write");
   const parsed = budgetEntrySchema.safeParse({
     amount: formData.get("amount"),
     description: formData.get("description"),
@@ -112,7 +112,7 @@ export async function addBudgetEntry(formData: FormData) {
 }
 
 export async function deleteBudgetEntry(formData: FormData) {
-  await requireAdmin();
+  await requireAppAccess("finance", "write");
   const parsed = z.string().uuid().safeParse(formData.get("id"));
   if (!parsed.success) return { ok: false, message: "Choose a valid forecast." } as const;
 

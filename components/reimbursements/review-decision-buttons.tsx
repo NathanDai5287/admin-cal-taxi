@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
@@ -93,6 +95,7 @@ export function ReviewStatusBadge() {
 }
 
 export function ReviewDecisionButtons({ compact = false, disabled = false }: { compact?: boolean; disabled?: boolean }) {
+  const canWrite = useAppWriteAccess();
   const { change, denialReason, error, pending, status } = useReviewStatus();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [denyOpen, setDenyOpen] = useState(false);
@@ -115,10 +118,10 @@ export function ReviewDecisionButtons({ compact = false, disabled = false }: { c
   }
 
   return <>
-    <Button compact={compact} disabled={disabled || pending || status === "approved"} onClick={() => change("approved")} variant="primary">
+    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "approved"} onClick={() => change("approved")} variant="primary">
       {status === "approved" ? "Approved" : compact ? "Approve" : "Approve submission"}
     </Button>
-    <Button compact={compact} disabled={disabled || pending || status === "denied"} onClick={openDenyDialog} variant="danger">
+    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "denied"} onClick={openDenyDialog} variant="danger">
       {status === "denied" ? "Denied" : compact ? "Deny" : "Deny submission"}
     </Button>
     {status === "denied" && denialReason && !compact

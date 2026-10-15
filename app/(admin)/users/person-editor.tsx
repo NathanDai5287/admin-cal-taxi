@@ -49,7 +49,7 @@ export function PersonEditor({ member, onClose }: { member: MemberRow; onClose: 
           <input ref={nameInput} className="field-input" id="person-name" name="fullName" defaultValue={member.fullName} maxLength={120} required />
         </div>
         <div className="field">
-          <label className="field-label" htmlFor="person-membership">Membership</label>
+          <label className="field-label" htmlFor="person-membership">Membership role</label>
           <select className="field-input" id="person-membership" name="membership" value={membership} onChange={(event) => setMembership(event.target.value)}>
             <option value="">Not classified</option>
             <option value="brother">Brother</option>
@@ -67,8 +67,8 @@ export function PersonEditor({ member, onClose }: { member: MemberRow; onClose: 
         </div>
       </fieldset>
       <fieldset disabled={pending} className="grid gap-3">
-        <legend className="field-label mb-3">Executive positions</legend>
-        <p className="helper-text">Only brothers can hold positions. Each position has one person, except rush chair.</p>
+        <legend className="field-label mb-3">Executive roles</legend>
+        <p className="helper-text">Only brothers can hold executive roles. These also assign the Executive member role. Multiple people can be rush chair.</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {EXECUTIVE_ROLE_OPTIONS.map(({ value, label }) => (
             <label className="flex items-center gap-2 text-sm" key={value}>

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 export async function POST(request: Request) {
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "admin") {
+  if (!session || !hasAppAccess(session, "connections", "write")) {
     return NextResponse.json({ error: "Administrator access required" }, { status: 403 });
   }
 

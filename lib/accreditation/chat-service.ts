@@ -33,7 +33,7 @@ import type { ExtractedChunk } from "@/lib/accreditation/types";
 import { resolveChatDates, type ChatDateResolution } from "@/lib/accreditation/chat-dates";
 import { policyClient } from "@/lib/policy/server";
 import { buildPolicyToolContext, clockQuestionIntent, describeClock, extractWeekdayDeadlineCounts, getPolicyClock } from "@/lib/policy/tools";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 
 const inputSchema = z.object({
   message: z.string().trim().min(1).max(4_000),
@@ -202,7 +202,7 @@ const chatIdSchema = z.string().uuid();
 
 export async function listAccreditationAskChats(): Promise<{ chats: AccreditationAskChatSummary[]; error?: string }> {
   if (!accreditationEnabled()) return { chats: [], error: "Accreditation is disabled." };
-  await requireAdmin("/");
+  await requireAppAccess("ask-policy", "read");
 
   const db = await policyClient();
   const result = await db.from("accreditation_ask_chats")
@@ -224,7 +224,7 @@ export async function listAccreditationAskChats(): Promise<{ chats: Accreditatio
 
 export async function loadAccreditationAskChat(chatId: string): Promise<{ chat?: AccreditationAskChatSummary; turns?: AccreditationAskChatTurn[]; error?: string }> {
   if (!accreditationEnabled()) return { error: "Accreditation is disabled." };
-  await requireAdmin("/");
+  await requireAppAccess("ask-policy", "read");
   const parsedId = chatIdSchema.safeParse(chatId);
   if (!parsedId.success) return { error: "That chat could not be opened." };
 
@@ -279,7 +279,7 @@ export async function loadAccreditationAskChat(chatId: string): Promise<{ chat?:
 
 export async function deleteAccreditationAskChat(chatId: string): Promise<{ success?: true; error?: string }> {
   if (!accreditationEnabled()) return { error: "Accreditation is disabled." };
-  await requireAdmin("/");
+  await requireAppAccess("ask-policy", "write");
   const parsedId = chatIdSchema.safeParse(chatId);
   if (!parsedId.success) return { error: "That chat could not be deleted." };
 
@@ -354,7 +354,7 @@ export async function runAccreditationChat(
   options: { adminAuthorized?: boolean; onTextDelta?: (delta: string) => void; signal?: AbortSignal } = {},
 ): Promise<AccreditationChatResult> {
   if (!accreditationEnabled()) return { error: "Accreditation is disabled." };
-  if (!options.adminAuthorized) await requireAdmin("/");
+  if (!options.adminAuthorized) await requireAppAccess("ask-policy", "write");
 
   const parsed = inputSchema.safeParse({
     message: formData.get("message"),

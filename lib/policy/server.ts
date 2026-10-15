@@ -1,13 +1,12 @@
 import "server-only";
 import { notFound } from "next/navigation";
-import { requireMember } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 
 export function policyEnabled() { return process.env.POLICY_ASSISTANT_ENABLED === "true"; }
-export async function requirePolicyMember() {
+export async function requirePolicyMember(access: "read" | "write" = "read") {
   if (!policyEnabled()) notFound();
-  const session = await requireMember("/");
-  if (session.profile.role !== "admin" && process.env.POLICY_ASSISTANT_MEMBERS_ENABLED !== "true") notFound();
+  const session = await requireAppAccess("policy", access);
   return session;
 }
 // Isolated schema follows the migration; reads/searches still use the user's RLS session.

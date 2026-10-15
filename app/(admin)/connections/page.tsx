@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/brand/button";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { revokeConnection } from "./actions";
 
@@ -13,7 +13,7 @@ export default async function ConnectionsPage({
 }: {
   searchParams: Promise<{ result?: string }>;
 }) {
-  await requireAdmin("/");
+  const session = await requireAppAccess("connections");
   const [{ result }, supabase] = await Promise.all([searchParams, createClient()]);
   const { data: grants, error } = await supabase.auth.oauth.listGrants();
 
@@ -39,7 +39,7 @@ export default async function ConnectionsPage({
                 </div>
                 <form action={revokeConnection}>
                   <input name="clientId" type="hidden" value={grant.client.id} />
-                  <Button compact type="submit" variant="danger">Remove access</Button>
+                  <Button compact type="submit" variant="danger" disabled={session.appAccess.connections !== "write"}>Remove access</Button>
                 </form>
               </li>
             ))}

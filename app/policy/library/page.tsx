@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { requirePolicyMember } from "@/lib/policy/server";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { Button } from "@/components/brand/button";
@@ -13,7 +13,7 @@ function MetadataFields({ values = {} }: { values?: Record<string, unknown> }) {
 const button = "rounded bg-brand px-4 py-2 text-sm font-bold text-white";
 export default async function PolicyLibrary({ searchParams }: { searchParams: Promise<{ message?: string }> }) {
   await requirePolicyMember();
-  await requireAdmin("/");
+  await requireAppAccess("policy");
   const params = await searchParams;
   const db = createAccreditationAdminClient();
   const result = await db.from("policy_documents").select("*").order("created_at", { ascending: false });

@@ -1,4 +1,6 @@
 "use client";
+
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 import { Button } from "@/components/brand/button";
 
 import Link from "next/link";
@@ -57,6 +59,7 @@ function selectionKey(row: PaymentTableRow) {
 }
 
 export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] }) {
+  const canWrite = useAppWriteAccess();
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -439,7 +442,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
             {paymentGroups.length} {paymentGroups.length === 1 ? "member" : "members"}
           </span>
           <Button variant="secondary" compact disabled={selectedRows.length === 0} onClick={() => setSelectedKeys(new Set())} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Clear</Button>
-          <Button variant="primary" compact disabled={selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Confirm selected payouts</Button>
+          <Button variant="primary" compact disabled={!canWrite || selectedRows.length === 0} onClick={openReviewDialog} tabIndex={selectedRows.length === 0 ? -1 : undefined} type="button">Confirm selected payouts</Button>
         </div>
       </div>
       <div className="table-scroll border-t border-rule">
@@ -453,7 +456,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     aria-label="Select all approved unpaid reimbursements"
                     checked={allEligibleSelected}
                     className="checkbox-brand"
-                    disabled={!eligibleRows.length}
+                    disabled={!canWrite || !eligibleRows.length}
                     onChange={toggleAll}
                     ref={selectAllRef}
                     type="checkbox"
@@ -487,7 +490,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                         : `Reimbursement from ${item.full_name} is not eligible for payment`}
                       checked={selectedKeys.has(selectionKey(item))}
                       className="checkbox-brand"
-                      disabled={!eligible}
+                      disabled={!canWrite || !eligible}
                       onChange={(event) => toggleRow(item, event.currentTarget.checked)}
                       title={eligible ? undefined : "Only approved, unpaid reimbursements can be selected"}
                       type="checkbox"
@@ -524,7 +527,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td>
                     <div className="inline-action">
                       <InlineStatusSelect
-                        disabled={item.reimbursed || item.status === "pending" || pendingFields.has(`${item.id}:status`)}
+                        disabled={!canWrite || item.reimbursed || item.status === "pending" || pendingFields.has(`${item.id}:status`)}
                         onChange={(status) => requestStatusChange(item, status)}
                         status={item.status}
                       />
@@ -533,7 +536,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td>
                     <div className="inline-action">
                       <ReimbursedCheckbox
-                        disabled={item.status !== "approved" || pendingFields.has(`${item.id}:reimbursed`)}
+                        disabled={!canWrite || item.status !== "approved" || pendingFields.has(`${item.id}:reimbursed`)}
                         onChange={(reimbursed) => void changeReimbursed(item, reimbursed)}
                         reimbursed={item.reimbursed}
                         title={item.status === "approved" ? undefined : "Only approved reimbursements can be marked paid"}

@@ -1,4 +1,6 @@
 "use client";
+
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 import { Button } from "@/components/brand/button";
 
 import { useEffect, useState, useTransition } from "react";
@@ -7,6 +9,7 @@ import { updateMerchant } from "@/app/(admin)/finance/review/actions";
 
 // Inline rename for the expense (merchant) shown in the submissions table.
 export function EditableMerchant({ id, merchant }: { id: string; merchant: string | null }) {
+  const canWrite = useAppWriteAccess();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(merchant ?? "");
   const [error, setError] = useState("");
@@ -22,7 +25,7 @@ export function EditableMerchant({ id, merchant }: { id: string; merchant: strin
     return (
       <span className="inline-flex items-center gap-2 flex-wrap">
         <span>{value.trim() ? value : "Not detected"}</span>
-        <Button disabled={pending} variant="text" onClick={() => setEditing(true)} type="button">
+        <Button disabled={!canWrite || pending} variant="text" onClick={() => setEditing(true)} type="button">
           {pending ? "Saving…" : "Rename"}
         </Button>
       </span>
@@ -60,12 +63,12 @@ export function EditableMerchant({ id, merchant }: { id: string; merchant: strin
         placeholder="Expense name"
         required
       />
-      <Button variant="primary" compact disabled={pending} type="submit">
+      <Button variant="primary" compact disabled={!canWrite || pending} type="submit">
         {pending ? "Saving…" : "Save"}
       </Button>
       <Button
         variant="secondary" compact
-        disabled={pending}
+        disabled={!canWrite || pending}
         onClick={() => setEditing(false)}
         type="button"
       >

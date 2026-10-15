@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { sendDiscordAnnouncement } from "@/lib/reimbursements/discord";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 
@@ -26,7 +26,7 @@ export async function sendMemberAnnouncement(
   _previousState: MemberAnnouncementState,
   formData: FormData,
 ): Promise<MemberAnnouncementState> {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
 
   const parsed = announcementSchema.safeParse({
     message: formData.get("message"),

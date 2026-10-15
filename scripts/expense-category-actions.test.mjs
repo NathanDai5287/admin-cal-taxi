@@ -32,7 +32,7 @@ async function loadAction() {
     .replace('import { revalidatePath } from "next/cache";', "const revalidatePath = () => {};")
     .replace('import { redirect } from "next/navigation";', "const redirect = () => {};")
     .replace('import { z } from "zod";', `import { z } from "${new URL("../node_modules/zod/index.js", import.meta.url)}";`)
-    .replace('import { requireAdmin } from "@/lib/reimbursements/auth";', 'const requireAdmin = async () => ({ userId: "admin" });')
+    .replace('import { requireAppAccess } from "@/lib/reimbursements/auth";', 'const requireAppAccess = async () => ({ userId: "admin" });')
     .replace(/import \{ categories, categorySchema, type ReimbursementCategory \} from [^;]+;/, 'const categories = [["administration"], ["rush"], ["house"]]; const categorySchema = z.enum(["administration", "rush", "house"]);')
     .replace('import { createAdminClient } from "@/lib/reimbursements/supabase/admin";', databaseMock);
   const compiled = ts.transpileModule(isolated, {

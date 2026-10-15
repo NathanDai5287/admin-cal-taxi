@@ -23,7 +23,8 @@
     "test:venue": "node --test scripts/venue-inquiries.test.mjs",
     "test:mailing-list": "node --test scripts/mailing-list.test.mjs scripts/mailing-list-database.test.mjs scripts/mailing-list-actions.test.mjs",
     "test:nu-news": "node --test scripts/nu-news.test.mjs scripts/nu-news-database.test.mjs scripts/nu-news-mcp.test.mjs",
-    "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh"
+    "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh",
+    "test:access": "node --test scripts/app-access.test.mjs scripts/role-app-access-database.test.mjs scripts/mailing-list-actions.test.mjs scripts/nu-news-mcp.test.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",

@@ -4,7 +4,7 @@ import { build } from "esbuild";
 
 const fixture = `
 export const state = { allowed: true, writes: 0, error: false, rows: [], paths: [] };
-export async function requireAdmin() { if (!state.allowed) throw Error('Not authorized'); return { userId: 'administrator' }; }
+export async function requireAppAccess() { if (!state.allowed) throw Error('Not authorized'); return { userId: 'administrator' }; }
 export function revalidatePath(path) { state.paths.push(path); }
 export function createAdminClient() {
   return { from(table) {

@@ -8,7 +8,7 @@ const bundle = await build({
     builder.onResolve({ filter: /^(server-only|next\/cache|@\/lib\/reimbursements\/auth|@\/lib\/reimbursements\/supabase\/admin)$/ }, (args) => ({ path: args.path, namespace: "mock" }));
     builder.onLoad({ filter: /.*/, namespace: "mock" }, (args) => ({ contents: args.path === "server-only" ? "" : args.path === "next/cache"
       ? "export const revalidatePath = p => globalThis.mailingTest.invalidations.push(p);"
-      : args.path.endsWith("/auth") ? "export const requireAdmin = async () => { if (!globalThis.mailingTest.admin) throw new Error('Unauthorized'); };"
+      : args.path.endsWith("/auth") ? "export const requireAppAccess = async (app, level = 'read') => { if (app !== 'mailing-list' || !globalThis.mailingTest.admin || (level === 'write' && globalThis.mailingTest.readOnly)) throw new Error('Unauthorized'); };"
       : "export const createAdminClient = () => { globalThis.mailingTest.clients++; return globalThis.mailingTest.client; };" }));
   } }],
 });
@@ -17,7 +17,7 @@ const contact = { first_name: "Alex", last_name: "Smith", email: "ALEX@example.c
 const id = "e5de54f9-bb27-44af-8d4d-de178cfdb234";
 const state = () => (globalThis.mailingTest = { admin: true, clients: 0, invalidations: [], client: null });
 
-test("every action checks admin authorization before accessing storage", async () => {
+test("every action checks app authorization before accessing storage", async () => {
   const s = state(); s.admin = false;
   await assert.rejects(saveContact(contact), /Unauthorized/);
   await assert.rejects(importContacts([contact]), /Unauthorized/);
@@ -97,4 +97,13 @@ test("save errors preserve input and distinguish duplicate and removed records",
   assert.equal((await saveContact(contact, id)).ok, true);
   assert.deepEqual(s.invalidations, ["/mailing-list"]);
   assert.equal(contact.email, "ALEX@example.com");
+});
+
+test("read access blocks all mailing-list mutations before storage", async () => {
+  const s = state();
+  s.readOnly = true;
+  await assert.rejects(saveContact(contact), /Unauthorized/);
+  await assert.rejects(importContacts([contact]), /Unauthorized/);
+  await assert.rejects(deleteContact(id), /Unauthorized/);
+  assert.equal(s.clients, 0);
 });

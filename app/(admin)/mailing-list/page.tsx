@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { contactSearchFilters } from "@/lib/mailing-list/contacts";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { MailingList } from "./mailing-list";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 export default async function MailingListPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
-  await requireAdmin("/");
+  await requireAppAccess("mailing-list");
   const params = await searchParams;
   const search = typeof params.q === "string" ? params.q.trim().slice(0, 100) : "";
   const requestedPage = Math.min(1_000_000, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));

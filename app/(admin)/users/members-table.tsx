@@ -180,10 +180,14 @@ export function MembersTable({
   members,
   currentUserId,
   academicYears,
+  canWrite,
+  canAssignAdmin,
 }: {
   members: MemberRow[];
   currentUserId: string;
   academicYears: AcademicYearOption[];
+  canWrite: boolean;
+  canAssignAdmin: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingMember = members.find((member) => member.id === editingId);
@@ -278,7 +282,7 @@ export function MembersTable({
             <th>Contact</th>
             <th>Discord ID</th>
             <th>Member since</th>
-            <th>App access</th>
+            <th>Account role</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -290,7 +294,7 @@ export function MembersTable({
             return (
               <tr key={member.id}>
                 <td>
-                  <button type="button" className="text-brand underline underline-offset-4 text-left" onClick={() => setEditingId(member.id)}>
+                  <button type="button" disabled={!canWrite} className="text-brand underline underline-offset-4 text-left disabled:text-ink disabled:no-underline" onClick={() => setEditingId(member.id)}>
                     {userLabel(member.fullName, member.email)}
                   </button>
                   {isYou ? <span className="text-muted"> (you)</span> : null}
@@ -306,7 +310,7 @@ export function MembersTable({
                 </td>
                 <td>
                   <DiscordMemberId
-                    disabled={memberPending}
+                    disabled={!canWrite || memberPending}
                     member={member}
                     onSave={(discordUserId) => changeDiscordUserId(member.id, discordUserId)}
                   />
@@ -315,7 +319,7 @@ export function MembersTable({
                   <select
                     aria-label={`Academic term for ${userLabel(member.fullName, member.email)}`}
                     className="field-input min-w-40"
-                    disabled={memberPending || !academicYears.length}
+                    disabled={!canWrite || memberPending || !academicYears.length}
                     onChange={(event) => changeAcademicTerm(member.id, event.target.value)}
                     value={member.memberSinceTermId}
                   >
@@ -329,9 +333,9 @@ export function MembersTable({
                 </td>
                 <td>
                   <select
-                    aria-label={`App access for ${userLabel(member.fullName, member.email)}`}
+                    aria-label={`Account role for ${userLabel(member.fullName, member.email)}`}
                     className="field-input"
-                    disabled={isYou || memberPending}
+                    disabled={!canWrite || !canAssignAdmin || isYou || memberPending}
                     onChange={(event) => changeRole(member.id, event.target.value as "member" | "admin")}
                     title={isYou ? "You can't change your own role" : undefined}
                     value={member.role}
@@ -344,15 +348,15 @@ export function MembersTable({
                         No access
                       </option>
                     ) : null}
-                    <option value="member">Member</option>
-                    <option value="admin">Admin</option>
+                    <option value="member">Base member</option>
+                    <option value="admin">Administrator</option>
                   </select>
                 </td>
                 <td className="whitespace-nowrap">
                   <span className={member.hasSignedIn ? "text-ok" : "text-caution"}>{member.statusLabel}</span>
                 </td>
                 <td>
-                  <RemoveButton disabled={isYou || memberPending} onRemove={() => remove(member.id)} />
+                  <RemoveButton disabled={!canWrite || isYou || memberPending} onRemove={() => remove(member.id)} />
                   {errors.get(member.id) ? <span className="form-message ml-2" role="alert">{errors.get(member.id)}</span> : null}
                 </td>
               </tr>

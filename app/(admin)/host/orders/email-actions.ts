@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { prepareHostingEmail, deliverHostingEmails, sendCompletedContract } from "@/lib/host-email";
 import { currentRevision, contractWasSent, eventToday } from "@/lib/host-event";
 import { listSigning, syncSigning } from "@/lib/host-signing";
@@ -12,7 +12,7 @@ const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId
 function failure(error: unknown) { return { ok: false as const, error: error instanceof Error ? error.message : "Request failed. Please retry." }; }
 function refresh(orderId: string) { revalidatePath(`/host/orders/${orderId}`); revalidatePath("/host/orders"); revalidatePath("/finance/planning"); }
 export async function recordHostingDepositAction(input: { orderId: string; amount: number; paidDate: string; requestId: string }) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   try {
     const parsed = z.object({ orderId: z.string().min(1).max(200), amount: z.number().positive(), paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), requestId: z.string().uuid() }).parse(input);
     if (parsed.paidDate > eventToday()) throw new Error("Choose today or an earlier payment date.");
@@ -25,7 +25,7 @@ export async function recordHostingDepositAction(input: { orderId: string; amoun
   } catch (error) { return failure(error); }
 }
 export async function undoHostingDepositAction(input: { orderId: string; paymentIds: string[] }) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   try {
     const parsed = z.object({ orderId: z.string().min(1).max(200), paymentIds: z.array(z.string().uuid()).min(1).max(500) }).parse(input);
     const { error } = await workflowDb().from("hosting_deposit_payments").update({ reversed_at: new Date().toISOString(), reversed_by: userId, reversal_reason: "Paid status undone" }).eq("order_id", parsed.orderId).in("id", parsed.paymentIds).is("reversed_at", null);
@@ -35,18 +35,18 @@ export async function undoHostingDepositAction(input: { orderId: string; payment
   } catch (error) { return failure(error); }
 }
 export async function previewHostingEmailAction(input: z.infer<typeof requestSchema>) {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try { return { ok: true as const, data: await prepareHostingEmail(requestSchema.parse(input)) }; } catch (error) { return failure(error); }
 }
 export async function sendHostingEmailAction(orderId: string, ids: string[]) {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId); z.array(z.string().uuid()).min(1).max(40).parse(ids);
     const data = await deliverHostingEmails(orderId, ids); refresh(orderId); return { ok: true as const, data };
   } catch (error) { return failure(error); }
 }
 export async function refreshHostingProgressAction(orderId: string) {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId);
     const revision = currentRevision(await listSigning(orderId));
@@ -60,7 +60,7 @@ export async function refreshHostingProgressAction(orderId: string) {
   } catch (error) { refresh(orderId); return failure(error); }
 }
 export async function copyHostingSigningLinkAction(orderId: string, revisionId: string, email: string) {
-  await requireAdmin("/");
+  await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId); z.string().max(200).parse(revisionId); z.string().email().parse(email);
     const revision = currentRevision(await listSigning(orderId));
@@ -72,7 +72,7 @@ export async function copyHostingSigningLinkAction(orderId: string, revisionId: 
   } catch (error) { return failure(error); }
 }
 export async function cancelHostingEventAction(orderId: string) {
-  const { userId } = await requireAdmin("/");
+  const { userId } = await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId);
     if (!await getOrderFresh(orderId)) throw new Error("Order not found.");

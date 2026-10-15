@@ -3,7 +3,7 @@ import { z } from "zod";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { policyEnabled } from "@/lib/policy/server";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   if (type !== "policy" && type !== "accreditation") return Response.json({ error: "Invalid document type" }, { status: 400 });
   if ((type === "policy" && !policyEnabled()) || (type === "accreditation" && !accreditationEnabled())) return Response.json({ error: "Not found" }, { status: 404 });
   const session = await getSessionProfile();
-  if (!session || session.profile.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || !hasAppAccess(session, type, "read")) return Response.json({ error: "Forbidden" }, { status: 403 });
   const ids = idsSchema.safeParse((url.searchParams.get("ids") ?? "").split(",").filter(Boolean));
   if (!ids.success) return Response.json({ error: "Invalid document IDs" }, { status: 400 });
   const table = type === "policy" ? "policy_documents" : "accreditation_sources";

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { APP_OPTIONS, type AppKey, type AccessLevel } from "@/lib/app-access";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
@@ -11,6 +12,7 @@ export type SessionProfile = {
   userId: string;
   email: string;
   avatarUrl: string;
+  appAccess: Partial<Record<AppKey, AccessLevel>>;
   profile: {
     id: string;
     full_name: string;
@@ -204,14 +206,20 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
       userId,
       email,
       avatarUrl,
+      appAccess: {},
       profile: { id: userId, full_name: "", role: "none" },
     };
   }
+
+  const accessResult = await supabase.rpc("get_my_app_access");
+  if (accessResult.error) throw new Error("Unable to load app access.");
+  const appAccess = Object.fromEntries((accessResult.data ?? []).map((grant) => [grant.app_key, grant.access_level]));
 
   return {
     userId,
     email,
     avatarUrl,
+    appAccess: profile.removed_at ? {} : appAccess,
     // Soft-deleted members keep their row but are treated as having no access.
     profile: {
       id: profile.id,
@@ -251,6 +259,21 @@ export async function requireAdmin(loginPath = "/reimbursements/login") {
   }
   if (session.profile.role !== "admin") {
     throw new Error("This area is restricted to administrators.");
+  }
+  return session;
+}
+
+export function hasAppAccess(session: SessionProfile | null, app: AppKey, level: "read" | "write" = "read") {
+  const access = session?.appAccess[app] ?? "none";
+  return access === "write" || (level === "read" && access === "read");
+}
+
+export async function requireAppAccess(app: AppKey, level: "read" | "write" = "read", loginPath = "/") {
+  const session = await getSessionProfile();
+  if (!session) redirect(loginPath);
+  if (!hasAppAccess(session, app, level)) {
+    const label = APP_OPTIONS.find((option) => option.key === app)?.label ?? app;
+    throw new Error(`You do not have ${level} access to ${label}.`);
   }
   return session;
 }

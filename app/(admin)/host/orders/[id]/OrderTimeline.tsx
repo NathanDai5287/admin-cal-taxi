@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
@@ -24,6 +26,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
   rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string;
 }) {
+  const canWrite = useAppWriteAccess();
   const router = useRouter();
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [previews, setPreviews] = useState<EmailPreview[]>([]); const [previewIndex, setPreviewIndex] = useState(0);
@@ -53,14 +56,14 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const wasSent = contractWasSent(revision, workflow);
   const signed = revision?.state === "signed" || (!!revision && revision.totalCount > 0 && revision.signedCount >= revision.totalCount);
   const held = progress.stage === "held";
-  const allowed = emailConfigured && !signingUnavailable && !cancelled && !!revision;
+  const allowed = canWrite && emailConfigured && !signingUnavailable && !cancelled && !!revision;
   const delivered = (kind: EmailKind) => workflow.deliveries.some(d => d.kind === kind && d.status === "sent" && d.revision_id === revision?.id);
   const hasUnsentInvitation = workflow.deliveries.some(d => d.kind === "invitation" && d.status !== "sent" && d.revision_id === revision?.id)
     || !!revision?.recipients.some(person => ["not_sent", "unconfirmed"].includes(signerProgress(person, revision, workflow).state));
 
   useEffect(() => {
     async function poll() {
-      if (polling.current || pausePolling.current || document.visibilityState !== "visible" || cancelled) return;
+      if (!canWrite || polling.current || pausePolling.current || document.visibilityState !== "visible" || cancelled) return;
       polling.current = true;
       try {
         const result = await refreshHostingProgressAction(order.id);
@@ -74,7 +77,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     // Initial render uses saved signing state, so no editor ever flashes.
     void poll();
     return () => { clearInterval(timer); window.removeEventListener("focus", poll); };
-  }, [order.id, cancelled, router]);
+  }, [canWrite, order.id, cancelled, router]);
 
   const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, depositPaid, today, cancelled]);
   const [previewScope, setPreviewScope] = useState("");
@@ -179,8 +182,8 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     try { const result = await copyHostingSigningLinkAction(order.id, revision.id, email); if (!result.ok) { setMessage(result.error); return; } await navigator.clipboard.writeText(result.data); setMessage("Personal signing link copied."); } catch { setMessage("Clipboard unavailable. Reload and retry."); }
   }
   const emailButton = (kind: EmailKind, label: string, enabled = true) => kind === "invitation" && !wasSent
-    ? <Button compact disabled={busy || preparing || !allowed || !enabled} onClick={() => prepare(kind)}>{label}</Button>
-    : <button type="button" className={timelineAction} disabled={busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
+    ? <Button compact disabled={!canWrite || busy || preparing || !allowed || !enabled} onClick={() => prepare(kind)}>{label}</Button>
+    : <button type="button" className={timelineAction} disabled={!canWrite || busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
   const visiblePdf = pdfPreview?.scope === scope ? pdfPreview : null;
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
   const activity = workflow.deliveries.filter(d => d.status !== "queued");
@@ -208,7 +211,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     {signingUnavailable && <p className="mb-6 text-sm text-warn">Could not verify signing history. Reload before sending documents.</p>}
     <ol aria-label="Event stages" className="ml-2 border-l border-rule">
       <Milestone title="Approve contract" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision}>
-        {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <Button compact disabled={busy || reviewingContract || cancelled || signingUnavailable} onClick={reviewContract}>{reviewingContract ? "Reviewing contract…" : "Review contract"}</Button>}
+        {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <Button compact disabled={!canWrite || busy || reviewingContract || cancelled || signingUnavailable} onClick={reviewContract}>{reviewingContract ? "Reviewing contract…" : "Review contract"}</Button>}
       </Milestone>
       <Milestone title="Send contract" detail={wasSent ? "Sent" : "Draft until sent"} done={wasSent}>
         {!revision && <p className="text-[12px] text-muted">Approve the contract to review its emails.</p>}
@@ -223,7 +226,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
               return <li key={person.email} className="grid grid-cols-[1rem_minmax(0,1.1fr)_minmax(0,1fr)] items-start gap-x-2.5 py-1">
                 <span className="pt-0.5"><SignatureIcon progress={signature} /></span>
                 <div className="min-w-0"><p className="font-medium text-ink [overflow-wrap:anywhere]">{person.name}</p><a href={`mailto:${person.email}`} title={person.email} className="mt-0.5 block truncate text-[11px] text-muted hover:text-brand">{person.email}</a>
-                  {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
+                  {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={!canWrite || busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={!canWrite || busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
                 </div>
                 <p className="leading-snug text-muted [overflow-wrap:anywhere]">{club || "—"}</p>
               </li>;
@@ -253,9 +256,9 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
     <section id="deposit-return-details" aria-label="Deposit return details" className="mt-5 scroll-mt-6">
       <h3 className="text-[13px] font-semibold">Deposit return</h3>
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
-        <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
-        <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" min={representatives.rentalPaymentTiming === "day_before" ? schedule.eventEndDate : undefined} max={today} value={refund.date} disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
-        <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
+        <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
+        <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" min={representatives.rentalPaymentTiming === "day_before" ? schedule.eventEndDate : undefined} max={today} value={refund.date} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
+        <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
         <div className="col-span-2">{emailButton("refund", "Review return confirmation", wasSent && canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
       </div>
     </section>
@@ -267,7 +270,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
         {d.error && <p className="mt-1 text-warn [overflow-wrap:anywhere]">{d.error}</p>}
       </li>)}</ul>
     </section>}
-    {!cancelled && <Button className="mt-5" variant="text" compact disabled={busy || reviewingContract} onClick={cancel}>Cancel event</Button>}
+    {!cancelled && <Button className="mt-5" variant="text" compact disabled={!canWrite || busy || reviewingContract} onClick={cancel}>Cancel event</Button>}
     </section>
     <aside ref={previewSection} aria-label="Document previews" className="min-w-0 scroll-mt-6 pt-5 lg:sticky lg:top-6 lg:pt-0">
       {reviewingContract && !cancelled && !signingUnavailable ? <>

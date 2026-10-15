@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import {
   getRushLeads,
   getRushVotes,
@@ -11,6 +12,7 @@ import { RushAccessControl } from "./access-control";
 export const dynamic = "force-dynamic";
 
 export default async function RushAdminPage() {
+  const session = await requireAppAccess("rush");
   const [leads, votes, pairs, scans] = await Promise.all([
     getRushLeads(),
     getRushVotes(),
@@ -215,7 +217,7 @@ export default async function RushAdminPage() {
           <h2 className="text-lg font-semibold text-ink">
             Pizza topping votes
           </h2>
-          <ResetVotesButton />
+          {session.appAccess.rush === "write" && <ResetVotesButton />}
         </div>
         {votes.length === 0 ? (
           <p className="mt-3 text-sm text-muted">No votes yet.</p>
@@ -289,7 +291,7 @@ export default async function RushAdminPage() {
                     <td className="px-4 py-2 text-ink">
                       {entry.leadCount}
                     </td>
-                    <RushAccessControl banned={entry.banned} deviceId={entry.deviceId} ip={entry.ip} />
+                    {session.appAccess.rush === "write" ? <RushAccessControl banned={entry.banned} deviceId={entry.deviceId} ip={entry.ip} /> : entry.banned ? "Blocked" : "Allowed"}
                   </tr>
                 ))}
               </tbody>

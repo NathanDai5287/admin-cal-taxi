@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { redirect } from "next/navigation";
 
 /**
@@ -5,6 +6,7 @@ import { redirect } from "next/navigation";
  * generates all four PDFs (contract, both invoices, and the credit memo)
  * from one page. This redirect keeps old bookmarks and links working.
  */
-export default function InvoicePage() {
+export default async function InvoicePage() {
+  await requireAppAccess("host");
   redirect("/host/documents");
 }

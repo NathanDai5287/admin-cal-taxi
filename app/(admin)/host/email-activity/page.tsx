@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { requireAppAccess, getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 import { emailTrackingEnabled, loadEmailActivity, type EmailActivity } from "@/lib/email-tracking";
 
@@ -63,9 +63,10 @@ function EmailRecord({ message }: { message: EmailActivity }) {
 export default async function EmailActivityPage({ searchParams }: {
   searchParams: Promise<{ order?: string }>;
 }) {
+  await requireAppAccess("host");
   const session = await getSessionProfile();
   if (!session) redirect("/");
-  if (session.profile.role !== "admin") {
+  if (!hasAppAccess(session, "host")) {
     return <AccessDenied showSubmitLink={session.profile.role === "member"} />;
   }
   const { order } = await searchParams;

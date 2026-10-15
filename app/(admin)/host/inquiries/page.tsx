@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { listVenueInquiries } from "@/lib/venue-inquiries";
 import styles from "./inquiries.module.css";
 
@@ -24,7 +24,7 @@ function formatEventDate(value: string | null) {
 }
 
 export default async function VenueInquiriesPage() {
-  await requireAdmin("/");
+  await requireAppAccess("host");
   const inquiries = await listVenueInquiries();
 
   return (

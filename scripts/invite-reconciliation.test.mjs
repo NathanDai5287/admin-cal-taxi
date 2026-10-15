@@ -36,7 +36,7 @@ function setupFallback({ sameIdentity = false, failure = false } = {}) {
   state.client = {
     auth: { getClaims: async () => ({ data: { claims: { sub: "signed-in-id", email: person.email, user_metadata: { full_name: "Provider Name" } } } }) },
     from: () => clientQuery,
-    rpc: async () => ({ error: { code: "PGRST202", message: "RPC unavailable" } }),
+    rpc: async (name) => name === "get_my_app_access" ? { data: [{ app_key: "submit", access_level: "write" }], error: null } : { error: { code: "PGRST202", message: "RPC unavailable" } },
   };
   state.admin = { from(table) {
     if (table === "invites") return { ...inviteQuery, delete: () => ({ eq: async () => { state.inviteDeleted = true; return {}; } }) };

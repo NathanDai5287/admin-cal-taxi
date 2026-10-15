@@ -23,11 +23,11 @@ import { getAccreditationProviders } from "@/lib/accreditation/providers";
 import { extractSource } from "@/lib/accreditation/extract";
 import { REPORT_KEYS, type ReportDraft, type SourceKind, type TemplateAnalysis, type TemplateMapping } from "@/lib/accreditation/types";
 import { buildDraft } from "@/lib/accreditation/workflow";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 
 async function requireAccreditationAdmin() {
   if (!accreditationEnabled()) throw new Error("Accreditation is disabled.");
-  return requireAdmin();
+  return requireAppAccess("accreditation", "write");
 }
 
 const uuid = z.string().uuid();

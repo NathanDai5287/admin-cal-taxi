@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { ButtonLink } from "@/components/brand/button";
 /**
  * /host/orders — the order archive list.
@@ -36,6 +37,7 @@ function PageHeading() {
 }
 
 export default async function OrdersPage() {
+  await requireAppAccess("host");
   if (!ordersConfigured()) {
     return (
       <div className="space-y-8">

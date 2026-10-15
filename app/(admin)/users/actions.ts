@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole } from "@/lib/people";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createClient } from "@/lib/reimbursements/supabase/server";
@@ -25,7 +25,7 @@ function isProfileRole(value: unknown): value is ProfileRole {
 }
 
 export async function inviteUser(formData: FormData) {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const emails = parseInviteEmails(formData.get("email"));
   const role = formData.get("role");
   const memberSinceTermValue = String(formData.get("memberSinceTermId") ?? "");
@@ -72,7 +72,7 @@ export async function inviteUser(formData: FormData) {
 }
 
 export async function updateMemberAcademicTerm(userId: string, academicTermId: string) {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const normalizedTermId = academicTermId.trim() || null;
 
   if (!userId) {
@@ -96,7 +96,7 @@ export async function updateMemberAcademicTerm(userId: string, academicTermId: s
 }
 
 export async function setUserRole(userId: string, role: string) {
-  const session = await requireAdmin("/");
+  const session = await requireAppAccess("users", "write");
 
   if (!userId) {
     throw new Error("Missing user.");
@@ -126,7 +126,7 @@ export async function setUserRole(userId: string, role: string) {
 }
 
 export async function updatePendingUserName(userId: string, fullName: string) {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const normalizedName = fullName.trim();
 
   if (!userId) {
@@ -156,7 +156,7 @@ function normalizeDiscordUserId(value: string) {
 }
 
 export async function updateDiscordUserId(userId: string, discordUserId: string) {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const normalizedId = normalizeDiscordUserId(discordUserId);
 
   if (!userId) {
@@ -181,7 +181,7 @@ export async function updateDiscordUserId(userId: string, discordUserId: string)
 }
 
 export async function removeUser(userId: string) {
-  const session = await requireAdmin("/");
+  const session = await requireAppAccess("users", "write");
 
   if (!userId) {
     throw new Error("Missing user.");
@@ -208,7 +208,7 @@ export async function removeUser(userId: string) {
 }
 
 export async function updatePerson(userId: string, formData: FormData): Promise<{ error?: string }> {
-  await requireAdmin("/");
+  await requireAppAccess("users", "write");
   const fullName = String(formData.get("fullName") ?? "").trim();
   const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();

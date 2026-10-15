@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export default async function UsersLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionProfile();
@@ -11,7 +11,7 @@ export default async function UsersLayout({ children }: { children: React.ReactN
     redirect("/");
   }
 
-  if (session.profile.role !== "admin") {
+  if (!hasAppAccess(session, "users")) {
     return (
       <div data-brand className="min-h-screen">
         <AccessDenied showSubmitLink={session.profile.role === "member"} />
@@ -26,8 +26,9 @@ export default async function UsersLayout({ children }: { children: React.ReactN
         title="Theta Xi"
         subtitle="Admin"
         tabs={[
-          { href: "/users", label: "Members" },
-          { href: "/users/announcements", label: "Discord messages" },
+          { href: "/users", label: "Users" },
+          ...(hasAppAccess(session, "roles") ? [{ href: "/roles", label: "Roles" }] : []),
+          ...(session.appAccess.users === "write" ? [{ href: "/users/announcements", label: "Discord messages" }] : []),
         ]}
       />
       <main className="max-w-[1080px] mx-auto px-6 py-8">{children}</main>

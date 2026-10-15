@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -12,6 +14,7 @@ const BLANK: ContactInput = { first_name: "", last_name: "", email: "", phone: "
 const TEMPLATE = "Fname,Lname,Email,Phone\r\nAlex,Smith,alex@example.com,+1 (510) 555-0123\r\n";
 
 export function MailingList({ contacts, count, page, pages, search }: { contacts: Contact[]; count: number; page: number; pages: number; search: string }) {
+  const canWrite = useAppWriteAccess();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
@@ -94,7 +97,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
             } finally { setExporting(false); }
           });
         }}>{exporting ? "Loading emails…" : emailExport ? "Close export" : "Export all emails"}</Button>
-        <Button variant="secondary" aria-expanded={showImport} aria-controls="contact-import" onClick={() => setShowImport(!showImport)} disabled={pending}>{showImport ? "Close import" : "Import contacts"}</Button>
+        <Button variant="secondary" aria-expanded={showImport} aria-controls="contact-import" disabled={!canWrite || pending} onClick={() => setShowImport(!showImport)}>{showImport ? "Close import" : "Import contacts"}</Button>
       </div>
     </div>
 
@@ -118,7 +121,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
     <section className="card" aria-labelledby="contact-entry-title">
       <div className="card-header"><h2 className="card-title" id="contact-entry-title">{editing ? `Edit ${editing.first_name} ${editing.last_name}` : "Add a person"}</h2></div>
       <form onSubmit={submitContact} className="card-body border-t border-rule pt-5">
-        <fieldset disabled={pending} className="m-0 grid min-w-0 gap-4 border-0 p-0 sm:grid-cols-2 lg:grid-cols-4">
+        <fieldset disabled={!canWrite || pending} className="m-0 grid min-w-0 gap-4 border-0 p-0 sm:grid-cols-2 lg:grid-cols-4">
           {CONTACT_FIELDS.map((field) => <div className="field min-w-0" key={field}>
             <label className="field-label" htmlFor={`contact-${field}`}>{LABELS[field]}{(field === "last_name" || field === "phone") && <span className="font-normal normal-case tracking-normal text-muted"> (optional)</span>}</label>
             <input ref={field === "first_name" ? firstName : undefined} id={`contact-${field}`} name={field} className="field-input w-full min-w-0" type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} autoComplete={field === "first_name" ? "given-name" : field === "last_name" ? "family-name" : field === "phone" ? "tel" : "email"} required={field === "first_name"} maxLength={field === "email" ? 254 : field === "phone" ? 60 : 100} value={draft[field]} onChange={(event) => setDraft({ ...draft, [field]: event.target.value })} aria-describedby="contact-entry-help" />
@@ -197,7 +200,7 @@ export function MailingList({ contacts, count, page, pages, search }: { contacts
             <td className="max-w-48 break-words font-semibold">{contact.first_name}</td><td className="max-w-48 break-words">{contact.last_name || "—"}</td>
             <td className="max-w-64 break-words">{contact.email ? <a className="text-brand underline-offset-4 hover:underline" href={`mailto:${contact.email}`}>{contact.email}</a> : "—"}</td>
             <td className="whitespace-nowrap">{contact.phone ? <a className="text-brand underline-offset-4 hover:underline" href={`tel:${contact.phone.replace(/[^+\d]/g, "")}`}>{contact.phone}</a> : "—"}</td>
-            <td>{removing === contact.id ? <div className="flex flex-wrap items-center gap-2"><span className="text-sm">Remove {contact.first_name}?</span><Button compact variant="danger" disabled={pending} onClick={() => run(async () => { const result = await deleteContact(contact.id); setNotice(result); if (result.ok) { setEmailExport(null); setCopyStatus(""); setRemoving(null); if (editing?.id === contact.id) { setEditing(null); setDraft(BLANK); } router.refresh(); } })}>Remove</Button><Button compact variant="secondary" disabled={pending} onClick={() => setRemoving(null)}>Keep</Button></div> : <div className="flex gap-2"><Button compact variant="secondary" disabled={pending} onClick={() => edit(contact)} aria-label={`Edit ${contact.first_name} ${contact.last_name}`}>Edit</Button><Button compact variant="text" disabled={pending} onClick={() => setRemoving(contact.id)} aria-label={`Remove ${contact.first_name} ${contact.last_name}`}>Remove</Button></div>}</td>
+            <td>{removing === contact.id ? <div className="flex flex-wrap items-center gap-2"><span className="text-sm">Remove {contact.first_name}?</span><Button compact variant="danger" disabled={pending} onClick={() => run(async () => { const result = await deleteContact(contact.id); setNotice(result); if (result.ok) { setEmailExport(null); setCopyStatus(""); setRemoving(null); if (editing?.id === contact.id) { setEditing(null); setDraft(BLANK); } router.refresh(); } })}>Remove</Button><Button compact variant="secondary" disabled={pending} onClick={() => setRemoving(null)}>Keep</Button></div> : <div className="flex gap-2"><Button compact variant="secondary" disabled={!canWrite || pending} onClick={() => edit(contact)} aria-label={`Edit ${contact.first_name} ${contact.last_name}`}>Edit</Button><Button compact variant="text" disabled={!canWrite || pending} onClick={() => setRemoving(contact.id)} aria-label={`Remove ${contact.first_name} ${contact.last_name}`}>Remove</Button></div>}</td>
           </tr>)}</tbody>
         </table></div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule px-6 py-4 text-sm"><p className="m-0 tabular-nums">{((page - 1) * 50 + 1).toLocaleString()}–{Math.min(page * 50, count).toLocaleString()} of {count.toLocaleString()}{search && <> · <Link className="text-brand underline" href="/mailing-list">Clear search</Link></>}</p>

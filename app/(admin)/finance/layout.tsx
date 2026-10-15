@@ -1,8 +1,9 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-route";
 
 export const metadata = { title: { default: "Finance", template: "%s · Finance" } };
@@ -16,7 +17,7 @@ export default async function FinanceLayout({ children }: { children: React.Reac
     redirect("/reimbursements/login");
   }
 
-  if (session.profile.role !== "admin") {
+  if (!hasAppAccess(session, "finance")) {
     return <AccessDenied showSubmitLink />;
   }
 
@@ -35,7 +36,7 @@ export default async function FinanceLayout({ children }: { children: React.Reac
           { href: "/finance/accounts/activity", label: "Transactions" },
         ]}
       />
-      <main className="finance-main max-w-[1080px] mx-auto px-6 py-8">{children}</main>
+      <main className="finance-main max-w-[1080px] mx-auto px-6 py-8"><AppAccessBoundary access={session.appAccess["finance"]}>{children}</AppAccessBoundary></main>
     </div>
   );
 }

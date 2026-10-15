@@ -1,13 +1,11 @@
 "use server";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createSigningLinks, listSigning, markSigningLinkSent, prepareSigning, reconcileSigning, syncSigning } from "@/lib/host-signing";
 import type { SigningActivation } from "@/lib/host-signing";
 import { revalidatePath } from "next/cache";
 import { loadWorkflow, registerSigning } from "@/lib/host-workflow";
 import { getOrderFresh } from "@/lib/host-orders";
-
-async function admin() { await requireAdmin("/"); }
 
 async function assertEventActive(orderId: string) {
   const [order, workflow] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId)]);
@@ -16,18 +14,18 @@ async function assertEventActive(orderId: string) {
 }
 
 export async function listSigningAction(orderId: string) {
-  await admin();
+  await requireAppAccess("host");
   return listSigning(orderId);
 }
 
 export async function prepareSigningAction(orderId: string, payload: Record<string, unknown>, requestKey: string, expectedLatestRevisionId: string) {
-  await admin();
+  await requireAppAccess("host", "write");
   await assertEventActive(orderId);
   return prepareSigning(orderId, payload, requestKey, expectedLatestRevisionId);
 }
 
 export async function createSigningLinksAction(orderId: string, revisionId: string, hash: string, activation: SigningActivation) {
-  await admin();
+  await requireAppAccess("host", "write");
   await assertEventActive(orderId);
   const revision = await createSigningLinks(orderId, revisionId, hash, activation);
   // Routing metadata is additive; registration failure must never prompt a
@@ -39,20 +37,20 @@ export async function createSigningLinksAction(orderId: string, revisionId: stri
 }
 
 export async function syncSigningAction(orderId: string, revisionId: string) {
-  await admin();
+  await requireAppAccess("host", "write");
   const revision = await syncSigning(orderId, revisionId);
   revalidatePath(`/host/orders/${orderId}`);
   return revision;
 }
 
 export async function reconcileSigningAction(orderId: string, revisionId: string) {
-  await admin();
+  await requireAppAccess("host", "write");
   const revision = await reconcileSigning(orderId, revisionId);
   revalidatePath(`/host/orders/${orderId}`);
   return revision;
 }
 
 export async function markSigningLinkSentAction(orderId: string, revisionId: string, email: string, sent: boolean) {
-  await admin();
+  await requireAppAccess("host", "write");
   return markSigningLinkSent(orderId, revisionId, email, sent);
 }

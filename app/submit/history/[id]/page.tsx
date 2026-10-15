@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireMember } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { formatCategory, formatMoney } from "@/lib/reimbursements/format";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "My reimbursement" };
 
 export default async function MemberReimbursementPage({ params }: { params: Promise<{ id: string }> }) {
-  const [{ userId }, { id }] = await Promise.all([requireMember(), params]);
+  const [{ userId }, { id }] = await Promise.all([requireAppAccess("submit"), params]);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const supabase = await createClient();
   const { data: row, error } = await supabase.from("reimbursements")

@@ -1,9 +1,10 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import { redirect } from "next/navigation";
 
 import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { nuNewsIsSetUp } from "@/lib/nu-news/store";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 import "./nu-news.css";
 
@@ -16,7 +17,7 @@ export default async function NuNewsLayout({ children }: { children: React.React
     redirect("/");
   }
 
-  if (session.profile.role !== "admin") {
+  if (!hasAppAccess(session, "nu-news")) {
     return (
       <div data-brand className="nu-news min-h-screen">
         <AccessDenied showSubmitLink={session.profile.role === "member"} />
@@ -28,7 +29,7 @@ export default async function NuNewsLayout({ children }: { children: React.React
     <div data-brand className="nu-news min-h-screen">
       <AppNav homeHref="/nu-news" title="Theta Xi" subtitle="Nu News" />
       <main className="nu-news-main max-w-[1080px] mx-auto px-6 py-8">
-        {await nuNewsIsSetUp() ? children : (
+        {await nuNewsIsSetUp() ? <AppAccessBoundary access={session.appAccess["nu-news"]}>{children}</AppAccessBoundary> : (
           <section className="card">
             <div className="card-header">
               <h1 className="card-title">Setup needed</h1>

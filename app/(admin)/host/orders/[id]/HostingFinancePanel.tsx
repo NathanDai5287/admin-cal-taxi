@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -41,6 +43,7 @@ export default function HostingFinancePanel({
   today: string;
   eventCancelled?: boolean;
 }) {
+  const canWrite = useAppWriteAccess();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -140,10 +143,10 @@ export default function HostingFinancePanel({
                 {item.kind === "deposit" ? paid ? "Received" : "Not received" : paid ? "Paid" : "Unpaid"}
               </span>}
             </div>
-            {item.total > 0 && <Button compact variant={paid ? "text" : "secondary"} disabled={busy || (!paid && !confirmed)}
+            {item.total > 0 && <Button compact variant={paid ? "text" : "secondary"} disabled={!canWrite || busy || (!paid && !confirmed)}
               aria-label={`${paid ? "Undo paid status for" : item.kind === "deposit" ? "Mark received:" : "Mark paid:"} ${item.label.toLowerCase()}`}
               onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{item.kind === "deposit" ? paid ? "Undo received" : "Mark received" : paid ? "Undo paid" : "Mark paid"}</Button>}
-            {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={busy} onClick={() => undoPaid(item.kind)}>Undo paid</Button>}
+            {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={!canWrite || busy} onClick={() => undoPaid(item.kind)}>Undo paid</Button>}
           </div>;
         })}
       </div>

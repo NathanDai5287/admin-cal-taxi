@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { formatStatus } from "@/lib/reimbursements/format";
 
 export type ReimbursementStatus =
@@ -19,13 +21,14 @@ export function InlineStatusSelect({
   onChange: (status: ReimbursementStatus) => void;
   status: ReimbursementStatus;
 }) {
+  const canWrite = useAppWriteAccess();
   const isProcessing = status === "pending";
 
   return (
     <select
       aria-label={`Change status from ${formatStatus(status)}`}
       className={`inline-status-select badge-${status}`}
-      disabled={disabled || isProcessing}
+      disabled={!canWrite || disabled || isProcessing}
       onChange={(event) => onChange(event.currentTarget.value as ReimbursementStatus)}
       value={status}
     >

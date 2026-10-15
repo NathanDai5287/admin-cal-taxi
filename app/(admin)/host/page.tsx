@@ -1,11 +1,11 @@
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import HostHome from "@/components/host/HostHome";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { personContactEmail } from "@/lib/people";
 
 export default async function HostPage() {
-  await requireAdmin();
+  await requireAppAccess("host");
   const supabase = await createClient();
   const { data, error } = await loadAllPages((from, to) => supabase.from("profiles")
     .select("id, full_name, email, contact_email, phone, executive_roles")

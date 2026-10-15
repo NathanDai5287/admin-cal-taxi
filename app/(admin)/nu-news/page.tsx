@@ -3,13 +3,13 @@ import Link from "next/link";
 import { Button } from "@/components/brand/button";
 import { createIssue } from "@/app/(admin)/nu-news/actions";
 import { listIssues } from "@/lib/nu-news/store";
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function NuNewsPage() {
-  await requireAdmin("/");
+  const session = await requireAppAccess("nu-news");
   const issues = await listIssues();
 
   return (
@@ -19,9 +19,9 @@ export default async function NuNewsPage() {
           <h1 className="page-title">Nu News</h1>
           <p className="page-lede">Enter each semester’s newsletter, check the preview, then finalize it. A final issue and its PDF never change.</p>
         </div>
-        <form action={createIssue} className="nu-news-create">
+        {session.appAccess["nu-news"] === "write" && <form action={createIssue} className="nu-news-create">
           <Button type="submit">New issue</Button>
-        </form>
+        </form>}
       </div>
 
       <section className="nu-news-archive" aria-labelledby="issues-heading">

@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireMember } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { reimbursementSchema } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { processReimbursementReceipt } from "@/lib/reimbursements/tabscanner";
@@ -18,7 +18,7 @@ export type PrepareUploadResult =
 export async function prepareReceiptUpload(
   extension: string,
 ): Promise<PrepareUploadResult> {
-  await requireMember();
+  await requireAppAccess("submit", "write");
 
   const parsed = z.enum(RECEIPT_EXTENSIONS).safeParse(extension);
   if (!parsed.success) {
@@ -43,7 +43,7 @@ export type SubmitResult =
   | { ok: false; message: string };
 
 export async function submitReimbursement(formData: FormData): Promise<SubmitResult> {
-  const { userId, profile } = await requireMember();
+  const { userId, profile } = await requireAppAccess("submit", "write");
 
   const parsed = reimbursementSchema.safeParse({
     category: formData.get("category"),

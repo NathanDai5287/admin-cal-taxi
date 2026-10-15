@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -103,6 +105,7 @@ export function PolicyChat({
   initialChats: AccreditationAskChatSummary[];
   initialError?: string;
 }) {
+  const canWrite = useAppWriteAccess();
   const fileInput = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -310,18 +313,18 @@ export function PolicyChat({
       <aside className="flex min-h-0 flex-col border-b border-rule/70 bg-canvas/50 md:border-b-0 md:border-r md:border-rule/70" aria-label="Saved chats">
         <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
           <h2 className="text-sm font-semibold text-ink">Your chats</h2>
-          <button type="button" onClick={newChat} disabled={pending || Boolean(busyChatId)} className="bg-brand-light px-3 py-2 text-xs font-semibold text-brand transition-colors hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40">New chat</button>
+          <button type="button" onClick={newChat} disabled={!canWrite || pending || Boolean(busyChatId)} className="bg-brand-light px-3 py-2 text-xs font-semibold text-brand transition-colors hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40">New chat</button>
         </div>
         <div className="ask-policy-scroll flex-1 overflow-y-auto px-2 pb-3 pt-1 sm:px-3">
           {chats.length ? (
             <ul className="space-y-1">
               {chats.map((chat) => (
                 <li key={chat.id} className="group flex items-center gap-1">
-                  <button type="button" onClick={() => openChat(chat.id)} disabled={pending || Boolean(busyChatId)} aria-pressed={chat.id === chatId} className={`min-w-0 flex-1 px-3 py-2.5 text-left text-sm leading-5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand disabled:opacity-50 ${chat.id === chatId ? "bg-brand-light text-brand" : "text-ink hover:bg-surface"}`}>
+                  <button type="button" onClick={() => openChat(chat.id)} disabled={ pending || Boolean(busyChatId)} aria-pressed={chat.id === chatId} className={`min-w-0 flex-1 px-3 py-2.5 text-left text-sm leading-5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand disabled:opacity-50 ${chat.id === chatId ? "bg-brand-light text-brand" : "text-ink hover:bg-surface"}`}>
                     <span className="block truncate font-semibold">{chat.title}</span>
                     {busyChatId === chat.id ? <span className="mt-0.5 block text-xs text-muted">Opening…</span> : null}
                   </button>
-                  <button type="button" onClick={() => deleteChat(chat.id)} disabled={pending || Boolean(busyChatId)} className="shrink-0 px-2 py-2 text-xs font-medium text-muted hover:bg-warn-light hover:text-warn focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand disabled:opacity-40" aria-label={`Delete ${chat.title}`}>Delete</button>
+                  <button type="button" onClick={() => deleteChat(chat.id)} disabled={!canWrite || pending || Boolean(busyChatId)} className="shrink-0 px-2 py-2 text-xs font-medium text-muted hover:bg-warn-light hover:text-warn focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand disabled:opacity-40" aria-label={`Delete ${chat.title}`}>Delete</button>
                 </li>
               ))}
             </ul>
@@ -334,7 +337,7 @@ export function PolicyChat({
       <div className="flex min-h-0 min-w-0 flex-col">
         <div className="flex min-h-[60px] items-center justify-between gap-4 border-b border-rule/60 px-5 py-3 sm:px-8">
           <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-ink"><span className="h-2 w-2 shrink-0 rounded-full bg-ok" aria-hidden="true" /><span className="truncate">{chatTitle || "New conversation"}</span></div>
-          {chatId ? <button type="button" onClick={() => deleteChat(chatId)} disabled={pending || Boolean(busyChatId)} className="shrink-0 px-3 py-1.5 text-xs font-medium text-muted hover:bg-warn-light hover:text-warn disabled:opacity-40">Delete chat</button> : null}
+          {chatId ? <button type="button" onClick={() => deleteChat(chatId)} disabled={!canWrite || pending || Boolean(busyChatId)} className="shrink-0 px-3 py-1.5 text-xs font-medium text-muted hover:bg-warn-light hover:text-warn disabled:opacity-40">Delete chat</button> : null}
         </div>
 
         <div className="ask-policy-scroll flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface px-4 py-7 sm:px-8 sm:py-9" aria-live="polite" aria-busy={Boolean(busyChatId)}>
@@ -370,13 +373,13 @@ export function PolicyChat({
 
         <div className="bg-surface px-4 pb-5 pt-3 sm:px-8 sm:pb-6">
           <div className="mx-auto max-w-4xl">
-            {attachments.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="Temporary chat attachments">{attachments.map((file, index) => <span key={`${file.name}:${file.lastModified}`} className="inline-flex items-center gap-2 rounded-full bg-brand-light px-3 py-1.5 text-xs text-brand"><span className="max-w-[220px] truncate">{file.name}</span><button type="button" onClick={() => removeAttachment(index)} disabled={pending || Boolean(busyChatId)} className="px-1 text-xs font-bold hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" aria-label={`Remove ${file.name}`}>×</button></span>)}</div> : null}
+            {attachments.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="Temporary chat attachments">{attachments.map((file, index) => <span key={`${file.name}:${file.lastModified}`} className="inline-flex items-center gap-2 rounded-full bg-brand-light px-3 py-1.5 text-xs text-brand"><span className="max-w-[220px] truncate">{file.name}</span><button type="button" onClick={() => removeAttachment(index)} disabled={!canWrite || pending || Boolean(busyChatId)} className="px-1 text-xs font-bold hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" aria-label={`Remove ${file.name}`}>×</button></span>)}</div> : null}
             {error ? <p role="alert" className="form-message mb-3">{error}</p> : null}
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="ask-policy-composer flex items-end gap-2 p-2">
-              <input ref={fileInput} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.xlsx,.txt,.md,.csv,.json" className="sr-only" disabled={pending || Boolean(busyChatId)} onChange={(event) => { addAttachments(Array.from(event.target.files ?? [])); event.target.value = ""; }} tabIndex={-1} />
-              <button type="button" onClick={() => fileInput.current?.click()} disabled={pending || Boolean(busyChatId)} className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:bg-canvas hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40" aria-label="Attach files or images" title="Attach files or images"><PaperclipIcon /></button>
-              <textarea ref={textarea} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} disabled={pending || Boolean(busyChatId)} rows={1} maxLength={4000} placeholder="Ask about accreditation…" className="max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted" aria-label="Message" />
-              <button type="submit" disabled={pending || Boolean(busyChatId) || !input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center bg-action text-white transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message"><SendIcon /></button>
+              <input ref={fileInput} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.xlsx,.txt,.md,.csv,.json" className="sr-only" disabled={!canWrite || pending || Boolean(busyChatId)} onChange={(event) => { addAttachments(Array.from(event.target.files ?? [])); event.target.value = ""; }} tabIndex={-1} />
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={!canWrite || pending || Boolean(busyChatId)} className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:bg-canvas hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40" aria-label="Attach files or images" title="Attach files or images"><PaperclipIcon /></button>
+              <textarea ref={textarea} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} disabled={!canWrite || pending || Boolean(busyChatId)} rows={1} maxLength={4000} placeholder="Ask about accreditation…" className="max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted" aria-label="Message" />
+              <button type="submit" disabled={!canWrite || pending || Boolean(busyChatId) || !input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center bg-action text-white transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message"><SendIcon /></button>
             </form>
             <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">Chats are saved to your account. Attachments are temporary; use Add evidence to store a source. <Link href="/accreditation" className="font-semibold text-brand underline underline-offset-2">Create documents</Link></p>
           </div>

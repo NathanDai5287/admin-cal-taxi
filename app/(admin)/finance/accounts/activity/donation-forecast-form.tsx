@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useActionState, useOptimistic } from "react";
 
 import { Button } from "@/components/brand/button";
@@ -22,6 +24,7 @@ type FormState = ActivityActionState & { resetKey: number };
 const initialState: FormState = { status: "idle", message: "", resetKey: 0 };
 
 export function DonationForecastForm({ forecasts, today }: { forecasts: DonationForecastRow[]; today: string }) {
+  const canWrite = useAppWriteAccess();
   const [optimisticForecasts, addOptimisticForecast] = useOptimistic(
     forecasts,
     (current: DonationForecastRow[], entry: DonationForecastRow) => [entry, ...current],
@@ -43,7 +46,7 @@ export function DonationForecastForm({ forecasts, today }: { forecasts: Donation
 
   return (
     <>
-      <form key={state.resetKey} action={formAction} className="card-body border-t border-rule pt-5">
+      <fieldset disabled={!canWrite}><form key={state.resetKey} action={formAction} className="card-body border-t border-rule pt-5">
         <div className="grid gap-4 md:grid-cols-[1fr_2fr_1fr] items-end">
           <div className="field"><label className="field-label" htmlFor="forecast-date">Expected date</label><input className="field-input" defaultValue={today} id="forecast-date" name="budgetDate" type="date" required /></div>
           <div className="field"><label className="field-label" htmlFor="forecast-description">Description</label><input className="field-input" id="forecast-description" maxLength={500} name="description" placeholder="Who or what is this expected gift from?" required /></div>
@@ -55,7 +58,7 @@ export function DonationForecastForm({ forecasts, today }: { forecasts: Donation
           </div>
           <Button variant="secondary" type="submit" disabled={pending}>{pending ? "Adding…" : "Add forecast"}</Button>
         </div>
-      </form>
+      </form></fieldset>
       {optimisticForecasts.length ? (
         <div className="table-scroll border-t border-rule">
           <table className="data-table">

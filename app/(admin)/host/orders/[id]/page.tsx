@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { ButtonLink } from "@/components/brand/button";
 /**
  * /host/orders/[id] — a single archived rental.
@@ -40,6 +41,7 @@ export default async function OrderDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await requireAppAccess("host");
   const { id } = await params;
 
   if (!ordersConfigured()) {
@@ -118,8 +120,8 @@ export default async function OrderDetailPage({
     <div key={order.id} className="space-y-7">
       <OrderDetailHeader order={order} status={status} actions={
         <>
-          <WorkspaceActions order={order} />
-          {!signing.failed && !signing.revisions.some(r => !!r.envelope_id) && <DeleteOrderButton orderId={order.id} />}
+          {session.appAccess.host === "write" && <WorkspaceActions order={order} />}
+          {session.appAccess.host === "write" && !signing.failed && !signing.revisions.some(r => !!r.envelope_id) && <DeleteOrderButton orderId={order.id} />}
         </>
       } />
 

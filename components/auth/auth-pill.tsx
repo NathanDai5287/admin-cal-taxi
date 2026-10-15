@@ -15,6 +15,7 @@ export type AuthPillSession = {
   email: string;
   avatarUrl: string;
   role: "none" | "member" | "admin";
+  canSubmit?: boolean;
 };
 
 export type AuthPillProps = {
@@ -192,7 +193,7 @@ function SignOutPill({ session }: { session: AuthPillSession }) {
 }
 
 export function AuthPill({ memberSite = false, showPolicy = false, session }: AuthPillProps) {
-  const hasMemberNavigation = memberSite && (session?.role === "member" || session?.role === "admin");
+  const hasMemberNavigation = memberSite && session?.canSubmit;
   // Assume One Tap will show until it reports otherwise, so the fallback
   // button doesn't flash before Google's island appears.
   const [oneTapVisible, setOneTapVisible] = useState(true);

@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-import { AccessDenied, SubmitSiteLink } from "@/components/auth/access-denied";
+import { AccessDenied } from "@/components/auth/access-denied";
+import type { AppKey } from "@/lib/app-access";
 import { SiteHomeIcon } from "@/components/site-home-icon";
 import { policyEnabled } from "@/lib/policy/server";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,11 @@ const ADMIN_APPS = [
   },
   {
     href: "/users",
-    label: "Members & invites",
-    description: "Invite members and manage who has access",
+    label: "Users",
+    description: "Invite people, edit contacts, and assign roles",
   },
+  { href: "/roles", label: "Roles", description: "Set read, write, or no access to each app for each role" },
+  { href: "/submit", label: "Reimbursements", description: "Submit chapter expenses and review your requests" },
   {
     href: "/connections",
     label: "Connected AI clients",
@@ -84,7 +87,9 @@ export default async function Home({
     );
   }
 
-  if (session.profile.role === "none") {
+  const accessibleApps = ADMIN_APPS.filter((app) => hasAppAccess(session, app.href.slice(1) as AppKey));
+
+  if (!accessibleApps.length) {
     return (
       <div data-brand className="min-h-screen">
         <AccessDenied />
@@ -92,40 +97,17 @@ export default async function Home({
     );
   }
 
-  if (session.profile.role === "member") {
-    return (
-      <div data-brand className="min-h-screen">
-        <main className="mx-auto max-w-[520px] px-6 py-16">
-          <section className="card">
-            <div className="card-header">
-              <span className="card-title">Member</span>
-            </div>
-            <div className="card-body border-t border-rule pt-5">
-              <h1 className="m-0 text-[18px] font-bold text-ink">
-                Chapter reimbursements
-              </h1>
-              <p className="mt-2 mb-5 text-[13.5px] text-muted leading-relaxed">
-                You can submit chapter expenses from the reimbursement form.
-              </p>
-              <SubmitSiteLink />
-              {policyEnabled() && process.env.POLICY_ASSISTANT_MEMBERS_ENABLED === "true" ? <Link className="block mt-4 text-brand underline" href="/policy">Ask the Policy Assistant</Link> : null}
-            </div>
-          </section>
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div data-brand className="min-h-screen">
       <main className="mx-auto max-w-[1080px] px-6 py-16">
         <SiteHomeIcon />
         <p className="page-eyebrow mt-6">Theta Xi</p>
-        <h1 className="page-title">Admin</h1>
+        <h1 className="page-title">Apps</h1>
         <p className="page-lede">Internal tools for chapter operations.</p>
 
         <ul className="mt-10 m-0 p-0 grid gap-4 sm:grid-cols-2 list-none">
-          {ADMIN_APPS.map((app) => (
+          {accessibleApps.map((app) => (
             <li key={app.href}>
               <Link
                 href={app.href}

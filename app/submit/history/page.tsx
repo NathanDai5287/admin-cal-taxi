@@ -1,4 +1,4 @@
-import { requireMember } from "@/lib/reimbursements/auth";
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { MemberHistory } from "@/components/reimbursements/member-history";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
@@ -6,7 +6,7 @@ import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My reimbursements" };
 export default async function HistoryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const [{ userId }, params] = await Promise.all([requireMember(), searchParams]);
+  const [{ userId }, params] = await Promise.all([requireAppAccess("submit"), searchParams]);
   const requestedPage = Number(params.page ?? 1);
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? Math.min(requestedPage, 100000) : 1;
   const supabase = await createClient();

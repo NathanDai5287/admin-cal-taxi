@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useActionState, useOptimistic } from "react";
 
 import { Button } from "@/components/brand/button";
@@ -25,6 +27,7 @@ type FormState = ActivityActionState & { resetKey: number };
 const initialState: FormState = { status: "idle", message: "", resetKey: 0 };
 
 export function ManualExpenseForm({ expenses, today }: { expenses: ManualExpenseRow[]; today: string }) {
+  const canWrite = useAppWriteAccess();
   const [optimisticExpenses, addOptimisticExpense] = useOptimistic(
     expenses,
     (current: ManualExpenseRow[], expense: ManualExpenseRow) => [expense, ...current],
@@ -49,7 +52,7 @@ export function ManualExpenseForm({ expenses, today }: { expenses: ManualExpense
 
   return (
     <>
-      <form key={state.resetKey} action={formAction} className="card-body border-t border-rule pt-5">
+      <fieldset disabled={!canWrite}><form key={state.resetKey} action={formAction} className="card-body border-t border-rule pt-5">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1.5fr_1fr] items-end">
           <div className="field">
             <label className="field-label" htmlFor="manual-category">Category</label>
@@ -89,7 +92,7 @@ export function ManualExpenseForm({ expenses, today }: { expenses: ManualExpense
           </div>
           <Button variant="primary" type="submit" disabled={pending}>{pending ? "Recording…" : "Record expense"}</Button>
         </div>
-      </form>
+      </form></fieldset>
       {optimisticExpenses.length ? (
         <div className="table-scroll border-t border-rule">
           <div className="flex items-baseline justify-between gap-4 border-b border-rule px-6 py-3">

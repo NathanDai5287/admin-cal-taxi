@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
+
 import { useActionState, useState } from "react";
 
 import { Button } from "@/components/brand/button";
@@ -21,6 +23,7 @@ export function ExpensePlanForm({ budgets, completedCategories, expenses }: {
   completedCategories: ReimbursementCategory[];
   expenses: CategoryExpense[];
 }) {
+  const canWrite = useAppWriteAccess();
   const [state, formAction, pending] = useActionState(saveReimbursementBudgets, initialState);
   const [plannedAmounts, setPlannedAmounts] = useState(Object.fromEntries(categories.map(([category]) => [category, budgets[category]?.toString() ?? ""])));
   const [completed, setCompleted] = useState(completedCategories);
@@ -48,7 +51,7 @@ export function ExpensePlanForm({ budgets, completedCategories, expenses }: {
   }
 
   return (
-    <form action={formAction} className="card-body border-t border-rule">
+    <fieldset disabled={!canWrite}><form action={formAction} className="card-body border-t border-rule">
       <table className={styles.table}>
         <caption className="sr-only">Editable planned expenses and actual spending by category</caption>
         <thead><tr><th scope="col">Category</th><th scope="col">Planned</th><th scope="col">Actual</th><th scope="col"><span className="sr-only">Completion</span></th></tr></thead>
@@ -78,7 +81,7 @@ export function ExpensePlanForm({ budgets, completedCategories, expenses }: {
         </div>
         <Button variant="primary" type="submit" disabled={pending}>{pending ? "Saving plans…" : "Save plans"}</Button>
       </div>
-    </form>
+    </form></fieldset>
   );
 }
 

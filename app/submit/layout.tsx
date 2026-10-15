@@ -1,7 +1,8 @@
+import { AppAccessBoundary } from "@/components/auth/app-access-boundary";
 import type { Metadata } from "next";
 
 import { ProtectedShell } from "@/components/auth/protected-shell";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-route";
 
 export const metadata: Metadata = {
@@ -16,14 +17,14 @@ export const maxDuration = 60;
 export default async function SubmitLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionProfile();
   const hasMemberAccess =
-    session?.profile.role === "member" || session?.profile.role === "admin";
+    hasAppAccess(session, "submit");
 
   return (
     <ProtectedShell>
       <div data-brand className="min-h-screen">
         {hasMemberAccess ? <RefreshCurrentRoute /> : null}
         <main className="max-w-[720px] mx-auto px-6 py-8">
-          {children}
+          <AppAccessBoundary access={session?.appAccess.submit}>{children}</AppAccessBoundary>
         </main>
       </div>
     </ProtectedShell>

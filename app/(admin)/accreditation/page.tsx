@@ -1,3 +1,4 @@
+import { requireAppAccess } from "@/lib/reimbursements/auth";
 import Link from "next/link";
 
 import { Button } from "@/components/brand/button";
@@ -19,6 +20,7 @@ function statusLabel(status: string) {
 }
 
 export default async function AccreditationDashboard({ searchParams }: { searchParams: Promise<{ cycle?: string; result?: string }> }) {
+  await requireAppAccess("accreditation");
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [cyclesResult, familiesResult, templatesResult, sourcesResult, runsResult] = await Promise.all([
