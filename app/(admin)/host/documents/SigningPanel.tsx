@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button, ButtonLink } from "@/components/brand/button";
 import { cleanClubs, normalizeOrgName } from "@/lib/host-clubs";
 import type { SharedState } from "@/lib/host-shared-state";
@@ -41,7 +41,7 @@ function validate(data: SharedState): string | null {
   return null;
 }
 
-export default function SigningPanel({ data, update, orderId, saveOrder, reviewedOrderVersion, showPresignControl = false, preparationEnabled = true, initialRevisions, beforeSigningAction, onFinalized }: {
+export default function SigningPanel({ data, update, orderId, saveOrder, reviewedOrderVersion, showPresignControl = false, preparationEnabled = true, initialRevisions, beforeSigningAction, onFinalized, reviewOnOpen = false, representativeAction }: {
   data: SharedState;
   update: <K extends keyof SharedState>(key: K, value: SharedState[K]) => void;
   orderId: string;
@@ -52,6 +52,8 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
   initialRevisions?: SigningRevision[];
   beforeSigningAction?: () => Promise<void>;
   onFinalized?: (orderId: string) => void | Promise<void>;
+  reviewOnOpen?: boolean;
+  representativeAction?: ReactNode;
 }) {
   const [revisions, setRevisions] = useState<SigningRevision[]>(initialRevisions ?? []);
   const [historyLoaded, setHistoryLoaded] = useState(initialRevisions !== undefined || !orderId);
@@ -63,6 +65,8 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
   const [historyChanged, setHistoryChanged] = useState(false);
   const [editing, setEditing] = useState(false);
   const latestSeen = useRef<string | undefined>(undefined);
+  const reviewStarted = useRef(false);
+  const activeRevision = revisions.find(row => ["awaiting_signatures", "preparing_completed_copy", "signed", "activating", "created", "creating", "creation_uncertain"].includes(row.state));
   const clubs = [...new Set(cleanClubs(data.clubs).map(normalizeOrgName))];
   const currentPayload = useMemo(() => JSON.stringify(buildContractPayload(data, { sign: data.contractPresign })), [data]);
   const invalid = validate(data);
@@ -128,6 +132,14 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
       setError(err instanceof Error ? err.message : "Could not prepare contract");
     } finally { setBusy(false); }
   }
+
+  const prepareOnOpen = useEffectEvent(prepare);
+  useEffect(() => {
+    if (!reviewOnOpen || !historyLoaded || latestSeen.current === undefined || reviewStarted.current) return;
+    reviewStarted.current = true;
+    if (activeRevision) return;
+    queueMicrotask(() => { void prepareOnOpen(); });
+  }, [reviewOnOpen, historyLoaded, revisions, activeRevision]);
 
   async function create() {
     if (!preview || previewPayload !== currentPayload) { setError("Contract details changed. Preview the new PDF before creating links."); return; }
@@ -205,40 +217,40 @@ export default function SigningPanel({ data, update, orderId, saveOrder, reviewe
   }
 
 
-  const activeRevision = revisions.find(row => ["awaiting_signatures", "preparing_completed_copy", "signed", "activating", "created", "creating", "creation_uncertain"].includes(row.state));
   const history = revisions.filter(row => row.id !== activeRevision?.id && row.id !== preview?.id);
   const showPreparation = preparationEnabled && historyLoaded && (!activeRevision || editing || !!preview);
   return <div className="space-y-6 bg-canvas/40 px-5 py-5">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h2 className="card-title">{activeRevision ? "Current contract" : preparationEnabled ? "Review & signing" : "Contract signing"}</h2>
-        <p className="card-subtitle mt-1.5">{activeRevision ? "Track signatures on the same contract. Payments are recorded separately." : !historyLoaded ? "Loading signing status…" : preparationEnabled ? "Review the named representatives and full PDF, then create their personal links." : "Use Edit order to review representatives and prepare signing links in a separate draft."}</p>
+        <h2 className="card-title">{activeRevision ? "Current contract" : preparationEnabled ? "Review contract" : "Contract signing"}</h2>
+        <p className="card-subtitle mt-1.5">{activeRevision ? "Track signatures on the same contract. Payments are recorded separately." : !historyLoaded ? "Loading signing status…" : preparationEnabled ? "Review the contract, approve it, then review the emails before sending." : "Use Edit order to review representatives and prepare signing links in a separate draft."}</p>
       </div>
-      {preparationEnabled && activeRevision && !editing && <Button type="button" variant="text" compact onClick={() => setEditing(true)}>Prepare replacement</Button>}
+      {preparationEnabled && !representativeAction && activeRevision && !editing && <Button type="button" variant="text" compact onClick={() => setEditing(true)}>Prepare replacement</Button>}
     </div>
-    {showPreparation && <div className="space-y-5">
+    {showPreparation && (!preview || previewPayload !== currentPayload) && <div className="space-y-5">
       {showPresignControl ? <>
         {clubs.map(club => <div key={club} className="border-t border-rule pt-4"><h3 className="text-[14px] font-semibold">{club}</h3><RepresentativeFields data={data} update={update} club={club} /></div>)}
         <ChapterSigningFields data={data} update={update} />
       </> : <>
-        <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[14px] font-semibold">Representatives</h3><ButtonLink href="/host" variant="text" compact>Edit people</ButtonLink></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-[14px] font-semibold">Representatives</h3>{representativeAction ?? <ButtonLink href="/host" variant="text" compact>Edit people</ButtonLink>}</div>
         {data.contractSigners.map(person => <div key={person.id} className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]"><strong>{person.fullName || "Name missing"}</strong><span>{person.club}</span><span className="text-muted break-all">{person.email || "Email missing"}</span></div>)}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4"><p className="text-[13px]">{data.contractPresign ? "Theta Xi: auto-sign with the generator’s chapter signature" : `Theta Xi: ${data.chapterSignerName || "Representative missing"} · ${data.chapterSignerEmail || "Email missing"}`}</p><ButtonLink href="/host/contract" variant="text" compact>Edit chapter signature</ButtonLink></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4"><p className="text-[13px]">{data.contractPresign ? "Theta Xi: auto-sign with the generator’s chapter signature" : `Theta Xi: ${data.chapterSignerName || "Representative missing"} · ${data.chapterSignerEmail || "Email missing"}`}</p>{!representativeAction && <ButtonLink href="/host/contract" variant="text" compact>Edit chapter signature</ButtonLink>}</div>
       </>}
       {activeRevision && <p className="field-hint">Existing signing links stay active while you prepare and review a replacement.</p>}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <Button type="button" variant="primary" disabled={busy || !!invalid || historyChanged} onClick={prepare}>{busy ? "Preparing preview…" : "Preview contract"}</Button>
+      <Button type="button" variant="primary" disabled={busy || !!invalid || historyChanged} onClick={prepare}>{busy ? "Preparing contract…" : "Review contract"}</Button>
       {invalid && <span className="text-[12px] text-muted">{invalid}</span>}
       {historyChanged && <span className="text-[12px] text-warn">Signing history changed elsewhere. Reload the page before preparing a revision.</span>}
       </div>
     </div>}
     {preview && <div className="space-y-4 border-t border-rule pt-5">
       <div>
-        <h3 className="card-title">Contract preview</h3>
-        <p className="card-subtitle mt-1.5">Revision {preview.revision}: review the contract before creating signing links.</p>
+        <h3 className="card-title">Contract PDF</h3>
+        <p className="card-subtitle mt-1.5">Review all pages before approval. You will review the emails next.</p>
       </div>
+      <a className="text-[13px] font-semibold text-brand underline" href={`/api/host/signing/files/${preview.order_id}/${preview.id}/original`} target="_blank" rel="noopener noreferrer">Open full contract PDF</a>
       <iframe title="Contract signing preview" className="h-[540px] w-full border border-rule bg-surface" src={`/api/host/signing/files/${preview.order_id}/${preview.id}/original`} />
-      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Approving…" : "Approve contract"}</Button><p className="field-hint">Saves the approved agreement. Review and send its emails from the event timeline.</p></div>
+      <div className="flex flex-wrap items-center gap-4"><Button type="button" disabled={busy || previewPayload !== currentPayload || preview.state !== "preview"} onClick={create}>{busy ? "Approving…" : "Approve contract"}</Button><p className="field-hint">Approval saves this contract and opens email review. Emails are sent only when you select Send.</p></div>
       {previewPayload !== currentPayload && <p className="text-[12px] text-warn">Details changed after preview. Prepare a new revision.</p>}
     </div>}
     {error && <p role="alert" className="text-[13px] text-warn">{error}</p>}
