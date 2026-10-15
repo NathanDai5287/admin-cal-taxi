@@ -1,4 +1,5 @@
 "use client";
+import { CHAPTER_ZELLE_EMAIL } from "@/lib/chapter-contacts";
 
 import { useState } from "react";
 import type { SharedState } from "@/lib/host-state-model";
@@ -53,7 +54,7 @@ function paymentMessage({
     ...payments.map(payment => payment.text),
     `${rentalPaymentTiming === "day_before" ? "After the event and receipt of the full rental fee" : "Upon receipt of the full rental fee"}: The ${money.format(deposit)} security deposit is returned, subject to the hosting contract.`,
     "",
-    "Zelle: calthetaxi@gmail.com",
+    `Zelle: ${CHAPTER_ZELLE_EMAIL}`,
     "If you would prefer to pay by credit card or cash, please let us know.",
   ].join("\n");
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole } from "@/lib/people";
 
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
@@ -204,4 +205,39 @@ export async function removeUser(userId: string) {
 
   revalidatePath("/users");
   revalidatePath("/finance/accounts/receivable");
+}
+
+export async function updatePerson(userId: string, formData: FormData): Promise<{ error?: string }> {
+  await requireAdmin("/");
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const membership = String(formData.get("membership") ?? "") || null;
+  const executiveRoles = formData.getAll("executiveRoles").map(String);
+
+  if (!fullName || fullName.length > 120) return { error: "Enter a name with 120 characters or fewer." };
+  if (phone.length > 50) return { error: "Enter a phone number with 50 characters or fewer." };
+  if (contactEmail.length > 254) return { error: "Enter an email with 254 characters or fewer." };
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) return { error: "Enter a valid contact email." };
+  if (membership !== null && membership !== "brother" && membership !== "associate_member") return { error: "Choose a valid membership." };
+  if (membership !== "brother" && executiveRoles.length > 0) return { error: "Remove executive positions before changing membership." };
+
+  if (!executiveRoles.every((role): role is ExecutiveRole => EXECUTIVE_ROLE_OPTIONS.some((option) => option.value === role))) return { error: "Choose valid executive positions." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_update_person", {
+    target_user_id: userId,
+    person_name: fullName,
+    person_contact_email: contactEmail,
+    person_phone: phone,
+    person_membership: membership,
+    person_executive_roles: executiveRoles,
+  });
+  if (error?.code === "23505") return { error: "This position already has a person. Remove their assignment first." };
+  if (error) return { error: "Unable to save this person. Check the details and try again." };
+
+  revalidatePath("/users");
+  revalidatePath("/host");
+  revalidatePath("/finance/accounts/receivable");
+  return {};
 }

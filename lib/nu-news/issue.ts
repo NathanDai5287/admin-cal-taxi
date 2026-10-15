@@ -1,3 +1,4 @@
+import { CHAPTER_ZELLE_EMAIL, FOUNDATION_CONTACT_EMAIL } from "../chapter-contacts";
 import { z } from "zod";
 
 export const NU_NEWS_BUCKET = "nu-news";
@@ -5,8 +6,8 @@ export const NU_NEWS_BUCKET = "nu-news";
 export const DEFAULT_DONATE = {
   heading: "HOW TO DONATE",
   body: [
-    "Donations directly to the Nu Chapter, a 501(c)(7) organization, can be made through Zelle at the following account: calthetaxi@gmail.com",
-    "Tax deductible donations can be made to the Theta Xi Foundation, a 501(c)(3) organization, contact NAM_Pres@comcast.net or go to ThetaXi.org and click on “Give,” for more information",
+    `Donations directly to the Nu Chapter, a 501(c)(7) organization, can be made through Zelle at the following account: ${CHAPTER_ZELLE_EMAIL}`,
+    `Tax deductible donations can be made to the Theta Xi Foundation, a 501(c)(3) organization, contact ${FOUNDATION_CONTACT_EMAIL} or go to ThetaXi.org and click on “Give,” for more information`,
   ].join("\n"),
 };
 

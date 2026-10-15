@@ -1,3 +1,5 @@
+import type { ExecutiveRole, Membership } from "@/lib/people";
+
 export type Json =
   | string
   | number
@@ -416,6 +418,10 @@ export type Database = {
           id: string;
           full_name: string;
           email: string;
+          contact_email: string;
+          phone: string;
+          membership: Membership | null;
+          executive_roles: ExecutiveRole[];
           role: Database["public"]["Enums"]["app_role"];
           removed_at: string | null;
           has_signed_in: boolean;
@@ -427,6 +433,10 @@ export type Database = {
           id: string;
           full_name?: string;
           email?: string;
+          contact_email?: string;
+          phone?: string;
+          membership?: Membership | null;
+          executive_roles?: ExecutiveRole[];
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
@@ -435,8 +445,13 @@ export type Database = {
           created_at?: string;
         };
         Update: {
+          id?: string;
           full_name?: string;
           email?: string;
+          contact_email?: string;
+          phone?: string;
+          membership?: Membership | null;
+          executive_roles?: ExecutiveRole[];
           role?: Database["public"]["Enums"]["app_role"];
           removed_at?: string | null;
           has_signed_in?: boolean;
@@ -621,6 +636,17 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      admin_update_person: {
+        Args: {
+          target_user_id: string;
+          person_name: string;
+          person_contact_email: string;
+          person_phone: string;
+          person_membership: Membership | null;
+          person_executive_roles: ExecutiveRole[];
+        };
+        Returns: undefined;
+      };
       import_mailing_list_contacts: { Args: { contacts: Json }; Returns: number };
       mcp_create_reimbursement: {
         Args: {

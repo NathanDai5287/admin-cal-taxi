@@ -1,3 +1,4 @@
+import { CHAPTER_ZELLE_EMAIL } from "./chapter-contacts";
 import { EMAIL_LABELS, type EmailKind } from "./host-event";
 import { formatDateISO } from "./host-format";
 
@@ -9,7 +10,7 @@ export function hostingEmail(input: { kind: EmailKind; name: string; organizatio
   const subject = `${title} · ${input.organization} · ${input.eventDate}`;
   const signing = input.kind === "invitation" || input.kind === "reminder";
   const paymentInstructions = input.kind === "deposit_invoice" || input.kind === "rental_invoice"
-    ? "You can pay by Zelle at calthetaxi@gmail.com. Would you prefer cash or credit card? Reply to let us know. Credit card payments have a 3% surcharge."
+    ? `You can pay by Zelle at ${CHAPTER_ZELLE_EMAIL}. Would you prefer cash or credit card? Reply to let us know. Credit card payments have a 3% surcharge.`
     : "";
   const message = input.kind === "invitation" ? "Please review and sign your hosting agreement using your personal link below."
     : input.kind === "reminder" ? "Your signature is still needed on the hosting agreement. Please use your personal link below to review and sign."

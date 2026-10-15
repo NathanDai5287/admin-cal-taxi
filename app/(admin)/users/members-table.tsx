@@ -2,14 +2,20 @@
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm, updatePendingUserName } from "@/app/(admin)/users/actions";
+import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm } from "@/app/(admin)/users/actions";
 import { Button } from "@/components/brand/button";
+import { PersonEditor } from "@/app/(admin)/users/person-editor";
+import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 import { userLabel } from "@/lib/reimbursements/user-label";
 
 export type MemberRow = {
   id: string;
   fullName: string;
   email: string;
+  contactEmail: string;
+  phone: string;
+  membership: Membership | null;
+  executiveRoles: ExecutiveRole[];
   discordUserId: string;
   memberSinceTermId: string;
   role: "none" | "member" | "admin";
@@ -25,7 +31,6 @@ export type AcademicYearOption = {
 
 type OptimisticUpdate =
   | { type: "role"; userId: string; role: MemberRow["role"] }
-  | { type: "name"; userId: string; fullName: string }
   | { type: "discord"; userId: string; discordUserId: string }
   | { type: "academicTerm"; userId: string; memberSinceTermId: string }
   | { type: "remove"; userId: string };
@@ -33,11 +38,6 @@ type OptimisticUpdate =
 function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[] {
   if (update.type === "remove") {
     return members.filter((member) => member.id !== update.userId);
-  }
-  if (update.type === "name") {
-    return members.map((member) =>
-      member.id === update.userId ? { ...member, fullName: update.fullName } : member,
-    );
   }
   if (update.type === "discord") {
     return members.map((member) =>
@@ -92,50 +92,6 @@ function DiscordMemberId({
         className="shrink-0"
         compact
         disabled={disabled || !valid || normalizedId === member.discordUserId}
-        type="submit"
-        variant="secondary"
-      >
-        Save
-      </Button>
-    </form>
-  );
-}
-
-function PendingMemberName({
-  member,
-  disabled,
-  onSave,
-}: {
-  member: MemberRow;
-  disabled: boolean;
-  onSave: (fullName: string) => void;
-}) {
-  const [fullName, setFullName] = useState(member.fullName);
-  const normalizedName = fullName.trim();
-  const unchanged = normalizedName === member.fullName;
-
-  return (
-    <form
-      className="flex min-w-56 items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSave(normalizedName);
-      }}
-    >
-      <input
-        aria-label={`Name for ${userLabel(member.fullName, member.email)}`}
-        className="field-input min-w-0"
-        disabled={disabled}
-        maxLength={120}
-        onChange={(event) => setFullName(event.target.value)}
-        placeholder="Enter name"
-        required
-        value={fullName}
-      />
-      <Button
-        className="shrink-0"
-        compact
-        disabled={disabled || !normalizedName || unchanged}
         type="submit"
         variant="secondary"
       >
@@ -229,6 +185,8 @@ export function MembersTable({
   currentUserId: string;
   academicYears: AcademicYearOption[];
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingMember = members.find((member) => member.id === editingId);
   const [optimisticMembers, applyOptimistic] = useOptimistic(members, applyUpdate);
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
@@ -252,21 +210,6 @@ export function MembersTable({
         await setUserRole(userId, role);
       } catch {
         setErrors((current) => new Map(current).set(userId, "Unable to update that role. Please try again."));
-      } finally {
-        setMemberPending(userId, false);
-      }
-    });
-  }
-
-  function changeName(userId: string, fullName: string) {
-    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
-    setMemberPending(userId, true);
-    startTransition(async () => {
-      applyOptimistic({ type: "name", userId, fullName });
-      try {
-        await updatePendingUserName(userId, fullName);
-      } catch {
-        setErrors((current) => new Map(current).set(userId, "Unable to update that name. Please try again."));
       } finally {
         setMemberPending(userId, false);
       }
@@ -324,14 +267,18 @@ export function MembersTable({
 
   return (
     <>
+      {editingMember && <PersonEditor key={editingMember.id} member={editingMember} onClose={() => setEditingId(null)} />}
+      <div className="table-scroll">
       <table className={"data-table" + (pending ? " opacity-80" : "")}>
         <thead>
           <tr>
             <th>Name</th>
-            <th>Email</th>
+            <th>Membership</th>
+            <th>Executive positions</th>
+            <th>Contact</th>
             <th>Discord ID</th>
             <th>Member since</th>
-            <th>Role</th>
+            <th>App access</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -343,16 +290,20 @@ export function MembersTable({
             return (
               <tr key={member.id}>
                 <td>
-                  {member.hasSignedIn
-                    ? userLabel(member.fullName, member.email)
-                    : <PendingMemberName
-                        disabled={memberPending}
-                        member={member}
-                        onSave={(fullName) => changeName(member.id, fullName)}
-                      />}
+                  <button type="button" className="text-brand underline underline-offset-4 text-left" onClick={() => setEditingId(member.id)}>
+                    {userLabel(member.fullName, member.email)}
+                  </button>
                   {isYou ? <span className="text-muted"> (you)</span> : null}
                 </td>
-                <td>{member.email}</td>
+                <td className="whitespace-nowrap">{member.membership === "brother" ? "Brother" : member.membership === "associate_member" ? "Associate member" : "Not classified"}</td>
+                <td>
+                  {member.executiveRoles.length > 0 && <span className="block text-xs text-muted">Executive member</span>}
+                  {member.executiveRoles.map((office) => EXECUTIVE_ROLE_OPTIONS.find((option) => option.value === office)?.label).join(", ") || "None"}
+                </td>
+                <td>
+                  <span className="block">{member.contactEmail || member.email}</span>
+                  {member.phone && <span className="block text-muted">{member.phone}</span>}
+                </td>
                 <td>
                   <DiscordMemberId
                     disabled={memberPending}
@@ -378,7 +329,7 @@ export function MembersTable({
                 </td>
                 <td>
                   <select
-                    aria-label={`Role for ${userLabel(member.fullName, member.email)}`}
+                    aria-label={`App access for ${userLabel(member.fullName, member.email)}`}
                     className="field-input"
                     disabled={isYou || memberPending}
                     onChange={(event) => changeRole(member.id, event.target.value as "member" | "admin")}
@@ -409,6 +360,7 @@ export function MembersTable({
           })}
         </tbody>
       </table>
+      </div>
     </>
   );
 }

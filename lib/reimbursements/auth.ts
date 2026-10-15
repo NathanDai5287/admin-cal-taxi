@@ -79,43 +79,29 @@ async function claimInviteWithoutRpc({
 
     const { data: provisional } = await admin
       .from("profiles")
-      .select("id")
+      .select("id, full_name")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
     let profileError: PostgrestError | null = null;
     if (provisional && provisional.id !== userId) {
-      // Rollout fallback for a provisional profile created by the newer
-      // invitation flow when the claim RPC is temporarily unavailable.
-      const inserted = await admin.from("profiles").insert({
-        id: userId,
-        email: "",
-        full_name: fullName,
-        role: invite.role,
-        removed_at: null,
-      });
-      profileError = inserted.error;
-      if (!profileError) {
-        const transferred = await admin.from("chapter_receivables")
-          .update({ member_id: userId })
-          .eq("member_id", provisional.id);
-        profileError = transferred.error;
-      }
-      if (!profileError) {
-        const removed = await admin.from("profiles").delete().eq("id", provisional.id);
-        profileError = removed.error;
-      }
-      if (!profileError) {
-        const finalized = await admin.from("profiles")
-          .update({ email: normalizedEmail })
-          .eq("id", userId);
-        profileError = finalized.error;
-      }
+      const claimed = await admin.from("profiles")
+        .update({
+          id: userId,
+          email: normalizedEmail,
+          full_name: provisional.full_name || fullName,
+          role: invite.role,
+          has_signed_in: true,
+          removed_at: null,
+        })
+        .eq("id", provisional.id);
+      profileError = claimed.error;
     } else {
       const restored = await admin.from("profiles").upsert({
         id: userId,
         email: normalizedEmail,
-        full_name: fullName,
+        full_name: provisional?.full_name || fullName,
+        has_signed_in: true,
         role: invite.role,
         removed_at: null,
       });

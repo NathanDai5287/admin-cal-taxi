@@ -252,6 +252,11 @@ export function missingFields(
   need(cleanClubs(d.clubs).length > 0, "organization");
   need(d.eventDate.trim(), "event date");
 
+  if (kind !== "contract" && !d.currentOrderId && !d.loadedOrderIdentity) {
+    need(d.treasurerName.trim(), "treasurer name (Users or event contacts)");
+    need(d.treasurerContact.trim(), "treasurer email or phone (Users or event contacts)");
+  }
+
   switch (kind) {
     case "contract":
       need(isValidTime(d.startTime), "valid start time");

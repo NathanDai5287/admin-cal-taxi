@@ -20,7 +20,7 @@ import OrderSigning from "./OrderSigning";
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
-export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "nathan.dai@berkeley.edu" }: {
+export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "" }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
   rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string;
 }) {
@@ -203,6 +203,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
     </div>
     {cancelled && <p className="mb-6 text-sm text-warn">This event is cancelled. Its signing and payment history is retained.</p>}
+    {emailConfigured && !previewReplyTo && <p className="mb-6 text-sm text-warn">Assign a treasurer with an email in <a href="/users" className="underline">Users</a> before preparing a new email.</p>}
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
     {signingUnavailable && <p className="mb-6 text-sm text-warn">Could not verify signing history. Reload before sending documents.</p>}
     <ol aria-label="Event stages" className="ml-2 border-l border-rule">

@@ -19,7 +19,7 @@ export default async function UsersPage() {
   const [profilesResult, yearsResult, termsResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("profiles")
-      .select("id, full_name, email, role, has_signed_in, discord_user_id, member_since_term_id, created_at")
+      .select("id, full_name, email, contact_email, phone, membership, executive_roles, role, has_signed_in, discord_user_id, member_since_term_id, created_at")
       .is("removed_at", null)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
@@ -53,7 +53,7 @@ export default async function UsersPage() {
       <div>
         <p className="page-eyebrow">Chapter admin</p>
         <h1 className="page-title">Members</h1>
-        <p className="page-lede">Invite people, record when they joined, and manage who can access the chapter apps.</p>
+        <p className="page-lede">Manage contact details, membership, and executive positions.</p>
       </div>
 
       <section className="card" aria-labelledby="invite-user-title">
@@ -88,7 +88,7 @@ export default async function UsersPage() {
             </select>
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="role">Role</label>
+            <label className="field-label" htmlFor="role">App access</label>
             <select className="field-input" defaultValue="member" id="role" name="role">
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -103,7 +103,7 @@ export default async function UsersPage() {
         </p>
       </section>
 
-      <section className="card table-scroll" aria-labelledby="members-title">
+      <section className="card" aria-labelledby="members-title">
         <div className="card-header">
           <span className="card-title" id="members-title">Members</span>
         </div>
@@ -114,6 +114,10 @@ export default async function UsersPage() {
             id: profile.id,
             fullName: profile.full_name,
             email: profile.email,
+            contactEmail: profile.contact_email,
+            phone: profile.phone,
+            membership: profile.membership,
+            executiveRoles: profile.executive_roles,
             discordUserId: profile.discord_user_id,
             memberSinceTermId: profile.member_since_term_id ?? "",
             role: profile.role,
@@ -122,6 +126,7 @@ export default async function UsersPage() {
           }))}
         />
         <p className="helper-text px-6 pb-5">
+          Select a name to edit contact details and positions.
           Academic terms come from the shared calendar used by Accreditation and Finance.
           Removing someone revokes their invitation or access while preserving their history.
         </p>
