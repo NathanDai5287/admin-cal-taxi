@@ -5,6 +5,8 @@ import { AppNav } from "@/components/brand/app-nav";
 import { nuNewsIsSetUp } from "@/lib/nu-news/store";
 import { getSessionProfile } from "@/lib/reimbursements/auth";
 
+import "./nu-news.css";
+
 export const metadata = { title: { default: "Nu News", template: "%s · Nu News" } };
 
 export default async function NuNewsLayout({ children }: { children: React.ReactNode }) {
@@ -16,16 +18,16 @@ export default async function NuNewsLayout({ children }: { children: React.React
 
   if (session.profile.role !== "admin") {
     return (
-      <div data-brand className="min-h-screen">
+      <div data-brand className="nu-news min-h-screen">
         <AccessDenied showSubmitLink={session.profile.role === "member"} />
       </div>
     );
   }
 
   return (
-    <div data-brand className="min-h-screen">
+    <div data-brand className="nu-news min-h-screen">
       <AppNav homeHref="/nu-news" title="Theta Xi" subtitle="Nu News" />
-      <main className="max-w-[1080px] mx-auto px-6 py-8">
+      <main className="nu-news-main max-w-[1080px] mx-auto px-6 py-8">
         {await nuNewsIsSetUp() ? children : (
           <section className="card">
             <div className="card-header">

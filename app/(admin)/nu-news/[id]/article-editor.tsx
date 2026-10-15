@@ -20,7 +20,7 @@ type ArticleEditorProps = {
 
 export function ArticleEditor({ article, position, count, headshotPreview, busy, onChange, onMove, onRemove, onHeadshot }: ArticleEditorProps) {
   return (
-    <article className="card-plain grid gap-4 p-5">
+    <article className="nu-news-article grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="m-0 text-[15px] font-bold text-ink">Article {position} · {article.title || "Untitled"}</h3>
         <div className="flex gap-2">

@@ -160,15 +160,21 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="nu-news-editor grid gap-6">
+      <div className="nu-news-heading flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link className="back-link" href="/nu-news">← All issues</Link>
-          <h1 className="page-title">{issue.season || "Untitled issue"}</h1>
+          <div className="flex flex-wrap items-center gap-3"><h1 className="page-title">{issue.season || "Untitled issue"}</h1><span className="badge">Draft</span></div>
           <p className="page-lede">Paste each author’s writing exactly as they sent it. The PDF prints it without changes.</p>
         </div>
         <Button variant="danger" compact disabled={busy} onClick={deleteDraft}>Delete draft</Button>
       </div>
+
+      <nav className="nu-news-sections" aria-label="Issue sections">
+        {["Issue details", "Cover", "Articles", "Photos", "How to donate", "Before you finalize"].map((title) => (
+          <a key={title} href={`#${title.toLowerCase().replaceAll(" ", "-")}`}>{title}</a>
+        ))}
+      </nav>
 
       <Section title="Issue details">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -262,7 +268,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
         <MissingItems items={missing} />
       </Section>
 
-      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center gap-3 border-t border-rule bg-surface px-6 py-3">
+      <div className="nu-news-actions sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-rule bg-surface px-6 py-3">
         <Button disabled={busy || !unsaved} onClick={save}>Save</Button>
         <Button variant="secondary" disabled={busy} onClick={preview}>Make preview</Button>
         <Button variant="secondary" disabled={busy || missing.length > 0} onClick={finalize}>Finalize</Button>
@@ -270,7 +276,7 @@ export function IssueEditor({ issueId, initialIssue, photoUrls, initialPreviewMa
           {progress || notice?.text || (unsaved ? "Unsaved changes" : "All changes saved")}
         </p>
         {previewMadeAt ? (
-          <a className="ml-auto text-[13px] text-brand underline" href={pdfHref} target="_blank" rel="noreferrer">
+          <a className="nu-news-preview-link ml-auto text-[13px] text-brand underline" href={pdfHref} target="_blank" rel="noreferrer">
             Open preview · made {formatReimbursementDate(previewMadeAt, true)}
           </a>
         ) : null}
