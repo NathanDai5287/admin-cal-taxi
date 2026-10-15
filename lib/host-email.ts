@@ -12,11 +12,12 @@ import { createAdminClient } from "./reimbursements/supabase/admin";
 import { orderInvoiceDueDate, orderPaymentSchedule } from "./host-payment-schedule";
 import { defaultDocuments } from "./host-order-documents";
 import type { Order } from "./host-orders-types";
+import { simplifyRentalLineItems } from "./host-rental-items";
 import { renderDepositReceiptPdf } from "./host-deposit-receipt-pdf";
 
 type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalInvoiceStyle?: number; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
@@ -82,8 +83,10 @@ async function invoicePdf(order: Order, kind: "deposit_invoice" | "rental_invoic
   const defaults = defaultDocuments(order, order.documents.find(d => d.kind === "deposit_invoice" && !d.stale)?.number);
   if (!current && defaults.missing[kind].length) throw new Error(`Complete the invoice details first: ${defaults.missing[kind].join(", ")}.`);
   const endpoint = kind === "deposit_invoice" ? "invoice/deposit" : "invoice/rental";
+  const payload = { ...(current?.payload ?? defaults.payloads[kind]) };
+  if (kind === "rental_invoice" && Array.isArray(payload.line_items)) payload.line_items = simplifyRentalLineItems(payload.line_items);
   const response = await fetch(`${backendOrigin()}/api/generate/${endpoint}`, {
-    method: "POST", headers: { "X-Admin-Key": backendKey()!, "Content-Type": "application/json" }, body: JSON.stringify(current?.payload ?? defaults.payloads[kind]), cache: "no-store", signal: AbortSignal.timeout(60_000),
+    method: "POST", headers: { "X-Admin-Key": backendKey()!, "Content-Type": "application/json" }, body: JSON.stringify(payload), cache: "no-store", signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok || !response.headers.get("content-type")?.includes("application/pdf")) throw new Error("Invoice generation failed. No email was sent.");
   return { filename: `${kind.replaceAll("_", "-")}-${order.id}.pdf`, content: Buffer.from(await response.arrayBuffer()).toString("base64") };
@@ -93,9 +96,10 @@ async function updatedInvoicePreview(order: Order, row: DeliveryRow, kind: "depo
   const invoiceAmount = kind === "deposit_invoice" ? order.depositAmount ?? undefined : order.rentalPrice ?? undefined;
   const message = hostingEmail({ kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, invoiceAmount, invoiceDueDate, replyTo: row.payload.body.reply_to });
   const sameDate = row.payload.invoiceDueDate === invoiceDueDate || row.payload.body.text.includes(`is due ${invoiceDueDate}`);
-  if (sameDate && message.html === row.payload.body.html && message.text === row.payload.body.text) return row.payload;
-  const attachments = sameDate ? row.payload.body.attachments : [await invoicePdf(order, kind)];
-  return { ...row.payload, invoiceDueDate, body: { ...row.payload.body, ...message, attachments } };
+  const sameStyle = kind !== "rental_invoice" || row.payload.rentalInvoiceStyle === 1;
+  if (sameDate && sameStyle && message.html === row.payload.body.html && message.text === row.payload.body.text) return row.payload;
+  const attachments = sameDate && sameStyle ? row.payload.body.attachments : [await invoicePdf(order, kind)];
+  return { ...row.payload, invoiceDueDate, ...(kind === "rental_invoice" ? { rentalInvoiceStyle: 1 } : {}), body: { ...row.payload.body, ...message, attachments } };
 }
 function preview(row: DeliveryRow): EmailPreview {
   return { id: row.id, recipient: row.recipient, subject: row.payload.body.subject, html: row.payload.body.html, attachments: row.payload.body.attachments.map(a => a.filename), status: row.status };
@@ -173,11 +177,12 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
       const invoiceDueDate = orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice");
       const legacy = legacyRows[0]?.payload;
       const sameDate = legacy && (legacy.invoiceDueDate === invoiceDueDate || legacy.body.text.includes(`is due ${invoiceDueDate}`));
-      attachments = sameDate ? legacy.body.attachments : [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
+      const sameStyle = input.kind !== "rental_invoice" || legacy?.rentalInvoiceStyle === 1;
+      attachments = sameDate && sameStyle ? legacy!.body.attachments : [await invoicePdf(order, input.kind as "deposit_invoice" | "rental_invoice")];
     }
     const invoiceDueDate = invoice ? orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice") : undefined;
     const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, invoiceDueDate, replyTo: sender.replyTo });
-    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}) };
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}), ...(input.kind === "rental_invoice" ? { rentalInvoiceStyle: 1 } : {}) };
     const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
     if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
     const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);

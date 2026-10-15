@@ -143,7 +143,7 @@ export default function PricingCalculator() {
           </div>
 
           <div>
-            <label className="field-label">Property Protection</label>
+            <label className="field-label">Capacity adjustment</label>
             <RadioGroup name="protection" tiers={C.protectionTiers} selected={sel.protection}
               onSelect={setSel("protection")} formatVal={fmtDollar} />
           </div>
@@ -201,9 +201,9 @@ export default function PricingCalculator() {
         <div className="px-6 pb-6 border-t border-rule pt-3">
           <BreakdownRow label="Base rate" value={fmt(C.baseRate)} />
           <BreakdownRow
-            label={`Capacity (${Math.max(0, guestsNum - C.capacityThreshold)} × $${C.perGuestRate.toFixed(2)})`}
-            value={result.capacity > 0 ? `+${fmt(result.capacity)}` : "$0"}
-            dim={result.capacity === 0}
+            label="Capacity fee"
+            value={result.capacity + result.protection > 0 ? `+${fmt(result.capacity + result.protection)}` : "$0"}
+            dim={result.capacity + result.protection === 0}
           />
           <BreakdownRow
             label="Fire permit (Required for > 50 guests)"
@@ -214,11 +214,6 @@ export default function PricingCalculator() {
             label={`Alcohol — ${result.alcoholLabel}`}
             value={result.alcohol > 0 ? `+${fmt(result.alcohol)}` : "$0"}
             dim={result.alcohol === 0}
-          />
-          <BreakdownRow
-            label={`Protection — ${result.protectionLabel}`}
-            value={result.protection > 0 ? `+${fmt(result.protection)}` : "$0"}
-            dim={result.protection === 0}
           />
           <BreakdownRow
             label={`Date — ${result.dateLabel}`}

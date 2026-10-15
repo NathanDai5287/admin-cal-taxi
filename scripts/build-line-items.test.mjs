@@ -14,7 +14,9 @@ async function loadBuilder() {
     /import \{ roundCents \} from [^;]+;/,
     "const roundCents = n => Math.round(n * 100) / 100;",
   );
-  const compiled = ts.transpileModule(standalone, {
+  const simplifier = await readFile(new URL("../lib/host-rental-items.ts", import.meta.url), "utf8");
+  const sourceWithSimplifier = standalone.replace(/import \{ simplifyRentalLineItems \} from [^;]+;/, simplifier);
+  const compiled = ts.transpileModule(sourceWithSimplifier, {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
@@ -146,4 +148,20 @@ test("no breakdown falls back to a single generic line at the target", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0].amount, "1500.00");
   assert.match(items[0].description, /October 3, 2026/);
+});
+
+
+test("rental labels omit details and combine protection into capacity without changing other charges", () => {
+  const detailed = { ...breakdown(), protection: 150, protectionLabel: "Messy", alcohol: 100, alcoholLabel: "Full open bar" };
+  const items = buildLineItems(detailed, 2335, "October 3, 2026");
+  assert.equal(sum(items), 2335);
+  assert.equal(items.find(item => item.description === "Capacity fee").amount, "550.00");
+  assert.equal(items.find(item => item.description === "Alcohol").amount, "100.00");
+  assert.ok(items.every(item => !/—|protection/i.test(item.description)));
+});
+
+test("protection becomes capacity when the guest count has no capacity charge", () => {
+  const items = buildLineItems({ ...smallBreakdown(), capacity: 0, protection: 50 }, 400, "");
+  assert.equal(items.find(item => item.description === "Capacity fee").amount, "50.00");
+  assert.equal(sum(items), 400);
 });
