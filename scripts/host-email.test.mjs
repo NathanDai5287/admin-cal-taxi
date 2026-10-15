@@ -258,3 +258,48 @@ test("new messages use the managed treasurer and stored messages retain their re
   await assert.rejects(prepareHostingEmail(request), /Assign a treasurer with an email in Users/);
   state.treasurerEmail = "host@example.test";
 });
+
+test("rental invoice labels update only unattempted previews and preserve amounts and delivery identity", async () => {
+  const originalOrder = structuredClone(state.order);
+  try {
+    state.rows = [];
+    const line_items = [
+      { description: "Base rental — Theta Xi Fraternity House", amount: "150.00" },
+      { description: "Capacity fee — 200 guests", amount: "930.00" },
+      { description: "Alcohol", amount: "100.00" },
+      { description: "Property protection — Average", amount: "220.00" },
+    ];
+    state.order.documents = [{ kind: "rental_invoice", stale: false, sourceSnapshot: {}, generatedAt: "2026-10-04", payload: { line_items } }];
+    const generated = [];
+    globalThis.fetch = async (_url, init) => {
+      generated.push(JSON.parse(init.body));
+      return new Response("simplified rental PDF", { headers: { "Content-Type": "application/pdf" } });
+    };
+    const input = { ...request, kind: "rental_invoice", recipients: undefined };
+    const original = await prepareHostingEmail(input);
+    assert.deepEqual(generated[0].line_items, [
+      { description: "Base rental", amount: "150.00" },
+      { description: "Capacity fee", amount: "1150.00" },
+      { description: "Alcohol surcharge", amount: "100.00" },
+    ]);
+    assert.deepEqual(state.order.documents[0].payload.line_items, line_items);
+    state.rows[0].payload.rentalInvoiceStyle = 1;
+    state.rows[0].payload.body.attachments[0].content = "old detailed PDF";
+    const updated = await prepareHostingEmail(input);
+    assert.equal(updated[0].id, original[0].id);
+    assert.equal(state.rows[0].payload.rentalInvoiceStyle, 2);
+    assert.equal(generated.length, 2);
+    assert.notEqual(state.rows[0].payload.body.attachments[0].content, "old detailed PDF");
+    await prepareHostingEmail(input);
+    assert.equal(generated.length, 2);
+    state.rows[0].payload.rentalInvoiceStyle = 1;
+    state.rows[0].attempted_at = "2026-10-04T12:00:00Z";
+    const frozen = structuredClone(state.rows[0].payload);
+    for (const status of ["queued", "failed", "sent"]) {
+      state.rows[0].status = status;
+      await prepareHostingEmail(input);
+      assert.deepEqual(state.rows[0].payload, frozen);
+    }
+    assert.equal(generated.length, 2);
+  } finally { state.order = originalOrder; state.rows = []; }
+});

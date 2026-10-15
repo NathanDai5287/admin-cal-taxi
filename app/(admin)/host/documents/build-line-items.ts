@@ -6,6 +6,7 @@
 import type { LineItem } from "@/components/host/LineItemList";
 import type { PricingBreakdown } from "@/lib/host-shared-state";
 import { roundCents } from "@/lib/host-format";
+import { simplifyRentalLineItems } from "@/lib/host-rental-items";
 
 /**
  * Build itemized rental invoice lines from the pricing breakdown, scaled
@@ -118,10 +119,10 @@ export function buildLineItems(
 
   // Reassemble in display order; pinned lines keep their raw amount.
   const valueOf = new Map(pool.map((c, i) => [c, poolValues[i]]));
-  return components.map(c => ({
+  return simplifyRentalLineItems(components.map(c => ({
     description: c.description,
     amount: (pinFees && c.fixed ? c.raw : valueOf.get(c)!).toFixed(2),
-  }));
+  })));
 }
 
 /**
