@@ -148,6 +148,10 @@ export default async function OrderDetailPage({
       />
 
       <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
+        paymentHistory={[
+          ...deposits.filter(payment => !payment.reversed_at).map(payment => ({ kind: "deposit", amount: Number(payment.amount), date: payment.paid_date })),
+          ...(paymentsResult.data ?? []).filter(payment => !payment.reversed_at).map(payment => ({ kind: payment.kind, amount: Number(payment.amount), date: payment.paid_date })),
+        ]}
         depositPaid={depositPaid}
         rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}

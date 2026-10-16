@@ -123,9 +123,10 @@ test("new and existing contracts retain their own payment dates across the hosti
     assert.equal(summary.includes("11:59 p.m. Pacific Time"), beforeEvent);
     const timeline = renderToStaticMarkup(createElement(OrderTimeline, { ...props, order: saved }));
     assert.ok(timeline.includes(expectedDate));
-    assert.equal(timeline.indexOf("Send rental invoice") < timeline.indexOf("Event held"), beforeEvent);
-    assert.equal(timeline.indexOf("Receive rental payment") < timeline.indexOf("Event held"), beforeEvent);
-    assert.ok(timeline.indexOf("Return deposit") > timeline.indexOf("Event held"));
+    const stages = timeline.slice(timeline.indexOf('<ol aria-label="Event stages"'));
+    assert.equal(stages.indexOf("Send rental invoice") < stages.indexOf("Event held"), beforeEvent);
+    assert.equal(stages.indexOf("Receive rental payment") < stages.indexOf("Event held"), beforeEvent);
+    assert.ok(stages.indexOf("Return deposit") > stages.indexOf("Event held"));
     const schedule = paymentSchedule(terms);
     const message = renderToStaticMarkup(createElement(PaymentMessagePanel, { eventDate: terms.eventDate, depositAmount: "300", rentalAmount: 1400, depositDueDate: schedule.depositDueDate, rentalDueDate: schedule.rentalDueDate, rentalPaymentTiming: terms.rentalPaymentTiming }));
     assert.equal(message.includes("After the event and receipt"), beforeEvent);
@@ -137,6 +138,7 @@ test("new and existing contracts retain their own payment dates across the hosti
   assert.equal(orderInvoiceDueDate(archived, "rental_invoice"), "November 3, 2026");
   const earlyInvoice = { ...order, eventDate: legacy.eventDate, snapshot: orderSnapshot(legacy), documents: [{ ...archived.documents[0], payload: { due_date: "October 29, 2026" } }] };
   const timeline = renderToStaticMarkup(createElement(OrderTimeline, { ...props, order: earlyInvoice }));
-  assert.ok(timeline.indexOf("Send rental invoice") > timeline.indexOf("Event held"));
+  const stages = timeline.slice(timeline.indexOf('<ol aria-label="Event stages"'));
+  assert.ok(stages.indexOf("Send rental invoice") > stages.indexOf("Event held"));
   assert.match(timeline, /Contract due November 2, 2026 · Invoice due October 29, 2026/);
 });

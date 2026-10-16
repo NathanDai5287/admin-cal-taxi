@@ -33,3 +33,15 @@ export function timelineDateGroups(dates: TimelineDate[]) {
   }
   return [...groups].sort(([first], [second]) => first - second);
 }
+
+export type TimelinePayment = { kind: string; amount: number; date: string };
+
+export function paymentCompletionDate(payments: TimelinePayment[], total: number): string | null {
+  if (total <= 0) return null;
+  let received = 0;
+  for (const payment of [...payments].sort((first, second) => first.date.localeCompare(second.date))) {
+    received += payment.amount;
+    if (received >= total) return payment.date;
+  }
+  return null;
+}

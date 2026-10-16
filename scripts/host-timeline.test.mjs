@@ -3,7 +3,7 @@ import test from "node:test";
 import { build } from "esbuild";
 
 const compiled = await build({ entryPoints: ["lib/host-timeline.ts"], bundle: true, write: false, platform: "node", format: "esm" });
-const { timelineDay, relativeTimelineDate, timelineDateGroups } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
+const { timelineDay, relativeTimelineDate, timelineDateGroups, paymentCompletionDate } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 
 test("saved invoice text and exact Pacific deadlines use the same calendar day", () => {
   const day = timelineDay("2026-10-29");
@@ -33,4 +33,15 @@ test("shared dates retain every task and separate invoice deadlines retain their
   assert.deepEqual(groups[0][1].map(date => date.label), ["Invoice", "Now"]);
   assert.equal(groups[1][0] - groups[0][0], 4);
   assert.equal(dates[0].detail, "November 2, 2026");
+});
+
+test("payment completion uses the receipt reaching the total, not a later extra payment", () => {
+  const payments = [
+    { kind: "deposit", amount: 100, date: "2026-10-25" },
+    { kind: "deposit", amount: 150, date: "2026-10-23" },
+    { kind: "deposit", amount: 100, date: "2026-10-20" },
+  ];
+  assert.equal(paymentCompletionDate(payments, 250), "2026-10-23");
+  assert.equal(paymentCompletionDate(payments, 500), null);
+  assert.equal(paymentCompletionDate([], 0), null);
 });

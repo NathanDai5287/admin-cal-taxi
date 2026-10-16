@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { formatDateISO } from "@/lib/host-format";
 import { orderInvoiceDueDate, orderPaymentSchedule, formatRentalDeadline } from "@/lib/host-payment-schedule";
-import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
+import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, eventToday, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
 import type { EmailPreview } from "@/lib/host-email";
 import type { SigningRevision } from "@/lib/host-signing";
 import type { Order } from "@/lib/host-orders-types";
@@ -20,13 +20,13 @@ import OrderPreviewReader from "./OrderPreviewReader";
 import OrderIcon from "@/components/host/OrderIcon";
 import OrderSigning from "./OrderSigning";
 import OrderDateStrip from "./OrderDateStrip";
-import { relativeTimelineDate, timelineDay } from "@/lib/host-timeline";
+import { relativeTimelineDate, timelineDay, paymentCompletionDate, type TimelinePayment } from "@/lib/host-timeline";
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
-export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "" }: {
+export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "", paymentHistory = [] }: {
   order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
-  rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string;
+  rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string; paymentHistory?: TimelinePayment[];
 }) {
   const canWrite = useAppWriteAccess();
   const router = useRouter();
@@ -195,11 +195,37 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const rentalDeadline = rentalContractDate === rentalInvoiceDate ? `Due ${rentalContractDate}` : `Contract due ${rentalContractDate} · Invoice due ${rentalInvoiceDate}`;
   const invoiceTiming = wasSent ? "Ready now · Contract sent" : "After contract is sent";
   const eventDates = schedule.eventEndDate === order.eventDate ? formatDateISO(order.eventDate) : `${formatDateISO(order.eventDate)}–${formatDateISO(schedule.eventEndDate)}`;
+  function sentDate(kind: EmailKind) {
+    const timestamps = workflow.deliveries.filter(delivery => delivery.kind === kind && delivery.status === "sent" && delivery.revision_id === revision?.id)
+      .map(delivery => delivery.sent_at).filter((date): date is string => !!date);
+    if (kind === "invitation") timestamps.push(...(revision?.recipients.map(person => person.sentAt).filter((date): date is string => !!date) ?? []));
+    return timestamps.length ? eventToday(new Date(timestamps.sort()[0])) : null;
+  }
+  const undatedSteps = [
+    { label: "Approve contract", done: !!revision, date: null, waiting: "Ready now" },
+    { label: "Send contract", done: wasSent, date: sentDate("invitation"), waiting: revision ? "Ready now" : "After contract approval" },
+    { label: "Everyone signs", done: signed, date: null, waiting: wasSent ? "Waiting for remaining signatures" : "After contract is sent" },
+    { label: "Send deposit invoice", done: delivered("deposit_invoice"), date: sentDate("deposit_invoice"), waiting: invoiceTiming },
+    { label: "Send rental invoice", done: delivered("rental_invoice"), date: sentDate("rental_invoice"), waiting: invoiceTiming },
+    { label: "Pay fire permit", done: permitTotal === 0 || permitPaid >= permitTotal, date: paymentCompletionDate(paymentHistory.filter(payment => payment.kind === "fire_permit"), permitTotal), waiting: "Ready now" },
+    { label: "Return deposit", done: delivered("refund"), date: workflow.refund?.date ?? null, waiting: canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) ? "Ready now" : representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment" },
+  ];
+  const completedDates = undatedSteps.filter(step => step.done && step.date).map(step => ({ label: step.label, date: step.date!, detail: `Completed · ${formatDateISO(step.date!)}` }));
+  const undated = undatedSteps.filter(step => !step.done || !step.date).map(step => ({
+    label: step.label,
+    detail: step.label === "Pay fire permit" && permitTotal === 0 ? "Not required" : step.done ? "Completed · Completion date unavailable" : cancelled ? "Cancelled" : `No deadline · ${step.waiting}`,
+  }));
+  const completedPayments = [
+    { label: "Receive deposit", date: paymentCompletionDate(paymentHistory.filter(payment => payment.kind === "deposit"), order.depositAmount ?? 0) },
+    { label: "Receive rental payment", date: paymentCompletionDate(paymentHistory.filter(payment => payment.kind === "revenue"), order.rentalPrice ?? 0) },
+  ].filter(payment => payment.date).map(payment => ({ label: payment.label, date: payment.date!, detail: `Completed · ${formatDateISO(payment.date!)}` }));
   const timelineDates = [
     { label: "Now", date: today, detail: formatDateISO(today) },
-    { label: "Deposit deadline", date: depositInvoiceDate, detail: depositInvoiceDate },
-    { label: "Rental deadline", date: schedule.rentalDueDate, detail: rentalContractDate },
-    { label: "Event", date: order.eventDate, detail: eventDates },
+    ...completedDates,
+    ...completedPayments,
+    { label: "Receive deposit · Deadline", date: depositInvoiceDate, detail: depositInvoiceDate },
+    { label: "Receive rental payment · Deadline", date: schedule.rentalDueDate, detail: rentalContractDate },
+    { label: "Event held", date: order.eventDate, detail: eventDates },
     ...(timelineDay(rentalInvoiceDate) !== timelineDay(schedule.rentalDueDate) ? [{ label: "Rental invoice deadline", date: rentalInvoiceDate, detail: rentalInvoiceDate }] : []),
   ];
   const rentalMilestones = <>
@@ -214,11 +240,11 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   </>;
   return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
     <section aria-label="Event timeline" className="min-w-0">
-    <OrderDateStrip dates={timelineDates} today={today} endDate={schedule.eventEndDate} />
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
     </div>
+    <OrderDateStrip dates={timelineDates} undated={undated} today={today} endDate={schedule.eventEndDate} />
     {cancelled && <p className="mb-6 text-sm text-warn">This event is cancelled. Its signing and payment history is retained.</p>}
     {emailConfigured && !previewReplyTo && <p className="mb-6 text-sm text-warn">Assign a treasurer with an email in <a href="/users" className="underline">Users</a> before preparing a new email.</p>}
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
