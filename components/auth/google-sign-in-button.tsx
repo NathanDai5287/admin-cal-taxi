@@ -55,7 +55,10 @@ export function GoogleSignInButton({
       clearLegacyHostOnlyAuthCookies();
       const supabase = createClient();
       const nextPath = next ?? `${window.location.pathname}${window.location.search}`;
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const { origin, hostname } = window.location;
+      const memberSite = hostname === "reimbursements.cal.taxi" || hostname === "reimbursements.localhost";
+      const callbackPath = memberSite ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const redirectTo = `${origin}${callbackPath}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo },
