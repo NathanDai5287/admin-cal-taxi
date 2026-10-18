@@ -10,12 +10,14 @@ const compiled = await build({
   stdin: { contents: `export * from "./lib/host-payment-schedule";
     export * from "./lib/host-state-model";
     export * from "./lib/host-order-documents";
+    export * from "./lib/host-draft-storage";
     export * from "./lib/host-order-snapshot";`, resolveDir: root },
   bundle: true, write: false, platform: "node", format: "cjs", alias: { "@": root },
 });
 const compiledModule = { exports: {} };
 vm.runInThisContext(`(function(require,module,exports){${compiled.outputFiles[0].text}\n})`)(createRequire(path.join(root, "package.json")), compiledModule, compiledModule.exports);
 const { EMPTY_STATE, sharedStateFromSnapshot, orderSnapshot, defaultDocuments,
+  readDraft, draftKey,
   paymentSchedule, formatRentalDeadline, contractDraftPaymentTiming, orderInvoiceDueDate } = compiledModule.exports;
 const event = { ...structuredClone(EMPTY_STATE), clubs: ["Sample Club"], eventDate: "2026-10-16",
   finalPrice: "1400", depositAmount: "300", numGuests: "200", startTime: "20:00", endTime: "01:00",
@@ -37,6 +39,38 @@ test("new contracts carry the advance deadline while historical snapshots retain
   assert.equal(newDefaults.payloads.rental_invoice.due_date, "October 15, 2026 at 11:59 p.m. Pacific Time");
   assert.equal(newDefaults.payloads.deposit_invoice.due_date, oldDefaults.payloads.deposit_invoice.due_date);
   assert.equal(sharedStateFromSnapshot(orderSnapshot(event)).rentalPaymentTiming, terms);
+});
+
+test("new contracts require payment after shutdown while historical contracts retain their terms", () => {
+  const legacy = structuredClone(event);
+  delete legacy.shutdownPaymentRequired;
+  const original = structuredClone(legacy);
+  assert.equal(sharedStateFromSnapshot(legacy).shutdownPaymentRequired, false);
+  assert.deepEqual(legacy, original);
+  assert.equal(defaultDocuments({ ...order, snapshot: legacy }).payloads.contract.shutdown_payment_required, false);
+  assert.equal(defaultDocuments(order).payloads.contract.shutdown_payment_required, true);
+  assert.equal(sharedStateFromSnapshot(orderSnapshot(event)).shutdownPaymentRequired, true);
+  assert.equal(sharedStateFromSnapshot(orderSnapshot(sharedStateFromSnapshot(legacy))).shutdownPaymentRequired, false);
+  const sentSnapshot = orderSnapshot(event);
+  delete sentSnapshot.shutdownPaymentRequired;
+  assert.deepEqual(orderSnapshot(sharedStateFromSnapshot(sentSnapshot)), sentSnapshot);
+});
+
+test("saved drafts preserve shutdown terms without upgrading older drafts", () => {
+  const originalStorage = globalThis.localStorage;
+  const legacy = structuredClone(event);
+  delete legacy.shutdownPaymentRequired;
+  const drafts = new Map([
+    [draftKey("legacy"), JSON.stringify(legacy)],
+    [draftKey("current"), JSON.stringify(event)],
+    [draftKey("existing-order"), JSON.stringify({ ...legacy, currentOrderId: order.id })],
+  ]);
+  try {
+    globalThis.localStorage = { getItem: key => drafts.get(key) ?? null };
+    assert.equal(readDraft("legacy").shutdownPaymentRequired, false);
+    assert.equal(readDraft("existing-order").shutdownPaymentRequired, false);
+    assert.equal(readDraft("current").shutdownPaymentRequired, true);
+  } finally { globalThis.localStorage = originalStorage; }
 });
 
 test("day-before deadlines use calendar dates across year, leap-day, and Pacific DST boundaries", () => {
@@ -110,6 +144,40 @@ test("PDF proxy refuses old backend wording for new contracts but permits histor
     assert.equal(await legacy.text(), "old PDF");
     globalThis.fetch = async () => new Response("new PDF", { headers: { "Content-Type": "application/pdf", "X-Rental-Payment-Timing": terms } });
     const current = await services.exports.generateContract(request({ rental_payment_timing: terms }), { params: Promise.resolve({ path: ["contract"] }) });
+    assert.equal(current.status, 200);
+    assert.equal(await current.text(), "new PDF");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("signing previews require confirmation of shutdown payment terms only for new contracts", async () => {
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => Response.json({ revision: { id: "legacy", rentalPaymentTiming: terms } });
+    await assert.rejects(services.exports.prepareSigning("order", { rental_payment_timing: terms, shutdown_payment_required: true }, "new", ""), /No signing links were created/);
+    assert.equal((await services.exports.prepareSigning("order", { shutdown_payment_required: false }, "legacy", "")).id, "legacy");
+    globalThis.fetch = async () => Response.json({ revision: { id: "current", rentalPaymentTiming: terms, shutdownPaymentRequired: true } });
+    assert.equal((await services.exports.prepareSigning("order", { rental_payment_timing: terms, shutdown_payment_required: true }, "new", "")).id, "current");
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("PDF downloads require confirmation of shutdown payment terms only for new contracts", async () => {
+  const originalFetch = globalThis.fetch;
+  const request = payload => new Request("https://admin.example.test/api/host/generate/contract", {
+    method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "application/json" },
+  });
+  const route = payload => services.exports.generateContract(request(payload), { params: Promise.resolve({ path: ["contract"] }) });
+  try {
+    globalThis.fetch = async () => new Response("old PDF", { headers: { "Content-Type": "application/pdf", "X-Rental-Payment-Timing": terms } });
+    const rejected = await route({ rental_payment_timing: terms, shutdown_payment_required: true });
+    assert.equal(rejected.status, 502);
+    assert.equal((await rejected.json()).error, "shutdown_payment_terms_unavailable");
+    const historical = await route({ rental_payment_timing: terms, shutdown_payment_required: false });
+    assert.equal(historical.status, 200);
+    assert.equal(await historical.text(), "old PDF");
+    globalThis.fetch = async () => new Response("new PDF", { headers: {
+      "Content-Type": "application/pdf", "X-Rental-Payment-Timing": terms, "X-Shutdown-Payment-Required": "true",
+    } });
+    const current = await route({ rental_payment_timing: terms, shutdown_payment_required: true });
     assert.equal(current.status, 200);
     assert.equal(await current.text(), "new PDF");
   } finally { globalThis.fetch = originalFetch; }

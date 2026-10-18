@@ -79,6 +79,7 @@ export type SharedState = {
   contractPresign: boolean;
   eventDate: string;
   rentalPaymentTiming: "day_before" | "after_conclusion";
+  shutdownPaymentRequired: boolean;
   numGuests: string;
 
   // Contract draft (so /host/contract restores after reload)
@@ -148,6 +149,7 @@ export const EMPTY_STATE: SharedState = {
   contractPresign: false,
   eventDate: "",
   rentalPaymentTiming: "day_before",
+  shutdownPaymentRequired: true,
   numGuests: "",
 
   startTime: "",
@@ -278,6 +280,7 @@ export function sharedStateFromSnapshot(snapshot: Record<string, unknown>): Shar
     contractPresign: bool(snapshot.contractPresign, false),
     eventDate: str(snapshot.eventDate, EMPTY_STATE.eventDate),
     rentalPaymentTiming: snapshot.rentalPaymentTiming === "day_before" ? "day_before" : "after_conclusion",
+    shutdownPaymentRequired: bool(snapshot.shutdownPaymentRequired, false),
     numGuests: str(snapshot.numGuests, EMPTY_STATE.numGuests),
     startTime: str(snapshot.startTime, EMPTY_STATE.startTime),
     endTime: str(snapshot.endTime, EMPTY_STATE.endTime),

@@ -134,6 +134,7 @@ export function buildContractPayload(
   return withClubs({
     date:       formatDateISO(d.eventDate),
     rental_payment_timing: d.rentalPaymentTiming,
+    shutdown_payment_required: d.shutdownPaymentRequired,
     start_time: d.startTime,
     end_time:   d.endTime,
     price:      effectiveRentalPrice(d),

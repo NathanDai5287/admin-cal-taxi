@@ -108,6 +108,7 @@ export default function WorkspaceActions({
       ...next,
       currentOrderId: "",
       rentalPaymentTiming: "day_before",
+      shutdownPaymentRequired: true,
       orderDraftIntent: "",
       loadedOrderIdentity: "",
       contractSigners: [],

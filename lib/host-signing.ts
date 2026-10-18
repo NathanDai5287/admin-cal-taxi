@@ -26,6 +26,7 @@ export type SigningRevision = {
   error: string | null;
   created_at: string;
   rentalPaymentTiming?: "day_before" | "after_conclusion";
+  shutdownPaymentRequired?: boolean;
 };
 
 export type SigningActivation = {
@@ -69,6 +70,9 @@ export async function prepareSigning(orderId: string, payload: Record<string, un
   });
   if (payload.rental_payment_timing === "day_before" && result.revision.rentalPaymentTiming !== "day_before") {
     throw new Error("The contract generator needs its payment-deadline update before new contracts can be prepared. No signing links were created.");
+  }
+  if (payload.shutdown_payment_required === true && result.revision.shutdownPaymentRequired !== true) {
+    throw new Error("The contract generator needs its shutdown payment update before new contracts can be prepared. No signing links were created.");
   }
   return result.revision;
 }

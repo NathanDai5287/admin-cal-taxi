@@ -50,8 +50,13 @@ export async function POST(
 
   const body = await request.text();
   let requiresNewDeadline = false;
+  let requiresShutdownPayment = false;
   if (path.join("/") === "contract") {
-    try { requiresNewDeadline = JSON.parse(body).rental_payment_timing === "day_before"; }
+    try {
+      const payload = JSON.parse(body);
+      requiresNewDeadline = payload.rental_payment_timing === "day_before";
+      requiresShutdownPayment = payload.shutdown_payment_required === true;
+    }
     catch { return NextResponse.json({ error: "invalid_input" }, { status: 400 }); }
   }
   let upstream: Response;
@@ -72,6 +77,10 @@ export async function POST(
   if (upstream.ok && requiresNewDeadline && upstream.headers.get("x-rental-payment-timing") !== "day_before") {
     await upstream.body?.cancel();
     return NextResponse.json({ error: "payment_terms_unavailable", detail: "The contract generator needs its payment-deadline update before new contracts can be generated." }, { status: 502 });
+  }
+  if (upstream.ok && requiresShutdownPayment && upstream.headers.get("x-shutdown-payment-required") !== "true") {
+    await upstream.body?.cancel();
+    return NextResponse.json({ error: "shutdown_payment_terms_unavailable", detail: "The contract generator needs its shutdown payment update before new contracts can be generated." }, { status: 502 });
   }
 
   // Pass the PDF (or JSON error) through, preserving the download filename.
