@@ -185,7 +185,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     try { const result = await copyHostingSigningLinkAction(order.id, revision.id, email); if (!result.ok) { setMessage(result.error); return; } await navigator.clipboard.writeText(result.data); setMessage("Personal signing link copied."); } catch { setMessage("Clipboard unavailable. Reload and retry."); }
   }
   const emailButton = (kind: EmailKind, label: string, enabled = true) => kind === "invitation" && !wasSent
-    ? <Button compact disabled={!canWrite || busy || preparing || !allowed || !enabled} onClick={() => prepare(kind)}>{label}</Button>
+    ? <Button compact className="gap-1.5" disabled={!canWrite || busy || preparing || !allowed || !enabled} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</Button>
     : <button type="button" className={timelineAction} disabled={!canWrite || busy || !allowed || !enabled} onPointerEnter={() => { void warm(kind).catch(() => {}); }} onFocus={() => { void warm(kind).catch(() => {}); }} onClick={() => prepare(kind)}><OrderIcon name="mail" className="h-3.5 w-3.5" />{label}</button>;
   const visiblePdf = pdfPreview?.scope === scope ? pdfPreview : null;
   const selected = previewScope === scope ? previews[previewIndex] : undefined;
@@ -291,7 +291,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
               return <li key={person.email} className="grid grid-cols-[1rem_minmax(0,1.1fr)_minmax(0,1fr)] items-start gap-x-2.5 py-1">
                 <span className="pt-0.5"><SignatureIcon progress={signature} /></span>
                 <div className="min-w-0"><p className="font-medium text-ink [overflow-wrap:anywhere]">{person.name}</p><a href={`mailto:${person.email}`} title={person.email} className="mt-0.5 block truncate text-[11px] text-muted hover:text-brand">{person.email}</a>
-                  {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={!canWrite || busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}>Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={!canWrite || busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
+                  {person.status !== "SIGNED" && revision.state === "awaiting_signatures" && !cancelled && <div className="flex flex-wrap gap-x-3"><button type="button" className={timelineAction} disabled={!canWrite || busy || !allowed || signature.state !== "pending"} onClick={() => prepare("reminder", [person.email])}><OrderIcon name="mail" className="h-3.5 w-3.5" />Remind<span className="sr-only"> {person.name}</span></button><button type="button" className={timelineAction} disabled={!canWrite || busy || signingUnavailable} onClick={() => copy(person.email)}>Copy link<span className="sr-only"> for {person.name}</span></button></div>}
                 </div>
                 <p className="leading-snug text-muted [overflow-wrap:anywhere]">{club || "—"}</p>
               </li>;
