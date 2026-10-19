@@ -303,3 +303,37 @@ test("rental invoice labels update only unattempted previews and preserve amount
     assert.equal(generated.length, 2);
   } finally { state.order = originalOrder; state.rows = []; }
 });
+
+
+test("rental receipts upgrade queued previews in place and freeze all attempted deliveries", async () => {
+  state.rows = [];
+  state.rentals = [{ id: "rental-style", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2026-10-19", reversed_at: null }];
+  const input = { ...request, kind: "receipt", recipients: undefined };
+  const original = await prepareHostingEmail(input);
+  assert.equal(original.length, 2);
+  assert.equal(state.rows[0].payload.rentalReceiptStyle, 1);
+  const identity = state.rows.map(row => ({ id: row.id, key: row.request_key, recipient: row.recipient }));
+  const bodies = state.rows.map(row => ({ ...row.payload.body, attachments: undefined }));
+  state.rows.forEach(row => {
+    delete row.payload.rentalReceiptStyle;
+    row.payload.body.attachments[0].content = "old-basic-rental-pdf";
+  });
+  const refreshed = await prepareHostingEmail(input);
+  assert.deepEqual(refreshed.map(row => row.id), original.map(row => row.id));
+  assert.deepEqual(state.rows.map(row => ({ id: row.id, key: row.request_key, recipient: row.recipient })), identity);
+  assert.deepEqual(state.rows.map(row => ({ ...row.payload.body, attachments: undefined })), bodies);
+  assert.ok(state.rows.every(row => row.payload.rentalReceiptStyle === 1 && row.payload.body.attachments[0].content !== "old-basic-rental-pdf"));
+  state.rows.forEach(row => {
+    delete row.payload.rentalReceiptStyle;
+    row.payload.body.attachments[0].content = "frozen-rental-pdf";
+    row.attempted_at = "2026-10-19T12:00:00Z";
+  });
+  for (const status of ["queued", "failed", "sent"]) {
+    state.rows.forEach(row => { row.status = status; });
+    const frozen = structuredClone(state.rows);
+    await prepareHostingEmail(input);
+    assert.deepEqual(state.rows, frozen);
+  }
+  state.rows = [];
+  state.rentals = [];
+});

@@ -14,11 +14,11 @@ import { orderInvoiceDueDate, orderPaymentSchedule } from "./host-payment-schedu
 import { defaultDocuments } from "./host-order-documents";
 import type { Order } from "./host-orders-types";
 import { simplifyRentalLineItems } from "./host-rental-items";
-import { renderDepositReceiptPdf } from "./host-deposit-receipt-pdf";
+import { renderDepositReceiptPdf, renderRentalReceiptPdf, type ReceiptPayment } from "./host-payment-receipt-pdf";
 
 type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalInvoiceStyle?: number; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalReceiptStyle?: number; rentalInvoiceStyle?: number; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { replyTo?: string; id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
@@ -119,6 +119,19 @@ function preview(row: DeliveryRow): EmailPreview {
 function depositReceiptAttachment(order: Order, payments: { id: string; amount: number; paid_date: string }[], contact: string): Attachment {
   return { filename: `deposit-payment-receipt-${order.id}.pdf`, content: Buffer.from(renderDepositReceiptPdf(order, payments, eventToday(), contact)).toString("base64") };
 }
+function rentalReceiptAttachment(order: Order, payments: ReceiptPayment[], contact: string): Attachment {
+  return { filename: `rental-payment-receipt-${order.id}.pdf`, content: Buffer.from(renderRentalReceiptPdf(order, payments, eventToday(), contact)).toString("base64") };
+}
+async function updateRentalReceiptPreview(order: Order, row: DeliveryRow, payments: ReceiptPayment[]): Promise<DeliveryRow> {
+  if (row.status !== "queued" || row.attempted_at || row.payload.rentalReceiptStyle === 1) return row;
+  const payload = { ...row.payload, rentalReceiptStyle: 1, body: { ...row.payload.body, attachments: [rentalReceiptAttachment(order, payments, row.payload.body.reply_to)] } };
+  const db = workflowDb();
+  const update = await db.from("hosting_email_deliveries").update({ payload }).eq("id", row.id).eq("status", "queued").is("attempted_at", null);
+  if (update.error) throw new Error("Unable to update the rental receipt preview.");
+  const fresh = await db.from("hosting_email_deliveries").select("*").eq("id", row.id);
+  if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the rental receipt preview.");
+  return fresh.data[0] as DeliveryRow;
+}
 export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPreview[]> {
   // Preview uses archived state; delivery still synchronizes Documenso and
   // checks current terms, payments and recipients immediately before sending.
@@ -203,7 +216,10 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   }
   const existing = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).in("request_key", keys);
   if (existing.error) throw new Error("Unable to load saved previews.");
-  const saved = (existing.data ?? []) as DeliveryRow[];
+  const existingRows = (existing.data ?? []) as DeliveryRow[];
+  const saved = input.kind === "receipt"
+    ? await Promise.all(existingRows.map(row => updateRentalReceiptPreview(order, row, payments.rows)))
+    : existingRows;
   if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
   const sender = await config();
   const money = (n: number) => `$${n.toFixed(2)}`;
@@ -213,7 +229,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   if (input.kind === "receipt") {
     if (payments.total <= 0) throw new Error("Record a rental payment before sending a receipt.");
     detail = `Rental payments received: ${money(payments.total)}. Remaining rental fee: ${money(Math.max((order.rentalPrice ?? 0) - payments.total, 0))}.`;
-    attachments = [await statementPdf(order, "Rental payment receipt", [detail, ...payments.rows.map(r => `${r.paid_date}: ${money(Number(r.amount))} (record ${r.id})`), "This receipt covers the recorded rental payments listed above. The refundable deposit is separate."], sender.replyTo)];
+    attachments = [rentalReceiptAttachment(order, payments.rows, sender.replyTo)];
   }
   if (input.kind === "refund") {
     const refund = input.refund!;
@@ -223,7 +239,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
     const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, detail, replyTo: sender.replyTo });
     const body: MessageBody = { from: sender.from, to: [person.email], reply_to: sender.replyTo, ...message, attachments };
-    const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.refund ? { refund: input.refund } : {}) };
+    const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(input.kind === "receipt" ? { rentalReceiptStyle: 1 } : {}), ...(input.refund ? { refund: input.refund } : {}) };
     return { request_key: requestKey(person.email), order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload };
   });
   const inserted = await db.from("hosting_email_deliveries").upsert(pending, { onConflict: "request_key", ignoreDuplicates: true });
