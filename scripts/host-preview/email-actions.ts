@@ -5,6 +5,16 @@ import type { EmailRequest, EmailPreview } from "../../lib/host-email";
 import type { EventWorkflow } from "../../lib/host-event";
 const key = "host.timeline.preview.v1";
 export async function recordHostingDepositAction(input: { orderId: string; amount: number; paidDate: string; requestId: string }) { return recordHostingPaymentAction({ ...input, kind: "deposit" }); }
+export async function recordHostingDepositReturnAction(orderId: string) {
+  const data = read();
+  const workflow = previewWorkflow(orderId);
+  if (workflow.refund) return { ok: true as const, data: workflow.refund };
+  const amount = (data.finance[orderId]?.payments ?? []).filter(payment => payment.kind === "deposit" && !payment.reversedAt).reduce((total, payment) => total + payment.amount, 0);
+  if (amount <= 0) return { ok: false as const, error: "Record the received deposit before marking it returned." };
+  workflow.refund = { amount, date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }), method: "" };
+  save(orderId, workflow);
+  return { ok: true as const, data: workflow.refund };
+}
 export async function undoHostingDepositAction(input: { orderId: string; paymentIds: string[] }) {
   const data = read();
   for (const payment of data.finance[input.orderId]?.payments ?? []) if (payment.kind === "deposit" && input.paymentIds.includes(payment.id) && !payment.reversedAt) payment.reversedAt = new Date().toISOString();

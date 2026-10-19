@@ -98,7 +98,7 @@ export default function HostingFinancePanel({
       const result = kind === "deposit" ? await recordHostingDepositAction(paymentInput) : await recordHostingPaymentAction({ ...paymentInput, kind });
       if (result.ok) {
         setPendingPayments(current => current.map(payment => payment.id === optimistic.id ? { ...payment, id: result.data.id } : payment));
-        setMessage(`${paymentLabel(kind)} marked paid.`);
+        setMessage(`${paymentLabel(kind)} marked ${kind === "fire_permit" ? "paid" : "received"}.`);
         setRequestIds((current) => ({ ...current, [kind]: crypto.randomUUID() }));
         router.refresh();
       } else {
@@ -119,11 +119,11 @@ export default function HostingFinancePanel({
     try {
       const result = kind === "deposit" ? await undoHostingDepositAction({ orderId, paymentIds }) : await undoHostingPaymentStatusAction({ orderId, kind, paymentIds });
       if (!result.ok) throw new Error(result.error);
-      setMessage(`${paymentLabel(kind)} marked unpaid.`);
+      setMessage(`${paymentLabel(kind)} marked ${kind === "fire_permit" ? "unpaid" : "not received"}.`);
       router.refresh();
     } catch (error) {
       setReversedIds(current => new Set([...current].filter(id => !paymentIds.includes(id))));
-      setMessage(error instanceof Error ? error.message : "Could not undo paid status. Reload to check the payment, then retry.");
+      setMessage(error instanceof Error ? error.message : "Could not undo payment status. Reload to check the payment, then retry.");
     } finally { setBusy(false); }
   }
 
@@ -134,19 +134,21 @@ export default function HostingFinancePanel({
           { kind: "revenue", label: "Rental payment", total: revenue, paid: revenuePaid },
           { kind: "fire_permit", label: "Fire permit", total: firePermit, paid: permitPaid }] as const).map(item => {
           const paid = item.total > 0 && item.paid >= item.total;
+          const paymentState = item.kind === "fire_permit" ? "paid" : "received";
+          const paymentAction = `${paid ? "Undo" : "Mark"} ${paymentState}`;
           return <div key={item.kind} className="flex flex-col items-start gap-2">
             <div className="min-w-0 text-[13px]">
               <span className="font-medium">{item.label}</span>
               <span className="ml-2 tabular-nums text-muted">{item.total > 0 ? formatMoney(item.total) : "Not required"}</span>
               {item.total > 0 && <span className={`mt-1 flex items-center gap-1.5 text-[12px] ${paid ? "text-ok" : "text-muted"}`}>
                 {paid && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 8 3 3 7-7" /></svg>}
-                {item.kind === "deposit" ? paid ? "Received" : "Not received" : paid ? "Paid" : "Unpaid"}
+                {item.kind === "fire_permit" ? paid ? "Paid" : "Unpaid" : paid ? "Received" : "Not received"}
               </span>}
             </div>
             {item.total > 0 && <Button compact variant={paid ? "text" : "secondary"} disabled={!canWrite || busy || (!paid && !confirmed)}
-              aria-label={`${paid ? "Undo paid status for" : item.kind === "deposit" ? "Mark received:" : "Mark paid:"} ${item.label.toLowerCase()}`}
-              onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{item.kind === "deposit" ? paid ? "Undo received" : "Mark received" : paid ? "Undo paid" : "Mark paid"}</Button>}
-            {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={!canWrite || busy} onClick={() => undoPaid(item.kind)}>Undo paid</Button>}
+              aria-label={`${paymentAction}: ${item.label.toLowerCase()}`}
+              onClick={() => paid ? undoPaid(item.kind) : recordPayment(item.kind)}>{paymentAction}</Button>}
+            {item.total === 0 && item.paid > 0 && <Button compact variant="text" disabled={!canWrite || busy} onClick={() => undoPaid(item.kind)}>Undo {paymentState}</Button>}
           </div>;
         })}
       </div>

@@ -7,10 +7,41 @@ import { currentRevision, contractWasSent, eventToday } from "@/lib/host-event";
 import { listSigning, syncSigning } from "@/lib/host-signing";
 import { getOrderFresh } from "@/lib/host-orders";
 import { ensureHostingForecast, loadWorkflow, workflowDb } from "@/lib/host-workflow";
+import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { orderPaymentSchedule } from "@/lib/host-payment-schedule";
 
-const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "deposit_receipt", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().min(1).max(120) }).optional() });
+const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "deposit_receipt", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().max(120) }).optional() });
 function failure(error: unknown) { return { ok: false as const, error: error instanceof Error ? error.message : "Request failed. Please retry." }; }
 function refresh(orderId: string) { revalidatePath(`/host/orders/${orderId}`); revalidatePath("/host/orders"); revalidatePath("/finance/planning"); }
+export async function recordHostingDepositReturnAction(orderId: string) {
+  await requireAppAccess("host", "write");
+  try {
+    z.string().min(1).max(200).parse(orderId);
+    const [order, workflow] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId)]);
+    if (!order || order.statusOverride === "cancelled" || workflow.cancelledAt) throw new Error("This order cannot return a deposit.");
+    if (workflow.refund) return { ok: true as const, data: workflow.refund };
+    const date = eventToday();
+    if (order.snapshot.rentalPaymentTiming === "day_before" && date < orderPaymentSchedule(order).eventEndDate) throw new Error("Return the deposit after the event ends.");
+    const db = workflowDb();
+    const [deposits, rentals] = await Promise.all([
+      db.from("hosting_deposit_payments").select("amount").eq("order_id", orderId).is("reversed_at", null),
+      createAdminClient().from("hosting_finance_payments").select("amount").eq("order_id", orderId).eq("kind", "revenue").is("reversed_at", null),
+    ]);
+    if (deposits.error || rentals.error) throw new Error("Unable to verify recorded payments.");
+    const amount = (deposits.data ?? []).reduce((total, payment) => total + Number(payment.amount), 0);
+    const rentalPaid = (rentals.data ?? []).reduce((total, payment) => total + Number(payment.amount), 0);
+    if (amount <= 0) throw new Error("Record the received deposit before marking it returned.");
+    if (rentalPaid < (order.rentalPrice ?? Infinity)) throw new Error("Record the full rental payment before returning the deposit.");
+    const state = await db.from("hosting_event_state").upsert({ order_id: orderId }, { onConflict: "order_id", ignoreDuplicates: true });
+    if (state.error) throw new Error("Unable to save the deposit return.");
+    const saved = await db.from("hosting_event_state").update({ refund_amount: amount, refund_date: date, refund_method: null }).eq("order_id", orderId).is("refund_amount", null).is("cancelled_at", null);
+    if (saved.error) throw new Error("Unable to save the deposit return.");
+    const current = await loadWorkflow(orderId);
+    if (!current.refund || current.cancelledAt) throw new Error("The order changed. Reload before recording the deposit return.");
+    refresh(orderId);
+    return { ok: true as const, data: current.refund };
+  } catch (error) { return failure(error); }
+}
 export async function recordHostingDepositAction(input: { orderId: string; amount: number; paidDate: string; requestId: string }) {
   const { userId } = await requireAppAccess("host", "write");
   try {

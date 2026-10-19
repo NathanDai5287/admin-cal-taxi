@@ -24,7 +24,7 @@ export async function loadWorkflow(orderId: string): Promise<EventWorkflow> {
   return {
     activatedAt: settings.data!.activated_at as string, cancelledAt: state.data?.cancelled_at ?? null,
     deliveries: (deliveries.data ?? []) as EmailDelivery[],
-    refund: state.data?.refund_amount ? { amount: Number(state.data.refund_amount), date: state.data.refund_date, method: state.data.refund_method } : null,
+    refund: state.data?.refund_amount ? { amount: Number(state.data.refund_amount), date: state.data.refund_date, method: state.data.refund_method ?? "" } : null,
   };
 }
 export async function registerSigning(revision: SigningRevision) {

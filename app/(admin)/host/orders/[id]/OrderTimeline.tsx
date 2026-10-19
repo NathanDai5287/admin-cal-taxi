@@ -11,7 +11,7 @@ import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, eventTod
 import type { EmailPreview } from "@/lib/host-email";
 import type { SigningRevision } from "@/lib/host-signing";
 import type { Order } from "@/lib/host-orders-types";
-import { cancelHostingEventAction, copyHostingSigningLinkAction, refreshHostingProgressAction, sendHostingEmailAction } from "../email-actions";
+import { cancelHostingEventAction, copyHostingSigningLinkAction, recordHostingDepositReturnAction, refreshHostingProgressAction, sendHostingEmailAction } from "../email-actions";
 import { hostingEmailDraft } from "@/lib/host-email-draft";
 import { createHostingDocumentCache, createHostingPreviewCache } from "@/lib/host-preview-client";
 import { fmtUSD } from "../order-format";
@@ -32,8 +32,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
   const router = useRouter();
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [previews, setPreviews] = useState<EmailPreview[]>([]); const [previewIndex, setPreviewIndex] = useState(0);
-  const [refund, setRefund] = useState(workflow.refund ?? { amount: order.depositAmount ?? 0, date: today, method: "" });
-  const refundDetails = useRef<HTMLDetailsElement>(null);
+  const refund = workflow.refund ?? undefined;
   const polling = useRef(false); const previewSection = useRef<HTMLElement>(null);
   const [preparing, setPreparing] = useState(false);
   const [reviewingContract, setReviewingContract] = useState(false);
@@ -82,7 +81,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     return () => { clearInterval(timer); window.removeEventListener("focus", poll); };
   }, [canWrite, order.id, cancelled, router]);
 
-  const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, depositPaid, today, cancelled]);
+  const scope = JSON.stringify([order.id, order.updatedAt, revision?.id, revision?.recipients.map(p => [p.email, p.status]), rentalPaid, depositPaid, refund, today, cancelled]);
   const [previewScope, setPreviewScope] = useState("");
   useEffect(() => { pausePolling.current = reviewingContract || busy || (previewScope === scope && (preparing || previews.length > 0)) || pdfPreview?.scope === scope; }, [reviewingContract, busy, preparing, previews.length, previewScope, scope, pdfPreview?.scope]);
   const [cache] = useState(createHostingPreviewCache);
@@ -113,12 +112,22 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     }, 150);
     return () => clearTimeout(timer);
   }, [allowed, revision?.state, wasSent, hasUnsentInvitation, rentalPaid, depositPaid, warm, documents, order.id, revision?.id, revision?.files.original]);
-  const refundKey = JSON.stringify(refund);
   useEffect(() => {
-    if (!allowed || !wasSent || !canReturnDeposit || rentalPaid < (order.rentalPrice ?? Infinity) || refund.amount <= 0 || !refund.method.trim()) return;
+    if (!allowed || !wasSent || !refund) return;
     const timer = setTimeout(() => { void warm("refund").catch(() => {}); }, 300);
     return () => clearTimeout(timer);
-  }, [allowed, wasSent, canReturnDeposit, rentalPaid, order.rentalPrice, refund.amount, refund.method, refundKey, warm]);
+  }, [allowed, wasSent, refund, warm]);
+
+  async function markReturned() {
+    setBusy(true); setMessage("");
+    try {
+      const result = await recordHostingDepositReturnAction(order.id);
+      if (!result.ok) { setMessage(result.error); return; }
+      setMessage("Deposit marked returned. Review the confirmation email below.");
+      cache.clear(); router.refresh();
+    } catch { setMessage("Could not confirm the deposit return. Reload to check its status."); }
+    finally { setBusy(false); }
+  }
 
   async function prepare(kind: EmailKind, recipients?: string[]) {
     if (!revision) return;
@@ -209,7 +218,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     { label: "Send deposit invoice", done: delivered("deposit_invoice"), date: sentDate("deposit_invoice"), waiting: invoiceTiming },
     { label: "Send rental invoice", done: delivered("rental_invoice"), date: sentDate("rental_invoice"), waiting: invoiceTiming },
     { label: "Pay fire permit", done: permitTotal === 0 || permitPaid >= permitTotal, date: paymentCompletionDate(paymentHistory.filter(payment => payment.kind === "fire_permit"), permitTotal), waiting: "Ready now" },
-    { label: "Return deposit", done: delivered("refund"), date: workflow.refund?.date ?? null, waiting: canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) ? "Ready now" : representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment" },
+    { label: "Return deposit", done: !!workflow.refund, date: workflow.refund?.date ?? null, waiting: canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) ? "Ready now" : representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment" },
   ];
   const completedDates = undatedSteps.filter(step => step.done && step.date).map(step => ({ label: step.label, date: step.date!, detail: `Completed · ${formatDateISO(step.date!)}` }));
   const undated = undatedSteps.filter(step => !step.done || !step.date).map(step => ({
@@ -236,7 +245,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     </Milestone>
     <Milestone title="Receive rental payment" detail={<Deadline date={schedule.rentalDueDate} label={rentalDeadline} today={today} />} done={rentalPaid >= (order.rentalPrice ?? Infinity)}>
       <p className="text-[12px] text-muted">{fmtUSD(rentalPaid)} / {fmtUSD(order.rentalPrice ?? 0)}</p>
-      {emailButton("receipt", "Review payment receipt", rentalPaid > 0 && wasSent)}
+      {emailButton("receipt", "Review rental receipt", rentalPaid > 0 && wasSent)}
     </Milestone>
   </>;
   return <>
@@ -245,22 +254,16 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
       <section id="deposit-return-details" aria-label="Deposit return details" className="min-w-0 scroll-mt-6">
         <div className="text-[13px]">
           <span className="font-medium">Deposit return</span>
-          <span className="ml-2 tabular-nums text-muted">{fmtUSD(workflow.refund?.amount ?? order.depositAmount ?? 0)}</span>
+          <span className="ml-2 tabular-nums text-muted">{fmtUSD(workflow.refund?.amount ?? depositPaid)}</span>
           <span className={`mt-1 flex items-center gap-1.5 text-[12px] ${workflow.refund ? "text-ok" : "text-muted"}`}>
             {workflow.refund && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 8 3 3 7-7" /></svg>}
             {workflow.refund ? "Returned" : "Not returned"}
           </span>
         </div>
-        <details ref={refundDetails} className="mt-2">
-          <summary className="cursor-pointer text-[12px] font-medium text-brand underline underline-offset-4">Return details</summary>
-          {!workflow.refund && <p className="mt-2 text-[12px] text-muted">{!canReturnDeposit ? "Return the deposit after the event ends." : rentalPaid < (order.rentalPrice ?? Infinity) ? "Record the full rental payment before returning the deposit." : "After you return the deposit, enter the amount, date, and method to review the confirmation email and PDF."}</p>}
-          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
-            <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
-            <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" min={representatives.rentalPaymentTiming === "day_before" ? schedule.eventEndDate : undefined} max={today} value={refund.date} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
-            <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
-            <div className="col-span-2">{emailButton("refund", "Review return confirmation", wasSent && canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
-          </div>
-        </details>
+        {!workflow.refund && <>
+          <Button compact variant="secondary" className="mt-2" disabled={!canWrite || busy || cancelled || signingUnavailable || !wasSent || !canReturnDeposit || rentalPaid < (order.rentalPrice ?? Infinity) || depositPaid <= 0} onClick={() => { void markReturned(); }}>Mark returned</Button>
+          <p className="mt-1 text-[12px] text-muted">{!canReturnDeposit ? "After the event ends" : rentalPaid < (order.rentalPrice ?? Infinity) ? "After full rental payment" : depositPaid <= 0 ? "After the deposit is received" : "Record after you return the deposit."}</p>
+        </>}
       </section>
     </div>
     <div className="mt-7 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
@@ -316,8 +319,8 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
       </Milestone>
       {!rentalBeforeEvent && rentalMilestones}
-      <Milestone title="Return deposit" detail={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : (representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment")} done={delivered("refund")} last>
-        <a className={timelineAction} href="#deposit-return-details" onClick={() => { if (refundDetails.current) refundDetails.current.open = true; }}>Deposit return details</a>
+      <Milestone title="Return deposit" detail={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : (representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment")} done={!!workflow.refund} last>
+        {emailButton("refund", "Review deposit return confirmation", wasSent && !!workflow.refund)}
       </Milestone>
     </ol>
 

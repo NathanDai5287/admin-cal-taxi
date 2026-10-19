@@ -215,23 +215,27 @@ test("invoice email and attachment keep the saved invoice date and preserve atte
 });
 
 
-test("early rental payment does not allow returning a deposit before an overnight event ends", async () => {
-  const originalOrder = structuredClone(state.order);
-  try {
-    state.rows = [];
-    state.order.eventDate = "2020-10-16";
-    state.order.snapshot = { ...state.order.snapshot, eventDate: "2020-10-16", startTime: "21:30", endTime: "01:00", rentalPaymentTiming: "day_before" };
-    state.rentals = [{ id: "rental-paid", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2020-10-15", reversed_at: null }];
-    const refund = { amount: 300, date: "2020-10-16", method: "Zelle" };
-    await assert.rejects(prepareHostingEmail({ ...request, kind: "refund", refund }), /on or after the event ends/);
-    assert.equal(state.rows.length, 0);
-    state.order.snapshot.rentalPaymentTiming = "after_conclusion";
-    const legacy = await prepareHostingEmail({ ...request, kind: "refund", refund });
-    assert.match(legacy[0].html, /2020-10-16/);
-    state.order.snapshot.rentalPaymentTiming = "day_before";
-    const previews = await prepareHostingEmail({ ...request, kind: "refund", refund: { ...refund, date: "2020-10-17" } });
-    assert.match(previews[0].html, /2020-10-17/);
-  } finally { state.order = originalOrder; state.rows = []; state.rentals = []; }
+test("deposit return confirmation requires a recorded return and never changes that record", async () => {
+  state.rows = []; state.refund = null;
+  state.rentals = [{ id: "rental-paid", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2020-10-15", reversed_at: null }];
+  const refund = { amount: 125, date: "2020-10-17", method: "" };
+  const input = { ...request, kind: "refund", refund };
+  await assert.rejects(prepareHostingEmail(input), /Mark the deposit returned/);
+  assert.equal(state.rows.length, 0);
+  state.refund = refund;
+  const previews = await prepareHostingEmail(input);
+  assert.equal(previews.length, 1);
+  assert.match(previews[0].html, /Deposit returned: \$125\.00 on 2020-10-17\./);
+  assert.doesNotMatch(previews[0].html, /via/);
+  assert.equal(previews[0].html, hostingEmailDraft(state.order, state.revision, "refund", 1400, state.treasurerEmail, refund)[0].html);
+  assert.deepEqual(state.refund, refund);
+  await assert.rejects(prepareHostingEmail({ ...input, refund: { ...refund, amount: 300 } }), /return changed/);
+  const calls = [];
+  globalThis.fetch = async (_url, init) => { calls.push(JSON.parse(init.body)); return Response.json({ id: "return-provider" }); };
+  assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1);
+  assert.deepEqual(calls[0].to, ["one@example.test", "two@example.test"]);
+  assert.deepEqual(state.refund, refund);
+  state.rows = []; state.rentals = []; state.refund = null;
 });
 
 test("new messages use the managed treasurer and stored messages retain their reply address", async () => {
@@ -310,7 +314,7 @@ test("rental receipts upgrade queued previews in place and freeze all attempted 
   state.rentals = [{ id: "rental-style", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2026-10-19", reversed_at: null }];
   const input = { ...request, kind: "receipt", recipients: undefined };
   const original = await prepareHostingEmail(input);
-  assert.equal(original.length, 2);
+  assert.equal(original.length, 1);
   assert.equal(state.rows[0].payload.rentalReceiptStyle, 1);
   const identity = state.rows.map(row => ({ id: row.id, key: row.request_key, recipient: row.recipient }));
   const bodies = state.rows.map(row => ({ ...row.payload.body, attachments: undefined }));
@@ -336,4 +340,31 @@ test("rental receipts upgrade queued previews in place and freeze all attempted 
   }
   state.rows = [];
   state.rentals = [];
+});
+
+test("rental receipts use one shared email and preserve individual sent or attempted history", async () => {
+  state.rows = [];
+  state.rentals = [{ id: "rental-group", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2026-10-19", reversed_at: null }];
+  const input = { ...request, kind: "receipt", recipients: undefined };
+  const grouped = await prepareHostingEmail(input);
+  assert.equal(grouped.length, 1);
+  assert.equal(grouped[0].html, hostingEmailDraft(state.order, state.revision, "receipt", 1400, state.treasurerEmail)[0].html);
+  const calls = [];
+  globalThis.fetch = async (_url, init) => { calls.push(JSON.parse(init.body)); return Response.json({ id: "rental-group-provider" }); };
+  assert.equal((await deliverHostingEmails(state.order.id, grouped.map(p => p.id))).sent, 1);
+  assert.deepEqual(calls[0].to, ["one@example.test", "two@example.test"]);
+  const group = structuredClone(state.rows[0]);
+  const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  const suffix = hash({ terms: group.payload.termsHash, kind: "receipt", payments: group.payload.paymentsHash, refund: undefined });
+  const legacy = state.revision.recipients.map(person => ({ ...structuredClone(group), id: crypto.randomUUID(), request_key: hash([state.order.id, state.revision.id, "receipt", person.email.toLowerCase(), suffix]), recipient: person.email, payload: { ...structuredClone(group.payload), sharedFinancialEmail: undefined, body: { ...structuredClone(group.payload.body), to: [person.email] } } }));
+  for (const status of ["queued", "sent", "failed"]) {
+    state.rows = structuredClone(legacy);
+    state.rows.forEach(row => { row.status = status; row.attempted_at = status === "queued" ? null : "2026-10-19T12:00:00Z"; });
+    const frozen = structuredClone(state.rows);
+    const archived = await prepareHostingEmail(input);
+    assert.equal(archived.length, 2);
+    assert.deepEqual(state.rows, frozen);
+    assert.deepEqual(archived.map(p => p.id), frozen.map(row => row.id));
+  }
+  state.rows = []; state.rentals = [];
 });
