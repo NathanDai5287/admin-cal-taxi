@@ -128,13 +128,13 @@ export default function HostingFinancePanel({
   }
 
   return (
-    <section id="event-finances" aria-label="Event payments" className="scroll-mt-6 border-b border-rule pb-4">
-      <div className="grid gap-x-8 gap-y-4 sm:grid-cols-3">
+    <section id="event-finances" aria-label="Event payments" className="scroll-mt-6">
+      <div className="grid items-start gap-x-8 gap-y-4 sm:grid-cols-3">
         {([{ kind: "deposit", label: "Deposit received", total: depositTotal, paid: depositPaid },
           { kind: "revenue", label: "Rental payment", total: revenue, paid: revenuePaid },
           { kind: "fire_permit", label: "Fire permit", total: firePermit, paid: permitPaid }] as const).map(item => {
           const paid = item.total > 0 && item.paid >= item.total;
-          return <div key={item.kind} className="flex flex-wrap items-center justify-between gap-3">
+          return <div key={item.kind} className="flex flex-col items-start gap-2">
             <div className="min-w-0 text-[13px]">
               <span className="font-medium">{item.label}</span>
               <span className="ml-2 tabular-nums text-muted">{item.total > 0 ? formatMoney(item.total) : "Not required"}</span>

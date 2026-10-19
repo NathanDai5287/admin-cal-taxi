@@ -24,8 +24,8 @@ import { relativeTimelineDate, timelineDay, paymentCompletionDate, type Timeline
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
-export default function OrderTimeline({ order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "", paymentHistory = [] }: {
-  order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
+export default function OrderTimeline({ financePanel, order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "", paymentHistory = [] }: {
+  financePanel: ReactNode; order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
   rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string; paymentHistory?: TimelinePayment[];
 }) {
   const canWrite = useAppWriteAccess();
@@ -33,6 +33,7 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
   const [busy, setBusy] = useState(false); const [message, setMessage] = useState("");
   const [previews, setPreviews] = useState<EmailPreview[]>([]); const [previewIndex, setPreviewIndex] = useState(0);
   const [refund, setRefund] = useState(workflow.refund ?? { amount: order.depositAmount ?? 0, date: today, method: "" });
+  const refundDetails = useRef<HTMLDetailsElement>(null);
   const polling = useRef(false); const previewSection = useRef<HTMLElement>(null);
   const [preparing, setPreparing] = useState(false);
   const [reviewingContract, setReviewingContract] = useState(false);
@@ -238,7 +239,31 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       {emailButton("receipt", "Review payment receipt", rentalPaid > 0 && wasSent)}
     </Milestone>
   </>;
-  return <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+  return <>
+    <div className="grid items-start gap-8 border-b border-rule pb-4 lg:grid-cols-4">
+      <div className="min-w-0 lg:col-span-3">{financePanel}</div>
+      <section id="deposit-return-details" aria-label="Deposit return details" className="min-w-0 scroll-mt-6">
+        <div className="text-[13px]">
+          <span className="font-medium">Deposit return</span>
+          <span className="ml-2 tabular-nums text-muted">{fmtUSD(workflow.refund?.amount ?? order.depositAmount ?? 0)}</span>
+          <span className={`mt-1 flex items-center gap-1.5 text-[12px] ${workflow.refund ? "text-ok" : "text-muted"}`}>
+            {workflow.refund && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m3 8 3 3 7-7" /></svg>}
+            {workflow.refund ? "Returned" : "Not returned"}
+          </span>
+        </div>
+        <details ref={refundDetails} className="mt-2">
+          <summary className="cursor-pointer text-[12px] font-medium text-brand underline underline-offset-4">Return details</summary>
+          {!workflow.refund && <p className="mt-2 text-[12px] text-muted">{!canReturnDeposit ? "Return the deposit after the event ends." : rentalPaid < (order.rentalPrice ?? Infinity) ? "Record the full rental payment before returning the deposit." : "After you return the deposit, enter the amount, date, and method to review the confirmation email and PDF."}</p>}
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+            <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
+            <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" min={representatives.rentalPaymentTiming === "day_before" ? schedule.eventEndDate : undefined} max={today} value={refund.date} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
+            <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
+            <div className="col-span-2">{emailButton("refund", "Review return confirmation", wasSent && canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
+          </div>
+        </details>
+      </section>
+    </div>
+    <div className="mt-7 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
     <section aria-label="Event timeline" className="min-w-0">
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
@@ -292,18 +317,10 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
       </Milestone>
       {!rentalBeforeEvent && rentalMilestones}
       <Milestone title="Return deposit" detail={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : (representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment")} done={delivered("refund")} last>
-        <a className={`${timelineAction} ml-3`} href="#deposit-return-details">Deposit return details</a>
+        <a className={timelineAction} href="#deposit-return-details" onClick={() => { if (refundDetails.current) refundDetails.current.open = true; }}>Deposit return details</a>
       </Milestone>
     </ol>
-    <section id="deposit-return-details" aria-label="Deposit return details" className="mt-5 scroll-mt-6">
-      <h3 className="text-[13px] font-semibold">Deposit return</h3>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
-        <label className="text-[12px] text-muted">Amount returned<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="number" min="0.01" max={order.depositAmount ?? 0} step="0.01" value={refund.amount} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, amount: Number(e.target.value) })} /></label>
-        <label className="min-w-0 text-[12px] text-muted">Return date<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" type="date" min={representatives.rentalPaymentTiming === "day_before" ? schedule.eventEndDate : undefined} max={today} value={refund.date} disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, date: e.target.value })} /></label>
-        <label className="col-span-2 text-[12px] text-muted">Return method<input className="field-input mt-1 !min-h-8 !py-1 !text-[12px]" value={refund.method} maxLength={120} placeholder="e.g. Zelle" disabled={!canWrite || !!workflow.refund} onChange={e => setRefund({ ...refund, method: e.target.value })} /></label>
-        <div className="col-span-2">{emailButton("refund", "Review return confirmation", wasSent && canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) && refund.amount > 0 && !!refund.method.trim())}</div>
-      </div>
-    </section>
+
     {activity.length > 0 && <section className="mt-7" aria-label="Email activity">
       <h3 className="text-sm font-semibold">Email activity</h3>
       <ul className="mt-2 space-y-3">{activity.map(d => <li key={d.id} className="text-[12px]">
@@ -324,7 +341,8 @@ export default function OrderTimeline({ order, revisions, workflow, today, email
         onClose={() => { ++selection.current; ++documentSelection.current; setPreviews([]); setPreparing(false); setPdfPreview(null); }}
         onEmail={() => { ++documentSelection.current; setPdfPreview(null); }} onDocument={(url, label) => { void openDocument(url, label); }} onWarmDocument={url => { void documents.load(url).catch(() => {}); }} />}
     </aside>
-  </div>;
+  </div>
+  </>;
 }
 function Deadline({ date, label, today }: { date: string; label: string; today: string }) {
   return <span className="block text-right"><span className="block">{label}</span><span className="block">{relativeTimelineDate(date, today)}</span></span>;

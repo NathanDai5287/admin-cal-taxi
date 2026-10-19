@@ -125,29 +125,29 @@ export default async function OrderDetailPage({
         </>
       } />
 
-      <HostingFinancePanel
-        key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data, deposits })}
-        financeOrder={financeResult.data ? {
-          status: financeResult.data.status,
-          plannedRevenue: Number(financeResult.data.planned_revenue),
-          plannedFirePermit: Number(financeResult.data.planned_fire_permit),
-        } : null}
-        orderId={order.id}
-        eventCancelled={!!workflow.cancelledAt || order.statusOverride === "cancelled"}
-        payments={[...(paymentsResult.data ?? []).map((payment) => ({
-          id: payment.id,
-          kind: payment.kind,
-          amount: Number(payment.amount),
-          paidDate: payment.paid_date,
-          reversedAt: payment.reversed_at,
-        })), ...deposits.map(payment => ({ id: payment.id, kind: "deposit" as const, amount: Number(payment.amount), paidDate: payment.paid_date, reversedAt: payment.reversed_at }))]}
-        depositTotal={order.depositAmount ?? 0}
-        previewFirePermit={planPreview.plannedFirePermit}
-        previewRevenue={planPreview.plannedRevenue}
-        today={today}
-      />
-
-      <OrderTimeline order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
+      <OrderTimeline financePanel={
+        <HostingFinancePanel
+          key={JSON.stringify({ finance: financeResult.data, payments: paymentsResult.data, deposits })}
+          financeOrder={financeResult.data ? {
+            status: financeResult.data.status,
+            plannedRevenue: Number(financeResult.data.planned_revenue),
+            plannedFirePermit: Number(financeResult.data.planned_fire_permit),
+          } : null}
+          orderId={order.id}
+          eventCancelled={!!workflow.cancelledAt || order.statusOverride === "cancelled"}
+          payments={[...(paymentsResult.data ?? []).map((payment) => ({
+            id: payment.id,
+            kind: payment.kind,
+            amount: Number(payment.amount),
+            paidDate: payment.paid_date,
+            reversedAt: payment.reversed_at,
+          })), ...deposits.map(payment => ({ id: payment.id, kind: "deposit" as const, amount: Number(payment.amount), paidDate: payment.paid_date, reversedAt: payment.reversed_at }))]}
+          depositTotal={order.depositAmount ?? 0}
+          previewFirePermit={planPreview.plannedFirePermit}
+          previewRevenue={planPreview.plannedRevenue}
+          today={today}
+        />
+      } order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
         paymentHistory={[
           ...deposits.filter(payment => !payment.reversed_at).map(payment => ({ kind: "deposit", amount: Number(payment.amount), date: payment.paid_date })),
           ...(paymentsResult.data ?? []).filter(payment => !payment.reversed_at).map(payment => ({ kind: payment.kind, amount: Number(payment.amount), date: payment.paid_date })),
