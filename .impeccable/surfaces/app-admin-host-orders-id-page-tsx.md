@@ -72,4 +72,4 @@ After merging origin/main at 21eb08a, all 34 combined signing, payment-date, eve
 
 ## Fitted date summary
 
-The date summary always fits the timeline panel without scrolling. Dates retain proportional spacing across the available width. Nearby dates move into short separate rows so date labels remain readable. Milestone names and details appear beside the date marker on hover, keyboard focus, or tap. The detail panel stays within the timeline width and available viewport height. Escape dismisses it. The summary no longer reserves a tall area for wrapped milestone names.
+The date summary spans both the timeline and preview columns and always fits in one row without scrolling. Dates retain proportional spacing across the full available width. Nearby dates share a readable range marker when their labels would overlap. Milestone names and exact dates appear beside the marker on hover, keyboard focus, or tap. The detail panel stays within the summary width and available viewport height. Escape dismisses it. The summary has no additional date rows or wrapped milestone names.

@@ -268,13 +268,15 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
         </>}
       </section>
     </div>
-    <div className="mt-7 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+    <div className="mt-7">
+    <OrderDateStrip dates={timelineDates} undated={undated} today={today} endDate={schedule.eventEndDate} />
+    </div>
+    <div className="mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
     <section aria-label="Event timeline" className="min-w-0">
     <div className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
       <h2 className="text-xl font-semibold text-ink">Event timeline</h2>
       <span className="text-[13px] font-medium text-brand">{signingUnavailable ? "Signing status unavailable" : EVENT_STAGE_LABELS[progress.stage]}{progress.total > 0 ? ` · ${progress.signed}/${progress.total} signed` : ""}</span>
     </div>
-    <OrderDateStrip dates={timelineDates} undated={undated} today={today} endDate={schedule.eventEndDate} />
     {cancelled && <p className="mb-6 text-sm text-warn">This event is cancelled. Its signing and payment history is retained.</p>}
     {emailConfigured && !previewReplyTo && <p className="mb-6 text-sm text-warn">Assign a treasurer with an email in <a href="/users" className="underline">Users</a> before preparing a new email.</p>}
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
