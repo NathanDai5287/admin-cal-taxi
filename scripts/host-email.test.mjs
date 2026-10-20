@@ -368,3 +368,49 @@ test("rental receipts use one shared email and preserve individual sent or attem
   }
   state.rows = []; state.rentals = [];
 });
+
+
+test("deposit return PDFs upgrade queued previews while keeping delivery identity and archived bytes", async () => {
+  state.rows = [];
+  state.rentals = [{ id: "rental-refund-style", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2026-10-19", reversed_at: null }];
+  state.refund = { amount: 125, date: "2020-10-17", method: "" };
+  const input = { ...request, kind: "refund", refund: state.refund, recipients: undefined };
+  const original = await prepareHostingEmail(input);
+  assert.equal(state.rows[0].payload.depositReturnStyle, 1);
+  assert.match(original[0].attachments[0], /deposit-return-confirmation.*\.pdf/);
+  const identity = { id: state.rows[0].id, key: state.rows[0].request_key, recipient: state.rows[0].recipient };
+  const body = { ...state.rows[0].payload.body, attachments: undefined };
+  delete state.rows[0].payload.depositReturnStyle;
+  state.rows[0].payload.body.attachments[0].content = "old-return-pdf";
+  const upgraded = await prepareHostingEmail(input);
+  assert.equal(upgraded[0].id, original[0].id);
+  assert.deepEqual({ id: state.rows[0].id, key: state.rows[0].request_key, recipient: state.rows[0].recipient }, identity);
+  assert.deepEqual({ ...state.rows[0].payload.body, attachments: undefined }, body);
+  assert.notEqual(state.rows[0].payload.body.attachments[0].content, "old-return-pdf");
+  assert.deepEqual(state.refund, { amount: 125, date: "2020-10-17", method: "" });
+  delete state.rows[0].payload.depositReturnStyle;
+  state.rows[0].payload.body.attachments[0].content = "archived-return-pdf";
+  state.rows[0].attempted_at = "2026-10-19T12:00:00Z";
+  for (const status of ["queued", "sent", "failed"]) {
+    state.rows[0].status = status;
+    const frozen = structuredClone(state.rows);
+    await prepareHostingEmail(input);
+    assert.deepEqual(state.rows, frozen);
+  }
+  const group = structuredClone(state.rows[0]);
+  const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+  const suffix = hash({ terms: group.payload.termsHash, kind: "refund", payments: group.payload.paymentsHash, refund: input.refund });
+  const legacy = state.revision.recipients.map(person => ({ ...structuredClone(group), id: crypto.randomUUID(), request_key: hash([state.order.id, state.revision.id, "refund", person.email.toLowerCase(), suffix]), recipient: person.email, payload: { ...structuredClone(group.payload), sharedFinancialEmail: undefined, body: { ...structuredClone(group.payload.body), to: [person.email] } } }));
+  state.rows = structuredClone(legacy);
+  state.rows.forEach(row => { row.status = "queued"; row.attempted_at = null; });
+  const legacyIds = state.rows.map(row => row.id);
+  const previews = await prepareHostingEmail(input);
+  assert.deepEqual(previews.map(row => row.id), legacyIds);
+  assert.equal(state.rows.length, legacy.length);
+  assert.ok(state.rows.every(row => row.payload.depositReturnStyle === 1 && row.payload.body.attachments[0].content !== "archived-return-pdf"));
+  state.rows = structuredClone(legacy);
+  const frozen = structuredClone(state.rows);
+  await prepareHostingEmail(input);
+  assert.deepEqual(state.rows, frozen);
+  state.rows = []; state.rentals = []; state.refund = null;
+});

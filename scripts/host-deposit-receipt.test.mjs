@@ -8,7 +8,7 @@ import { PDFDocument } from "pdf-lib";
 const result = await build({ entryPoints: ["lib/host-payment-receipt-pdf.ts"], bundle: true, write: false, format: "esm", platform: "node", packages: "external" });
 const temporary = path.join(process.cwd(), "node_modules/.deposit-receipt-test.mjs");
 await writeFile(temporary, result.outputFiles[0].text);
-const { renderDepositReceiptPdf, renderRentalReceiptPdf } = await import(`file://${temporary.replaceAll("\\", "/")}`);
+const { renderDepositReceiptPdf, renderRentalReceiptPdf, renderDepositReturnPdf } = await import(`file://${temporary.replaceAll("\\", "/")}`);
 await unlink(temporary);
 const order = { id: "ord_receipt_test", eventDate: "2026-10-16", clubName: "Plextech, Theta Tau, Beta Alpha Psi, Berkeley Investment Group, Product Space, and 180 Degrees Consulting", depositAmount: 300, rentalPrice: 1400, snapshot: {}, documents: [] };
 
@@ -40,4 +40,19 @@ test("rental receipt uses rental branding and fits six clubs with multiple parti
   const reissued = await PDFDocument.load(renderRentalReceiptPdf(order, payments, "2026-10-20", "host@example.test"));
   assert.equal(reissued.getTitle(), pdf.getTitle());
   assert.throws(() => renderRentalReceiptPdf(order, [], "2026-10-19", "host@example.test"), /recorded rental/);
+});
+
+
+test("deposit return confirmation fits six clubs and uses the recorded return identity", async () => {
+  const refund = { amount: 125, date: "2020-10-17", method: "" };
+  const pdf = await PDFDocument.load(renderDepositReturnPdf(order, refund, "2026-10-19", "host@example.test"));
+  assert.equal(pdf.getPageCount(), 1);
+  assert.deepEqual(pdf.getPage(0).getSize(), { width: 612, height: 792 });
+  assert.match(pdf.getTitle(), /Theta Xi Deposit Return Confirmation DRC-20261016-/);
+  const reissued = await PDFDocument.load(renderDepositReturnPdf(order, refund, "2026-10-20", "host@example.test"));
+  assert.equal(reissued.getTitle(), pdf.getTitle());
+  const changed = await PDFDocument.load(renderDepositReturnPdf(order, { ...refund, amount: 300 }, "2026-10-19", "host@example.test"));
+  assert.notEqual(changed.getTitle(), pdf.getTitle());
+  const unicode = await PDFDocument.load(renderDepositReturnPdf({ ...order, clubName: 'Café & Société — #pagebreak()' }, { ...refund, method: 'Zelle — #pagebreak()' }, "2026-10-19", "host@example.test"));
+  assert.equal(unicode.getPageCount(), 1);
 });

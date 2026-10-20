@@ -50,3 +50,28 @@ export function orderInvoiceDueDate(order: Order, kind: InvoiceKind): string {
   return kind === "deposit_invoice" ? formatDateISO(schedule.depositDueDate)
     : formatRentalDeadline(schedule.rentalDueDate, sharedStateFromSnapshot(order.snapshot).rentalPaymentTiming);
 }
+
+export function orderDepositReturnDueDate(
+  order: Pick<Order, "eventDate" | "snapshot" | "rentalPrice">,
+  rentalPayments: { amount: number; date: string }[],
+): string | null {
+  const payments = rentalPayments.toSorted((a, b) => a.date.localeCompare(b.date));
+  let paid = 0;
+  let fullPaymentDate = "";
+  for (const payment of payments) {
+    paid += payment.amount;
+    if (paid < (order.rentalPrice ?? 0)) continue;
+    fullPaymentDate = payment.date;
+    break;
+  }
+  if (!fullPaymentDate) return null;
+  const eventEndDate = orderPaymentSchedule(order).eventEndDate;
+  let dueDate = fullPaymentDate > eventEndDate ? fullPaymentDate : eventEndDate;
+  let businessDays = 0;
+  while (businessDays < 2) {
+    dueDate = addDaysIso(dueDate, 1);
+    const weekday = new Date(`${dueDate}T00:00:00Z`).getUTCDay();
+    if (weekday !== 0 && weekday !== 6) businessDays += 1;
+  }
+  return dueDate;
+}

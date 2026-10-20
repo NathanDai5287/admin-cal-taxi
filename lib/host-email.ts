@@ -2,7 +2,6 @@ import "server-only";
 import { personContactEmail } from "./people";
 import { prepareTrackedEmail, recordEmailProvider } from "./email-tracking";
 import { createHash } from "node:crypto";
-import { PDFDocument, StandardFonts } from "pdf-lib";
 import { backendKey, backendOrigin } from "./host-backend";
 import { getOrderFresh } from "./host-orders";
 import { listSigning, signingFile, syncSigning, type SigningRevision } from "./host-signing";
@@ -14,11 +13,11 @@ import { orderInvoiceDueDate } from "./host-payment-schedule";
 import { defaultDocuments } from "./host-order-documents";
 import type { Order } from "./host-orders-types";
 import { simplifyRentalLineItems } from "./host-rental-items";
-import { renderDepositReceiptPdf, renderRentalReceiptPdf, type ReceiptPayment } from "./host-payment-receipt-pdf";
+import { renderDepositReceiptPdf, renderRentalReceiptPdf, renderDepositReturnPdf, type DepositReturn, type ReceiptPayment } from "./host-payment-receipt-pdf";
 
 type Attachment = { filename: string; content: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalReceiptStyle?: number; rentalInvoiceStyle?: number; sharedFinancialEmail?: boolean; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalReceiptStyle?: number; depositReturnStyle?: number; rentalInvoiceStyle?: number; sharedFinancialEmail?: boolean; refund?: { amount: number; date: string; method: string } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { replyTo?: string; id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
@@ -72,24 +71,6 @@ async function exactFile(revision: SigningRevision, kind: "original" | "complete
   const response = await signingFile(revision.order_id, revision.id, kind);
   return { filename: `hosting-contract-r${revision.revision}-${kind}.pdf`, content: Buffer.from(await response.arrayBuffer()).toString("base64") };
 }
-async function statementPdf(order: Order, title: string, lines: string[], replyTo: string): Promise<Attachment> {
-  const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let page = pdf.addPage([612, 792]); let y = 735;
-  // Standard-font PDFs explicitly replace unsupported characters rather than
-  // crash or silently truncate a receipt. Emails retain the original Unicode.
-  const ascii = (s: string) => s.normalize("NFKD").replace(/[^\x20-\x7e]/g, "?");
-  for (const [i, line] of ["Theta Xi Hosting", title, order.clubName, `Event: ${order.eventDate}`, `Order: ${order.id}`, "", ...lines, "", "Theta Xi - Nu Chapter", "2639 Durant Ave, Berkeley, CA 94704", replyTo].entries()) {
-    const words = ascii(line).split(/\s+/); let row = "";
-    for (const word of words) {
-      if (row && font.widthOfTextAtSize(`${row} ${word}`, 11) > 510) { if (y < 55) { page = pdf.addPage([612, 792]); y = 735; } page.drawText(row, { x: 50, y, size: 11, font }); y -= 19; row = word; } else row += (row ? " " : "") + word;
-    }
-    if (y < 55) { page = pdf.addPage([612, 792]); y = 735; }
-    page.drawText(row, { x: 50, y, size: i === 1 ? 20 : 11, font: i < 2 ? bold : font }); y -= i === 1 ? 38 : 22;
-  }
-  return { filename: `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${order.id}.pdf`, content: Buffer.from(await pdf.save()).toString("base64") };
-}
 async function invoicePdf(order: Order, kind: "deposit_invoice" | "rental_invoice") {
   const current = order.documents.filter(d => d.kind === kind && !d.stale && d.sourceSnapshot).sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0];
   const defaults = defaultDocuments(order, order.documents.find(d => d.kind === "deposit_invoice" && !d.stale)?.number);
@@ -122,14 +103,20 @@ function depositReceiptAttachment(order: Order, payments: { id: string; amount: 
 function rentalReceiptAttachment(order: Order, payments: ReceiptPayment[], contact: string): Attachment {
   return { filename: `rental-payment-receipt-${order.id}.pdf`, content: Buffer.from(renderRentalReceiptPdf(order, payments, eventToday(), contact)).toString("base64") };
 }
-async function updateRentalReceiptPreview(order: Order, row: DeliveryRow, payments: ReceiptPayment[]): Promise<DeliveryRow> {
-  if (row.status !== "queued" || row.attempted_at || row.payload.rentalReceiptStyle === 1) return row;
-  const payload = { ...row.payload, rentalReceiptStyle: 1, body: { ...row.payload.body, attachments: [rentalReceiptAttachment(order, payments, row.payload.body.reply_to)] } };
+function depositReturnAttachment(order: Order, refund: DepositReturn, contact: string): Attachment {
+  return { filename: `deposit-return-confirmation-${order.id}.pdf`, content: Buffer.from(renderDepositReturnPdf(order, refund, eventToday(), contact)).toString("base64") };
+}
+async function updateReceiptPreview(order: Order, row: DeliveryRow, payments: ReceiptPayment[]): Promise<DeliveryRow> {
+  const refund = row.kind === "refund";
+  const currentStyle = refund ? row.payload.depositReturnStyle : row.payload.rentalReceiptStyle;
+  if (row.status !== "queued" || row.attempted_at || currentStyle === 1) return row;
+  const attachment = refund ? depositReturnAttachment(order, row.payload.refund!, row.payload.body.reply_to) : rentalReceiptAttachment(order, payments, row.payload.body.reply_to);
+  const payload = { ...row.payload, ...(refund ? { depositReturnStyle: 1 } : { rentalReceiptStyle: 1 }), body: { ...row.payload.body, attachments: [attachment] } };
   const db = workflowDb();
   const update = await db.from("hosting_email_deliveries").update({ payload }).eq("id", row.id).eq("status", "queued").is("attempted_at", null);
-  if (update.error) throw new Error("Unable to update the rental receipt preview.");
+  if (update.error) throw new Error("Unable to update the receipt preview.");
   const fresh = await db.from("hosting_email_deliveries").select("*").eq("id", row.id);
-  if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the rental receipt preview.");
+  if (fresh.error || fresh.data?.length !== 1) throw new Error("Unable to load the receipt preview.");
   return fresh.data[0] as DeliveryRow;
 }
 export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPreview[]> {
@@ -168,7 +155,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (group.error) throw new Error("Unable to load the shared email preview.");
     if (group.data?.length) {
       const row = group.data[0] as DeliveryRow;
-      if (input.kind === "receipt") return [preview(await updateRentalReceiptPreview(order, row, payments.rows))];
+      if (input.kind === "receipt" || input.kind === "refund") return [preview(await updateReceiptPreview(order, row, payments.rows))];
       let payload = row.payload;
       const unattempted = row.status === "queued" && !row.attempted_at;
       if (invoice && unattempted) payload = await updatedInvoicePreview(order, row, input.kind as "deposit_invoice" | "rental_invoice");
@@ -188,7 +175,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (legacy.error) throw new Error("Unable to verify previous invoice deliveries.");
     const legacyRows = (legacy.data ?? []) as DeliveryRow[];
     if (sharedFinancialEmail && legacyRows.length) {
-      const archived = input.kind === "receipt" ? await Promise.all(legacyRows.map(row => updateRentalReceiptPreview(order, row, payments.rows))) : legacyRows;
+      const archived = input.kind === "receipt" || input.kind === "refund" ? await Promise.all(legacyRows.map(row => updateReceiptPreview(order, row, payments.rows))) : legacyRows;
       return archived.map(preview);
     }
     if (legacyRows.some(row => row.status !== "queued" || row.attempted_at)) throw new Error("This invoice has individual delivery history. It will not be resent as a new group email.");
@@ -206,7 +193,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     } else if (input.kind === "refund") {
       const refund = workflow.refund!;
       detail = `Deposit returned: $${refund.amount.toFixed(2)} on ${refund.date}${refund.method ? ` via ${refund.method}` : ""}.`;
-      attachments = [await statementPdf(order, "Deposit return confirmation", [detail, `Original refundable deposit: $${(order.depositAmount ?? 0).toFixed(2)}.`, "Return information recorded by the hosting administrator."], sender.replyTo)];
+      attachments = [depositReturnAttachment(order, refund, sender.replyTo)];
     } else {
       const invoiceDueDate = orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice");
       const legacy = legacyRows[0]?.payload;
@@ -216,7 +203,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     }
     const invoiceDueDate = invoice ? orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice") : undefined;
     const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, invoiceDueDate, replyTo: sender.replyTo });
-    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}), ...(input.kind === "rental_invoice" ? { rentalInvoiceStyle: 2 } : {}), ...(input.kind === "receipt" ? { rentalReceiptStyle: 1 } : {}), ...(sharedFinancialEmail ? { sharedFinancialEmail: true } : {}), ...(input.refund ? { refund: input.refund } : {}) };
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}), ...(input.kind === "rental_invoice" ? { rentalInvoiceStyle: 2 } : {}), ...(input.kind === "receipt" ? { rentalReceiptStyle: 1 } : {}), ...(input.kind === "refund" ? { depositReturnStyle: 1 } : {}), ...(sharedFinancialEmail ? { sharedFinancialEmail: true } : {}), ...(input.refund ? { refund: input.refund } : {}) };
     const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
     if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
     const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);

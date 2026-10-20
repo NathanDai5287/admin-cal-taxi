@@ -6,7 +6,7 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNod
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import { formatDateISO } from "@/lib/host-format";
-import { orderInvoiceDueDate, orderPaymentSchedule, formatRentalDeadline } from "@/lib/host-payment-schedule";
+import { orderDepositReturnDueDate, orderInvoiceDueDate, orderPaymentSchedule, formatRentalDeadline } from "@/lib/host-payment-schedule";
 import { contractWasSent, currentRevision, EMAIL_LABELS, eventProgress, eventToday, EVENT_STAGE_LABELS, signerProgress, type EmailKind, type EventWorkflow, type SignerProgress } from "@/lib/host-event";
 import type { EmailPreview } from "@/lib/host-email";
 import type { SigningRevision } from "@/lib/host-signing";
@@ -50,6 +50,8 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
   const signerClubs = new Map(representatives.contractSigners.map(person => [person.email.trim().toLowerCase(), person.club.trim()]));
   if (representatives.chapterSignerEmail.trim()) signerClubs.set(representatives.chapterSignerEmail.trim().toLowerCase(), "Theta Xi");
   const schedule = orderPaymentSchedule(order);
+  const depositReturnDueDate = orderDepositReturnDueDate(order, paymentHistory.filter(payment => payment.kind === "revenue"));
+  const depositReturnDeadline = depositReturnDueDate ? `${order.snapshot.depositReturnTiming === "two_business_days" ? "Due" : "Return target"} ${formatDateISO(depositReturnDueDate)}` : order.snapshot.depositReturnTiming === "two_business_days" ? "Within 2 business days after the event and full rental payment" : representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment";
   const rentalInvoiceDate = formatDateISO(orderInvoiceDueDate(order, "rental_invoice"));
   const depositInvoiceDate = formatDateISO(orderInvoiceDueDate(order, "deposit_invoice"));
   const canReturnDeposit = !!workflow.refund || representatives.rentalPaymentTiming !== "day_before" || today >= schedule.eventEndDate;
@@ -221,7 +223,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     { label: "Return deposit", done: !!workflow.refund, date: workflow.refund?.date ?? null, waiting: canReturnDeposit && rentalPaid >= (order.rentalPrice ?? Infinity) ? "Ready now" : representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment" },
   ];
   const completedDates = undatedSteps.filter(step => step.done && step.date).map(step => ({ label: step.label, date: step.date!, detail: `Completed · ${formatDateISO(step.date!)}` }));
-  const undated = undatedSteps.filter(step => !step.done || !step.date).map(step => ({
+  const undated = undatedSteps.filter(step => (!step.done || !step.date) && !(step.label === "Return deposit" && depositReturnDueDate)).map(step => ({
     label: step.label,
     detail: step.label === "Pay fire permit" && permitTotal === 0 ? "Not required" : step.done ? "Completed · Completion date unavailable" : cancelled ? "Cancelled" : `No deadline · ${step.waiting}`,
   }));
@@ -233,18 +235,18 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     { label: "Now", date: today, detail: formatDateISO(today) },
     ...completedDates,
     ...completedPayments,
+    ...(depositReturnDueDate ? [{ label: order.snapshot.depositReturnTiming === "two_business_days" ? "Return deposit · Deadline" : "Deposit return target", date: depositReturnDueDate, detail: depositReturnDeadline }] : []),
     { label: "Receive deposit · Deadline", date: depositInvoiceDate, detail: depositInvoiceDate },
     { label: "Receive rental payment · Deadline", date: schedule.rentalDueDate, detail: rentalContractDate },
     { label: "Event held", date: order.eventDate, detail: eventDates },
     ...(timelineDay(rentalInvoiceDate) !== timelineDay(schedule.rentalDueDate) ? [{ label: "Rental invoice deadline", date: rentalInvoiceDate, detail: rentalInvoiceDate }] : []),
   ];
   const rentalMilestones = <>
-    <Milestone title="Send rental invoice" done={delivered("rental_invoice")}>
+    <Milestone title="Send rental invoice" amount={fmtUSD(order.rentalPrice ?? 0)} done={delivered("rental_invoice")}>
       {!delivered("rental_invoice") && <p className="text-[12px] text-muted">{invoiceTiming}</p>}
       {emailButton("rental_invoice", delivered("rental_invoice") ? "View rental email" : "Review rental invoice", wasSent)}
     </Milestone>
-    <Milestone title="Receive rental payment" detail={<Deadline date={schedule.rentalDueDate} label={rentalDeadline} today={today} />} done={rentalPaid >= (order.rentalPrice ?? Infinity)}>
-      <p className="text-[12px] text-muted">{fmtUSD(rentalPaid)} / {fmtUSD(order.rentalPrice ?? 0)}</p>
+    <Milestone title="Receive rental payment" amount={`${fmtUSD(rentalPaid)} / ${fmtUSD(order.rentalPrice ?? 0)} received`} detail={<Deadline date={schedule.rentalDueDate} label={rentalDeadline} today={today} />} done={rentalPaid >= (order.rentalPrice ?? Infinity)}>
       {emailButton("receipt", "Review rental receipt", rentalPaid > 0 && wasSent)}
     </Milestone>
   </>;
@@ -278,7 +280,7 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
     {!emailConfigured && <p className="mb-6 text-sm text-warn">Hosting email is awaiting setup. You can still use the existing personal signing links.</p>}
     {signingUnavailable && <p className="mb-6 text-sm text-warn">Could not verify signing history. Reload before sending documents.</p>}
     <ol aria-label="Event stages" className="ml-2 border-l border-rule">
-      <Milestone title="Approve contract" detail={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision}>
+      <Milestone title="Approve contract" amount={`${fmtUSD(order.rentalPrice ?? 0)} rental · ${fmtUSD(order.depositAmount ?? 0)} deposit`} done={!!revision}>
         {revision ? <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/original`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Approved contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Approved contract · revision {revision.revision}</a> : <Button compact disabled={!canWrite || busy || reviewingContract || cancelled || signingUnavailable} onClick={reviewContract}>{reviewingContract ? "Reviewing contract…" : "Review contract"}</Button>}
       </Milestone>
       <Milestone title="Send contract" detail={wasSent ? "Sent" : "Draft until sent"} done={wasSent}>
@@ -303,23 +305,23 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
           <div className="mt-1 flex flex-wrap items-center gap-x-4">{!signed && emailButton("reminder", "Remind unsigned signers", wasSent && revision.state === "awaiting_signatures")}{signed && revision.files.completed && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/completed`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Signed contract"); }}><OrderIcon name="file" className="h-3.5 w-3.5" />Signed contract</a>}{signed && revision.files.audit && <a className={timelineAction} href={`/api/host/signing/files/${order.id}/${revision.id}/audit`} onClick={e => { e.preventDefault(); void openDocument(e.currentTarget.href, "Audit trail"); }}>Audit trail</a>}</div>
         </>}
       </Milestone>
-      <Milestone title="Send deposit invoice" done={delivered("deposit_invoice")}>
+      <Milestone title="Send deposit invoice" amount={fmtUSD(order.depositAmount ?? 0)} done={delivered("deposit_invoice")}>
         {!delivered("deposit_invoice") && <p className="text-[12px] text-muted">{invoiceTiming}</p>}
         {emailButton("deposit_invoice", delivered("deposit_invoice") ? "View deposit email" : "Review deposit invoice", wasSent)}
       </Milestone>
-      <Milestone title="Receive deposit" detail={<Deadline date={depositInvoiceDate} label={`Due ${depositInvoiceDate}`} today={today} />} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
-        <p className="text-[12px] text-muted">{fmtUSD(depositPaid)} / {fmtUSD(order.depositAmount ?? 0)}</p>
+      <Milestone title="Receive deposit" amount={`${fmtUSD(depositPaid)} / ${fmtUSD(order.depositAmount ?? 0)} received`} detail={<Deadline date={depositInvoiceDate} label={`Due ${depositInvoiceDate}`} today={today} />} done={(order.depositAmount ?? 0) === 0 || depositPaid >= (order.depositAmount ?? 0)}>
         {emailButton("deposit_receipt", "Review deposit receipt", depositPaid > 0 && wasSent)}
       </Milestone>
       {rentalBeforeEvent && rentalMilestones}
-      <Milestone title="Pay fire permit" detail={permitTotal > 0 ? `${fmtUSD(permitPaid)} / ${fmtUSD(permitTotal)}` : "Not required"} done={permitTotal === 0 || permitPaid >= permitTotal}>
+      <Milestone title="Pay fire permit" amount={permitTotal > 0 ? `${fmtUSD(permitPaid)} / ${fmtUSD(permitTotal)} paid` : undefined} detail={permitTotal === 0 ? "Not required" : undefined} done={permitTotal === 0 || permitPaid >= permitTotal}>
         {permitTotal > 0 && <a className={timelineAction} href="#event-finances">Update fire permit payment</a>}
       </Milestone>
       <Milestone title="Event held" detail={<Deadline date={order.eventDate} label={`Event dates · ${eventDates}`} today={today} />} done={held}>
         {held && !signed && <p className="text-[13px] text-warn">The event date has passed; {progress.total - progress.signed} signature{progress.total - progress.signed === 1 ? " is" : "s are"} still pending.</p>}
       </Milestone>
       {!rentalBeforeEvent && rentalMilestones}
-      <Milestone title="Return deposit" detail={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : (representatives.rentalPaymentTiming === "day_before" ? "After the event and full rental payment" : "After full rental payment")} done={!!workflow.refund} last>
+      <Milestone title="Return deposit" amount={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : fmtUSD(depositPaid)} detail={depositReturnDueDate ? <Deadline date={depositReturnDueDate} label={depositReturnDeadline} today={today} /> : depositReturnDeadline} done={!!workflow.refund} last>
+        {workflow.refund && <p className="text-[12px] text-muted">Returned {formatDateISO(workflow.refund.date)}</p>}
         {emailButton("refund", "Review deposit return confirmation", wasSent && !!workflow.refund)}
       </Milestone>
     </ol>
@@ -350,10 +352,13 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
 function Deadline({ date, label, today }: { date: string; label: string; today: string }) {
   return <span className="block text-right"><span className="block">{label}</span><span className="block">{relativeTimelineDate(date, today)}</span></span>;
 }
-function Milestone({ title, detail, done, children, last = false }: { title: string; detail?: ReactNode; done: boolean; children?: ReactNode; last?: boolean }) {
+function Milestone({ title, amount, detail, done, children, last = false }: { title: string; amount?: string; detail?: ReactNode; done: boolean; children?: ReactNode; last?: boolean }) {
   return <li className={`relative pl-5 ${last ? "pb-0" : "pb-3"}`}>
     <span aria-hidden="true" className={`absolute -left-[9px] top-1 flex h-4 w-4 items-center justify-center rounded-full border bg-surface ${done ? "border-brand text-brand" : "border-rule"}`}>{done && <svg viewBox="0 0 16 16" className="h-3 w-3" fill="none"><path d="m3 8 3 3 7-7" stroke="currentColor" strokeWidth="2" /></svg>}</span>
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><h3 className="text-[15px] font-bold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{detail && <p className="ml-auto max-w-full text-right text-[12px] text-muted tabular-nums">{detail}</p>}</div>{children && <div className="mt-1">{children}</div>}
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+      <div><h3 className="text-[15px] font-bold text-ink">{title}<span className="sr-only">{done ? ", complete" : ", pending"}</span></h3>{amount && <p className="mt-1 text-[12px] text-muted tabular-nums">{amount}</p>}</div>
+      {detail && <p className="ml-auto max-w-full text-right text-[12px] text-muted tabular-nums">{detail}</p>}
+    </div>{children && <div className="mt-1">{children}</div>}
   </li>;
 }
 function SignatureIcon({ progress }: { progress: SignerProgress }) {
