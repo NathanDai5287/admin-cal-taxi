@@ -68,3 +68,8 @@ Browser checks used only the loopback fixture at desktop 1440px and mobile 390px
 The single scoped type/layout detector pass reported 19 font-size findings against the separate public-site DESIGN.md ramp. This private administrator surface intentionally retains its established 11–15px operational text, as this brief requires. No layout findings appeared, and no public typography rules or global tokens changed.
 
 After merging origin/main at 21eb08a, all 34 combined signing, payment-date, event, email, and preview-cache tests passed. TypeScript, the production webpack build, and scoped ESLint passed, retaining the existing callback dependency and navigation warnings. Before screenshots use the original c614e2a baseline. The two After screenshots were refreshed once at 1440px and 390px after the main merge, with no overflow or sent activity. Their fresh sample uses day_before: rental payment is due October 15 before the October 16 event. Both date policies remain covered by the combined tests. The matching contract-service release remains a separate dependency; no live payment-date behavior was verified.
+
+
+## Fitted date summary
+
+The date summary always fits the timeline panel without scrolling. Dates retain proportional spacing across the available width. Nearby dates move into short separate rows so date labels remain readable. Milestone names and details appear beside the date marker on hover, keyboard focus, or tap. The detail panel stays within the timeline width and available viewport height. Escape dismisses it. The summary no longer reserves a tall area for wrapped milestone names.

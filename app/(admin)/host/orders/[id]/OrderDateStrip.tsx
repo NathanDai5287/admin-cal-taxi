@@ -1,54 +1,66 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { relativeTimelineDate, timelineDateGroups, timelineDay, type TimelineDate } from "@/lib/host-timeline";
 
+const markerWidth = 64;
+const laneHeight = 48;
+const tooltipWidth = 280;
+
 export default function OrderDateStrip({ dates, undated, today, endDate }: { dates: TimelineDate[]; undated: { label: string; detail: string }[]; today: string; endDate: string }) {
-  const [selection, setSelection] = useState<{ day: number | null; offset: number } | null>(null);
+  const [selection, setSelection] = useState<{ day: number | null; left: number; top: number; space: number; above: boolean } | null>(null);
+  const [width, setWidth] = useState(320);
   const strip = useRef<HTMLDivElement>(null);
   const tooltipId = useId();
   const groups = timelineDateGroups(dates);
-  const dayWidth = 64;
   const firstDay = groups[0][0];
   const dayCount = Math.max(1, Math.max(groups.at(-1)![0], timelineDay(endDate)!) - firstDay);
   const selected = selection?.day === null ? undated : groups.find(([day]) => day === selection?.day)?.[1];
+  const laneEnds: number[] = [];
+  const markers = groups.map(([day, entries]) => {
+    const left = markerWidth / 2 + (day - firstDay) / dayCount * Math.max(0, width - markerWidth);
+    const availableLane = laneEnds.findIndex(end => left - end >= markerWidth);
+    const lane = availableLane < 0 ? laneEnds.length : availableLane;
+    laneEnds[lane] = left;
+    return { day, entries, left, lane };
+  });
+
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(entry.contentRect.width);
+      setSelection(null);
+    });
+    observer.observe(strip.current!);
+    return () => observer.disconnect();
+  }, []);
 
   function showDetails(day: number | null, button: HTMLButtonElement) {
-    const bounds = button.getBoundingClientRect();
-    const offset = bounds.left + bounds.width / 2 - strip.current!.getBoundingClientRect().left;
-    setSelection({ day, offset });
+    const bounds = (button.querySelector("[aria-hidden]") ?? button).getBoundingClientRect();
+    const parent = strip.current!.getBoundingClientRect();
+    const above = window.innerHeight - bounds.bottom < 220 && bounds.top > window.innerHeight - bounds.bottom;
+    const space = above ? bounds.top - 16 : window.innerHeight - bounds.bottom - 16;
+    setSelection({ day, left: bounds.left + bounds.width / 2 - parent.left, top: (above ? bounds.top : bounds.bottom) - parent.top, space, above });
   }
 
-  return <div ref={strip} className="relative mb-3" onMouseLeave={() => setSelection(null)} onKeyDown={event => { if (event.key === "Escape") setSelection(null); }}>
-    <p className="mb-2 text-[11px] text-muted">Key dates · One tick per day · Scroll for more</p>
-    <div aria-label="Key event dates" className="flex overflow-x-auto pt-1 pb-2" onScroll={event => {
-      const focused = document.activeElement;
-      if (focused instanceof HTMLButtonElement && event.currentTarget.contains(focused)) {
-        showDetails(focused.dataset.day ? Number(focused.dataset.day) : null, focused);
-        return;
-      }
-      setSelection(null);
-    }}>
-      <div className="relative min-h-36 flex-1 border-t border-rule" style={{ minWidth: (dayCount + 1) * dayWidth }}>
-      {Array.from({ length: dayCount + 1 }, (_, day) => <span key={day} aria-hidden="true" className="absolute top-0 h-1.5 border-l border-rule" style={{ left: day * dayWidth + 12 }} />)}
-      {groups.map(([day, entries]) => <button key={day} data-day={day} type="button" aria-label={entries.map(entry => `${entry.label}: ${entry.detail} · ${relativeTimelineDate(entry.date, today)}`).join("; ")} aria-describedby={selection?.day === day ? tooltipId : undefined}
-        className="absolute top-0 min-h-32 w-16 px-2 pt-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
-        style={{ left: (day - firstDay) * dayWidth }}
+  return <div ref={strip} className="relative mb-3 min-w-0" onMouseLeave={() => setSelection(null)} onKeyDown={event => { if (event.key === "Escape") setSelection(null); }}>
+    <p className="mb-2 text-[11px] text-muted">Key dates · Hover or select for details</p>
+    <div aria-label="Key event dates" className="relative" style={{ height: laneEnds.length * laneHeight }}>
+      {laneEnds.map((_, lane) => <span key={lane} aria-hidden="true" className="absolute right-8 left-8 border-t border-rule" style={{ top: lane * laneHeight + 8 }} />)}
+      {markers.map(({ day, entries, left, lane }) => <button key={day} type="button" aria-label={entries.map(entry => `${entry.label}: ${entry.detail} · ${relativeTimelineDate(entry.date, today)}`).join("; ")} aria-describedby={selection?.day === day ? tooltipId : undefined}
+        className="absolute h-11 w-16 -translate-x-1/2 text-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+        style={{ left, top: lane * laneHeight }}
         onMouseEnter={event => showDetails(day, event.currentTarget)} onFocus={event => showDetails(day, event.currentTarget)} onClick={event => showDetails(day, event.currentTarget)} onBlur={() => setSelection(null)}>
-        <span aria-hidden="true" className={`absolute -top-1 left-2 h-2 w-2 rounded-full border border-brand ${entries.some(entry => entry.label === "Now") ? "bg-brand" : "bg-surface"}`} />
-        <span className="block text-[12px] font-semibold text-ink">{new Date(day * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}{entries.some(entry => entry.label === "Now") ? " · Today" : ""}</span>
-        <span className="mt-1 block text-[11px] leading-snug text-muted">{entries.find(entry => entry.label !== "Now")?.label ?? "Today"}{entries.length > 1 ? ` · ${entries.length - 1} more` : ""}</span>
+        <span aria-hidden="true" className={`absolute top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full border border-brand ${entries.some(entry => entry.label === "Now") ? "bg-brand" : "bg-surface"}`} />
+        <span className="mt-3 block text-[12px] font-semibold text-ink">{new Date(day * 86_400_000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}</span>
+        {entries.some(entry => entry.label === "Now") && <span className="sr-only">Today</span>}
       </button>)}
-      </div>
-      {undated.length > 0 && <button type="button" aria-label="Milestones with no date" aria-describedby={selection?.day === null ? tooltipId : undefined}
-        className="relative min-h-20 w-36 shrink-0 border-t border-dashed border-rule px-2 pt-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
-        onMouseEnter={event => showDetails(null, event.currentTarget)} onFocus={event => showDetails(null, event.currentTarget)} onClick={event => showDetails(null, event.currentTarget)} onBlur={() => setSelection(null)}>
-        <span aria-hidden="true" className="absolute -top-1 left-2 h-2 w-2 rounded-full border border-dashed border-brand bg-surface" />
-        <span className="block text-[12px] font-semibold text-ink">No date</span>
-        <span className="mt-1 block text-[11px] text-muted">{undated.length} milestones</span>
-      </button>}
     </div>
-    {selected && <div id={tooltipId} role="tooltip" style={{ left: `clamp(0px, ${selection!.offset}px, max(0px, calc(100% - 280px)))` }} className="absolute top-full z-20 w-[280px] max-w-full max-h-72 overflow-y-auto space-y-2 rounded border border-rule bg-surface px-3 py-2 text-[12px] text-ink shadow-sm">
+    {undated.length > 0 && <button type="button" aria-label="Milestones with no date" aria-describedby={selection?.day === null ? tooltipId : undefined}
+      className="min-h-11 px-2 text-[12px] text-muted underline decoration-dashed underline-offset-4 focus-visible:outline-2 focus-visible:outline-brand"
+      onMouseEnter={event => showDetails(null, event.currentTarget)} onFocus={event => showDetails(null, event.currentTarget)} onClick={event => showDetails(null, event.currentTarget)} onBlur={() => setSelection(null)}>
+      No date · {undated.length} milestones
+    </button>}
+    {selected && <div id={tooltipId} role="tooltip" style={{ left: `clamp(0px, ${selection!.left - tooltipWidth / 2}px, max(0px, calc(100% - ${tooltipWidth}px)))`, top: selection!.top + (selection!.above ? -8 : 8), maxHeight: selection!.space, transform: selection!.above ? "translateY(-100%)" : undefined }} className="absolute z-20 w-[280px] max-w-full overflow-y-auto space-y-2 rounded border border-rule bg-surface px-3 py-2 text-[12px] text-ink shadow-sm">
       {selection?.day === null && <p className="font-semibold">No date</p>}
       {selected.map(entry => <div key={entry.label}><p className="font-semibold">{entry.label}</p><p>{entry.detail}</p>{"date" in entry && <p className="text-muted">{relativeTimelineDate(entry.date as string, today)} · Pacific Time</p>}</div>)}
     </div>}
