@@ -3,6 +3,7 @@ import test from "node:test";
 import { build } from "esbuild";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
 const root = process.cwd(); const fixture = path.join(root, "scripts/host-email-fixture.ts");
 const result = await build({ stdin: { contents: 'export * from "./lib/host-email"; export { hostingEmailDraft } from "./lib/host-email-draft"; export { state } from "./scripts/host-email-fixture";', resolveDir: root }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "safe-transports", setup(build) {
   build.onResolve({ filter: /host-orders$|host-signing$|host-workflow$|host-backend$|email-tracking$|supabase\/admin$/ }, () => ({ path: fixture }));
@@ -236,6 +237,56 @@ test("deposit return confirmation requires a recorded return and never changes t
   assert.deepEqual(calls[0].to, ["one@example.test", "two@example.test"]);
   assert.deepEqual(state.refund, refund);
   state.rows = []; state.rentals = []; state.refund = null;
+});
+
+test("deposit return previews survive JSONB storage without changing delivery identity or PDF bytes", async () => {
+  const db = new PGlite();
+  state.rows = [];
+  state.rentals = [{ id: "rental-jsonb", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2020-10-15", reversed_at: null }];
+  state.refund = { amount: 125, date: "2020-10-17", method: "" };
+  try {
+    const input = { ...request, kind: "refund", refund: { method: "", date: state.refund.date, amount: state.refund.amount } };
+    const previews = await prepareHostingEmail(input);
+    const original = structuredClone(state.rows[0]);
+    const stored = await db.query("SELECT $1::jsonb AS payload", [JSON.stringify(original.payload)]);
+    state.rows[0].payload = stored.rows[0].payload;
+    assert.notDeepEqual(Object.keys(state.rows[0].payload.refund), Object.keys(state.refund));
+    assert.deepEqual(await prepareHostingEmail(input), previews);
+    assert.equal(state.rows.length, 1);
+    const calls = [];
+    globalThis.fetch = async (_url, init) => { calls.push({ key: init.headers["Idempotency-Key"], body: JSON.parse(init.body) }); return Response.json({ id: "return-jsonb-provider" }); };
+    assert.deepEqual(await deliverHostingEmails(state.order.id, previews.map(p => p.id)), { sent: 1, skipped: 0, errors: [] });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].key, `hosting/${original.id}`);
+    assert.deepEqual(calls[0].body, original.payload.body);
+    assert.equal(state.rows[0].request_key, original.request_key);
+    await deliverHostingEmails(state.order.id, previews.map(p => p.id));
+    assert.equal(calls.length, 1);
+  } finally {
+    await db.close();
+    state.rows = []; state.rentals = []; state.refund = null;
+  }
+});
+
+test("changed or removed deposit returns block frozen previews before any delivery attempt", async () => {
+  state.rows = [];
+  state.rentals = [{ id: "rental-refund-changed", order_id: state.order.id, kind: "revenue", amount: 1400, paid_date: "2020-10-15", reversed_at: null }];
+  const refund = { amount: 125, date: "2020-10-17", method: "" };
+  state.refund = refund;
+  try {
+    const input = { ...request, kind: "refund", refund };
+    const previews = await prepareHostingEmail(input);
+    const frozen = structuredClone(state.rows);
+    globalThis.fetch = async () => { throw Error("Changed deposit returns must not send"); };
+    for (const changed of [{ ...refund, amount: 300 }, { ...refund, date: "2020-10-18" }, { ...refund, method: "Zelle" }, null]) {
+      state.refund = changed;
+      await assert.rejects(prepareHostingEmail(input), /return changed|Mark the deposit returned/);
+      assert.deepEqual(await deliverHostingEmails(state.order.id, previews.map(p => p.id)), { sent: 0, skipped: 0, errors: ["The deposit return changed. Prepare a fresh preview."] });
+      assert.deepEqual(state.rows, frozen);
+    }
+  } finally {
+    state.rows = []; state.rentals = []; state.refund = null;
+  }
 });
 
 test("new messages use the managed treasurer and stored messages retain their reply address", async () => {

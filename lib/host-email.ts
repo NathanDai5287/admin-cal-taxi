@@ -23,6 +23,9 @@ export type EmailPreview = { replyTo?: string; id: string; recipient: string; su
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const termsHash = (order: Order) => hash({ clubName: order.clubName, eventDate: order.eventDate, rentalPrice: order.rentalPrice, depositAmount: order.depositAmount, snapshot: order.snapshot });
+function sameDepositReturn(recorded: DepositReturn | null, preview: DepositReturn | undefined) {
+  return !!recorded && !!preview && recorded.amount === preview.amount && recorded.date === preview.date && recorded.method === preview.method;
+}
 export function hostEmailConfigured() {
   return !!process.env.RESEND_API_KEY;
 }
@@ -142,7 +145,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (payments.total < (order.rentalPrice ?? Infinity)) throw new Error("Record full rental payment before confirming the deposit return.");
     const refund = input.refund;
     if (!workflow.refund) throw new Error("Mark the deposit returned before reviewing its confirmation email.");
-    if (!refund || hash(workflow.refund) !== hash(refund)) throw new Error("The deposit return changed. Reload before reviewing its confirmation email.");
+    if (!sameDepositReturn(workflow.refund, refund)) throw new Error("The deposit return changed. Reload before reviewing its confirmation email.");
   }
   const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "deposit_receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
   const requestKey = (email: string) => hash([order.id, revision.id, input.kind, email.toLowerCase(), suffix]);
@@ -258,7 +261,7 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
     // Recheck cancellation immediately before each delivery, including batch retries.
     const workflow = await loadWorkflow(orderId);
     if (workflow.cancelledAt) { errors.push("Event cancelled; remaining emails were not sent."); break; }
-    if (row.kind === "refund" && hash(workflow.refund) !== hash(row.payload.refund)) { errors.push("The deposit return changed. Prepare a fresh preview."); continue; }
+    if (row.kind === "refund" && !sameDepositReturn(workflow.refund, row.payload.refund)) { errors.push("The deposit return changed. Prepare a fresh preview."); continue; }
     const claim = await db.rpc("claim_hosting_email", { p_id: row.id });
     if (claim.error) throw new Error("Could not reserve email delivery. Retry shortly.");
     if (!claim.data) { errors.push("This email is already sending or needs review in Resend. Reload its delivery history."); continue; }
