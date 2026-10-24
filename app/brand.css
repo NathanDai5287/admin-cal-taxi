@@ -1395,3 +1395,28 @@
     }
   }
 }
+
+@layer components {
+  [data-brand] .plan-edit {
+    @apply cursor-pointer border-b border-dashed border-muted text-muted hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-brand;
+  }
+  [data-brand] .plan-edit-form {
+    @apply mt-2 flex flex-wrap items-center justify-end gap-2;
+  }
+  [data-brand] .plan-edit-form .money-input {
+    @apply w-36;
+  }
+  [data-brand] .plan-edit-form .field-input {
+    @apply min-h-9 text-right text-[13px];
+  }
+  [data-brand] .plan-edit-form button,
+  [data-brand] .plan-complete button {
+    @apply min-h-9 cursor-pointer border border-rule bg-surface px-3 text-[12px] font-semibold text-brand hover:border-brand hover:bg-brand-light disabled:cursor-wait disabled:opacity-60;
+  }
+  [data-brand] .plan-complete {
+    @apply flex flex-wrap items-center justify-end gap-3 text-[11.5px];
+  }
+  [data-brand] .plan-edit-error {
+    @apply w-full text-right text-[12px] text-warn;
+  }
+}

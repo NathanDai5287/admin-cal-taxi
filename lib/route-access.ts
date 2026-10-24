@@ -49,7 +49,6 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   "/api/accreditation/sources": ["accreditation", "ask-policy"],
   "/api/accreditation/processing-status": ["accreditation", "policy"],
   "/api/policy/sources": ["accreditation", "ask-policy", "policy"],
-  "/api/finance": ["finance"],
   "/api/host": ["host"],
   "/api/reimbursements/receipts": ["finance"],
 };

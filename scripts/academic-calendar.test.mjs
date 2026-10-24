@@ -6,7 +6,7 @@ test("one academic calendar connects accreditation, finance, and members", async
   const [migration, accreditation, finance, members, memberActions] = await Promise.all([
     readFile(new URL("../supabase/migrations/20261001000000_sitewide_academic_calendar.sql", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/accreditation/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/finance/planning/plan-vs-actual.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/users/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/users/actions.ts", import.meta.url), "utf8"),
   ]);

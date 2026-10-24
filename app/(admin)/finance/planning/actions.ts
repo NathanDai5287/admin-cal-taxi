@@ -30,7 +30,6 @@ function budgetRedirectTarget(
 
 function revalidateBudgetPages() {
   revalidatePath("/finance/planning");
-  revalidatePath("/finance/reports");
 }
 
 export type ExpensePlanState = {
@@ -61,6 +60,21 @@ export async function saveReimbursementBudgets(
   return { status: "success", message: "Expense plan saved." };
 }
 
+export async function saveCategoryPlan(_previousState: ExpensePlanState, formData: FormData): Promise<ExpensePlanState> {
+  const { userId } = await requireAppAccess("finance", "write");
+  const parsed = z.object({ category: categorySchema, amount: amountSchema }).safeParse({ category: formData.get("category"), amount: formData.get("amount") });
+  if (!parsed.success) return { status: "error", message: "Enter a valid non-negative amount." };
+
+  const supabase = createAdminClient();
+  const { data, error: readError } = await supabase.from("reimbursement_budgets").select("category_amounts, updated_at").eq("id", true).single();
+  if (readError) return { status: "error", message: "The plan could not be saved. Try again." };
+  const categoryAmounts = { ...(data.category_amounts as Record<string, number | null>), [parsed.data.category]: parsed.data.amount };
+  const { data: saved, error } = await supabase.from("reimbursement_budgets").update({ category_amounts: categoryAmounts, updated_by: userId }).eq("id", true).eq("updated_at", data.updated_at).select("id");
+  if (error || !saved.length) return { status: "error", message: "The plan could not be saved. Try again." };
+  revalidateBudgetPages();
+  return { status: "success", message: "Plan saved." };
+}
+
 export async function setExpenseCategoryCompleted(category: ReimbursementCategory, completed: boolean): Promise<ExpensePlanState> {
   const { userId } = await requireAppAccess("finance", "write");
   const parsed = z.object({ category: categorySchema, completed: z.boolean() }).safeParse({ category, completed });
@@ -75,7 +89,9 @@ export async function setExpenseCategoryCompleted(category: ReimbursementCategor
     if (completed) completedCategories.push(category);
     const { data: saved, error } = await supabase.from("reimbursement_budgets").update({ completed_categories: completedCategories, updated_by: userId }).eq("id", true).eq("updated_at", data.updated_at).select("id");
     if (error) return { status: "error", message: "Could not save this category. Try again." };
-    if (saved.length) return { status: "success", message: "Category saved." };
+    if (!saved.length) continue;
+    revalidateBudgetPages();
+    return { status: "success", message: "Category saved." };
   }
   return { status: "error", message: "The plan changed during saving. Try again." };
 }

@@ -5,6 +5,7 @@ import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-route";
+import { PlanVsActual } from "@/app/(admin)/finance/planning/plan-vs-actual";
 
 export const metadata = { title: { default: "Finance", template: "%s · Finance" } };
 
@@ -21,6 +22,8 @@ export default async function FinanceLayout({ children }: { children: React.Reac
     return <AccessDenied showSubmitLink />;
   }
 
+  const access = session.appAccess.finance;
+  const readOnly = access !== "write";
   return (
     <div data-brand className="min-h-screen">
       <RefreshCurrentRoute />
@@ -29,14 +32,14 @@ export default async function FinanceLayout({ children }: { children: React.Reac
         title="Theta Xi"
         subtitle="Finance"
         prefetchTabContent
-        tabs={[
+        tabs={readOnly ? [] : [
           { href: "/finance/planning", label: "Planning" },
           { href: "/finance/accounts/receivable", label: "Dues" },
           { href: "/finance/accounts/payable", label: "Reimbursements" },
           { href: "/finance/accounts/activity", label: "Transactions" },
         ]}
       />
-      <main className="finance-main max-w-[1080px] mx-auto px-6 py-8"><AppAccessBoundary access={session.appAccess["finance"]}>{children}</AppAccessBoundary></main>
+      <main className="finance-main max-w-[1080px] mx-auto px-6 py-8"><AppAccessBoundary access={access}>{readOnly ? <PlanVsActual /> : children}</AppAccessBoundary></main>
     </div>
   );
 }

@@ -146,7 +146,7 @@ test("hosting confirmation storage is unique and cancellation keeps payments", a
 });
 
 test("dated payments are separate from planned charge dates", async () => {
-  const planningPage = await readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8");
+  const planningPage = await readFile(new URL("../app/(admin)/finance/planning/plan-vs-actual.tsx", import.meta.url), "utf8");
 
   assert.match(planningPage, /chapter_dues_payment_events/);
   assert.match(planningPage, /\.gte\("paid_date", termStart\)/);
@@ -163,14 +163,14 @@ test("approved reimbursements count toward actual expenses before they are paid"
   assert.equal(summary.actualExpenses, 391.22);
   assert.equal(summary.expenseBreakdown.find((row) => row.category === "rush")?.actual, 391.22);
 
-  const planningPage = await readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8");
+  const planningPage = await readFile(new URL("../app/(admin)/finance/planning/plan-vs-actual.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(planningPage, /\.eq\("reimbursed", true\)/);
   assert.match(planningPage, /reimbursed_at\?\.slice\(0, 10\) \?\? row\.receipt_date/);
 });
 
 test("planning page shows color-coded plan vs actual bars", async () => {
   const [planningPage, brand] = await Promise.all([
-    readFile(new URL("../app/(admin)/finance/planning/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/finance/planning/plan-vs-actual.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/brand.css", import.meta.url), "utf8"),
   ]);
 
