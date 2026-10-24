@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ACCESS_LEVELS, APP_OPTIONS, isRoleKey, roleWithAncestors, type AppKey, type AccessLevel, type RoleKey } from "@/lib/app-access";
+import { ACCESS_LEVELS, APP_OPTIONS, VIEW_AS_COOKIE, isRoleKey, roleWithAncestors, type AppKey, type AccessLevel, type RoleKey } from "@/lib/app-access";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -133,8 +133,6 @@ async function claimInviteWithoutRpc({
     console.error("Invite reconciliation fallback failed", fallbackError);
   }
 }
-
-export const VIEW_AS_COOKIE = "view_as_role";
 
 async function roleAppAccess(supabase: Awaited<ReturnType<typeof createClient>>, role: RoleKey) {
   const { data, error } = await supabase.from("role_app_access").select("app_key, access_level").in("role_key", roleWithAncestors(role));

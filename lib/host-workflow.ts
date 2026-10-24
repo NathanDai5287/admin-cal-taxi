@@ -1,6 +1,5 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
-import { createAdminClient } from "./reimbursements/supabase/admin";
+import { createAdminClient, createUntypedAdminClient } from "./reimbursements/supabase/admin";
 import { hostingPlanFromOrder } from "./finance/hosting";
 import type { Order } from "./host-orders-types";
 import type { SigningRevision } from "./host-signing";
@@ -8,10 +7,7 @@ import type { EventWorkflow, EmailDelivery } from "./host-event";
 
 // Separate additive schema: the generated reimbursement schema stays intact.
 export function workflowDb() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) throw new Error("Hosting workflow database is unavailable.");
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createUntypedAdminClient();
 }
 export async function loadWorkflow(orderId: string): Promise<EventWorkflow> {
   const db = workflowDb();

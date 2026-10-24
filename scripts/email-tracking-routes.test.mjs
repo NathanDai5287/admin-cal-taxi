@@ -5,8 +5,8 @@ import { writeFile, unlink, readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 
 const result = await build({ stdin: { contents: `export { GET as click, HEAD as clickHead } from "./app/api/email-tracking/[token]/click/route"; export { GET as open, HEAD as openHead } from "./app/api/email-tracking/[token]/open/route"; export * from "./lib/email-tracking"; export { trackedLink } from "./lib/email-tracking-links"; export { sendInviteEmails } from "./lib/reimbursements/send-invite-email";`, resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "server-only", setup(build) {
-  build.onResolve({ filter: /^server-only$/ }, () => ({ path: "empty", namespace: "empty" }));
-  build.onLoad({ filter: /.*/, namespace: "empty" }, () => ({ contents: "" }));
+  build.onResolve({ filter: /^(server-only|next\/headers)$/ }, (args) => ({ path: args.path, namespace: "empty" }));
+  build.onLoad({ filter: /.*/, namespace: "empty" }, (args) => ({ contents: args.path === "next/headers" ? "export const cookies = async () => ({ get: () => undefined });" : "" }));
 } }] });
 const output = new URL("../node_modules/.email-tracking-test.mjs", import.meta.url);
 await writeFile(output, result.outputFiles[0].text);

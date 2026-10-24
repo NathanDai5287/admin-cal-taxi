@@ -45,3 +45,6 @@ export function roleWithAncestors(role: RoleKey): RoleKey[] {
 export function isRoleKey(value: string | undefined): value is RoleKey {
   return ROLE_OPTIONS.some(({ key }) => key === value);
 }
+
+export const VIEW_AS_COOKIE = "view_as_role";
+export const VIEW_AS_HEADER = "x-view-as-role";

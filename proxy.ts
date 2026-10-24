@@ -6,7 +6,8 @@ import { updateSession } from "@/lib/reimbursements/supabase/proxy";
 
 // Google sign-in is used on every host. This proxy only refreshes the
 // Supabase session cookie and maps the member submission host onto the
-// submit app. Role checks live in layouts and server code, not here.
+// submit app. It also opens each path only for the people that the route
+// registry allows.
 // Compared by hostname only, so any local dev port works.
 const SUBMIT_HOSTNAMES = new Set([
   "reimbursements.cal.taxi",
@@ -61,7 +62,7 @@ export default async function proxy(request: NextRequest) {
     // Unknown paths land on the app's catch-all, which bounces back to /.
     const url = request.nextUrl.clone();
     url.pathname = `/submit${pathname === "/" ? "" : pathname}`;
-    return updateSession(request, (req) =>
+    return updateSession(request, url.pathname, "/login", (req) =>
       NextResponse.rewrite(url, { request: req }),
     );
   }
@@ -71,7 +72,7 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return updateSession(request);
+  return updateSession(request, pathname, "/reimbursements/login");
 }
 
 export const config = {

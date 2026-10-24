@@ -4,6 +4,7 @@ import { build } from "esbuild";
 
 const replacements = {
   "server-only": "",
+  "next/headers": "export const cookies = async () => ({ get: () => undefined });",
   "next/navigation": "export function redirect() { throw new Error('Unexpected redirect'); }",
   react: "export const cache = fn => fn;",
   "@/lib/reimbursements/supabase/admin": "export const createAdminClient = () => globalThis.inviteTest.admin;",
@@ -12,7 +13,7 @@ const replacements = {
 const bundle = await build({
   entryPoints: ["lib/reimbursements/auth.ts"], bundle: true, write: false, format: "esm", platform: "node",
   plugins: [{ name: "invite-clients", setup(builder) {
-    builder.onResolve({ filter: /^(server-only|next\/navigation|react|@\/lib\/reimbursements\/supabase\/(admin|server))$/ }, args => ({ path: args.path, namespace: "mock" }));
+    builder.onResolve({ filter: /^(server-only|next\/headers|next\/navigation|react|@\/lib\/reimbursements\/supabase\/(admin|server))$/ }, args => ({ path: args.path, namespace: "mock" }));
     builder.onLoad({ filter: /.*/, namespace: "mock" }, args => ({ contents: replacements[args.path] }));
   } }],
 });

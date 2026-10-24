@@ -4,6 +4,7 @@ import { build } from "esbuild";
 
 const mocks = {
   "server-only": "",
+  "next/headers": "export const cookies = async () => ({ get: () => undefined });",
   "next/navigation": "export function redirect(path) { throw new Error(`Redirect: ${path}`); }",
   react: "export const cache = fn => fn;",
   "@/lib/reimbursements/supabase/server": "export const createClient = async () => globalThis.accessTest.client;",

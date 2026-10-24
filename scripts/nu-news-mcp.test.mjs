@@ -10,9 +10,9 @@ import { build } from "esbuild";
 const testModules = {
   name: "nu-news-mcp-test-modules",
   setup(builder) {
-    builder.onResolve({ filter: /^(server-only|@\/lib\/reimbursements\/supabase\/admin)$/ }, (args) => ({ path: args.path, namespace: "test" }));
+    builder.onResolve({ filter: /^(server-only|next\/headers|@\/lib\/reimbursements\/supabase\/admin)$/ }, (args) => ({ path: args.path, namespace: "test" }));
     builder.onLoad({ filter: /.*/, namespace: "test" }, (args) => ({
-      contents: args.path === "server-only" ? "" : "export const createAdminClient = () => globalThis.nuNewsTestAdmin;",
+      contents: args.path === "server-only" ? "" : args.path === "next/headers" ? "export const cookies = async () => ({ get: () => undefined });" : "export const createAdminClient = () => globalThis.nuNewsTestAdmin;",
     }));
   },
 };

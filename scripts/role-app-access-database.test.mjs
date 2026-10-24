@@ -9,7 +9,7 @@ async function setupDatabase(t) {
   const db = new PGlite({ extensions: { vector } });
   t.after(() => db.close());
   await db.exec(`
-    create role anon; create role authenticated; create role service_role bypassrls;
+    create role anon; create role authenticated; create role service_role bypassrls; create role authenticator;
     create schema auth; create schema storage; create schema extensions;
     create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;

@@ -3,7 +3,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isRoleKey } from "@/lib/app-access";
-import { getSessionProfile, VIEW_AS_COOKIE } from "@/lib/reimbursements/auth";
+import { getSessionProfile } from "@/lib/reimbursements/auth";
+import { VIEW_AS_COOKIE } from "@/lib/app-access";
 
 export async function startViewAs(role: string) {
   const session = await getSessionProfile();

@@ -3,7 +3,7 @@ import test from "node:test";
 import { build } from "esbuild";
 import { writeFile, unlink } from "node:fs/promises";
 
-const bundle = await build({ stdin: { contents: 'export {GET as pdf, HEAD as head} from "./app/(public)/public-site/news/[id]/pdf/route"; export {POST as view} from "./app/(public)/public-site/news/[id]/view/route";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "server-only", setup(b) { b.onResolve({ filter: /^next\/server$/ }, () => ({ path: "next/server.js", external: true })); b.onResolve({ filter: /^server-only$/ }, () => ({ path: "empty", namespace: "empty" })); b.onLoad({ filter: /.*/, namespace: "empty" }, () => ({ contents: "" })); } }] });
+const bundle = await build({ stdin: { contents: 'export {GET as pdf, HEAD as head} from "./app/(public)/public-site/news/[id]/pdf/route"; export {POST as view} from "./app/(public)/public-site/news/[id]/view/route";', resolveDir: process.cwd() }, bundle: true, write: false, format: "esm", platform: "node", packages: "external", plugins: [{ name: "server-only", setup(b) { b.onResolve({ filter: /^next\/server$/ }, () => ({ path: "next/server.js", external: true })); b.onResolve({ filter: /^(server-only|next\/headers)$/ }, (args) => ({ path: args.path, namespace: "empty" })); b.onLoad({ filter: /.*/, namespace: "empty" }, (args) => ({ contents: args.path === "next/headers" ? "export const cookies = async () => ({ get: () => undefined });" : "" })); } }] });
 const temporary = new URL("../node_modules/.newsletter-route-test.mjs", import.meta.url);
 await writeFile(temporary, bundle.outputFiles[0].text);
 const routes = await import(temporary.href); await unlink(temporary);
