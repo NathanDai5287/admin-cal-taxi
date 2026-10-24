@@ -115,3 +115,6 @@ body > [data-brand] {
 @media (max-width: 640px) {
   .view-as-includes { display: none; }
 }
+
+.view-as-bar :is(select, button):focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.view-as-bar[aria-busy="true"] { opacity: 0.8; cursor: wait; }
