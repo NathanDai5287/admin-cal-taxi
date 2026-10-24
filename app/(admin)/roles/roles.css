@@ -49,8 +49,7 @@
 }
 
 [data-brand] .roles-scroll {
-  max-height: 65vh;
-  overflow: auto;
+  overflow-x: auto;
   scrollbar-color: var(--color-rule) var(--color-surface);
   scroll-padding: 4rem 12rem;
 }
@@ -69,8 +68,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  min-width: 130px;
-  height: 64px;
+  min-width: 104px;
+  height: 48px;
   background: var(--color-canvas);
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -80,6 +79,7 @@
   position: sticky;
   left: 0;
   min-width: 190px;
+  white-space: nowrap;
   border-right: 1px solid var(--color-rule);
 }
 
@@ -102,7 +102,7 @@
 }
 
 [data-brand] .roles-matrix td {
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.375rem;
 }
 
 [data-brand] .role-access-control {
@@ -111,9 +111,15 @@
 
 [data-brand] .role-access-control .field-input,
 [data-brand] .role-access-fixed {
-  min-height: 44px;
+  min-height: 32px;
+  padding-block: 0.25rem;
   font-size: 13px;
   font-weight: 600;
+}
+
+[data-brand] .role-access-control .field-input[data-inherited] {
+  border-style: dashed;
+  font-weight: 400;
 }
 
 [data-brand] .role-access-control .field-input:disabled {
@@ -150,7 +156,7 @@
   [data-brand] .roles-main { padding: 1.5rem 1rem; }
   [data-brand] .roles-heading { align-items: flex-start; flex-direction: column; gap: 1rem; }
   [data-brand] .roles-legend { flex-direction: column; gap: 0.5rem; }
-  [data-brand] .roles-matrix .role-name { min-width: 132px; width: 132px; padding-inline: 0.75rem; }
+  [data-brand] .roles-matrix .role-name { min-width: 132px; padding-right: 0.75rem; }
   [data-brand] .roles-scroll { scroll-padding-left: 132px; }
 }
 
@@ -198,5 +204,3 @@
   [data-brand] .roles-bulk-fields .btn { width: 100%; white-space: normal; }
 }
 
-[data-brand] .role-tree-branch { color: var(--color-muted); font-weight: 400; }
-[data-brand] .role-access-inherited { display: block; margin-top: 0.25rem; font-size: 11px; }

@@ -55,10 +55,9 @@ function AccessSelect({ role, app, permissions, canWrite }: { role: RoleKey; app
   if (role === "admin") return <span className="role-access-fixed" data-access="write">Write</span>;
   return (
     <div className="role-access-control" aria-busy={pending}>
-      <select aria-label={`${roleLabel(role)}: ${appLabel} access`} className="field-input" data-access={access} disabled={!canWrite || pending} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
+      <select aria-label={`${roleLabel(role)}: ${appLabel} access`} className="field-input" data-access={access} data-inherited={inherited.from && access === inherited.access ? "" : undefined} title={inherited.from ? `${roleLabel(inherited.from)} gives ${inherited.access}` : undefined} disabled={!canWrite || pending} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
         {ACCESS_LEVELS.slice(minimumRank).map((level) => <option key={level} value={level}>{level[0].toUpperCase() + level.slice(1)}</option>)}
       </select>
-      {inherited.from && <span className="helper-text role-access-inherited">From {roleLabel(inherited.from)}</span>}
       {pending && <span role="status" className="helper-text">Saving…</span>}
       {error && <p role="alert" className="form-message">{error}</p>}
     </div>
@@ -69,7 +68,7 @@ function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: 
   return (
     <tr>
       <th scope="row" className="role-name" style={{ paddingLeft: `${0.75 + roleDepth(role) * 1.25}rem` }}>
-        {PARENT_ROLE[role] && <span aria-hidden className="role-tree-branch">└ </span>}{roleLabel(role)}
+        {roleLabel(role)}
       </th>
       {APP_OPTIONS.map((app) => (
         <td key={app.key}>
@@ -120,7 +119,7 @@ export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAc
   return (
     <>
     <BulkAccess canWrite={canWrite} pending={pending} startTransition={startTransition} />
-    <div className="table-scroll roles-scroll" role="region" aria-label="Access by role and app" tabIndex={0}>
+    <div className="roles-scroll" role="region" aria-label="Access by role and app" tabIndex={0}>
       <table className="data-table roles-matrix">
         <thead>
           <tr>
