@@ -1,16 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AccessLevel, type AppKey, type RoleAppAccess, type RoleKey } from "@/lib/app-access";
+import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AccessLevel, type AppKey, type RoleAppAccess, type RoleKey, PARENT_ROLE } from "@/lib/app-access";
 import { EXECUTIVE_ROLE_OPTIONS } from "@/lib/people";
-import { setAppAccess, setRoleAppAccess } from "./actions";
+import { ViewAsButton } from "@/components/view-as/view-as-bar";
+import { setRoleAppAccess } from "./actions";
 
-const PARENT_ROLE: Partial<Record<RoleKey, RoleKey>> = {
-  brother: "member",
-  associate_member: "member",
-  exec_member: "brother",
-  ...Object.fromEntries(EXECUTIVE_ROLE_OPTIONS.map(({ value }) => [value, "exec_member"])),
-};
 const ROLE_TREE_ORDER: RoleKey[] = ["admin", "member", "associate_member", "brother", "exec_member", ...EXECUTIVE_ROLE_OPTIONS.map(({ value }) => value)];
 
 function roleLabel(role: RoleKey) {
@@ -68,7 +63,7 @@ function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: 
   return (
     <tr>
       <th scope="row" className="role-name" style={{ paddingLeft: `${0.75 + roleDepth(role) * 1.25}rem` }}>
-        {roleLabel(role)}
+        <span className="role-name-cell">{roleLabel(role)}{role !== "admin" && <ViewAsButton role={role} />}</span>
       </th>
       {APP_OPTIONS.map((app) => (
         <td key={app.key}>
@@ -79,46 +74,9 @@ function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: 
   );
 }
 
-function BulkAccess({ canWrite, pending, startTransition }: { canWrite: boolean; pending: boolean; startTransition: React.TransitionStartFunction }) {
-  const [app, setApp] = useState<AppKey>(APP_OPTIONS[0].key);
-  const [access, setAccess] = useState<AccessLevel>("read");
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
-  const appLabel = APP_OPTIONS.find(({ key }) => key === app)!.label;
-
-  function applyAccess(event: React.SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setSaved("");
-    startTransition(async () => {
-      const result = await setAppAccess(app, access).catch(() => ({ error: "Unable to save access. Please try again." }));
-      setError(result.error ?? "");
-      if (!result.error) setSaved(`${appLabel}: all nonadministrator roles now have ${access} access.`);
-    });
-  }
-
-  return (
-    <form className="roles-bulk" onSubmit={applyAccess} aria-busy={pending}>
-      <div className="roles-bulk-heading">
-        <h2>Set access for everyone</h2>
-        <p className="helper-text">Replaces all role settings for this app. Signed-in users only; administrators keep Write.</p>
-      </div>
-      <fieldset className="roles-bulk-fields" disabled={!canWrite || pending}>
-        <label className="roles-bulk-app"><span className="field-label">App</span><select className="field-input" value={app} onChange={(event) => setApp(event.target.value as AppKey)}>{APP_OPTIONS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>
-        <label><span className="field-label">Access</span><select className="field-input" value={access} onChange={(event) => setAccess(event.target.value as AccessLevel)}>{ACCESS_LEVELS.map((level) => <option key={level} value={level}>{level[0].toUpperCase() + level.slice(1)}</option>)}</select></label>
-        <button className="btn btn-primary" type="submit">{pending ? `Saving ${appLabel}…` : `Set all roles for ${appLabel}`}</button>
-      </fieldset>
-      {error && <p role="alert" className="form-message">{error}</p>}
-      <p role="status" className="helper-text">{saved}</p>
-    </form>
-  );
-}
-
 export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAccess[]; canWrite: boolean }) {
-  const [pending, startTransition] = useTransition();
   return (
     <>
-    <BulkAccess canWrite={canWrite} pending={pending} startTransition={startTransition} />
     <div className="roles-scroll" role="region" aria-label="Access by role and app" tabIndex={0}>
       <table className="data-table roles-matrix">
         <thead>
@@ -128,7 +86,7 @@ export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAc
           </tr>
         </thead>
         <tbody>
-          {ROLE_TREE_ORDER.map((role) => <RoleRow key={role} role={role} permissions={permissions} canWrite={canWrite && !pending} />)}
+          {ROLE_TREE_ORDER.map((role) => <RoleRow key={role} role={role} permissions={permissions} canWrite={canWrite} />)}
         </tbody>
       </table>
     </div>

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 
 import { AuthPill } from "@/components/auth/auth-pill";
+import { ViewAsBar } from "@/components/view-as/view-as-bar";
 import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
 export async function ProtectedShell({
@@ -30,6 +31,7 @@ export async function ProtectedShell({
 
   return (
     <>
+      {session?.viewAsRole && <ViewAsBar role={session.viewAsRole} />}
       <AuthPill memberSite={memberSite} session={pillSession} showPolicy={showPolicy} />
       {children}
     </>

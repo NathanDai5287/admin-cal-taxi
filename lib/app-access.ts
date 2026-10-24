@@ -29,3 +29,19 @@ export type AppKey = (typeof APP_OPTIONS)[number]["key"];
 export type AccessLevel = (typeof ACCESS_LEVELS)[number];
 export type RoleKey = (typeof ROLE_OPTIONS)[number]["key"];
 export type RoleAppAccess = { role_key: RoleKey; app_key: AppKey; access_level: AccessLevel };
+
+export const PARENT_ROLE: Partial<Record<RoleKey, RoleKey>> = {
+  brother: "member",
+  associate_member: "member",
+  exec_member: "brother",
+  ...Object.fromEntries(EXECUTIVE_ROLE_OPTIONS.map(({ value }) => [value, "exec_member"])),
+};
+
+export function roleWithAncestors(role: RoleKey): RoleKey[] {
+  const parent = PARENT_ROLE[role];
+  return parent ? [role, ...roleWithAncestors(parent)] : [role];
+}
+
+export function isRoleKey(value: string | undefined): value is RoleKey {
+  return ROLE_OPTIONS.some(({ key }) => key === value);
+}

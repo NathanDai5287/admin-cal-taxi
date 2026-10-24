@@ -15,13 +15,3 @@ export async function setRoleAppAccess(role: RoleKey, app: AppKey, access: Acces
   revalidatePath("/", "layout");
   return {};
 }
-
-export async function setAppAccess(app: AppKey, access: AccessLevel): Promise<{ error?: string }> {
-  await requireAppAccess("roles", "write");
-  if (!APP_OPTIONS.some(({ key }) => key === app) || !ACCESS_LEVELS.includes(access)) return { error: "Choose a valid app and access level." };
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_set_app_access", { app_key: app, access_level: access });
-  if (error) return { error: "Unable to save access. Please try again." };
-  revalidatePath("/", "layout");
-  return {};
-}

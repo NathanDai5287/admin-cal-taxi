@@ -1,6 +1,7 @@
 import "server-only";
 
-import { APP_OPTIONS, type AppKey, type AccessLevel } from "@/lib/app-access";
+import { ACCESS_LEVELS, APP_OPTIONS, isRoleKey, roleWithAncestors, type AppKey, type AccessLevel, type RoleKey } from "@/lib/app-access";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
@@ -13,6 +14,7 @@ export type SessionProfile = {
   email: string;
   avatarUrl: string;
   appAccess: Partial<Record<AppKey, AccessLevel>>;
+  viewAsRole?: RoleKey;
   profile: {
     id: string;
     full_name: string;
@@ -132,6 +134,19 @@ async function claimInviteWithoutRpc({
   }
 }
 
+export const VIEW_AS_COOKIE = "view_as_role";
+
+async function roleAppAccess(supabase: Awaited<ReturnType<typeof createClient>>, role: RoleKey) {
+  const { data, error } = await supabase.from("role_app_access").select("app_key, access_level").in("role_key", roleWithAncestors(role));
+  if (error) throw new Error("Unable to load app access.");
+  const appAccess: Partial<Record<AppKey, AccessLevel>> = {};
+  for (const { app_key, access_level } of data) {
+    const app = app_key as AppKey;
+    if (ACCESS_LEVELS.indexOf(access_level) > ACCESS_LEVELS.indexOf(appAccess[app] ?? "none")) appAccess[app] = access_level;
+  }
+  return appAccess;
+}
+
 // Returns the signed-in user and their profile, or null when there is no
 // valid auth session. Sessions are shared across *.cal.taxi in production.
 // A signed-in user with no profiles row is treated as role "none" (no access)
@@ -211,6 +226,18 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
     };
   }
 
+  const viewAsRole = (await cookies()).get(VIEW_AS_COOKIE)?.value;
+  if (profile.role === "admin" && !profile.removed_at && isRoleKey(viewAsRole) && viewAsRole !== "admin") {
+    return {
+      userId,
+      email,
+      avatarUrl,
+      viewAsRole,
+      appAccess: await roleAppAccess(supabase, viewAsRole),
+      profile: { id: profile.id, full_name: profile.full_name, role: "member" },
+    };
+  }
+
   const accessResult = await supabase.rpc("get_my_app_access");
   if (accessResult.error) throw new Error("Unable to load app access.");
   const appAccess = Object.fromEntries((accessResult.data ?? []).map((grant) => [grant.app_key, grant.access_level]));
@@ -265,12 +292,14 @@ export async function requireAdmin(loginPath = "/reimbursements/login") {
 
 export function hasAppAccess(session: SessionProfile | null, app: AppKey, level: "read" | "write" = "read") {
   const access = session?.appAccess[app] ?? "none";
+  if (level === "write" && session?.viewAsRole) return false;
   return access === "write" || (level === "read" && access === "read");
 }
 
 export async function requireAppAccess(app: AppKey, level: "read" | "write" = "read", loginPath = "/") {
   const session = await getSessionProfile();
   if (!session) redirect(loginPath);
+  if (level === "write" && session.viewAsRole) throw new Error("View as is on. Exit View as to make changes.");
   if (!hasAppAccess(session, app, level)) {
     const label = APP_OPTIONS.find((option) => option.key === app)?.label ?? app;
     throw new Error(`You do not have ${level} access to ${label}.`);
