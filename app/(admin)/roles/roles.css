@@ -197,3 +197,6 @@
   [data-brand] .roles-bulk-fields > label { flex: 1; }
   [data-brand] .roles-bulk-fields .btn { width: 100%; white-space: normal; }
 }
+
+[data-brand] .role-tree-branch { color: var(--color-muted); font-weight: 400; }
+[data-brand] .role-access-inherited { display: block; margin-top: 0.25rem; font-size: 11px; }

@@ -21,6 +21,8 @@ import { decodeMcpReceipt } from "@/lib/mcp/receipt";
 import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
 import { listIssues } from "@/lib/nu-news/store";
 import { registerMailingTools } from "@/lib/mcp/mailing-list";
+import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AppKey, type RoleKey } from "@/lib/app-access";
+import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 
 type Supabase = import("@supabase/supabase-js").SupabaseClient<Database>;
 type McpCaller = { userId: string; clientId: string };
@@ -73,6 +75,12 @@ async function read(supabase: Supabase, resource: string) {
   const { data, error } = await supabase.rpc("mcp_admin_read", { p_resource: resource });
   if (error) throw new Error(`The ${resource.replaceAll("_", " ")} could not be loaded.`);
   return jsonResult(addCategoryLabels(data));
+}
+
+async function rpcResult(call: PromiseLike<{ data: Json; error: { message: string } | null }>) {
+  const { data, error } = await call;
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 async function write(
@@ -356,6 +364,34 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     }
     return jsonResult({ ...saved as Record<string, Json>, emailStatus: "sent" });
   });
+
+  server.registerTool("list_role_access", {
+    description: "List each role's access to each app, and each person's membership and executive positions. A person gets the highest access from all of their roles.",
+    inputSchema: z.object({}),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  }, async () => jsonResult(await rpcResult(supabase.rpc("mcp_list_role_access"))));
+
+  server.registerTool("set_role_access", {
+    description: "Set one role's access to one app. Omit role to set every nonadministrator role at once. Roles: base member applies to everyone; brother and associate member to that membership; exec_member to every brother with an executive position.",
+    inputSchema: z.object({
+      role: z.enum(ROLE_OPTIONS.map(({ key }) => key).filter((key) => key !== "admin") as [RoleKey, ...RoleKey[]]).optional(),
+      app: z.enum(APP_OPTIONS.map(({ key }) => key) as [AppKey, ...AppKey[]]),
+      access: z.enum(ACCESS_LEVELS),
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, async ({ role, app, access }) => jsonResult(await rpcResult(supabase.rpc("mcp_set_role_access", { p_role: role ?? null, p_app: app, p_access: access }))));
+
+  server.registerTool("set_person_roles", {
+    description: "Set a person's membership and executive positions. Only brothers can hold executive positions.",
+    inputSchema: z.object({
+      userId: z.uuid(),
+      membership: z.enum(MEMBERSHIP_OPTIONS.map(({ value }) => value) as [Membership, ...Membership[]]).nullable(),
+      executiveRoles: z.array(z.enum(EXECUTIVE_ROLE_OPTIONS.map(({ value }) => value) as [ExecutiveRole, ...ExecutiveRole[]])),
+    }),
+    annotations: { ...writeAnnotations, idempotentHint: true },
+  }, async ({ userId, membership, executiveRoles }) => jsonResult(await rpcResult(
+    supabase.rpc("mcp_set_person_roles", { p_user_id: userId, p_membership: membership, p_executive_roles: executiveRoles }),
+  )));
 
   server.registerTool("set_user_role", {
     description: "Set an active or invited user's member or administrator role.",

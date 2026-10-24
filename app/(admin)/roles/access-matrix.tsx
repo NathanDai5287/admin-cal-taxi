@@ -2,13 +2,47 @@
 
 import { useState, useTransition } from "react";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AccessLevel, type AppKey, type RoleAppAccess, type RoleKey } from "@/lib/app-access";
+import { EXECUTIVE_ROLE_OPTIONS } from "@/lib/people";
 import { setAppAccess, setRoleAppAccess } from "./actions";
 
-function AccessSelect({ role, app, access, canWrite }: { role: RoleKey; app: AppKey; access: AccessLevel; canWrite: boolean }) {
+const PARENT_ROLE: Partial<Record<RoleKey, RoleKey>> = {
+  brother: "member",
+  associate_member: "member",
+  exec_member: "brother",
+  ...Object.fromEntries(EXECUTIVE_ROLE_OPTIONS.map(({ value }) => [value, "exec_member"])),
+};
+const ROLE_TREE_ORDER: RoleKey[] = ["admin", "member", "associate_member", "brother", "exec_member", ...EXECUTIVE_ROLE_OPTIONS.map(({ value }) => value)];
+
+function roleLabel(role: RoleKey) {
+  return ROLE_OPTIONS.find(({ key }) => key === role)!.label;
+}
+
+function roleDepth(role: RoleKey): number {
+  const parent = PARENT_ROLE[role];
+  return parent ? roleDepth(parent) + 1 : 0;
+}
+
+function ownAccess(permissions: RoleAppAccess[], role: RoleKey, app: AppKey): AccessLevel {
+  return permissions.find((permission) => permission.role_key === role && permission.app_key === app)?.access_level ?? "none";
+}
+
+function inheritedAccess(permissions: RoleAppAccess[], role: RoleKey, app: AppKey): { access: AccessLevel; from?: RoleKey } {
+  const parent = PARENT_ROLE[role];
+  if (!parent) return { access: "none" };
+  const fromAbove = inheritedAccess(permissions, parent, app);
+  const parentOwn = ownAccess(permissions, parent, app);
+  return ACCESS_LEVELS.indexOf(parentOwn) >= ACCESS_LEVELS.indexOf(fromAbove.access) && parentOwn !== "none"
+    ? { access: parentOwn, from: parent }
+    : fromAbove;
+}
+
+function AccessSelect({ role, app, permissions, canWrite }: { role: RoleKey; app: AppKey; permissions: RoleAppAccess[]; canWrite: boolean }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
-  const roleLabel = ROLE_OPTIONS.find(({ key }) => key === role)?.label;
   const appLabel = APP_OPTIONS.find(({ key }) => key === app)?.label;
+  const inherited = inheritedAccess(permissions, role, app);
+  const minimumRank = ACCESS_LEVELS.indexOf(inherited.access);
+  const access = ACCESS_LEVELS[Math.max(ACCESS_LEVELS.indexOf(ownAccess(permissions, role, app)), minimumRank)];
 
   function changeAccess(value: AccessLevel) {
     setError("");
@@ -21,33 +55,30 @@ function AccessSelect({ role, app, access, canWrite }: { role: RoleKey; app: App
   if (role === "admin") return <span className="role-access-fixed" data-access="write">Write</span>;
   return (
     <div className="role-access-control" aria-busy={pending}>
-      <select aria-label={`${roleLabel}: ${appLabel} access`} className="field-input" data-access={access} disabled={!canWrite || pending} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
-        {ACCESS_LEVELS.map((level) => <option key={level} value={level}>{level[0].toUpperCase() + level.slice(1)}</option>)}
+      <select aria-label={`${roleLabel(role)}: ${appLabel} access`} className="field-input" data-access={access} disabled={!canWrite || pending} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
+        {ACCESS_LEVELS.slice(minimumRank).map((level) => <option key={level} value={level}>{level[0].toUpperCase() + level.slice(1)}</option>)}
       </select>
+      {inherited.from && <span className="helper-text role-access-inherited">From {roleLabel(inherited.from)}</span>}
       {pending && <span role="status" className="helper-text">Saving…</span>}
       {error && <p role="alert" className="form-message">{error}</p>}
     </div>
   );
 }
 
-function RoleRow({ role, permissions, canWrite }: { role: (typeof ROLE_OPTIONS)[number]; permissions: RoleAppAccess[]; canWrite: boolean }) {
+function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: RoleAppAccess[]; canWrite: boolean }) {
   return (
     <tr>
-      <th scope="row" className="role-name">{role.label}</th>
+      <th scope="row" className="role-name" style={{ paddingLeft: `${0.75 + roleDepth(role) * 1.25}rem` }}>
+        {PARENT_ROLE[role] && <span aria-hidden className="role-tree-branch">└ </span>}{roleLabel(role)}
+      </th>
       {APP_OPTIONS.map((app) => (
         <td key={app.key}>
-          <AccessSelect role={role.key} app={app.key} canWrite={canWrite} access={permissions.find((permission) => permission.role_key === role.key && permission.app_key === app.key)?.access_level ?? "none"} />
+          <AccessSelect role={role} app={app.key} permissions={permissions} canWrite={canWrite} />
         </td>
       ))}
     </tr>
   );
 }
-
-const ROLE_GROUPS = [
-  { label: "Account", roles: ROLE_OPTIONS.filter(({ key }) => key === "admin" || key === "member") },
-  { label: "Membership", roles: ROLE_OPTIONS.filter(({ key }) => key === "brother" || key === "associate_member") },
-  { label: "Executive", roles: ROLE_OPTIONS.filter(({ key }) => key !== "admin" && key !== "member" && key !== "brother" && key !== "associate_member") },
-];
 
 function BulkAccess({ canWrite, pending, startTransition }: { canWrite: boolean; pending: boolean; startTransition: React.TransitionStartFunction }) {
   const [app, setApp] = useState<AppKey>(APP_OPTIONS[0].key);
@@ -97,12 +128,9 @@ export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAc
             {APP_OPTIONS.map((app) => <th scope="col" key={app.key}>{app.label}</th>)}
           </tr>
         </thead>
-        {ROLE_GROUPS.map((group) => (
-          <tbody key={group.label}>
-            <tr className="roles-group"><th scope="rowgroup" colSpan={APP_OPTIONS.length + 1}><span>{group.label}</span></th></tr>
-            {group.roles.map((role) => <RoleRow key={role.key} role={role} permissions={permissions} canWrite={canWrite && !pending} />)}
-          </tbody>
-        ))}
+        <tbody>
+          {ROLE_TREE_ORDER.map((role) => <RoleRow key={role} role={role} permissions={permissions} canWrite={canWrite && !pending} />)}
+        </tbody>
       </table>
     </div>
     </>

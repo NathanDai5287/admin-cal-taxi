@@ -680,6 +680,18 @@ export type Database = {
         Args: { role_key: string; app_key: string; access_level: "none" | "read" | "write" };
         Returns: undefined;
       };
+      mcp_list_role_access: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      mcp_set_role_access: {
+        Args: { p_role: string | null; p_app: string; p_access: "none" | "read" | "write" };
+        Returns: Json;
+      };
+      mcp_set_person_roles: {
+        Args: { p_user_id: string; p_membership: string | null; p_executive_roles: string[] };
+        Returns: Json;
+      };
       admin_update_person: {
         Args: {
           target_user_id: string;
