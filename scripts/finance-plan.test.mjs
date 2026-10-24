@@ -50,6 +50,25 @@ test("dues payments change actual income without changing planned income", async
   assert.equal(after.actualIncome, 250);
 });
 
+test("planned expenses retain each allocation and include each category overrun", async () => {
+  const { buildPlanVsActual } = await loadCalculator();
+  const summary = buildPlanVsActual({
+    ...baseInput(),
+    categoryBudgets: { house: 1000, rush: 200, socials: 300 },
+    approvedReimbursements: [{ category: "rush", amount: 250.22 }],
+    directExpenses: [
+      { category: "rush", amount: 100.11 },
+      { category: "socials", amount: 75 },
+      { category: "education", amount: 25.44 },
+    ],
+  });
+
+  assert.equal(summary.plannedExpenses, 1675.77);
+  assert.equal(summary.actualExpenses, 450.77);
+  assert.equal(summary.expenseBreakdown.find((row) => row.category === "rush").planned, 200);
+  assert.equal(summary.expenseBreakdown.find((row) => row.category === "socials").planned, 300);
+});
+
 test("waivers and hosting cancellations remove planned values only", async () => {
   const { buildPlanVsActual } = await loadCalculator();
   const summary = buildPlanVsActual({
@@ -228,7 +247,7 @@ test("completed categories use recorded spending while retaining their original 
   assert.equal(rush.actual, 1150);
   assert.equal(rush.expected, 1150);
   assert.equal(rush.completed, true);
-  assert.equal(summary.plannedExpenses, 2000);
+  assert.equal(summary.plannedExpenses, 2150);
   assert.equal(summary.expectedExpenses, 2150);
 });
 

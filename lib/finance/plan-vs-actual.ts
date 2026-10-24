@@ -91,7 +91,7 @@ export function buildPlanVsActual(input: PlanVsActualInput) {
 
   const plannedIncome = incomeBreakdown.reduce((total, row) => total + cents(row.planned), 0);
   const actualIncome = incomeBreakdown.reduce((total, row) => total + cents(row.actual), 0);
-  const plannedExpenses = expenseBreakdown.reduce((total, row) => total + cents(row.planned), 0);
+  const plannedExpenses = expenseBreakdown.reduce((total, row) => total + cents(Math.max(row.planned, row.actual)), 0);
   const actualExpenseTotal = expenseBreakdown.reduce((total, row) => total + cents(row.actual), 0);
   const expectedExpenses = expenseBreakdown.reduce((total, row) => total + cents(row.expected), 0);
 

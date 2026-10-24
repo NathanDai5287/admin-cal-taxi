@@ -12,6 +12,9 @@
 | Reports | No financial writes | Spending breakdowns and PDF/CSV/JSON exports |
 | Members (shared app) | Registration, invitations and access | Existing member management |
 
+Planning adds the higher of each category's allocation or actual spending to Planned expenses.
+Category allocations remain unchanged when spending exceeds them.
+
 The Finance home redirects to Accounts. Old dues and reimbursement URLs redirect to their new pages. Submission and authentication URLs remain compatible.
 
 All activity belongs to the current academic term. Academic years and their Fall/Spring terms are shared with Accreditation and Members; Finance stores a reference to that calendar instead of maintaining independent dates. Creating an academic year that contains today also makes its matching term the Finance reporting period. Date filters on Reports remain ordinary report filters.
