@@ -2,10 +2,10 @@
 
 import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useOptimistic, useState, useTransition, type ReactNode } from "react";
 
 import { setReimbursementPaid } from "@/app/(admin)/finance/accounts/payable/actions";
-import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
+import { setReimbursementStatus, type ReviewDecision, type StatusMutationResult } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
 import { ResendEmailButton } from "@/components/email/resend-email-button";
 import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
@@ -17,7 +17,7 @@ import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/f
 type ReviewStatusState = {
   amount: number;
   change: (decision: ReviewDecision) => Promise<boolean>;
-  changePaid: (reimbursed: boolean) => Promise<void>;
+  changePaid: (reimbursed: boolean) => void;
   emailFailure: SavedEmailFailure | null;
   error: string;
   note: string;
@@ -30,7 +30,7 @@ type SavedEmailFailure = EmailFailure & { saved: "decision" | "payment" };
 
 const ReviewStatusContext = createContext<ReviewStatusState | null>(null);
 
-export function ReviewStatusProvider({ amount, children, initialNote = "", reimbursed: serverReimbursed, reimbursementId, requestedAmount, status: serverStatus }: {
+export function ReviewStatusProvider({ amount: serverAmount, children, initialNote = "", reimbursed: serverReimbursed, reimbursementId, requestedAmount, status: serverStatus }: {
   amount: number;
   children: ReactNode;
   initialNote?: string;
@@ -39,74 +39,39 @@ export function ReviewStatusProvider({ amount, children, initialNote = "", reimb
   requestedAmount: number;
   status: ReimbursementStatus;
 }) {
-  const [status, setStatus] = useState(serverStatus);
-  const [note, setNote] = useState(initialNote);
-  const [reimbursed, setReimbursed] = useState(serverReimbursed);
-  const [pending, setPending] = useState(false);
+  const [{ amount, note, reimbursed, status }, setOptimistic] = useOptimistic({ amount: serverAmount, note: initialNote, reimbursed: serverReimbursed, status: serverStatus });
+  const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [emailFailure, setEmailFailure] = useState<SavedEmailFailure | null>(null);
   const [reopenTarget, setReopenTarget] = useState<{ category: ReimbursementCategory; decision: ReviewDecision } | null>(null);
-  const mutationId = useRef(0);
 
-  useEffect(() => {
-    if (pending) return;
-    const timer = window.setTimeout(() => {
-      setStatus(serverStatus);
-      setNote(initialNote);
-      setReimbursed(serverReimbursed);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [pending, serverStatus, initialNote, serverReimbursed]);
-
-  async function change(decision: ReviewDecision, reopenCategory?: ReimbursementCategory) {
-    if (pending) return false;
-    const previous = status;
-    const previousNote = note;
-    const currentMutation = ++mutationId.current;
-    setStatus(decision.status);
-    setNote(decision.note);
-    setPending(true);
-    setError("");
-    setEmailFailure(null);
-    let reopenRequired = false;
-    try {
-      const result = await setReimbursementStatus(reimbursementId, decision, reopenCategory);
-      if (!result.ok) {
-        reopenRequired = Boolean(result.completedCategory && !reopenCategory);
-        if (result.completedCategory) setReopenTarget({ category: result.completedCategory, decision });
-        throw new Error(result.message);
+  function change(decision: ReviewDecision, reopenCategory?: ReimbursementCategory) {
+    return new Promise<boolean>((resolve) => startTransition(async () => {
+      setOptimistic({ amount: decision.amount ?? amount, note: decision.note, reimbursed, status: decision.status });
+      setError("");
+      setEmailFailure(null);
+      const result = await setReimbursementStatus(reimbursementId, decision, reopenCategory)
+        .catch((): StatusMutationResult => ({ ok: false, message: "Unable to save the review decision." }));
+      if (result.ok) {
+        if (result.emailFailure) setEmailFailure({ ...result.emailFailure, saved: "decision" });
+        return resolve(true);
       }
-      setEmailFailure(result.emailFailure ? { ...result.emailFailure, saved: "decision" } : null);
-      return true;
-    } catch (reason) {
-      if (mutationId.current === currentMutation) {
-        setStatus(previous);
-        setNote(previousNote);
-        const message = reason instanceof Error ? reason.message : "Unable to save the review decision.";
-        setError(reopenRequired ? "" : message);
-      }
-      return false;
-    } finally {
-      if (mutationId.current === currentMutation) setPending(false);
-    }
+      if (result.completedCategory) setReopenTarget({ category: result.completedCategory, decision });
+      if (!result.completedCategory || reopenCategory) setError(result.message);
+      resolve(false);
+    }));
   }
 
-  async function changePaid(next: boolean) {
-    if (pending) return;
-    setReimbursed(next);
-    setPending(true);
-    setError("");
-    setEmailFailure(null);
-    try {
-      const result = await setReimbursementPaid(reimbursementId, next);
-      if (!result.ok) throw new Error(result.message);
+  function changePaid(next: boolean) {
+    startTransition(async () => {
+      setOptimistic({ amount, note, reimbursed: next, status });
+      setError("");
+      setEmailFailure(null);
+      const result = await setReimbursementPaid(reimbursementId, next)
+        .catch(() => ({ ok: false, message: "Unable to change the payment state." }) as const);
+      if (!result.ok) return setError(result.message);
       if (result.emailFailure) setEmailFailure({ ...result.emailFailure, saved: "payment" });
-    } catch (reason) {
-      setReimbursed(!next);
-      setError(reason instanceof Error ? reason.message : "Unable to change the payment state.");
-    } finally {
-      setPending(false);
-    }
+    });
   }
 
   async function reopenAndApprove() {
