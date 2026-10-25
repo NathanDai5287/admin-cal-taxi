@@ -42,8 +42,6 @@ function inviteCopy(role: InviteRole) {
       role === "admin"
         ? `That signs you into ${destinationLabel}. You can also submit expenses at ${submitUrl}.`
         : `That signs you into ${destinationLabel}. Use this same Google account — access is tied to the invited email.`,
-      "",
-      "If Google One Tap does not appear, use the sign-in button in the top-right corner.",
     ].join("\n"),
     html: `
       <div style="font-family:Georgia,Times,'Times New Roman',serif;line-height:1.5;color:#1a1714;max-width:520px">
@@ -53,16 +51,13 @@ function inviteCopy(role: InviteRole) {
             Open ${destinationLabel}
           </a>
         </p>
-        <p style="margin:0 0 12px">
+        <p style="margin:0">
           Sign in with Google using <strong>this same email address</strong>.
           ${
             role === "admin"
               ? `You can also submit expenses at <a href="${submitUrl}">${submitUrl.replace(/^https?:\/\//, "")}</a>.`
               : "Access is tied to the invited email."
           }
-        </p>
-        <p style="margin:0;color:#5c564e;font-size:14px">
-          If Google One Tap does not appear, use the sign-in button in the top-right corner.
         </p>
       </div>
     `.trim(),
