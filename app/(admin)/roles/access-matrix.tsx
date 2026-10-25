@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AccessLevel, type AppKey, type RoleAppAccess, type RoleKey, PARENT_ROLE } from "@/lib/app-access";
 import { EXECUTIVE_ROLE_OPTIONS } from "@/lib/people";
 import { ViewAsButton } from "@/components/view-as/view-as-bar";
@@ -31,35 +31,34 @@ function inheritedAccess(permissions: RoleAppAccess[], role: RoleKey, app: AppKe
     : fromAbove;
 }
 
-function AccessSelect({ role, app, permissions, canWrite }: { role: RoleKey; app: AppKey; permissions: RoleAppAccess[]; canWrite: boolean }) {
-  const [pending, startTransition] = useTransition();
+type AccessChange = (role: RoleKey, app: AppKey, access: AccessLevel) => Promise<string>;
+
+function AccessSelect({ role, app, permissions, canWrite, onChange }: { role: RoleKey; app: AppKey; permissions: RoleAppAccess[]; canWrite: boolean; onChange: AccessChange }) {
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const appLabel = APP_OPTIONS.find(({ key }) => key === app)?.label;
   const inherited = inheritedAccess(permissions, role, app);
   const minimumRank = ACCESS_LEVELS.indexOf(inherited.access);
   const access = ACCESS_LEVELS[Math.max(ACCESS_LEVELS.indexOf(ownAccess(permissions, role, app)), minimumRank)];
 
-  function changeAccess(value: AccessLevel) {
-    setError("");
-    startTransition(async () => {
-      const result = await setRoleAppAccess(role, app, value).catch(() => ({ error: "Unable to save access. Please try again." }));
-      setError(result.error ?? "");
-    });
+  async function changeAccess(value: AccessLevel) {
+    setSaving(true);
+    setError(await onChange(role, app, value));
+    setSaving(false);
   }
 
   if (role === "admin") return <span className="role-access-fixed" data-access="write">Write</span>;
   return (
-    <div className="role-access-control" aria-busy={pending}>
-      <select aria-label={`${roleLabel(role)}: ${appLabel} access`} className="field-input" data-access={access} data-inherited={inherited.from && access === inherited.access ? "" : undefined} title={inherited.from ? `${roleLabel(inherited.from)} gives ${inherited.access}` : undefined} disabled={!canWrite || pending} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
+    <div className="role-access-control" aria-busy={saving} data-error={error ? "" : undefined} title={error || (inherited.from ? `${roleLabel(inherited.from)} gives ${inherited.access}` : undefined)}>
+      <select aria-label={`${roleLabel(role)}: ${appLabel} access`} aria-invalid={Boolean(error)} className="field-input" data-access={access} data-inherited={inherited.from && access === inherited.access ? "" : undefined} disabled={!canWrite} value={access} onChange={(event) => changeAccess(event.target.value as AccessLevel)}>
         {ACCESS_LEVELS.slice(minimumRank).map((level) => <option key={level} value={level}>{level[0].toUpperCase() + level.slice(1)}</option>)}
       </select>
-      {pending && <span role="status" className="helper-text">Saving…</span>}
-      {error && <p role="alert" className="form-message">{error}</p>}
+      {error && <span role="alert" className="sr-only">{error}</span>}
     </div>
   );
 }
 
-function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: RoleAppAccess[]; canWrite: boolean }) {
+function RoleRow({ role, permissions, canWrite, onChange }: { role: RoleKey; permissions: RoleAppAccess[]; canWrite: boolean; onChange: AccessChange }) {
   return (
     <tr>
       <th scope="row" className="role-name" style={{ paddingLeft: `${0.75 + roleDepth(role) * 1.25}rem` }}>
@@ -67,14 +66,28 @@ function RoleRow({ role, permissions, canWrite }: { role: RoleKey; permissions: 
       </th>
       {APP_OPTIONS.map((app) => (
         <td key={app.key}>
-          <AccessSelect role={role} app={app.key} permissions={permissions} canWrite={canWrite} />
+          <AccessSelect role={role} app={app.key} permissions={permissions} canWrite={canWrite} onChange={onChange} />
         </td>
       ))}
     </tr>
   );
 }
 
-export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAccess[]; canWrite: boolean }) {
+function withAccess(permissions: RoleAppAccess[], role: RoleKey, app: AppKey, access: AccessLevel) {
+  return permissions.map((permission) => permission.role_key === role && permission.app_key === app ? { ...permission, access_level: access } : permission);
+}
+
+export function AccessMatrix({ permissions: savedPermissions, canWrite }: { permissions: RoleAppAccess[]; canWrite: boolean }) {
+  const [permissions, setPermissions] = useState(savedPermissions);
+
+  async function changeAccess(role: RoleKey, app: AppKey, access: AccessLevel) {
+    const previous = ownAccess(permissions, role, app);
+    setPermissions((current) => withAccess(current, role, app, access));
+    const result = await setRoleAppAccess(role, app, access).catch(() => ({ error: "Unable to save access. Please try again." }));
+    if (result.error) setPermissions((current) => withAccess(current, role, app, previous));
+    return result.error ?? "";
+  }
+
   return (
     <>
     <div className="roles-scroll" role="region" aria-label="Access by role and app" tabIndex={0}>
@@ -86,7 +99,7 @@ export function AccessMatrix({ permissions, canWrite }: { permissions: RoleAppAc
           </tr>
         </thead>
         <tbody>
-          {ROLE_TREE_ORDER.map((role) => <RoleRow key={role} role={role} permissions={permissions} canWrite={canWrite} />)}
+          {ROLE_TREE_ORDER.map((role) => <RoleRow key={role} role={role} permissions={permissions} canWrite={canWrite} onChange={changeAccess} />)}
         </tbody>
       </table>
     </div>

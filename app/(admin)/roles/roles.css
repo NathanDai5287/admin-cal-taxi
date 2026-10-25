@@ -128,7 +128,20 @@
 }
 
 [data-brand] .role-access-control[aria-busy="true"] .field-input {
-  cursor: wait;
+  animation: role-access-saving 900ms ease-in-out infinite alternate;
+}
+
+[data-brand] .role-access-control[data-error] .field-input {
+  border-color: var(--color-warn);
+  box-shadow: inset 0 0 0 1px var(--color-warn);
+}
+
+@keyframes role-access-saving {
+  to { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-brand] .role-access-control[aria-busy="true"] .field-input { animation: none; opacity: 0.7; }
 }
 
 [data-brand] .role-access-fixed {
