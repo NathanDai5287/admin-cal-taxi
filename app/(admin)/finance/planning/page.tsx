@@ -7,6 +7,6 @@ export const metadata: Metadata = { title: "Plan vs actual" };
 export const dynamic = "force-dynamic";
 
 export default async function PlanningPage() {
-  await requireAppAccess("finance");
-  return <PlanVsActual editable />;
+  const session = await requireAppAccess("finance");
+  return <PlanVsActual editable={session.appAccess.finance === "write"} />;
 }

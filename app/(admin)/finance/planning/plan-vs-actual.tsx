@@ -123,7 +123,7 @@ export async function PlanVsActual({ editable = false }: { editable?: boolean })
                 plannedAmount={row.planned}
                 control={editable ? <CategoryMenu category={row.category} label={row.label} budget={budgets.get(row.category) ?? null} completed={completed} /> : null}
               >
-                <SpendingItems items={categoryItems} linked={editable} />
+                <SpendingItems items={categoryItems} />
               </PlanBarRow>
             );
           })}
@@ -189,7 +189,7 @@ function formatItemDate(value: string) {
     .format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
-function SpendingItems({ items, linked }: { items: SpendingItem[]; linked: boolean }) {
+function SpendingItems({ items }: { items: SpendingItem[] }) {
   if (!items.length) return <p className="spend-breakdown-empty">No spending yet</p>;
   return (
     <details className="spend-breakdown">
@@ -198,7 +198,7 @@ function SpendingItems({ items, linked }: { items: SpendingItem[]; linked: boole
         {items.map((item) => (
           <div className="spend-breakdown-item" key={`${item.receipt}-${item.id}`}>
             <div>
-              {linked && item.receipt ? <Link href={`/finance/review/${item.id}`}>{item.description}</Link> : <span>{item.description}</span>}
+              {item.receipt ? <Link href={`/finance/accounts/payable/${item.id}`}>{item.description}</Link> : <span>{item.description}</span>}
               <small>{formatItemDate(item.date)} · {item.receipt ? "Receipt" : "Manual"}</small>
             </div>
             <strong>{formatMoney(item.amount)}</strong>

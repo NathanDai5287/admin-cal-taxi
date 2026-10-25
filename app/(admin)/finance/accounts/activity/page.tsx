@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -15,7 +17,8 @@ function currentPacificDate() {
 }
 
 export default async function ActivityPage() {
-  await requireAppAccess("finance");
+  const session = await requireAppAccess("finance");
+  if (session.appAccess.finance !== "write") redirect("/finance/planning");
   const supabase = createAdminClient();
   const results = await Promise.all([
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("*").order("expense_date", { ascending: false }).order("id", { ascending: false }).range(from, to)),

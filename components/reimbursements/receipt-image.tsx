@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEvent } from "react";
+import { preload } from "react-dom";
 
 import { ReviewDecisionButtons } from "@/components/reimbursements/review-decision-buttons";
 import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
@@ -44,6 +45,7 @@ export function ReceiptImage({
     getPayableNavigationPreview,
     getServerPayableNavigationPreview,
   );
+  preload(fullSrc, { as: "image", fetchPriority: "low" });
   const previewSrc = cachedPreview?.id === reimbursementId
     ? cachedPreview.receiptUrl ?? src
     : src;

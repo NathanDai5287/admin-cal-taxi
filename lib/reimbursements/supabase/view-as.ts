@@ -29,4 +29,4 @@ function readOnlyFetch(allowedPaths: string[]): typeof fetch {
 }
 
 export const sessionFetch = readOnlyFetch(DATABASE_ENFORCED_PATHS);
-export const masterKeyFetch = readOnlyFetch([]);
+export const masterKeyFetch = readOnlyFetch(["/storage/v1/object/sign/"]);

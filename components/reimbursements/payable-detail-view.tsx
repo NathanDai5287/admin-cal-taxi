@@ -10,9 +10,9 @@ import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "
 import { formatReimbursementDate, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import type { PayableDetailData } from "@/lib/reimbursements/payable-detail-data";
 
-export function PayableDetailView({ detail }: { detail: PayableDetailData }) {
+export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: PayableDetailData; fullReceiptUrl?: string | null }) {
   const processingComplete = detail.status !== "pending";
-  const fullSrc = `/api/reimbursements/receipts/${detail.id}/original`;
+  const fullSrc = fullReceiptUrl ?? `/api/reimbursements/receipts/${detail.id}/original`;
 
   return (
     <ReviewStatusProvider initialDenialReason={detail.denialReason} reimbursementId={detail.id} status={detail.status}>

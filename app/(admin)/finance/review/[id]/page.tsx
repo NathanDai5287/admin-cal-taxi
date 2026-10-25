@@ -21,7 +21,10 @@ export default async function SubmissionReviewPage({ params }: { params: Promise
 
   if (!reimbursement) notFound();
 
-  const previewUrls = await getReceiptPreviewUrls([reimbursement.receipt_path]);
+  const [previewUrls, fullUrls] = await Promise.all([
+    getReceiptPreviewUrls([reimbursement.receipt_path]),
+    getReceiptPreviewUrls([reimbursement.receipt_path], "full"),
+  ]);
   const detail = payableDetailData(reimbursement, previewUrls.get(reimbursement.receipt_path) ?? null);
-  return <PayableDetailView detail={detail} />;
+  return <PayableDetailView detail={detail} fullReceiptUrl={fullUrls.get(reimbursement.receipt_path) ?? null} />;
 }
