@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PayableDetailView } from "@/components/reimbursements/payable-detail-view";
+import { loadEmailActivity } from "@/lib/email-tracking";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { payableDetailData } from "@/lib/reimbursements/payable-detail-data";
 import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls";
@@ -21,10 +22,11 @@ export default async function SubmissionReviewPage({ params }: { params: Promise
 
   if (!reimbursement) notFound();
 
-  const [previewUrls, fullUrls] = await Promise.all([
+  const [previewUrls, fullUrls, emails] = await Promise.all([
     getReceiptPreviewUrls([reimbursement.receipt_path]),
     getReceiptPreviewUrls([reimbursement.receipt_path], "full"),
+    loadEmailActivity(reimbursement.id),
   ]);
   const detail = payableDetailData(reimbursement, previewUrls.get(reimbursement.receipt_path) ?? null);
-  return <PayableDetailView detail={detail} fullReceiptUrl={fullUrls.get(reimbursement.receipt_path) ?? null} />;
+  return <PayableDetailView detail={detail} emails={emails} fullReceiptUrl={fullUrls.get(reimbursement.receipt_path) ?? null} />;
 }
