@@ -777,6 +777,7 @@
     width: 100%;
     height: min(560px, calc(100vh - 32px));
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     overflow: hidden;
     background: var(--color-surface);
@@ -795,6 +796,9 @@
   [data-brand] .payable-receipt-rail-heading strong,
   [data-brand] .payable-receipt-rail-footer strong {
     @apply text-[12px] text-ink;
+  }
+  [data-brand] .payable-receipt-rail-heading strong {
+    @apply truncate;
   }
   [data-brand] .payable-receipt-rail img {
     @apply block w-full h-full object-contain bg-canvas;
