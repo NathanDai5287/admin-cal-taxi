@@ -12,7 +12,7 @@ import {
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
 import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
-import { formatCategory, formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
+import { formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import {
   InlineStatusSelect,
@@ -463,7 +463,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   />
                 </label>
               </th>
-              <th>Member</th><th>Expense</th><th>Amount</th><th>Status</th><th>Paid</th>
+              <th>Member</th><th>Description</th><th>Amount</th><th>Status</th><th>Paid</th>
             </tr>
           </thead>
           <tbody ref={tableBodyRef}>
@@ -508,7 +508,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     </Link>
                     <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
                   </td>
-                  <td>{item.merchant || formatCategory(item.category)}</td>
+                  <td>{item.description}</td>
                   <td className="amount">
                     <span className="amount-check">
                       {formatMoney(item.amount)}
@@ -666,7 +666,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       ) : <div className="payable-receipt-empty">Hover or focus a row to see its receipt.</div>}
       {activePreview && (
         <div className="payable-receipt-rail-footer">
-          <span>{activePreview.merchant || formatCategory(activePreview.category)}</span>
+          <span>{activePreview.description}</span>
           <strong>{formatMoney(activePreview.amount)}</strong>
         </div>
       )}

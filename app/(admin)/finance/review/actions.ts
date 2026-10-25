@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireAdmin } from "@/lib/reimbursements/auth";
+import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";
 import { categorySchema, categoryValues, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";
@@ -89,24 +89,24 @@ export async function updateStatus(formData: FormData) {
   if (!result.ok) throw new Error(result.message);
 }
 
-export async function updateMerchant(formData: FormData) {
-  await requireAdmin("/");
+export async function updateDescription(formData: FormData) {
+  await requireAppAccess("finance", "write");
 
   const parsed = z.object({
     id: z.uuid(),
-    merchant: z.string().trim().min(1).max(200),
-  }).safeParse({ id: formData.get("id"), merchant: formData.get("merchant") });
+    description: z.string().trim().min(1).max(2000),
+  }).safeParse({ id: formData.get("id"), description: formData.get("description") });
   if (!parsed.success) {
-    throw new Error("Enter a valid expense name.");
+    throw new Error("Enter a description.");
   }
 
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("reimbursements")
-    .update({ merchant: parsed.data.merchant })
+    .update({ description: parsed.data.description })
     .eq("id", parsed.data.id);
   if (error) {
-    throw new Error("Unable to rename the expense. Please try again.");
+    throw new Error("Unable to save the description. Please try again.");
   }
 
   revalidatePath("/finance", "layout");

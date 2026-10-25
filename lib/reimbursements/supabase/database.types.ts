@@ -647,6 +647,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["reimbursement_category"];
           status?: Database["public"]["Enums"]["reimbursement_status"];
           merchant?: string | null;
+          description?: string;
           receipt_date?: string | null;
           receipt_total?: number | null;
           failure_reason?: string | null;

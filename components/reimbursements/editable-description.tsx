@@ -5,28 +5,27 @@ import { Button } from "@/components/brand/button";
 
 import { useEffect, useState, useTransition } from "react";
 
-import { updateMerchant } from "@/app/(admin)/finance/review/actions";
+import { updateDescription } from "@/app/(admin)/finance/review/actions";
 
-// Inline rename for the expense (merchant) shown in the submissions table.
-export function EditableMerchant({ id, merchant }: { id: string; merchant: string | null }) {
+export function EditableDescription({ id, description }: { id: string; description: string }) {
   const canWrite = useAppWriteAccess();
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(merchant ?? "");
+  const [value, setValue] = useState(description);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (pending || editing) return;
-    const timer = window.setTimeout(() => setValue(merchant ?? ""), 0);
+    const timer = window.setTimeout(() => setValue(description), 0);
     return () => window.clearTimeout(timer);
-  }, [editing, merchant, pending]);
+  }, [editing, description, pending]);
 
   if (!editing) {
     return (
       <span className="inline-flex items-center gap-2 flex-wrap">
-        <span>{value.trim() ? value : "Not detected"}</span>
+        <span>{value}</span>
         <Button disabled={!canWrite || pending} variant="text" onClick={() => setEditing(true)} type="button">
-          {pending ? "Saving…" : "Rename"}
+          {pending ? "Saving…" : "Edit"}
         </Button>
       </span>
     );
@@ -37,30 +36,30 @@ export function EditableMerchant({ id, merchant }: { id: string; merchant: strin
       className="inline-flex items-center gap-2 flex-wrap"
       action={(formData) => {
         setError("");
-        const next = String(formData.get("merchant") ?? "").trim();
+        const next = String(formData.get("description") ?? "").trim();
         const previous = value;
         setValue(next);
         setEditing(false);
         startTransition(async () => {
           try {
-            await updateMerchant(formData);
+            await updateDescription(formData);
           } catch {
             setValue(previous);
             setEditing(true);
-            setError("Unable to rename. Please try again.");
+            setError("Unable to save the description. Please try again.");
           }
         });
       }}
     >
       <input name="id" type="hidden" value={id} />
       <input
-        aria-label="Expense name"
+        aria-label="Description"
         autoFocus
         className="field-input"
         defaultValue={value}
-        maxLength={200}
-        name="merchant"
-        placeholder="Expense name"
+        maxLength={2000}
+        name="description"
+        placeholder="Description"
         required
       />
       <Button variant="primary" compact disabled={!canWrite || pending} type="submit">

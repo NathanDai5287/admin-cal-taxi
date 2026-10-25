@@ -306,12 +306,12 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async (input) => write(supabase, "set_budget", input));
 
   server.registerTool("update_reimbursement", {
-    description: "Approve or deny a reimbursement, change its merchant or category, or mark it paid or unpaid.",
+    description: "Approve or deny a reimbursement, change its description, merchant, or category, or mark it paid or unpaid.",
     inputSchema: z.object({
       reimbursementId: z.uuid(), status: z.enum(["approved", "denied"]).optional(),
-      merchant: z.string().trim().min(1).max(200).optional(), category: z.enum(categoryValues).optional(),
+      merchant: z.string().trim().min(1).max(200).optional(), description: z.string().trim().min(1).max(2000).optional(), category: z.enum(categoryValues).optional(),
       paid: z.boolean().optional(), confirm: z.boolean().default(false),
-    }).refine(({ status, merchant, category, paid }) => status !== undefined || merchant !== undefined || category !== undefined || paid !== undefined)
+    }).refine(({ status, merchant, description, category, paid }) => status !== undefined || merchant !== undefined || description !== undefined || category !== undefined || paid !== undefined)
       .refine(({ status, paid, confirm }) => (status !== "denied" && paid !== false) || confirm),
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
   }, async ({ confirm, ...input }) => write(supabase, "update_reimbursement", input, { confirmed: confirm }));

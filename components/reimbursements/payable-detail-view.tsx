@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { RefreshWhile } from "@/components/navigation/refresh-while";
 import { EditableCategory } from "@/components/reimbursements/editable-category";
-import { EditableMerchant } from "@/components/reimbursements/editable-merchant";
+import { EditableDescription } from "@/components/reimbursements/editable-description";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
 import { formatReimbursementDate, type ReimbursementCategory } from "@/lib/reimbursements/format";
@@ -38,8 +38,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
               <div><dt>Tabscanner total</dt><dd className="amount">{detail.tabscannerTotal}</dd></div>
               <div><dt>Category</dt><dd><EditableCategory category={detail.category as ReimbursementCategory} id={detail.id} /></dd></div>
               <div><dt>Receipt date</dt><dd>{formatReimbursementDate(detail.receiptDate)}</dd></div>
-              <div className="detail-wide"><dt>Expense</dt><dd><EditableMerchant id={detail.id} merchant={detail.merchant} /></dd></div>
-              <div className="detail-wide"><dt>Description</dt><dd>{detail.description}</dd></div>
+              <div className="detail-wide"><dt>Description</dt><dd><EditableDescription id={detail.id} description={detail.description} /></dd></div>
               <div className="detail-wide"><dt>Zelle phone number or email</dt><dd>{detail.paymentMethod}</dd></div>
             </dl>
           </section>

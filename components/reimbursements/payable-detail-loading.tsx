@@ -42,7 +42,7 @@ export function PayableDetailLoading() {
               <div><dt>Tabscanner total</dt><dd className="amount"><span aria-hidden="true" className="loading-block block h-5 w-20" /></dd></div>
               <div><dt>Category</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span aria-hidden="true" className="loading-block block h-4 w-28" /><Button disabled variant="text" type="button">Change</Button></span></dd></div>
               <div><dt>Receipt date</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-24" /></dd></div>
-              <div className="detail-wide"><dt>Expense</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span aria-hidden="true" className="loading-block block h-4 w-44" /><Button disabled variant="text" type="button">Rename</Button></span></dd></div>
+              <div className="detail-wide"><dt>Description</dt><dd><span className="inline-flex items-center gap-2 flex-wrap"><span aria-hidden="true" className="loading-block block h-4 w-44" /><Button disabled variant="text" type="button">Edit</Button></span></dd></div>
               <div className="detail-wide"><dt>Description</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-56" /></dd></div>
               <div className="detail-wide"><dt>Zelle phone number or email</dt><dd><span aria-hidden="true" className="loading-block block h-4 w-48" /></dd></div>
             </dl>

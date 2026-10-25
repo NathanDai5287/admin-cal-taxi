@@ -38,7 +38,6 @@ for (const role of ["treasurer", "brother", "associate_member", "member"]) {
     form.set("merchant", "Supplies");
     form.set("category", "house");
     await assert.rejects(review.setReimbursementStatus(reimbursementId, "approved"), /Administrator access/);
-    await assert.rejects(review.updateMerchant(form), /Administrator access/);
     await assert.rejects(review.updateCategory(form), /Administrator access/);
     await assert.rejects(payments.setReimbursementPaid(reimbursementId, true), /Administrator access/);
     await assert.rejects(payments.markReimbursementsPaid([reimbursementId]), /Administrator access/);

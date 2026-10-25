@@ -27,7 +27,7 @@ async function loadPlanVsActual() {
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("kind, amount, source").gte("budget_date", termStart).lte("budget_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("chapter_receivables").select("amount_assessed, waived_at").gte("due_date", termStart).lte("due_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("chapter_dues_payment_events").select("amount").gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
-    loadAllPages((from, to) => supabase.from("reimbursements").select("id, category, amount, merchant, description, reimbursed_at, receipt_date, submitted_at").eq("status", "approved").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("id, category, amount, description, reimbursed_at, receipt_date, submitted_at").eq("status", "approved").order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("id, category, amount, description, expense_date").gte("expense_date", termStart).lte("expense_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_orders").select("planned_revenue, planned_fire_permit, status").gte("event_date", termStart).lte("event_date", termEnd).order("order_id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_payments").select("amount, kind").is("reversed_at", null).gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
@@ -58,7 +58,7 @@ async function loadPlanVsActual() {
     hostingPayments: (hostingPaymentsResult.data ?? []).map((row) => ({ amount: Number(row.amount), kind: row.kind })),
   });
   const items: SpendingItem[] = [
-    ...actualReimbursements.map((row) => ({ category: row.category, id: row.id, receipt: true, description: row.merchant || row.description, amount: Number(row.amount), date: row.receipt_date ?? row.submitted_at.slice(0, 10) })),
+    ...actualReimbursements.map((row) => ({ category: row.category, id: row.id, receipt: true, description: row.description, amount: Number(row.amount), date: row.receipt_date ?? row.submitted_at.slice(0, 10) })),
     ...directExpenses.map((row) => ({ category: row.category, id: row.id, receipt: false, description: row.description, amount: Number(row.amount), date: row.expense_date })),
   ].sort((left, right) => right.date.localeCompare(left.date));
 

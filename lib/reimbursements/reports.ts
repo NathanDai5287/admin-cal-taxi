@@ -200,7 +200,7 @@ export function summarizeApproved(rows: ReportPageRow[], manualExpenses: ManualE
     categoryItems[row.category].push({
       id: row.id,
       source: "receipt",
-      description: row.merchant || row.description,
+      description: row.description,
       amount: cents / 100,
       date,
     });

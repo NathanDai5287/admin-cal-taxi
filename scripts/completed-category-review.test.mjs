@@ -42,7 +42,7 @@ async function reviewActions() {
   const isolated = source
     .replace('import { revalidatePath } from "next/cache";', "const revalidatePath = () => {};")
     .replace('import { z } from "zod";', `import { z } from "${new URL("../node_modules/zod/index.js", import.meta.url)}";`)
-    .replace('import { requireAdmin } from "@/lib/reimbursements/auth";', "const requireAdmin = async () => ({ userId: 'admin' });")
+    .replace('import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";', "const requireAdmin = async () => ({ userId: 'admin' }); const requireAppAccess = requireAdmin;")
     .replace(/import \{ categorySchema, categoryValues, type ReimbursementCategory \} from [^;]+;/, 'const categoryValues = ["rush", "house"]; const categorySchema = z.enum(categoryValues);')
     .replace('import { createAdminClient } from "@/lib/reimbursements/supabase/admin";', databaseMock)
     .replace('import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";', "");

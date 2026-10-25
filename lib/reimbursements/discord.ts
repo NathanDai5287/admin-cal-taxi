@@ -155,9 +155,6 @@ export async function notifyDiscordOfReimbursement(reimbursementId: string) {
     { name: "Auto-check", value: reimbursement.status.replaceAll("_", " "), inline: true },
   ];
 
-  if (reimbursement.merchant) {
-    fields.splice(3, 0, { name: "Merchant", value: truncate(reimbursement.merchant, 1024), inline: true });
-  }
   if (reimbursement.receipt_total !== null) {
     fields.splice(4, 0, {
       name: "Receipt total",
