@@ -46,7 +46,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
           <section className="card">
             <div className="card-header"><span className="card-title">Review decision</span></div>
             <div className="review-actions border-t border-rule">
-              <p>{detail.reimbursed ? "This reimbursement has been paid. Correct the payment in Accounts before changing the decision." : "Review the details and receipt image before making a decision."}</p>
+              <p>{detail.reimbursed ? "This reimbursement has been paid. To change the decision, first mark it unpaid in the Paid column of the Reimbursements list." : "Review the details and receipt image before making a decision."}</p>
               <div className="status-actions">
                 <ReviewDecisionButtons disabled={detail.reimbursed || !processingComplete} />
               </div>
