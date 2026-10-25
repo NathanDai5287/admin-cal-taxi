@@ -3,7 +3,7 @@ import { createUntypedAdminClient } from "./reimbursements/supabase/admin";
 import { trackEmailBody } from "./email-tracking-links";
 
 export type EmailActivity = {
-  id: string; kind: string; related_id: string | null; recipient: string; subject: string; created_at: string; sent_at: string | null;
+  id: string; kind: string; related_id: string | null; recipient: string; subject: string; body_text: string | null; created_at: string; sent_at: string | null;
   events: { kind: "opened" | "clicked"; url: string | null; occurred_at: string }[];
 };
 type EmailBody = { html: string; text: string; subject: string };
@@ -28,7 +28,7 @@ export async function prepareTrackedEmail<T extends EmailBody>(body: T, message:
   if (!emailTrackingEnabled()) return { id: null, body };
   const db = trackingDb();
   trackingAddress("configuration-check");
-  const saved = await db.from("email_tracking_messages").upsert({ message_key: message.key, kind: message.kind, related_id: message.relatedId ?? null, recipient: message.recipient, subject: body.subject }, { onConflict: "message_key", ignoreDuplicates: true });
+  const saved = await db.from("email_tracking_messages").upsert({ message_key: message.key, kind: message.kind, related_id: message.relatedId ?? null, recipient: message.recipient, subject: body.subject, body_text: body.text }, { onConflict: "message_key", ignoreDuplicates: true });
   if (saved.error) throw new Error("Unable to prepare email tracking. No email was sent.");
   const result = await db.from("email_tracking_messages").select("id,token").eq("message_key", message.key).single();
   if (result.error) throw new Error("Unable to load email tracking. No email was sent.");
@@ -52,7 +52,7 @@ export async function recordEmailEvent(token: string, kind: "opened" | "clicked"
 
 export async function loadEmailActivity(relatedId?: string): Promise<EmailActivity[]> {
   if (!emailTrackingEnabled()) return [];
-  let query = trackingDb().from("email_tracking_messages").select("id,kind,related_id,recipient,subject,created_at,sent_at,events:email_tracking_events(kind,url,occurred_at)").not("provider_id", "is", null).order("created_at", { ascending: false }).limit(100);
+  let query = trackingDb().from("email_tracking_messages").select("id,kind,related_id,recipient,subject,body_text,created_at,sent_at,events:email_tracking_events(kind,url,occurred_at)").not("provider_id", "is", null).order("created_at", { ascending: false }).limit(100);
   if (relatedId) query = query.eq("related_id", relatedId);
   const result = await query;
   if (result.error) throw new Error("Unable to load email activity.");

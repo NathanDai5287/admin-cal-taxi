@@ -33,6 +33,12 @@ export function EmailRecord({ message }: { message: EmailActivity }) {
         </dl>
       </div>
       <details className="mt-3">
+        <summary className="w-fit cursor-pointer py-3 text-sm font-medium text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">View email</summary>
+        {message.body_text
+          ? <p className="mt-2 whitespace-pre-wrap break-words border-t border-rule pt-4 text-sm leading-relaxed text-ink">{message.body_text}</p>
+          : <p className="mt-2 text-sm text-muted">The text of this email was not saved. Only emails sent after Oct 25, 2026 keep their text.</p>}
+      </details>
+      <details>
         <summary className="w-fit cursor-pointer py-3 text-sm font-medium text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">View activity ({message.events.length})</summary>
         {message.events.length === 0 ? (
           <p className="mt-3 text-sm text-muted">No activity recorded yet.</p>
