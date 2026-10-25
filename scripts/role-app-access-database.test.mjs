@@ -55,7 +55,7 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   const member = await person(db, "member", "brother", ["rush_chair"]);
   const associate = await person(db, "none", "associate_member");
   await signIn(db, admin);
-  assert.equal((await db.query("select * from public.get_my_app_access()")).rows.length, 12);
+  assert.equal((await db.query("select * from public.get_my_app_access()")).rows.length, 11);
   await assert.rejects(grant(db, "admin", "users", "none"), /cannot change/);
   await grant(db, "brother", "mailing-list", "read");
   await grant(db, "rush_chair", "mailing-list", "write");
@@ -72,7 +72,7 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   assert.equal((await db.query("select * from storage.objects where bucket_id = 'nu-news'")).rows.length, 1);
   await assert.rejects(db.query("insert into storage.objects(bucket_id, name) values ('nu-news', 'blocked.jpg')"), /row-level security/);
   assert.equal((await db.query("update profiles set full_name = 'Blocked' where id = $1 returning id", [member])).rows.length, 0);
-  await assert.rejects(grant(db, "brother", "roles", "write"), /Write access/);
+  await assert.rejects(grant(db, "brother", "users", "write"), /Write access/);
   await assert.rejects(db.query("update profiles set role = 'admin' where id = $1", [member]), /permission denied/);
   await assert.rejects(db.query("select public.record_dues_payment($1, 10, current_date, gen_random_uuid())", [randomUUID()]), /Only admins|admin|access/i);
   assert.equal((await db.query("select * from mailing_list_contacts")).rows.length, 1);
