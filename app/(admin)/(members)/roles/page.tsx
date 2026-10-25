@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Roles · Members" };
 export const dynamic = "force-dynamic";
 
 export default async function RolesPage() {
-  const session = await requireAppAccess("roles");
+  const session = await requireAppAccess("users");
   const supabase = await createClient();
   const { data, error } = await supabase.from("role_app_access").select("role_key, app_key, access_level");
   if (error) throw new Error("Unable to load role access. Please refresh and try again.");
@@ -23,9 +23,9 @@ export default async function RolesPage() {
       <div className="roles-guidance">
         <p className="roles-legend"><span><strong data-access="none">None</strong> adds no access.</span><span><strong data-access="read">Read</strong> allows viewing.</span><span><strong data-access="write">Write</strong> allows viewing and changes.</span></p>
       </div>
-      {session.appAccess.roles !== "write" && <p className="roles-read-notice">You have read access. You cannot change these settings.</p>}
+      {session.appAccess.users !== "write" && <p className="roles-read-notice">You have read access. You cannot change these settings.</p>}
       <section className="card min-w-0" aria-label="Role permissions">
-        <AccessMatrix permissions={data as RoleAppAccess[]} canWrite={session.appAccess.roles === "write"} />
+        <AccessMatrix permissions={data as RoleAppAccess[]} canWrite={session.appAccess.users === "write"} />
       </section>
     </div>
   );

@@ -46,7 +46,7 @@ const ADMIN_APPS = [
     label: "Mailing List",
     description: "Contact records, quick entry, and CSV or spreadsheet imports",
   },
-  { href: "/users", label: "Members", description: "Invite people, assign roles, and set what each role can access", apps: ["users", "roles"] as AppKey[] },
+  { href: "/users", label: "Members", description: "Invite people, assign roles, and set what each role can access" },
   { href: "/submit", label: "Reimbursements", description: "Submit chapter expenses and review your requests" },
   {
     href: "/connections",
@@ -83,8 +83,7 @@ export default async function Home({
   }
 
   const accessibleApps = ADMIN_APPS
-    .filter((app) => (("apps" in app && app.apps) || [app.href.slice(1) as AppKey]).some((key) => hasAppAccess(session, key)))
-    .map((app) => app.href === "/users" && !hasAppAccess(session, "users") ? { ...app, href: "/roles" } : app);
+    .filter((app) => hasAppAccess(session, app.href.slice(1) as AppKey));
 
   if (!accessibleApps.length) {
     return (

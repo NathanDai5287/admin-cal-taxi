@@ -11,7 +11,7 @@ export default async function MembersLayout({ children }: { children: React.Reac
     redirect("/");
   }
 
-  if (!hasAppAccess(session, "users") && !hasAppAccess(session, "roles")) {
+  if (!hasAppAccess(session, "users")) {
     return (
       <div data-brand className="min-h-screen">
         <AccessDenied showSubmitLink={session.profile.role === "member"} />
@@ -26,8 +26,8 @@ export default async function MembersLayout({ children }: { children: React.Reac
         title="Theta Xi"
         subtitle="Members"
         tabs={[
-          ...(hasAppAccess(session, "users") ? [{ href: "/users", label: "People" }] : []),
-          ...(hasAppAccess(session, "roles") ? [{ href: "/roles", label: "Roles" }] : []),
+          { href: "/users", label: "People" },
+          { href: "/roles", label: "Roles" },
         ]}
       />
       <main className="max-w-[1440px] mx-auto px-4 py-6 sm:px-6 sm:py-8">{children}</main>

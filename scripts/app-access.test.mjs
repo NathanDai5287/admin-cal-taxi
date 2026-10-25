@@ -55,8 +55,8 @@ test("permission lookup errors fail closed", async () => {
 
 test("signed-out users cannot read or write", async () => {
   setup({ signedIn: false });
-  await assert.rejects(requireAppAccess("roles"), /Redirect: \//);
-  assert.equal(hasAppAccess(null, "roles"), false);
+  await assert.rejects(requireAppAccess("users"), /Redirect: \//);
+  assert.equal(hasAppAccess(null, "users"), false);
 });
 
 

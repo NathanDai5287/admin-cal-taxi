@@ -9,8 +9,7 @@ export const APP_OPTIONS = [
   { key: "ask-policy", label: "Ask Policy", href: "/ask-policy" },
   { key: "nu-news", label: "Nu News", href: "/nu-news" },
   { key: "mailing-list", label: "Mailing List", href: "/mailing-list" },
-  { key: "users", label: "Members: people", href: "/users" },
-  { key: "roles", label: "Members: roles", href: "/roles" },
+  { key: "users", label: "Members", href: "/users" },
   { key: "connections", label: "Connected AI clients", href: "/connections" },
   { key: "policy", label: "Policy assistant", href: "/policy" },
 ] as const;

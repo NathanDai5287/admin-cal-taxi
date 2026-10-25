@@ -4,10 +4,10 @@ import "./people.css";
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm } from "@/app/(admin)/(members)/users/actions";
+import { removeUser } from "@/app/(admin)/(members)/users/actions";
 import { Button } from "@/components/brand/button";
 import { PersonEditor } from "@/app/(admin)/(members)/users/person-editor";
-import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
+import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 import { userLabel } from "@/lib/reimbursements/user-label";
 
 export type MemberRow = {
@@ -31,75 +31,15 @@ export type AcademicYearOption = {
   terms: Array<{ id: string; label: string }>;
 };
 
-type OptimisticUpdate =
-  | { type: "role"; userId: string; role: MemberRow["role"] }
-  | { type: "discord"; userId: string; discordUserId: string }
-  | { type: "academicTerm"; userId: string; memberSinceTermId: string }
-  | { type: "remove"; userId: string };
-
-function applyUpdate(members: MemberRow[], update: OptimisticUpdate): MemberRow[] {
-  if (update.type === "remove") {
-    return members.filter((member) => member.id !== update.userId);
-  }
-  if (update.type === "discord") {
-    return members.map((member) =>
-      member.id === update.userId ? { ...member, discordUserId: update.discordUserId } : member,
-    );
-  }
-  if (update.type === "academicTerm") {
-    return members.map((member) =>
-      member.id === update.userId ? { ...member, memberSinceTermId: update.memberSinceTermId } : member,
-    );
-  }
-  return members.map((member) =>
-    member.id === update.userId ? { ...member, role: update.role } : member,
-  );
-}
-
-function DiscordMemberId({
-  member,
-  disabled,
-  onSave,
-}: {
-  member: MemberRow;
-  disabled: boolean;
-  onSave: (discordUserId: string) => void;
-}) {
-  const [discordUserId, setDiscordUserId] = useState(member.discordUserId);
-  const normalizedId = discordUserId.trim().match(/^<@!?(\d{15,22})>$/)?.[1] ?? discordUserId.trim();
-  const valid = !normalizedId || /^\d{15,22}$/.test(normalizedId);
-
+function RoleBadges({ member }: { member: MemberRow }) {
+  const membership = MEMBERSHIP_OPTIONS.find(({ value }) => value === member.membership)?.label;
+  const offices = member.executiveRoles.map((office) => EXECUTIVE_ROLE_OPTIONS.find(({ value }) => value === office)?.label);
   return (
-    <form
-      className="flex min-w-56 items-center gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setDiscordUserId(normalizedId);
-        onSave(normalizedId);
-      }}
-    >
-      <input
-        aria-label={`Discord ID for ${userLabel(member.fullName, member.email)}`}
-        className="field-input min-w-0"
-        disabled={disabled}
-        inputMode="numeric"
-        maxLength={25}
-        onChange={(event) => setDiscordUserId(event.target.value)}
-        pattern="(?:[0-9]{15,22}|<@!?[0-9]{15,22}>)"
-        placeholder="Optional ID or mention"
-        title="Enter a 15–22 digit Discord user ID or paste a Discord mention"
-        value={discordUserId}
-      />
-      <Button
-        className="shrink-0"
-        compact
-        disabled={disabled || !valid || normalizedId === member.discordUserId}
-        type="submit"
-        variant="secondary"
-      >
-        Save
-      </Button>
-    </form>
+    <span className="people-roles">
+      {member.role === "admin" && <span className="badge badge-verified">Administrator</span>}
+      {membership ? <span className="badge">{membership}</span> : <span className="text-muted">Not classified</span>}
+      {offices.map((office) => <span key={office} className="badge badge-approved">{office}</span>)}
+    </span>
   );
 }
 
@@ -154,7 +94,7 @@ function RemoveButton({ disabled, onRemove }: { disabled?: boolean; onRemove: ()
     <button
       aria-label={armed ? "Click again to confirm removal" : "Remove user"}
       className={
-        "inline-flex h-11 w-11 items-center justify-center border transition-colors duration-150 cursor-pointer " +
+        "inline-flex h-9 w-9 items-center justify-center border transition-colors duration-150 cursor-pointer " +
         (armed
           ? "bg-danger border-danger text-white text-xs font-bold"
           : "bg-surface border-rule text-muted hover:text-warn hover:border-warn") +
@@ -193,77 +133,16 @@ export function MembersTable({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const editingMember = members.find((member) => member.id === editingId);
-  const [optimisticMembers, applyOptimistic] = useOptimistic(members, applyUpdate);
-  const [pending, startTransition] = useTransition();
-  const [errors, setErrors] = useState<Map<string, string>>(() => new Map());
-  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
-
-  function setMemberPending(userId: string, value: boolean) {
-    setPendingIds((current) => {
-      const next = new Set(current);
-      if (value) next.add(userId);
-      else next.delete(userId);
-      return next;
-    });
-  }
-
-  function changeRole(userId: string, role: "member" | "admin") {
-    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
-    setMemberPending(userId, true);
-    startTransition(async () => {
-      applyOptimistic({ type: "role", userId, role });
-      try {
-        await setUserRole(userId, role);
-      } catch {
-        setErrors((current) => new Map(current).set(userId, "Unable to update that role. Please try again."));
-      } finally {
-        setMemberPending(userId, false);
-      }
-    });
-  }
-
-  function changeDiscordUserId(userId: string, discordUserId: string) {
-    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
-    setMemberPending(userId, true);
-    startTransition(async () => {
-      applyOptimistic({ type: "discord", userId, discordUserId });
-      try {
-        await updateDiscordUserId(userId, discordUserId);
-      } catch {
-        setErrors((current) => new Map(current).set(userId, "Unable to update that Discord ID. Please try again."));
-      } finally {
-        setMemberPending(userId, false);
-      }
-    });
-  }
-
-  function changeAcademicTerm(userId: string, memberSinceTermId: string) {
-    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
-    setMemberPending(userId, true);
-    startTransition(async () => {
-      applyOptimistic({ type: "academicTerm", userId, memberSinceTermId });
-      try {
-        await updateMemberAcademicTerm(userId, memberSinceTermId);
-      } catch {
-        setErrors((current) => new Map(current).set(userId, "Unable to update that academic term. Please try again."));
-      } finally {
-        setMemberPending(userId, false);
-      }
-    });
-  }
+  const [optimisticMembers, removeOptimistic] = useOptimistic(members, (current, userId: string) => current.filter((member) => member.id !== userId));
+  const [, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const termLabels = new Map(academicYears.flatMap((year) => year.terms.map((term) => [term.id, term.label])));
 
   function remove(userId: string) {
-    setErrors((current) => { const next = new Map(current); next.delete(userId); return next; });
-    setMemberPending(userId, true);
+    setError("");
     startTransition(async () => {
-      applyOptimistic({ type: "remove", userId });
-      try {
-        await removeUser(userId);
-      } catch {
-        setErrors((current) => new Map(current).set(userId, "Unable to remove that user. Please try again."));
-      } finally {
-        setMemberPending(userId, false);
-      }
+      removeOptimistic(userId);
+      await removeUser(userId).catch(() => setError("Unable to remove that person. Please try again."));
     });
   }
 
@@ -273,87 +152,35 @@ export function MembersTable({
 
   return (
     <>
-      {editingMember && <PersonEditor key={editingMember.id} member={editingMember} onClose={() => setEditingId(null)} />}
-      <div className="table-scroll people-table-scroll" role="region" aria-label="Users and roles" tabIndex={0}>
-      <table className={"data-table people-table" + (pending ? " opacity-80" : "")}>
+      {editingMember && <PersonEditor key={editingMember.id} member={editingMember} academicYears={academicYears} canChangeAccount={canAssignAdmin && editingMember.id !== currentUserId} onClose={() => setEditingId(null)} />}
+      {error ? <p className="form-message px-6 pb-3" role="alert">{error}</p> : null}
+      <div className="table-scroll people-table-scroll" role="region" aria-label="People and roles" tabIndex={0}>
+      <table className="data-table people-table">
         <thead>
           <tr>
             <th>Name</th>
-            <th>Membership</th>
-            <th>Executive positions</th>
-            <th>Discord ID</th>
+            <th>Roles</th>
             <th>Member since</th>
-            <th>Account role</th>
+            <th>Discord</th>
             <th><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           {optimisticMembers.map((member) => {
             const isYou = member.id === currentUserId;
-            const memberPending = pendingIds.has(member.id);
             return (
               <tr key={member.id}>
                 <td className="people-identity">
-                  <button type="button" disabled={!canWrite} className="people-name" onClick={() => setEditingId(member.id)}>
-                    {userLabel(member.fullName, member.email)}
-                  </button>
-                  {isYou ? <span className="text-muted"> (you)</span> : null}
-                  <span className="people-contact">{member.contactEmail || member.email}</span>
-                  {member.phone && <span className="people-contact">{member.phone}</span>}
-                  <span className={member.hasSignedIn ? "people-status text-ok" : "people-status text-caution"}>{member.statusLabel}</span>
+                  <span className="people-name">{userLabel(member.fullName, member.email)}{isYou ? <span className="font-normal text-muted"> (you)</span> : null}</span>
+                  <span className="people-contact">{member.contactEmail || member.email}{member.phone ? ` · ${member.phone}` : ""}</span>
+                  {!member.hasSignedIn && <span className="people-status text-caution">{member.statusLabel}</span>}
                 </td>
-                <td data-label="Membership" className="whitespace-nowrap">{member.membership === "brother" ? "Brother" : member.membership === "associate_member" ? "Associate member" : "Not classified"}</td>
-                <td data-label="Executive positions">
-                  {member.executiveRoles.length > 0 && <span className="block text-xs text-muted">Executive member</span>}
-                  {member.executiveRoles.map((office) => EXECUTIVE_ROLE_OPTIONS.find((option) => option.value === office)?.label).join(", ") || "None"}
-                </td>
-                <td data-label="Discord ID">
-                  <DiscordMemberId
-                    disabled={!canWrite || memberPending}
-                    member={member}
-                    onSave={(discordUserId) => changeDiscordUserId(member.id, discordUserId)}
-                  />
-                </td>
-                <td data-label="Member since">
-                  <select
-                    aria-label={`Academic term for ${userLabel(member.fullName, member.email)}`}
-                    className="field-input min-w-40"
-                    disabled={!canWrite || memberPending || !academicYears.length}
-                    onChange={(event) => changeAcademicTerm(member.id, event.target.value)}
-                    value={member.memberSinceTermId}
-                  >
-                    <option value="">Not set</option>
-                    {academicYears.map((year) => (
-                      <optgroup key={year.id} label={year.label}>
-                        {year.terms.map((term) => <option key={term.id} value={term.id}>{term.label}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                </td>
-                <td data-label="Account role">
-                  <select
-                    aria-label={`Account role for ${userLabel(member.fullName, member.email)}`}
-                    className="field-input"
-                    disabled={!canWrite || !canAssignAdmin || isYou || memberPending}
-                    onChange={(event) => changeRole(member.id, event.target.value as "member" | "admin")}
-                    title={isYou ? "You can't change your own role" : undefined}
-                    value={member.role}
-                  >
-                    {/* 'none' is not a selectable option — removing access is
-                        done with the remove button. Shown only so members who
-                        currently have no access display accurately. */}
-                    {member.role === "none" ? (
-                      <option disabled hidden value="none">
-                        No access
-                      </option>
-                    ) : null}
-                    <option value="member">Base member</option>
-                    <option value="admin">Administrator</option>
-                  </select>
-                </td>
-                <td data-label="Remove user">
-                  <RemoveButton disabled={!canWrite || isYou || memberPending} onRemove={() => remove(member.id)} />
-                  {errors.get(member.id) ? <span className="form-message ml-2" role="alert">{errors.get(member.id)}</span> : null}
+                <td data-label="Roles"><RoleBadges member={member} /></td>
+                <td data-label="Member since" className="whitespace-nowrap">{termLabels.get(member.memberSinceTermId) ?? <span className="text-muted">Not set</span>}</td>
+                <td data-label="Discord" className="whitespace-nowrap" title={member.discordUserId || undefined}>{member.discordUserId ? "Linked" : <span className="text-muted">Not linked</span>}</td>
+                <td className="people-actions">
+                  {canWrite && <Button compact variant="secondary" onClick={() => setEditingId(member.id)} aria-label={`Edit ${userLabel(member.fullName, member.email)}`}>Edit</Button>}
+                  {canWrite && <RemoveButton disabled={isYou} onRemove={() => remove(member.id)} />}
                 </td>
               </tr>
             );

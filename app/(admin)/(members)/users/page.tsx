@@ -51,7 +51,7 @@ export default async function UsersPage() {
 
   return (
     <div className="grid min-w-0 gap-6">
-      <h1 className="page-title">Users</h1>
+      <h1 className="page-title">People</h1>
 
       {canWrite && <section className="card" aria-labelledby="invite-user-title">
         <div className="card-header">
@@ -85,7 +85,7 @@ export default async function UsersPage() {
             </select>
           </div>
           <div className="field">
-            <label className="field-label" htmlFor="role">Account role</label>
+            <label className="field-label" htmlFor="role">Account</label>
             <select className="field-input" defaultValue="member" id="role" name="role">
               <option value="member">Base member</option>
               {session.profile.role === "admin" && <option value="admin">Administrator</option>}
@@ -94,22 +94,20 @@ export default async function UsersPage() {
           <Button variant="primary" type="submit">Invite</Button>
         </form>
         <p className="helper-text px-6 pb-5">
-          Separate multiple email addresses with commas. Each person appears as a
-          member immediately, so you can assign dues before their first Google sign-in.
-          When email delivery is configured, they also receive sign-in instructions.
+          Separate email addresses with commas. New people show in the list at once, so you can set their roles before they sign in.
         </p>
       </section>}
 
       <section className="card min-w-0" aria-labelledby="members-title">
         <div className="card-header">
-          <h2 className="card-title" id="members-title">Users <span className="ml-2 text-muted tabular-nums">{profiles.length}</span></h2>
+          <h2 className="card-title" id="members-title">People <span className="ml-2 text-muted tabular-nums">{profiles.length}</span></h2>
         </div>
-        {!canWrite && <p className="helper-text px-6 pb-4">You have read access. You cannot change users or their roles.</p>}
+        {!canWrite && <p className="helper-text px-6 pb-4">You have read access. You cannot change people or their roles.</p>}
         <MembersTable
           canWrite={canWrite}
           canAssignAdmin={session.profile.role === "admin"}
           academicYears={academicYears}
-          currentUserId={session?.userId ?? ""}
+          currentUserId={session.userId}
           members={profiles.map((profile) => ({
             id: profile.id,
             fullName: profile.full_name,
@@ -122,14 +120,9 @@ export default async function UsersPage() {
             memberSinceTermId: profile.member_since_term_id ?? "",
             role: profile.role,
             hasSignedIn: profile.has_signed_in,
-            statusLabel: profile.has_signed_in ? "Signed in" : `Invited ${formatDate(profile.created_at)}`,
+            statusLabel: `Invited ${formatDate(profile.created_at)}`,
           }))}
         />
-        <p className="helper-text px-6 pb-5">
-          Select a name to edit contact details and positions.
-          Academic terms come from the shared calendar used by Accreditation and Finance.
-          Removing someone revokes their invitation or access while preserving their history.
-        </p>
       </section>
     </div>
   );

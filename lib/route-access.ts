@@ -39,7 +39,7 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   "/mailing-list": ["mailing-list"],
   "/nu-news": ["nu-news"],
   "/policy": ["policy"],
-  "/roles": ["roles"],
+  "/roles": ["users"],
   "/rush": ["rush"],
   "/submit": ["submit"],
   "/users": ["users"],

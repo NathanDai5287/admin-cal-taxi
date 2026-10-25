@@ -4,8 +4,8 @@
 }
 
 [data-brand] .people-table td {
-  vertical-align: top;
-  padding-block: 20px;
+  vertical-align: middle;
+  padding-block: 12px;
 }
 
 [data-brand] .people-table tbody tr:hover {
@@ -14,29 +14,38 @@
 
 [data-brand] .people-identity {
   min-width: 220px;
-  max-width: 300px;
+  max-width: 320px;
 }
 
 [data-brand] .people-name {
-  min-height: 32px;
-  color: var(--color-brand);
+  display: block;
+  color: var(--color-ink);
   font-weight: 600;
-  text-align: left;
-  cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-[data-brand] .people-name:hover:not(:disabled) {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+[data-brand] .people-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 180px;
 }
 
-[data-brand] .people-name:disabled {
-  color: var(--color-ink);
-  cursor: default;
+[data-brand] .people-actions {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
 }
 
-[data-brand] .people-name:focus-visible,
+[data-brand] .people-actions > * + * {
+  margin-left: 8px;
+}
+
+[data-brand] .people-actions .brand-button {
+  height: 36px;
+  vertical-align: middle;
+}
+
 [data-brand] .people-table button:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
@@ -51,20 +60,72 @@
 
 [data-brand] .people-status {
   display: block;
-  margin-top: 8px;
+  margin-top: 2px;
   font-size: 12px;
 }
 
-[data-brand] .people-table .field-input {
-  min-height: 44px;
+[data-brand] .person-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.25);
 }
 
-[data-brand] .person-editor {
+[data-brand] .person-dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+[data-brand] .person-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+[data-brand] .person-dialog-header button {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+[data-brand] .person-dialog-header button:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+[data-brand] .person-dialog-section {
   display: grid;
-  gap: 24px;
-  padding: 24px;
-  border-block: 1px solid var(--color-rule);
-  background: var(--color-canvas);
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+[data-brand] .person-dialog-heading {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+[data-brand] .person-dialog-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 20px;
 }
 
 [data-brand] .person-office {
@@ -143,7 +204,15 @@
     display: none;
   }
 
-  [data-brand] .person-editor {
-    padding: 20px 16px;
+  [data-brand] .people-table .people-actions {
+    width: 100%;
+    padding-top: 12px;
+    text-align: left;
+  }
+
+  [data-brand] .person-dialog-header,
+  [data-brand] .person-dialog-section,
+  [data-brand] .person-dialog-footer {
+    padding-inline: 16px;
   }
 }

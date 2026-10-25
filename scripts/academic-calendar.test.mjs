@@ -23,12 +23,12 @@ test("one academic calendar connects accreditation, finance, and members", async
 
 test("members can set or clear a join term and invitations can assign one", async () => {
   const [table, actions, migration] = await Promise.all([
-    readFile(new URL("../app/(admin)/(members)/users/members-table.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/(members)/users/person-editor.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/(members)/users/actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20261001000000_sitewide_academic_calendar.sql", import.meta.url), "utf8"),
   ]);
 
-  assert.match(table, /<th>Member since<\/th>/);
+  assert.match(table, /name="memberSinceTermId"/);
   assert.match(table, /<option value="">Not set<\/option>/);
   assert.match(actions, /invite_member_since_term_id: memberSinceTermId/);
   assert.match(migration, /set member_since_term_id = new_academic_term_id/);
