@@ -5,7 +5,7 @@ import { build } from "esbuild";
 const mocks = {
   "next/cache": "export const revalidatePath = () => {};",
   "next/server": "export const after = () => {};",
-  "@/lib/reimbursements/send-decision-email": "export const sendDecisionEmail = () => {};",
+  "@/lib/reimbursements/send-reimbursement-email": "export const sendDecisionEmail = () => {}; export const sendPaidEmail = () => {};",
   "@/lib/reimbursements/auth": `
     export const requireAppAccess = async () => ({ userId: 'treasurer' });
     export async function requireAdmin() {

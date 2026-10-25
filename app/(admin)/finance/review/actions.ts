@@ -7,7 +7,7 @@ import { z } from "zod";
 import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";
 import { categorySchema, categoryValues, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
-import { sendDecisionEmail } from "@/lib/reimbursements/send-decision-email";
+import { sendDecisionEmail } from "@/lib/reimbursements/send-reimbursement-email";
 import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";
 
 export type ReviewDecision = { status: "approved" | "denied"; note: string; amount?: number };

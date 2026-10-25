@@ -1,8 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { sendPaidEmail } from "@/lib/reimbursements/send-reimbursement-email";
 
 export type ReimbursedMutationResult =
   | { ok: true; row: { id: string; reimbursed: boolean; updated_at: string } }
@@ -42,6 +44,7 @@ export async function setReimbursementPaid(
     return { ok: false, message: "Only approved reimbursements can have payments recorded." };
   }
 
+  if (data.reimbursed) after(() => sendPaidEmail(data.id));
   revalidatePath("/finance", "layout");
   revalidatePath(`/finance/review/${parsed.data.id}`);
   revalidatePath("/finance/reports");
@@ -85,6 +88,7 @@ export async function markReimbursementsPaid(
   const updatedIds = updatedRows.map((row) => row.id);
   const updatedIdSet = new Set(updatedIds);
   const skippedIds = ids.filter((id) => !updatedIdSet.has(id));
+  after(() => Promise.all(updatedIds.map(sendPaidEmail)));
 
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/reports");
