@@ -446,12 +446,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         </div>
       </div>
       <div className="table-scroll border-t border-rule">
-        <table className="data-table">
+        <table className="data-table payable-table">
+          <colgroup><col className="payable-col-pay" /><col className="payable-col-member" /><col /><col className="payable-col-amount" /><col className="payable-col-status" /><col className="payable-col-paid" /></colgroup>
           <thead>
             <tr>
               <th>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span>Pay</span>
+                <label className="payable-select-all">
+                  <span className="sr-only">Pay</span>
                   <input
                     aria-label="Select all approved unpaid reimbursements"
                     checked={allEligibleSelected}
@@ -463,7 +464,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   />
                 </label>
               </th>
-              <th>Member</th><th>Description</th><th>Amount</th><th>Status</th><th>Paid</th>
+              <th>Member</th><th>Description</th><th className="text-right">Amount</th><th>Status</th><th className="text-center">Paid</th>
             </tr>
           </thead>
           <tbody ref={tableBodyRef}>
@@ -483,19 +484,16 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   onMouseLeave={hidePreview}
                 >
                   <td>
-                    <label className="inline-action checkbox-cell">
+                    {eligible ? <label className="inline-action checkbox-cell">
                     <input
-                      aria-label={eligible
-                        ? `Select reimbursement from ${item.full_name} for ${formatMoney(item.amount)}`
-                        : `Reimbursement from ${item.full_name} is not eligible for payment`}
+                      aria-label={`Select reimbursement from ${item.full_name} for ${formatMoney(item.amount)}`}
                       checked={selectedKeys.has(selectionKey(item))}
                       className="checkbox-brand"
-                      disabled={!canWrite || !eligible}
+                      disabled={!canWrite}
                       onChange={(event) => toggleRow(item, event.currentTarget.checked)}
-                      title={eligible ? undefined : "Only approved, unpaid reimbursements can be selected"}
                       type="checkbox"
                     />
-                    </label>
+                    </label> : null}
                   </td>
                   <td>
                     <Link
@@ -506,10 +504,10 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     >
                       {item.full_name}
                     </Link>
-                    <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString()}</div>
+                    <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
                   </td>
-                  <td>{item.description}</td>
-                  <td className="amount">
+                  <td><span className="payable-description" title={item.description}>{item.description}</span></td>
+                  <td className="amount text-right">
                     <span className="amount-check">
                       {formatMoney(item.amount)}
                       <span
@@ -534,14 +532,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     </div>
                   </td>
                   <td>
-                    <div className="inline-action">
+                    {item.status !== "approved" ? <span className="payable-paid-empty" aria-label="Not payable">—</span> : <div className="inline-action payable-paid-cell">
                       <ReimbursedCheckbox
                         disabled={!canWrite || item.status !== "approved" || pendingFields.has(`${item.id}:reimbursed`)}
                         onChange={(reimbursed) => void changeReimbursed(item, reimbursed)}
                         reimbursed={item.reimbursed}
-                        title={item.status === "approved" ? undefined : "Only approved reimbursements can be marked paid"}
                       />
-                    </div>
+                    </div>}
                   </td>
                 </tr>
               );

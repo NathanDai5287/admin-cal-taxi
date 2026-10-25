@@ -874,6 +874,23 @@
     @apply flex items-center px-4 py-3 min-h-full cursor-pointer;
   }
 
+  /* ── Reimbursements table ── */
+  [data-brand] .payable-table { @apply table-fixed; }
+  [data-brand] .payable-table .payable-col-pay { width: 48px; }
+  [data-brand] .payable-table .payable-col-member { width: 200px; }
+  [data-brand] .payable-table .payable-col-amount { width: 128px; }
+  [data-brand] .payable-table .payable-col-status { width: 168px; }
+  [data-brand] .payable-table .payable-col-paid { width: 64px; }
+  [data-brand] .payable-table td { @apply py-2.5; }
+  [data-brand] .payable-table th:first-child,
+  [data-brand] .payable-table td:first-child > label.inline-action { @apply pl-4 pr-0; }
+  [data-brand] .payable-select-all { @apply flex cursor-pointer items-center; }
+  [data-brand] .payable-table .submission-link { @apply block truncate; }
+  [data-brand] .payable-description { @apply line-clamp-2 text-ink; }
+  [data-brand] .payable-table td > div.inline-action { @apply flex items-center px-4 py-2.5; }
+  [data-brand] .payable-table td > div.payable-paid-cell { @apply mx-auto w-full justify-center; }
+  [data-brand] .payable-paid-empty { @apply block text-center text-muted; }
+
   /* ── Inline status select / checkboxes ── */
   [data-brand] .inline-status-select {
     @apply w-auto border font-bold uppercase cursor-pointer outline-none
