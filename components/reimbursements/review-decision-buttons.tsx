@@ -4,66 +4,71 @@ import { useAppWriteAccess } from "@/components/auth/app-access-boundary";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
+import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
+import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
 import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
 import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/format";
 
 type ReviewStatusState = {
-  change: (status: "approved" | "denied", denialReason?: string) => Promise<boolean>;
-  denialReason: string;
+  amount: number;
+  change: (decision: ReviewDecision) => Promise<boolean>;
   error: string;
+  note: string;
   pending: boolean;
+  requestedAmount: number;
   status: ReimbursementStatus;
 };
 
 const ReviewStatusContext = createContext<ReviewStatusState | null>(null);
 
-export function ReviewStatusProvider({ children, initialDenialReason = "", reimbursementId, status: serverStatus }: {
+export function ReviewStatusProvider({ amount, children, initialNote = "", reimbursementId, requestedAmount, status: serverStatus }: {
+  amount: number;
   children: ReactNode;
-  initialDenialReason?: string;
+  initialNote?: string;
   reimbursementId: string;
+  requestedAmount: number;
   status: ReimbursementStatus;
 }) {
   const [status, setStatus] = useState(serverStatus);
-  const [denialReason, setDenialReason] = useState(initialDenialReason);
+  const [note, setNote] = useState(initialNote);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [completedCategory, setCompletedCategory] = useState<ReimbursementCategory | null>(null);
+  const [reopenTarget, setReopenTarget] = useState<{ category: ReimbursementCategory; decision: ReviewDecision } | null>(null);
   const mutationId = useRef(0);
 
   useEffect(() => {
     if (pending) return;
     const timer = window.setTimeout(() => {
       setStatus(serverStatus);
-      setDenialReason(initialDenialReason);
+      setNote(initialNote);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [pending, serverStatus, initialDenialReason]);
+  }, [pending, serverStatus, initialNote]);
 
-  async function change(next: "approved" | "denied", note = "", reopenCategory?: ReimbursementCategory) {
+  async function change(decision: ReviewDecision, reopenCategory?: ReimbursementCategory) {
     if (pending) return false;
     const previous = status;
-    const previousReason = denialReason;
+    const previousNote = note;
     const currentMutation = ++mutationId.current;
-    setStatus(next);
-    setDenialReason(next === "denied" ? note : "");
+    setStatus(decision.status);
+    setNote(decision.note);
     setPending(true);
     setError("");
     let reopenRequired = false;
     try {
-      const result = await setReimbursementStatus(reimbursementId, next, next === "denied" ? note : undefined, reopenCategory);
+      const result = await setReimbursementStatus(reimbursementId, decision, reopenCategory);
       if (!result.ok) {
         reopenRequired = Boolean(result.completedCategory && !reopenCategory);
-        if (result.completedCategory) setCompletedCategory(result.completedCategory);
+        if (result.completedCategory) setReopenTarget({ category: result.completedCategory, decision });
         throw new Error(result.message);
       }
       return true;
     } catch (reason) {
       if (mutationId.current === currentMutation) {
         setStatus(previous);
-        setDenialReason(previousReason);
+        setNote(previousNote);
         const message = reason instanceof Error ? reason.message : "Unable to save the review decision.";
         setError(reopenRequired ? "" : message);
       }
@@ -74,12 +79,12 @@ export function ReviewStatusProvider({ children, initialDenialReason = "", reimb
   }
 
   async function reopenAndApprove() {
-    if (completedCategory && await change("approved", "", completedCategory)) setCompletedCategory(null);
+    if (reopenTarget && await change(reopenTarget.decision, reopenTarget.category)) setReopenTarget(null);
   }
 
-  return <ReviewStatusContext.Provider value={{ change, denialReason, error, pending, status }}>
+  return <ReviewStatusContext.Provider value={{ amount, change, error, note, pending, requestedAmount, status }}>
     {children}
-    <ReopenApprovalDialog category={completedCategory} error={error} pending={pending} onCancel={() => setCompletedCategory(null)} onConfirm={reopenAndApprove} />
+    <ReopenApprovalDialog category={reopenTarget?.category ?? null} error={error} pending={pending} onCancel={() => setReopenTarget(null)} onConfirm={reopenAndApprove} />
   </ReviewStatusContext.Provider>;
 }
 
@@ -96,79 +101,31 @@ export function ReviewStatusBadge() {
 
 export function ReviewDecisionButtons({ compact = false, disabled = false }: { compact?: boolean; disabled?: boolean }) {
   const canWrite = useAppWriteAccess();
-  const { change, denialReason, error, pending, status } = useReviewStatus();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const [denyOpen, setDenyOpen] = useState(false);
-  const [note, setNote] = useState("");
+  const { amount, change, error, note, pending, requestedAmount, status } = useReviewStatus();
+  const [decision, setDecision] = useState<ReviewDecision["status"] | null>(null);
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (denyOpen && !dialog.open) dialog.showModal();
-    if (!denyOpen && dialog.open) dialog.close();
-  }, [denyOpen]);
-
-  function openDenyDialog() {
-    setNote(denialReason);
-    setDenyOpen(true);
-  }
-
-  async function confirmDenial() {
-    if (await change("denied", note.trim())) setDenyOpen(false);
+  function confirm(next: ReviewDecision) {
+    setDecision(null);
+    void change(next);
   }
 
   return <>
-    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "approved"} onClick={() => change("approved")} variant="primary">
+    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "approved"} onClick={() => setDecision("approved")} variant="primary">
       {status === "approved" ? "Approved" : compact ? "Approve" : "Approve submission"}
     </Button>
-    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "denied"} onClick={openDenyDialog} variant="danger">
+    <Button compact={compact} disabled={!canWrite || disabled || pending || status === "denied"} onClick={() => setDecision("denied")} variant="danger">
       {status === "denied" ? "Denied" : compact ? "Deny" : "Deny submission"}
     </Button>
-    {status === "denied" && denialReason && !compact
-      ? <p className="m-0 text-[13px] leading-relaxed text-muted"><span className="font-semibold text-ink">Denial reason:</span> {denialReason}</p>
+    {(status === "denied" || status === "approved") && note && !compact
+      ? <p className="m-0 text-[13px] leading-relaxed text-muted"><span className="font-semibold text-ink">{status === "denied" ? "Denial reason:" : "Message to the member:"}</span> {note}</p>
       : null}
-    {error && !denyOpen ? <p className="form-message" role="alert">{error}</p> : null}
-    <dialog
-      aria-labelledby="denial-note-heading"
-      className="payment-review-dialog"
-      onCancel={(event) => {
-        if (pending) event.preventDefault();
-        else setDenyOpen(false);
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) setDenyOpen(false);
-      }}
-      onClose={() => setDenyOpen(false)}
-      ref={dialogRef}
-    >
-      <div className="payment-review-heading">
-        <div>
-          <p className="page-eyebrow m-0">Review decision</p>
-          <h2 id="denial-note-heading">Deny submission</h2>
-        </div>
-        <button aria-label="Close denial dialog" className="payment-review-close" disabled={pending} onClick={() => setDenyOpen(false)} type="button">×</button>
-      </div>
-      <div className="grid gap-2 px-6 pt-4">
-        <label className="field-label" htmlFor="denial-note">Why is this being denied? (optional)</label>
-        <textarea
-          className="field-textarea"
-          disabled={pending}
-          id="denial-note"
-          maxLength={500}
-          onChange={(event) => setNote(event.currentTarget.value)}
-          placeholder="For example: the receipt is illegible, or the expense is not covered."
-          rows={3}
-          value={note}
-        />
-        <p className="field-hint">The member sees this note with their denied request.</p>
-      </div>
-      {error ? <p className="payment-dialog-error" role="alert">{error}</p> : null}
-      <div className="payment-review-actions">
-        <Button variant="secondary" disabled={pending} onClick={() => setDenyOpen(false)} type="button">Cancel</Button>
-        <Button variant="danger" disabled={pending} onClick={confirmDenial} type="button">
-          {pending ? "Denying…" : "Deny submission"}
-        </Button>
-      </div>
-    </dialog>
+    {error ? <p className="form-message" role="alert">{error}</p> : null}
+    {decision && <DecisionDialog
+      amount={amount}
+      onCancel={() => setDecision(null)}
+      onConfirm={confirm}
+      requestedAmount={requestedAmount}
+      status={decision}
+    />}
   </>;
 }

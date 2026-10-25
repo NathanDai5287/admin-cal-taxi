@@ -11,7 +11,8 @@ import {
   markReimbursementsPaid,
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
-import { setReimbursementStatus } from "@/app/(admin)/finance/review/actions";
+import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
+import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
 import { formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import {
@@ -28,6 +29,8 @@ export type PaymentTableRow = {
   category: string;
   description: string;
   denial_reason: string | null;
+  approval_note: string | null;
+  requested_amount: number | null;
   failure_reason: string | null;
   full_name: string;
   id: string;
@@ -63,10 +66,8 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const denialDialogRef = useRef<HTMLDialogElement>(null);
-  const [denialTarget, setDenialTarget] = useState<PaymentTableRow | null>(null);
-  const [approvalTarget, setApprovalTarget] = useState<{ row: PaymentTableRow; category: ReimbursementCategory } | null>(null);
-  const [denialNote, setDenialNote] = useState("");
+  const [decisionTarget, setDecisionTarget] = useState<{ row: PaymentTableRow; status: ReviewDecision["status"] } | null>(null);
+  const [approvalTarget, setApprovalTarget] = useState<{ row: PaymentTableRow; category: ReimbursementCategory; decision: ReviewDecision } | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [feedback, setFeedback] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -185,20 +186,18 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     });
   }
 
-  async function changeStatus(row: PaymentTableRow, status: ReimbursementStatus, denialReason?: string, reopenCategory?: ReimbursementCategory) {
+  async function changeStatus(row: PaymentTableRow, decision: ReviewDecision, reopenCategory?: ReimbursementCategory) {
     const key = `${row.id}:status`;
-    const previousStatus = row.status;
-    const previousDenialReason = row.denial_reason;
-    const nextDenialReason = status === "denied" ? denialReason?.trim() || null : null;
+    const previous = { status: row.status, amount: row.amount };
     setMutationError("");
-    patchRow(row.id, { status, denial_reason: nextDenialReason });
+    patchRow(row.id, { status: decision.status, amount: decision.amount ?? row.amount });
     setFieldPending(key, true);
 
     try {
-      const result = await setReimbursementStatus(row.id, status, denialReason, reopenCategory);
+      const result = await setReimbursementStatus(row.id, decision, reopenCategory);
       if (!result.ok) {
-        patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
-        if (result.completedCategory) setApprovalTarget({ row, category: result.completedCategory });
+        patchRow(row.id, previous);
+        if (result.completedCategory) setApprovalTarget({ row, category: result.completedCategory, decision });
         setMutationError(result.completedCategory && !reopenCategory ? "" : result.message);
         return false;
       }
@@ -207,7 +206,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       router.refresh();
       return true;
     } catch (error) {
-      patchRow(row.id, { status: previousStatus, denial_reason: previousDenialReason });
+      patchRow(row.id, previous);
       setMutationError(error instanceof Error ? error.message : "Unable to change the status.");
       return false;
     } finally {
@@ -217,7 +216,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
   async function reopenAndApprove() {
     if (!approvalTarget) return;
-    if (await changeStatus(approvalTarget.row, "approved", undefined, approvalTarget.category)) setApprovalTarget(null);
+    if (await changeStatus(approvalTarget.row, approvalTarget.decision, approvalTarget.category)) setApprovalTarget(null);
   }
 
   async function changeReimbursed(row: PaymentTableRow, reimbursed: boolean) {
@@ -331,26 +330,13 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   }
 
   function requestStatusChange(row: PaymentTableRow, status: ReimbursementStatus) {
-    if (status === "denied") {
-      setDenialNote("");
-      setDenialTarget(row);
-      denialDialogRef.current?.showModal();
-      return;
-    }
-    void changeStatus(row, status);
+    if (status === "approved" || status === "denied") setDecisionTarget({ row, status });
   }
 
-  function closeDenialDialog() {
-    denialDialogRef.current?.close();
-    setDenialTarget(null);
-  }
-
-  async function confirmDenial() {
-    const row = denialTarget;
-    if (!row) return;
-    denialDialogRef.current?.close();
-    setDenialTarget(null);
-    await changeStatus(row, "denied", denialNote.trim());
+  function confirmDecision(decision: ReviewDecision) {
+    if (!decisionTarget) return;
+    setDecisionTarget(null);
+    void changeStatus(decisionTarget.row, decision);
   }
 
   function closeReviewDialog() {
@@ -607,40 +593,14 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         </div>
       </dialog>
 
-      <dialog
-        aria-labelledby="denial-note-heading"
-        className="payment-review-dialog"
-        onCancel={closeDenialDialog}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) closeDenialDialog();
-        }}
-        ref={denialDialogRef}
-      >
-        <div className="payment-review-heading">
-          <div>
-            <p className="page-eyebrow m-0">Review decision</p>
-            <h2 id="denial-note-heading">Deny {denialTarget ? `${denialTarget.full_name}’s` : "submission"} request</h2>
-          </div>
-          <button aria-label="Close denial dialog" className="payment-review-close" onClick={closeDenialDialog} type="button">×</button>
-        </div>
-        <div className="grid gap-2 px-6 pt-4">
-          <label className="field-label" htmlFor="payment-table-denial-note">Why is this being denied? (optional)</label>
-          <textarea
-            className="field-textarea"
-            id="payment-table-denial-note"
-            maxLength={500}
-            onChange={(event) => setDenialNote(event.currentTarget.value)}
-            placeholder="For example: the receipt is illegible, or the expense is not covered."
-            rows={3}
-            value={denialNote}
-          />
-          <p className="field-hint">The member sees this note with their denied request.</p>
-        </div>
-        <div className="payment-review-actions">
-          <Button variant="secondary" onClick={closeDenialDialog} type="button">Cancel</Button>
-          <Button variant="danger" onClick={confirmDenial} type="button">Deny submission</Button>
-        </div>
-      </dialog>
+      {decisionTarget && <DecisionDialog
+        amount={decisionTarget.row.amount}
+        memberName={decisionTarget.row.full_name}
+        onCancel={() => setDecisionTarget(null)}
+        onConfirm={confirmDecision}
+        requestedAmount={decisionTarget.row.requested_amount ?? decisionTarget.row.amount}
+        status={decisionTarget.status}
+      />}
     </section>
     <aside
       aria-label="Receipt preview"

@@ -4,6 +4,8 @@ import { build } from "esbuild";
 
 const mocks = {
   "next/cache": "export const revalidatePath = () => {};",
+  "next/server": "export const after = () => {};",
+  "@/lib/reimbursements/send-decision-email": "export const sendDecisionEmail = () => {};",
   "@/lib/reimbursements/auth": `
     export const requireAppAccess = async () => ({ userId: 'treasurer' });
     export async function requireAdmin() {
@@ -37,7 +39,7 @@ for (const role of ["treasurer", "brother", "associate_member", "member"]) {
     form.set("id", reimbursementId);
     form.set("merchant", "Supplies");
     form.set("category", "house");
-    await assert.rejects(review.setReimbursementStatus(reimbursementId, "approved"), /Administrator access/);
+    await assert.rejects(review.setReimbursementStatus(reimbursementId, { status: "approved", note: "" }), /Administrator access/);
     await assert.rejects(review.updateCategory(form), /Administrator access/);
     await assert.rejects(payments.setReimbursementPaid(reimbursementId, true), /Administrator access/);
     await assert.rejects(payments.markReimbursementsPaid([reimbursementId]), /Administrator access/);
@@ -46,7 +48,7 @@ for (const role of ["treasurer", "brother", "associate_member", "member"]) {
 
 test("administrators pass the management guard and reach input validation", async () => {
   globalThis.reimbursementRole = "admin";
-  assert.equal((await review.setReimbursementStatus("invalid", "approved")).ok, false);
+  assert.equal((await review.setReimbursementStatus("invalid", { status: "approved", note: "" })).ok, false);
   assert.equal((await payments.setReimbursementPaid("invalid", true)).ok, false);
 });
 

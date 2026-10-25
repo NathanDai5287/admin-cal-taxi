@@ -198,6 +198,11 @@ test("submission access cannot change claims, while treasurers can manage other 
   assert.equal((await db.query("update reimbursements set reimbursed = true where id = $1 returning id", [claim])).rows.length, 1);
   await signIn(db, admin, "test-oauth-client");
   await db.query("select mcp_admin_write('update_reimbursement', $1, null, true)", [JSON.stringify({ reimbursementId: claim, paid: false })]);
+  await db.query("select mcp_admin_write('update_reimbursement', $1, null, true)", [JSON.stringify({ reimbursementId: claim, status: "approved", note: "No tip", amount: 15 })]);
+  await db.exec("reset role");
+  const decided = (await db.query("select amount::float as amount, requested_amount::float as requested, approval_note from reimbursements where id = $1", [claim])).rows[0];
+  assert.deepEqual(decided, { amount: 15, requested: 20, approval_note: "No tip" });
+  await signIn(db, admin, "test-oauth-client");
   await db.query("select mcp_create_reimbursement($1, 'house', 20, 'Supplies', 'Check', $2, false, $3)", [brother, `mcp/${randomUUID()}.png`, randomUUID()]);
 });
 

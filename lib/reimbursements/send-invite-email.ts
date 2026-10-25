@@ -6,7 +6,7 @@ import { prepareTrackedEmail, recordEmailProvider } from "../email-tracking";
 
 type InviteRole = "member" | "admin";
 
-function publicSiteUrls() {
+export function publicSiteUrls() {
   const adminUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://admin.cal.taxi").replace(/\/$/, "");
   try {
     const url = new URL(adminUrl);

@@ -5,6 +5,9 @@ export type PayableDetailData = {
   id: string;
   name: string;
   amount: string;
+  amountValue: number;
+  requestedAmount: string;
+  requestedAmountValue: number;
   receiptUrl: string | null;
   category: string;
   description: string;
@@ -15,7 +18,7 @@ export type PayableDetailData = {
   tabscannerTotal: string;
   totalsMatch: boolean;
   comparisonMessage: string;
-  denialReason: string;
+  decisionNote: string;
   reimbursed: boolean;
   status: ReimbursementStatus;
 };
@@ -33,18 +36,24 @@ type PayableDetailSource = {
   receipt_total: number | string | null;
   failure_reason: string | null;
   denial_reason: string | null;
+  approval_note: string | null;
+  requested_amount: number | string | null;
   reimbursed: boolean;
   status: ReimbursementStatus;
 };
 
 export function payableDetailData(row: PayableDetailSource, receiptUrl: string | null): PayableDetailData {
+  const requestedAmount = row.requested_amount ?? row.amount;
   const totalsMatch = row.receipt_total !== null
-    && Math.round(Number(row.amount) * 100) === Math.round(Number(row.receipt_total) * 100);
+    && Math.round(Number(requestedAmount) * 100) === Math.round(Number(row.receipt_total) * 100);
 
   return {
     id: row.id,
     name: row.full_name,
     amount: formatMoney(row.amount),
+    amountValue: Number(row.amount),
+    requestedAmount: formatMoney(requestedAmount),
+    requestedAmountValue: Number(requestedAmount),
     receiptUrl,
     category: row.category,
     description: row.description,
@@ -61,7 +70,7 @@ export function payableDetailData(row: PayableDetailSource, receiptUrl: string |
         : row.status === "processing_failed"
           ? `Automatic verification failed${row.failure_reason ? `: ${row.failure_reason}` : "."}`
           : "The totals differ and need manual review.",
-    denialReason: row.denial_reason ?? "",
+    decisionNote: row.denial_reason ?? row.approval_note ?? "",
     reimbursed: row.reimbursed,
     status: row.status,
   };

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { categoryValues, formatCategory } from "@/lib/reimbursements/format";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
+import { sendDecisionEmail } from "@/lib/reimbursements/send-decision-email";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import type { Database, Json } from "@/lib/reimbursements/supabase/database.types";
@@ -306,15 +307,23 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async (input) => write(supabase, "set_budget", input));
 
   server.registerTool("update_reimbursement", {
-    description: "Approve or deny a reimbursement, change its description, merchant, or category, or mark it paid or unpaid.",
+    description: "Approve or deny a reimbursement, change its description, merchant, or category, or mark it paid or unpaid. An approval can set a different amount. A decision can include a note, and the member gets an email.",
     inputSchema: z.object({
       reimbursementId: z.uuid(), status: z.enum(["approved", "denied"]).optional(),
+      note: z.string().trim().max(500).optional(), amount: z.number().positive().max(99_999_999.99).multipleOf(0.01).optional(),
       merchant: z.string().trim().min(1).max(200).optional(), description: z.string().trim().min(1).max(2000).optional(), category: z.enum(categoryValues).optional(),
       paid: z.boolean().optional(), confirm: z.boolean().default(false),
     }).refine(({ status, merchant, description, category, paid }) => status !== undefined || merchant !== undefined || description !== undefined || category !== undefined || paid !== undefined)
-      .refine(({ status, paid, confirm }) => (status !== "denied" && paid !== false) || confirm),
+      .refine(({ status, paid, confirm }) => (status !== "denied" && paid !== false) || confirm)
+      .refine(({ status, note, amount }) => (note === undefined || status !== undefined) && (amount === undefined || status === "approved")),
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
-  }, async ({ confirm, ...input }) => write(supabase, "update_reimbursement", input, { confirmed: confirm }));
+  }, async ({ confirm, ...input }) => {
+    const result = await write(supabase, "update_reimbursement", input, { confirmed: confirm });
+    if (input.status) await sendDecisionEmail(input.reimbursementId).catch((error: Error) => {
+      throw new Error(`The decision was saved, but the email was not sent: ${error.message}`);
+    });
+    return result;
+  });
 
   server.registerTool("create_reimbursement", {
     description: "Create an approved reimbursement for an active or invited member and attach a JPG or PNG receipt image.",

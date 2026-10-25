@@ -15,7 +15,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
   const fullSrc = fullReceiptUrl ?? `/api/reimbursements/receipts/${detail.id}/original`;
 
   return (
-    <ReviewStatusProvider initialDenialReason={detail.denialReason} reimbursementId={detail.id} status={detail.status}>
+    <ReviewStatusProvider amount={detail.amountValue} initialNote={detail.decisionNote} reimbursementId={detail.id} requestedAmount={detail.requestedAmountValue} status={detail.status}>
       <RefreshWhile active={!processingComplete} />
       <Link className="back-link mb-4 inline-flex" href="/finance/accounts/payable">← All reimbursements</Link>
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
@@ -34,7 +34,8 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
               <ReviewStatusBadge />
             </div>
             <dl className="detail-list border-t border-rule">
-              <div><dt>Requested amount</dt><dd className="amount">{detail.amount}</dd></div>
+              <div><dt>Requested amount</dt><dd className="amount">{detail.requestedAmount}</dd></div>
+              {detail.amountValue !== detail.requestedAmountValue && <div><dt>Approved amount</dt><dd className="amount">{detail.amount}</dd></div>}
               <div><dt>Tabscanner total</dt><dd className="amount">{detail.tabscannerTotal}</dd></div>
               <div><dt>Category</dt><dd><EditableCategory category={detail.category as ReimbursementCategory} id={detail.id} /></dd></div>
               <div><dt>Receipt date</dt><dd>{formatReimbursementDate(detail.receiptDate)}</dd></div>
@@ -46,7 +47,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
           <section className="card">
             <div className="card-header"><span className="card-title">Review decision</span></div>
             <div className="review-actions border-t border-rule">
-              <p>{detail.reimbursed ? "This reimbursement has been paid. To change the decision, first mark it unpaid in the Paid column of the Reimbursements list." : "Review the details and receipt image before making a decision."}</p>
+              {detail.reimbursed && <p>This reimbursement has been paid. To change the decision, first mark it unpaid in the Paid column of the Reimbursements list.</p>}
               <div className="status-actions">
                 <ReviewDecisionButtons disabled={detail.reimbursed || !processingComplete} />
               </div>
@@ -68,7 +69,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
                 reimbursementStatus={detail.status}
                 src={detail.receiptUrl ?? fullSrc}
                 fullSrc={fullSrc}
-                submittedTotal={detail.amount}
+                submittedTotal={detail.requestedAmount}
                 tabscannerTotal={detail.tabscannerTotal}
                 totalsMatch={detail.totalsMatch}
               />
@@ -83,7 +84,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
               </span>
             </div>
             <div className="totals-card-values">
-              <div><span>Submitted total</span><strong>{detail.amount}</strong></div>
+              <div><span>Submitted total</span><strong>{detail.requestedAmount}</strong></div>
               <span aria-hidden="true" className="verification-symbol">{detail.totalsMatch ? "=" : "≠"}</span>
               <div><span>Tabscanner total</span><strong>{detail.tabscannerTotal}</strong></div>
             </div>

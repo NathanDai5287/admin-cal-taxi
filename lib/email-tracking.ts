@@ -7,7 +7,7 @@ export type EmailActivity = {
   events: { kind: "opened" | "clicked"; url: string | null; occurred_at: string }[];
 };
 type EmailBody = { html: string; text: string; subject: string };
-type TrackingMessage = { key: string; kind: "hosting" | "invite"; relatedId?: string; recipient: string };
+type TrackingMessage = { key: string; kind: "hosting" | "invite" | "reimbursement"; relatedId?: string; recipient: string };
 
 export function emailTrackingEnabled() {
   return Boolean(process.env.EMAIL_TRACKING_SECRET);

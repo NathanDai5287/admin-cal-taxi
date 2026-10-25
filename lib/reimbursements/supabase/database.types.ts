@@ -606,6 +606,8 @@ export type Database = {
           receipt_total: number | null;
           failure_reason: string | null;
           denial_reason: string | null;
+          approval_note: string | null;
+          requested_amount: number | null;
           reimbursed: boolean;
           reimbursed_at: string | null;
           reimbursement_date_is_estimated: boolean;
@@ -632,6 +634,8 @@ export type Database = {
           receipt_total?: number | null;
           failure_reason?: string | null;
           denial_reason?: string | null;
+          approval_note?: string | null;
+          requested_amount?: number | null;
           reimbursed?: boolean;
           reimbursed_at?: string | null;
           reimbursement_date_is_estimated?: boolean;
@@ -644,6 +648,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          amount?: number;
           category?: Database["public"]["Enums"]["reimbursement_category"];
           status?: Database["public"]["Enums"]["reimbursement_status"];
           merchant?: string | null;
@@ -652,6 +657,8 @@ export type Database = {
           receipt_total?: number | null;
           failure_reason?: string | null;
           denial_reason?: string | null;
+          approval_note?: string | null;
+          requested_amount?: number | null;
           reimbursed?: boolean;
           reimbursed_at?: string | null;
           reimbursement_date_is_estimated?: boolean;

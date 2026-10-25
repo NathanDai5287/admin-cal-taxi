@@ -94,17 +94,17 @@ test("members cannot prefill a denial note on submission", async (t) => {
   assert.match(rows[0]?.qual ?? "", /denial_reason is null/i);
 });
 
-test("the review action validates and stores the denial note", async () => {
+test("the review action validates and stores the decision note", async () => {
   const actions = await readFile(new URL("../app/(admin)/finance/review/actions.ts", import.meta.url), "utf8");
 
-  assert.match(actions, /denialReason: z\.string\(\)\.trim\(\)\.max\(500\)\.optional\(\)/);
-  assert.match(actions, /denial_reason: parsed\.data\.status === "denied" \? parsed\.data\.denialReason \|\| null : null/);
+  assert.match(actions, /note: z\.string\(\)\.trim\(\)\.max\(500\)/);
+  assert.match(actions, /denial_reason: approving \? null : parsed\.data\.note \|\| null/);
+  assert.match(actions, /approval_note: approving \? parsed\.data\.note \|\| null : null/);
 });
 
 test("denial prompts and member-facing reason stay wired", async () => {
-  const [buttons, paymentTable, reviewPage, detailData, detailView, detailLoading, memberPage] = await Promise.all([
-    readFile(new URL("../components/reimbursements/review-decision-buttons.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/reimbursements/reimbursement-payment-table.tsx", import.meta.url), "utf8"),
+  const [dialog, reviewPage, detailData, detailView, detailLoading, memberPage] = await Promise.all([
+    readFile(new URL("../components/reimbursements/decision-dialog.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/finance/review/[id]/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/reimbursements/payable-detail-data.ts", import.meta.url), "utf8"),
     readFile(new URL("../components/reimbursements/payable-detail-view.tsx", import.meta.url), "utf8"),
@@ -112,12 +112,11 @@ test("denial prompts and member-facing reason stay wired", async () => {
     readFile(new URL("../app/submit/history/[id]/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  for (const source of [buttons, paymentTable]) {
-    assert.match(source, /Why is this being denied\? \(optional\)/);
-  }
+  assert.match(dialog, /Why is this being denied\? \(optional\)/);
+  assert.match(dialog, /Message to the member \(optional\)/);
   assert.match(reviewPage, /denial_reason/);
-  assert.match(detailData, /denialReason: row\.denial_reason \?\? ""/);
-  assert.match(detailView, /initialDenialReason=\{detail\.denialReason\}/);
+  assert.match(detailData, /decisionNote: row\.denial_reason \?\? row\.approval_note \?\? ""/);
+  assert.match(detailView, /initialNote=\{detail\.decisionNote\}/);
   assert.match(reviewPage, /<PayableDetailView detail=\{detail\}/);
   assert.match(detailLoading, /<PayableDetailView detail=\{selected\}/);
   assert.match(memberPage, /denial_reason/);

@@ -12,7 +12,7 @@ async function reviewActions() {
     export const completed = new Set();
     export const controls = {};
     export function reset() {
-      Object.assign(row, { id: '${reimbursementId}', category: 'rush', status: 'verified', reimbursed: false, updated_at: '2026-10-06', denial_reason: null });
+      Object.assign(row, { id: '${reimbursementId}', category: 'rush', status: 'verified', reimbursed: false, updated_at: '2026-10-06', amount: 25, requested_amount: null, denial_reason: null, approval_note: null });
       completed.clear(); Object.assign(controls, { failApproval: false, failReopen: false, completeOnApproval: false, reopenCount: 0 });
     }
     const setExpenseCategoryCompleted = async (category) => {
@@ -41,6 +41,8 @@ async function reviewActions() {
     }) });`;
   const isolated = source
     .replace('import { revalidatePath } from "next/cache";', "const revalidatePath = () => {};")
+    .replace('import { after } from "next/server";', "const after = () => {};")
+    .replace('import { sendDecisionEmail } from "@/lib/reimbursements/send-decision-email";', "const sendDecisionEmail = () => {};")
     .replace('import { z } from "zod";', `import { z } from "${new URL("../node_modules/zod/index.js", import.meta.url)}";`)
     .replace('import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";', "const requireAdmin = async () => ({ userId: 'admin' }); const requireAppAccess = requireAdmin;")
     .replace(/import \{ categorySchema, categoryValues, type ReimbursementCategory \} from [^;]+;/, 'const categoryValues = ["rush", "house"]; const categorySchema = z.enum(categoryValues);')
@@ -55,7 +57,7 @@ async function reviewActions() {
 test("ordinary approval returns authoritative completed category without reopening", async () => {
   const { setReimbursementStatus, completed, row, controls } = await reviewActions();
   completed.add("rush");
-  const result = await setReimbursementStatus(reimbursementId, "approved");
+  const result = await setReimbursementStatus(reimbursementId, { status: "approved", note: "" });
   assert.equal(result.ok, false);
   assert.equal(result.completedCategory, "rush");
   assert.equal(row.status, "verified");
@@ -65,7 +67,7 @@ test("ordinary approval returns authoritative completed category without reopeni
 test("explicit reopen approves and keeps the category open", async () => {
   const { setReimbursementStatus, completed, row } = await reviewActions();
   completed.add("rush");
-  assert.equal((await setReimbursementStatus(reimbursementId, "approved", undefined, "rush")).ok, true);
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "" }, "rush")).ok, true);
   assert.equal(row.status, "approved");
   assert.equal(completed.has("rush"), false);
 });
@@ -74,7 +76,7 @@ test("approval failure reports a successful reopen without reversing it", async 
   const { setReimbursementStatus, completed, row, controls } = await reviewActions();
   completed.add("rush");
   controls.failApproval = true;
-  const result = await setReimbursementStatus(reimbursementId, "approved", undefined, "rush");
+  const result = await setReimbursementStatus(reimbursementId, { status: "approved", note: "" }, "rush");
   assert.equal(result.ok, false);
   assert.match(result.message, /category reopened, but approval failed/);
   assert.equal(row.status, "verified");
@@ -85,7 +87,7 @@ test("a category completed again during approval requires a new confirmation", a
   const { setReimbursementStatus, completed, row, controls } = await reviewActions();
   completed.add("rush");
   controls.completeOnApproval = true;
-  const result = await setReimbursementStatus(reimbursementId, "approved", undefined, "rush");
+  const result = await setReimbursementStatus(reimbursementId, { status: "approved", note: "" }, "rush");
   assert.equal(result.ok, false);
   assert.equal(result.completedCategory, "rush");
   assert.match(result.message, /completed again/);
@@ -96,20 +98,31 @@ test("a changed reimbursement and a failed reopen cannot approve", async () => {
   const { setReimbursementStatus, completed, row, controls } = await reviewActions();
   completed.add("rush");
   row.category = "house";
-  assert.equal((await setReimbursementStatus(reimbursementId, "approved", undefined, "rush")).ok, false);
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "" }, "rush")).ok, false);
   assert.equal(controls.reopenCount, 0);
   row.category = "rush";
   controls.failReopen = true;
-  assert.equal((await setReimbursementStatus(reimbursementId, "approved", undefined, "rush")).ok, false);
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "" }, "rush")).ok, false);
   assert.equal(row.status, "verified");
   assert.equal(completed.has("rush"), true);
 });
 
 test("open-category approval and denial retain their existing behavior", async () => {
   const { setReimbursementStatus, completed, row } = await reviewActions();
-  assert.equal((await setReimbursementStatus(reimbursementId, "approved")).ok, true);
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "" })).ok, true);
   completed.add("rush");
-  assert.equal((await setReimbursementStatus(reimbursementId, "denied", "Not covered")).ok, true);
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "denied", note: "Not covered" })).ok, true);
   assert.equal(row.denial_reason, "Not covered");
   assert.equal(completed.has("rush"), true);
+});
+
+test("approval can change the amount and keeps the requested amount", async () => {
+  const { setReimbursementStatus, row } = await reviewActions();
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "No tip", amount: 20 })).ok, true);
+  assert.equal(row.amount, 20);
+  assert.equal(row.requested_amount, 25);
+  assert.equal(row.approval_note, "No tip");
+  assert.equal((await setReimbursementStatus(reimbursementId, { status: "approved", note: "", amount: 25 })).ok, true);
+  assert.equal(row.amount, 25);
+  assert.equal(row.requested_amount, null);
 });

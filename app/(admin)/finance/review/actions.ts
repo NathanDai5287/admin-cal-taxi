@@ -1,23 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";
 import { categorySchema, categoryValues, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import { sendDecisionEmail } from "@/lib/reimbursements/send-decision-email";
 import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";
 
-type ReimbursementStatus = "approved" | "denied";
+export type ReviewDecision = { status: "approved" | "denied"; note: string; amount?: number };
+
+type DecidedRow = { id: string; status: ReviewDecision["status"]; amount: number; requested_amount: number | null; updated_at: string };
 
 export type StatusMutationResult =
-  | { ok: true; row: { id: string; status: ReimbursementStatus; updated_at: string } }
+  | { ok: true; row: DecidedRow }
   | { ok: false; message: string; completedCategory?: ReimbursementCategory };
 
 export async function setReimbursementStatus(
   id: string,
-  status: string,
-  denialReason?: string,
+  decision: ReviewDecision,
   reopenCategory?: ReimbursementCategory,
 ): Promise<StatusMutationResult> {
   await requireAdmin("/");
@@ -25,38 +28,47 @@ export async function setReimbursementStatus(
   const parsed = z.object({
     id: z.uuid(),
     status: z.enum(["approved", "denied"]),
-    denialReason: z.string().trim().max(500).optional(),
+    note: z.string().trim().max(500),
+    amount: z.number().positive().max(99_999_999.99).multipleOf(0.01).optional(),
     reopenCategory: categorySchema.optional(),
-  }).safeParse({ id, status, denialReason, reopenCategory });
+  }).safeParse({ id, ...decision, reopenCategory });
   if (!parsed.success) {
-    return { ok: false, message: "Choose a valid reimbursement status." };
+    return { ok: false, message: "Choose a valid decision and amount." };
   }
 
   const supabase = createAdminClient();
-  const reopening = parsed.data.status === "approved" ? parsed.data.reopenCategory : undefined;
+  const { data: submission, error: lookupError } = await supabase.from("reimbursements")
+    .select("category, status, reimbursed, amount, requested_amount").eq("id", parsed.data.id).maybeSingle();
+  if (lookupError) return { ok: false, message: "Could not check this reimbursement. Try again." };
+  if (!submission) return { ok: false, message: "That reimbursement no longer exists." };
+
+  const approving = parsed.data.status === "approved";
+  const reopening = approving ? parsed.data.reopenCategory : undefined;
   if (reopening) {
-    const { data: submission, error: lookupError } = await supabase.from("reimbursements")
-      .select("category, status, reimbursed").eq("id", parsed.data.id).maybeSingle();
-    if (lookupError) return { ok: false, message: "Could not check this reimbursement. Try again." };
-    if (!submission || submission.category !== reopening || submission.reimbursed || submission.status === "pending") {
+    if (submission.category !== reopening || submission.reimbursed || submission.status === "pending") {
       return { ok: false, message: "This reimbursement changed. Review it before approving." };
     }
     const reopened = await setExpenseCategoryCompleted(reopening, false);
     if (reopened.status === "error") return { ok: false, message: reopened.message };
     revalidatePath("/finance/planning");
   }
+  const requestedAmount = submission.requested_amount ?? submission.amount;
+  const amount = approving ? parsed.data.amount ?? submission.amount : submission.amount;
   let mutation = supabase
     .from("reimbursements")
     .update({
       status: parsed.data.status,
-      denial_reason: parsed.data.status === "denied" ? parsed.data.denialReason || null : null,
+      denial_reason: approving ? null : parsed.data.note || null,
+      approval_note: approving ? parsed.data.note || null : null,
+      amount,
+      requested_amount: Number(amount) === Number(requestedAmount) ? null : requestedAmount,
     })
     .eq("id", parsed.data.id)
     .eq("reimbursed", false)
     .neq("status", "pending");
   if (reopening) mutation = mutation.eq("category", reopening);
   const { data, error } = await mutation
-    .select("id, status, updated_at")
+    .select("id, amount, requested_amount, updated_at")
     .maybeSingle();
 
   if (error) {
@@ -70,23 +82,11 @@ export async function setReimbursementStatus(
     return { ok: false, message: `${reopening ? "The category reopened, but approval failed. " : ""}That reimbursement is paid, changed, still processing, or no longer exists.` };
   }
 
+  after(() => sendDecisionEmail(data.id));
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/reports");
   revalidatePath(`/finance/review/${parsed.data.id}`);
-  return {
-    ok: true,
-    row: { id: data.id, status: parsed.data.status, updated_at: data.updated_at },
-  };
-}
-
-export async function updateStatus(formData: FormData) {
-  const denialReason = formData.get("denialReason");
-  const result = await setReimbursementStatus(
-    String(formData.get("id") ?? ""),
-    String(formData.get("status") ?? ""),
-    typeof denialReason === "string" ? denialReason : undefined,
-  );
-  if (!result.ok) throw new Error(result.message);
+  return { ok: true, row: { ...data, status: parsed.data.status } };
 }
 
 export async function updateDescription(formData: FormData) {
