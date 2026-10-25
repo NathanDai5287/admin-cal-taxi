@@ -1,6 +1,7 @@
 export const MEMBERSHIP_OPTIONS = [
   { value: "brother", label: "Brother" },
   { value: "associate_member", label: "Associate member" },
+  { value: "alumni", label: "Alumni" },
 ] as const;
 
 export const EXECUTIVE_ROLE_OPTIONS = [

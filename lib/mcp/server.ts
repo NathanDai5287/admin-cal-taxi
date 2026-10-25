@@ -372,7 +372,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async () => jsonResult(await rpcResult(supabase.rpc("mcp_list_role_access"))));
 
   server.registerTool("set_role_access", {
-    description: "Set one role's access to one app. Omit role to set every nonadministrator role at once. Roles: base member applies to everyone; brother and associate member to that membership; exec_member to every brother with an executive position.",
+    description: "Set one role's access to one app. Omit role to set every nonadministrator role at once. Roles: base member applies to everyone; brother, associate member, and alumni to that membership; exec_member to every brother with an executive position.",
     inputSchema: z.object({
       role: z.enum(ROLE_OPTIONS.map(({ key }) => key).filter((key) => key !== "admin") as [RoleKey, ...RoleKey[]]).optional(),
       app: z.enum(APP_OPTIONS.map(({ key }) => key) as [AppKey, ...AppKey[]]),

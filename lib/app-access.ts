@@ -20,6 +20,7 @@ export const ROLE_OPTIONS = [
   { key: "member", label: "Base member" },
   { key: "brother", label: "Brother" },
   { key: "associate_member", label: "Associate member" },
+  { key: "alumni", label: "Alumni" },
   { key: "exec_member", label: "Executive member" },
   ...EXECUTIVE_ROLE_OPTIONS.map(({ value, label }) => ({ key: value, label })),
 ] as const;
@@ -32,6 +33,7 @@ export type RoleAppAccess = { role_key: RoleKey; app_key: AppKey; access_level: 
 export const PARENT_ROLE: Partial<Record<RoleKey, RoleKey>> = {
   brother: "member",
   associate_member: "member",
+  alumni: "member",
   exec_member: "brother",
   ...Object.fromEntries(EXECUTIVE_ROLE_OPTIONS.map(({ value }) => [value, "exec_member"])),
 };

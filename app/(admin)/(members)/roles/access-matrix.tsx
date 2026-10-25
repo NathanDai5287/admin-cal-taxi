@@ -6,7 +6,7 @@ import { EXECUTIVE_ROLE_OPTIONS } from "@/lib/people";
 import { ViewAsButton } from "@/components/view-as/view-as-bar";
 import { setRoleAppAccess } from "./actions";
 
-const ROLE_TREE_ORDER: RoleKey[] = ["admin", "member", "associate_member", "brother", "exec_member", ...EXECUTIVE_ROLE_OPTIONS.map(({ value }) => value)];
+const ROLE_TREE_ORDER: RoleKey[] = ["admin", "member", "associate_member", "alumni", "brother", "exec_member", ...EXECUTIVE_ROLE_OPTIONS.map(({ value }) => value)];
 
 function roleLabel(role: RoleKey) {
   return ROLE_OPTIONS.find(({ key }) => key === role)!.label;

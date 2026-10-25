@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole } from "@/lib/people";
+import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole } from "@/lib/people";
 
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
@@ -126,7 +126,8 @@ export async function updatePerson(userId: string, formData: FormData): Promise<
   const fullName = String(formData.get("fullName") ?? "").trim();
   const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();
-  const membership = String(formData.get("membership") ?? "") || null;
+  const membershipInput = String(formData.get("membership") ?? "");
+  const membership = MEMBERSHIP_OPTIONS.find(({ value }) => value === membershipInput)?.value ?? null;
   const executiveRoles = formData.getAll("executiveRoles").map(String);
   const discordUserId = normalizeDiscordUserId(String(formData.get("discordUserId") ?? ""));
   const memberSinceTermId = String(formData.get("memberSinceTermId") ?? "") || null;
@@ -136,7 +137,7 @@ export async function updatePerson(userId: string, formData: FormData): Promise<
   if (phone.length > 50) return { error: "Enter a phone number with 50 characters or fewer." };
   if (contactEmail.length > 254) return { error: "Enter an email with 254 characters or fewer." };
   if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) return { error: "Enter a valid contact email." };
-  if (membership !== null && membership !== "brother" && membership !== "associate_member") return { error: "Choose a valid membership." };
+  if (membershipInput && !membership) return { error: "Choose a valid membership." };
   if (membership !== "brother" && executiveRoles.length > 0) return { error: "Remove all offices before you change membership." };
   if (!executiveRoles.every((office): office is ExecutiveRole => EXECUTIVE_ROLE_OPTIONS.some((option) => option.value === office))) return { error: "Choose valid offices." };
   if (discordUserId && !/^\d{15,22}$/.test(discordUserId)) return { error: "Enter a 15–22 digit Discord user ID or paste a Discord mention." };
