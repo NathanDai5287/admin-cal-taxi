@@ -307,7 +307,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   }, async (input) => write(supabase, "set_budget", input));
 
   server.registerTool("update_reimbursement", {
-    description: "Approve or deny a reimbursement, change its description, merchant, or category, or mark it paid or unpaid. An approval can set a different amount. A decision can include a note, and the member gets an email.",
+    description: "Approve or deny a reimbursement, change its description, merchant, or category, or mark it paid or unpaid. An approval can set a different amount and include an optional note. A denial needs a note with the reason. The member gets an email for each decision.",
     inputSchema: z.object({
       reimbursementId: z.uuid(), status: z.enum(["approved", "denied"]).optional(),
       note: z.string().trim().max(500).optional(), amount: z.number().positive().max(99_999_999.99).multipleOf(0.01).optional(),
@@ -315,7 +315,8 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
       paid: z.boolean().optional(), confirm: z.boolean().default(false),
     }).refine(({ status, merchant, description, category, paid }) => status !== undefined || merchant !== undefined || description !== undefined || category !== undefined || paid !== undefined)
       .refine(({ status, paid, confirm }) => (status !== "denied" && paid !== false) || confirm)
-      .refine(({ status, note, amount }) => (note === undefined || status !== undefined) && (amount === undefined || status === "approved")),
+      .refine(({ status, note, amount }) => (note === undefined || status !== undefined) && (amount === undefined || status === "approved"))
+      .refine(({ status, note }) => status !== "denied" || Boolean(note), "A denial needs a note with the reason."),
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
   }, async ({ confirm, ...input }) => {
     const result = await write(supabase, "update_reimbursement", input, { confirmed: confirm });

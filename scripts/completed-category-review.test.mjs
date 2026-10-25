@@ -126,3 +126,11 @@ test("approval can change the amount and keeps the requested amount", async () =
   assert.equal(row.amount, 25);
   assert.equal(row.requested_amount, null);
 });
+
+test("a denial needs a reason", async () => {
+  const { setReimbursementStatus, row } = await reviewActions();
+  const result = await setReimbursementStatus(reimbursementId, { status: "denied", note: "  " });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /reason/);
+  assert.equal(row.status, "verified");
+});

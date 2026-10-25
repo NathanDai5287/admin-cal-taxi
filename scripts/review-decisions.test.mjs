@@ -112,7 +112,8 @@ test("denial prompts and member-facing reason stay wired", async () => {
     readFile(new URL("../app/submit/history/[id]/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(dialog, /Why is this being denied\? \(optional\)/);
+  assert.match(dialog, /Why is this being denied\?"/);
+  assert.match(dialog, /required=\{!approving\}/);
   assert.match(dialog, /Message to the member \(optional\)/);
   assert.match(reviewPage, /denial_reason/);
   assert.match(detailData, /decisionNote: row\.denial_reason \?\? row\.approval_note \?\? ""/);

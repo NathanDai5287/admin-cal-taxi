@@ -36,13 +36,17 @@ export async function setReimbursementStatus(
     return { ok: false, message: "Choose a valid decision and amount." };
   }
 
+  const approving = parsed.data.status === "approved";
+  if (!approving && !parsed.data.note) {
+    return { ok: false, message: "Write a reason for the denial." };
+  }
+
   const supabase = createAdminClient();
   const { data: submission, error: lookupError } = await supabase.from("reimbursements")
     .select("category, status, reimbursed, amount, requested_amount").eq("id", parsed.data.id).maybeSingle();
   if (lookupError) return { ok: false, message: "Could not check this reimbursement. Try again." };
   if (!submission) return { ok: false, message: "That reimbursement no longer exists." };
 
-  const approving = parsed.data.status === "approved";
   const reopening = approving ? parsed.data.reopenCategory : undefined;
   if (reopening) {
     if (submission.category !== reopening || submission.reimbursed || submission.status === "pending") {

@@ -50,12 +50,13 @@ export function DecisionDialog({ status, memberName, amount, requestedAmount, on
             <input className="field-input" id={amountId} inputMode="decimal" onChange={(event) => setAmountText(event.currentTarget.value)} required value={amountText} />
             <p className="field-hint">The member asked for {formatMoney(requestedAmount)}.</p>
           </>}
-          <label className="field-label" htmlFor={noteId}>{approving ? "Message to the member (optional)" : "Why is this being denied? (optional)"}</label>
+          <label className="field-label" htmlFor={noteId}>{approving ? "Message to the member (optional)" : "Why is this being denied?"}</label>
           <textarea
             className="field-textarea"
             id={noteId}
             maxLength={500}
             onChange={(event) => setNote(event.currentTarget.value)}
+            required={!approving}
             placeholder={approving ? "For example: approved for the receipt total without the tip." : "For example: the receipt is illegible, or the expense is not covered."}
             rows={3}
             value={note}
@@ -64,7 +65,7 @@ export function DecisionDialog({ status, memberName, amount, requestedAmount, on
         </div>
         <div className="payment-review-actions">
           <Button variant="secondary" onClick={onCancel} type="button">Cancel</Button>
-          <Button variant={approving ? "primary" : "danger"} disabled={approving && !amountValid} type="submit">
+          <Button variant={approving ? "primary" : "danger"} disabled={approving ? !amountValid : !note.trim()} type="submit">
             {approving ? "Approve submission" : "Deny submission"}
           </Button>
         </div>
