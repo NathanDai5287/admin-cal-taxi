@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/brand/button";
-import { updatePerson } from "@/app/(admin)/users/actions";
+import { updatePerson } from "@/app/(admin)/(members)/users/actions";
 import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole } from "@/lib/people";
-import type { MemberRow } from "@/app/(admin)/users/members-table";
+import type { MemberRow } from "@/app/(admin)/(members)/users/members-table";
 
 export function PersonEditor({ member, onClose }: { member: MemberRow; onClose: () => void }) {
   const nameInput = useRef<HTMLInputElement>(null);

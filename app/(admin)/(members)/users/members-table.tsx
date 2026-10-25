@@ -4,9 +4,9 @@ import "./people.css";
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm } from "@/app/(admin)/users/actions";
+import { removeUser, setUserRole, updateDiscordUserId, updateMemberAcademicTerm } from "@/app/(admin)/(members)/users/actions";
 import { Button } from "@/components/brand/button";
-import { PersonEditor } from "@/app/(admin)/users/person-editor";
+import { PersonEditor } from "@/app/(admin)/(members)/users/person-editor";
 import { EXECUTIVE_ROLE_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 import { userLabel } from "@/lib/reimbursements/user-label";
 

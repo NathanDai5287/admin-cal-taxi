@@ -30,7 +30,6 @@ export default async function FinanceLayout({ children }: { children: React.Reac
         homeHref="/finance/planning"
         title="Theta Xi"
         subtitle="Finance"
-        prefetchTabContent
         tabs={[
           { href: "/finance/planning", label: "Planning" },
           { href: "/finance/accounts/receivable", label: "Dues" },

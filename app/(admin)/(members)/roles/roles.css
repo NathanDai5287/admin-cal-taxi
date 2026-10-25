@@ -1,9 +1,6 @@
 [data-brand] .roles-main {
   display: grid;
   gap: 1.5rem;
-  max-width: 1440px;
-  margin-inline: auto;
-  padding: 2rem 1.5rem;
 }
 
 [data-brand] .roles-heading {
@@ -166,7 +163,6 @@
 }
 
 @media (max-width: 640px) {
-  [data-brand] .roles-main { padding: 1.5rem 1rem; }
   [data-brand] .roles-heading { align-items: flex-start; flex-direction: column; gap: 1rem; }
   [data-brand] .roles-legend { flex-direction: column; gap: 0.5rem; }
   [data-brand] .roles-matrix .role-name { min-width: 132px; padding-right: 0.75rem; }

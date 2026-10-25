@@ -4,14 +4,14 @@ import { AccessDenied } from "@/components/auth/access-denied";
 import { AppNav } from "@/components/brand/app-nav";
 import { getSessionProfile, hasAppAccess } from "@/lib/reimbursements/auth";
 
-export default async function UsersLayout({ children }: { children: React.ReactNode }) {
+export default async function MembersLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionProfile();
 
   if (!session) {
     redirect("/");
   }
 
-  if (!hasAppAccess(session, "users")) {
+  if (!hasAppAccess(session, "users") && !hasAppAccess(session, "roles")) {
     return (
       <div data-brand className="min-h-screen">
         <AccessDenied showSubmitLink={session.profile.role === "member"} />
@@ -26,7 +26,7 @@ export default async function UsersLayout({ children }: { children: React.ReactN
         title="Theta Xi"
         subtitle="Members"
         tabs={[
-          { href: "/users", label: "People" },
+          ...(hasAppAccess(session, "users") ? [{ href: "/users", label: "People" }] : []),
           ...(hasAppAccess(session, "roles") ? [{ href: "/roles", label: "Roles" }] : []),
         ]}
       />

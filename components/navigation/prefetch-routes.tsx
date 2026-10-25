@@ -22,7 +22,7 @@ export function PrefetchRoutes({ hrefs }: { hrefs: readonly string[] }) {
       let index = 0;
       const warm = (href: string) => {
         router.prefetch(href, {
-          kind: PrefetchKind.AUTO,
+          kind: PrefetchKind.FULL,
           // Polling and mutations drop warmed payloads. Re-warm when Next marks one stale.
           onInvalidate: () => {
             if (!cancelled) warm(href);

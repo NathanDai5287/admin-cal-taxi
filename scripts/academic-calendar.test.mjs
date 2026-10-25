@@ -7,8 +7,8 @@ test("one academic calendar connects accreditation, finance, and members", async
     readFile(new URL("../supabase/migrations/20261001000000_sitewide_academic_calendar.sql", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/accreditation/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/(admin)/finance/planning/plan-vs-actual.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/(admin)/users/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/(admin)/users/actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/(members)/users/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/(members)/users/actions.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(migration, /rename to academic_years/);
@@ -23,8 +23,8 @@ test("one academic calendar connects accreditation, finance, and members", async
 
 test("members can set or clear a join term and invitations can assign one", async () => {
   const [table, actions, migration] = await Promise.all([
-    readFile(new URL("../app/(admin)/users/members-table.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/(admin)/users/actions.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/(members)/users/members-table.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/(admin)/(members)/users/actions.ts", import.meta.url), "utf8"),
     readFile(new URL("../supabase/migrations/20261001000000_sitewide_academic_calendar.sql", import.meta.url), "utf8"),
   ]);
 

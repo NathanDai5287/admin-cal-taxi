@@ -1,8 +1,8 @@
 import { Button } from "@/components/brand/button";
 import type { Metadata } from "next";
 
-import { inviteUser } from "@/app/(admin)/users/actions";
-import { MembersTable, type AcademicYearOption } from "@/app/(admin)/users/members-table";
+import { inviteUser } from "@/app/(admin)/(members)/users/actions";
+import { MembersTable, type AcademicYearOption } from "@/app/(admin)/(members)/users/members-table";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
