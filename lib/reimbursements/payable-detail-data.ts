@@ -1,4 +1,4 @@
-import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+import type { ReimbursementStatus } from "@/lib/reimbursements/format";
 import { formatMoney } from "@/lib/reimbursements/format";
 
 export type PayableDetailData = {

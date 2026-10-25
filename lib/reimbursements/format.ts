@@ -77,6 +77,14 @@ export function formatReimbursementDate(value: string | null, includeTime = fals
   }).format(new Date(value));
 }
 
+export type ReimbursementStatus =
+  | "pending"
+  | "verified"
+  | "mismatch"
+  | "approved"
+  | "denied"
+  | "processing_failed";
+
 export function formatStatus(value: string) {
   return value.replaceAll("_", " ");
 }

@@ -13,10 +13,11 @@ test("the payable page shows every reimbursement without payment filters", async
   assert.match(source, /<ReimbursementPaymentTable rows=\{paymentRows\}/);
 });
 
-test("the combined table keeps review and payout controls", async () => {
+test("the combined table shows status as a tag and keeps payout controls", async () => {
   const source = await readSource("../components/reimbursements/reimbursement-payment-table.tsx");
 
-  assert.match(source, /<InlineStatusSelect/);
+  assert.doesNotMatch(source, /setReimbursementStatus|<select/);
+  assert.match(source, /className=\{`badge badge-\$\{item\.status\}`\}/);
   assert.match(source, /<ReimbursedCheckbox/);
   assert.match(source, /Select all approved unpaid reimbursements/);
   assert.match(source, /\/finance\/accounts\/payable\/\$\{item\.id\}/);

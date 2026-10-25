@@ -7,7 +7,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
 import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
-import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+import type { ReimbursementStatus } from "@/lib/reimbursements/format";
 import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/format";
 

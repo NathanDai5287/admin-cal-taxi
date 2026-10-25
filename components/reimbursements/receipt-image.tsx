@@ -4,7 +4,7 @@ import { useRef, useState, useSyncExternalStore, type MouseEvent, type PointerEv
 import { preload } from "react-dom";
 
 import { ReviewDecisionButtons } from "@/components/reimbursements/review-decision-buttons";
-import type { ReimbursementStatus } from "@/components/reimbursements/inline-status-select";
+import type { ReimbursementStatus } from "@/lib/reimbursements/format";
 import {
   getPayableNavigationPreview,
   getServerPayableNavigationPreview,

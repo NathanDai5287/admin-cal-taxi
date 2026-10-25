@@ -235,7 +235,7 @@
   [data-brand] .field-textarea {
     @apply resize-y min-h-[80px];
   }
-  [data-brand] select:is(.field-input, .inline-status-select):not([multiple]):is(:not([size]), [size="1"]) {
+  [data-brand] select.field-input:not([multiple]):is(:not([size]), [size="1"]) {
     appearance: none;
     padding-right: 2.5rem;
     background-image: var(--select-arrow);
@@ -244,7 +244,7 @@
     background-size: 1rem 1rem;
   }
   @media (forced-colors: active) {
-    [data-brand] select:is(.field-input, .inline-status-select):not([multiple]):is(:not([size]), [size="1"]) {
+    [data-brand] select.field-input:not([multiple]):is(:not([size]), [size="1"]) {
       appearance: auto;
       background-image: none;
     }
@@ -894,33 +894,7 @@
   [data-brand] .payable-table td > div.payable-paid-cell { @apply mx-auto w-full justify-center; }
   [data-brand] .payable-paid-empty { @apply block text-center text-muted; }
 
-  /* ── Inline status select / checkboxes ── */
-  [data-brand] .inline-status-select {
-    @apply w-auto border font-bold uppercase cursor-pointer outline-none
-           px-2 py-1 pr-7 text-[10.5px] tracking-[0.10em]
-           bg-canvas text-muted border-rule;
-    border-radius: 0;
-  }
-  [data-brand] .inline-status-select:focus-visible {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 25%, transparent);
-  }
-  [data-brand] .inline-status-select:disabled {
-    @apply cursor-not-allowed opacity-60;
-  }
-  [data-brand] .inline-status-select.badge-approved {
-    @apply bg-ok-light text-ok border-ok/30;
-  }
-  [data-brand] .inline-status-select.badge-verified {
-    @apply bg-brand-light text-brand border-brand/30;
-  }
-  [data-brand] .inline-status-select.badge-denied,
-  [data-brand] .inline-status-select.badge-processing_failed {
-    @apply bg-warn-light text-warn border-warn/30;
-  }
-  [data-brand] .inline-status-select.badge-pending,
-  [data-brand] .inline-status-select.badge-mismatch {
-    @apply bg-caution-light text-caution border-caution/30;
-  }
+  /* ── Checkboxes ── */
   [data-brand] .checkbox-brand {
     @apply w-4 h-4 m-0 accent-brand cursor-pointer;
   }

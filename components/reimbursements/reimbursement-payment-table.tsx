@@ -11,14 +11,7 @@ import {
   markReimbursementsPaid,
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
-import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
-import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
-import { formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
-import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
-import {
-  InlineStatusSelect,
-  type ReimbursementStatus,
-} from "@/components/reimbursements/inline-status-select";
+import { formatMoney, formatStatus, type ReimbursementStatus } from "@/lib/reimbursements/format";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 import { setPayableNavigationPreview } from "@/components/reimbursements/payable-navigation-preview";
 import { payableDetailData } from "@/lib/reimbursements/payable-detail-data";
@@ -66,8 +59,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   const router = useRouter();
   const selectAllRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [decisionTarget, setDecisionTarget] = useState<{ row: PaymentTableRow; status: ReviewDecision["status"] } | null>(null);
-  const [approvalTarget, setApprovalTarget] = useState<{ row: PaymentTableRow; category: ReimbursementCategory; decision: ReviewDecision } | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
   const [feedback, setFeedback] = useState("");
   const [dialogError, setDialogError] = useState("");
@@ -152,7 +143,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     const override = rowOverrides.get(serverRow.id);
     if (!override) return serverRow;
 
-    const statusPending = pendingFields.has(`${serverRow.id}:status`);
     const reimbursedPending = pendingFields.has(`${serverRow.id}:reimbursed`);
     const serverIsCurrent = override.updated_at !== undefined
       && Date.parse(serverRow.updated_at) >= Date.parse(override.updated_at);
@@ -160,9 +150,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
     return {
       ...serverRow,
       ...(!serverIsCurrent ? override : {}),
-      status: (statusPending || !serverIsCurrent) && override.status !== undefined
-        ? override.status
-        : serverRow.status,
       reimbursed: (reimbursedPending || !serverIsCurrent) && override.reimbursed !== undefined
         ? override.reimbursed
         : serverRow.reimbursed,
@@ -184,39 +171,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       else next.delete(key);
       return next;
     });
-  }
-
-  async function changeStatus(row: PaymentTableRow, decision: ReviewDecision, reopenCategory?: ReimbursementCategory) {
-    const key = `${row.id}:status`;
-    const previous = { status: row.status, amount: row.amount };
-    setMutationError("");
-    patchRow(row.id, { status: decision.status, amount: decision.amount ?? row.amount });
-    setFieldPending(key, true);
-
-    try {
-      const result = await setReimbursementStatus(row.id, decision, reopenCategory);
-      if (!result.ok) {
-        patchRow(row.id, previous);
-        if (result.completedCategory) setApprovalTarget({ row, category: result.completedCategory, decision });
-        setMutationError(result.completedCategory && !reopenCategory ? "" : result.message);
-        return false;
-      }
-
-      patchRow(row.id, result.row);
-      router.refresh();
-      return true;
-    } catch (error) {
-      patchRow(row.id, previous);
-      setMutationError(error instanceof Error ? error.message : "Unable to change the status.");
-      return false;
-    } finally {
-      setFieldPending(key, false);
-    }
-  }
-
-  async function reopenAndApprove() {
-    if (!approvalTarget) return;
-    if (await changeStatus(approvalTarget.row, approvalTarget.decision, approvalTarget.category)) setApprovalTarget(null);
   }
 
   async function changeReimbursed(row: PaymentTableRow, reimbursed: boolean) {
@@ -327,16 +281,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
   function openReviewDialog() {
     setDialogError("");
     dialogRef.current?.showModal();
-  }
-
-  function requestStatusChange(row: PaymentTableRow, status: ReimbursementStatus) {
-    if (status === "approved" || status === "denied") setDecisionTarget({ row, status });
-  }
-
-  function confirmDecision(decision: ReviewDecision) {
-    if (!decisionTarget) return;
-    setDecisionTarget(null);
-    void changeStatus(decisionTarget.row, decision);
   }
 
   function closeReviewDialog() {
@@ -510,13 +454,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     </span>
                   </td>
                   <td>
-                    <div className="inline-action">
-                      <InlineStatusSelect
-                        disabled={!canWrite || item.reimbursed || item.status === "pending" || pendingFields.has(`${item.id}:status`)}
-                        onChange={(status) => requestStatusChange(item, status)}
-                        status={item.status}
-                      />
-                    </div>
+                    <span className={`badge badge-${item.status}`}>{formatStatus(item.status)}</span>
                   </td>
                   <td>
                     {item.status !== "approved" ? <span className="payable-paid-empty" aria-label="Not payable">—</span> : <div className="inline-action payable-paid-cell">
@@ -537,7 +475,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
       {feedback && <p className="payment-feedback" role="status">{feedback}</p>}
       {mutationError && <p className="payment-dialog-error pb-3" role="alert">{mutationError}</p>}
 
-      <ReopenApprovalDialog category={approvalTarget?.category ?? null} error={mutationError} pending={Boolean(approvalTarget && pendingFields.has(`${approvalTarget.row.id}:status`))} onCancel={() => setApprovalTarget(null)} onConfirm={reopenAndApprove} />
       <dialog
         aria-labelledby="payment-review-heading"
         className="payment-review-dialog"
@@ -594,14 +531,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         </div>
       </dialog>
 
-      {decisionTarget && <DecisionDialog
-        amount={decisionTarget.row.amount}
-        memberName={decisionTarget.row.full_name}
-        onCancel={() => setDecisionTarget(null)}
-        onConfirm={confirmDecision}
-        requestedAmount={decisionTarget.row.requested_amount ?? decisionTarget.row.amount}
-        status={decisionTarget.status}
-      />}
     </section>
     <aside
       aria-label="Receipt preview"
