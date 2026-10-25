@@ -117,4 +117,13 @@ body > [data-brand] {
 }
 
 .view-as-bar :is(select, button):focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
-.view-as-bar[aria-busy="true"] { opacity: 0.8; cursor: wait; }
+.view-as-bar[aria-busy="true"] { cursor: wait; }
+.view-as-progress { position: fixed; inset: 0 0 auto; z-index: 70; height: 3px; overflow: hidden; background: color-mix(in srgb, var(--color-brand) 20%, transparent); }
+.view-as-progress::after { content: ""; position: absolute; inset: 0; width: 40%; background: var(--color-brand); animation: view-as-progress 900ms ease-in-out infinite; }
+.view-as-spinner { display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.4em; vertical-align: -0.1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: view-as-spin 700ms linear infinite; }
+@keyframes view-as-progress { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes view-as-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  .view-as-progress::after { animation: none; width: 100%; opacity: 0.6; }
+  .view-as-spinner { animation-duration: 2s; }
+}

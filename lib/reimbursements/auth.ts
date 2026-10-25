@@ -152,11 +152,12 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
   const avatarUrl = avatarUrlFromClaims(data?.claims);
   const claimedFullName = fullNameFromClaims(data?.claims);
 
-  const initialProfileResult = await supabase
-    .from("profiles")
-    .select("id, full_name, role, removed_at")
-    .eq("id", userId)
-    .maybeSingle();
+  const loadAccess = () => supabase.rpc("get_my_app_access");
+  const [initialProfileResult, initialAccessResult] = await Promise.all([
+    supabase.from("profiles").select("id, full_name, role, removed_at").eq("id", userId).maybeSingle(),
+    loadAccess(),
+  ]);
+  let accessResult = initialAccessResult;
   let profile = initialProfileResult.data;
 
   if (initialProfileResult.error) {
@@ -201,6 +202,7 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
       });
     }
     profile = result.data;
+    accessResult = await loadAccess();
   }
 
   if (!profile) {
@@ -213,7 +215,6 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
     };
   }
 
-  const accessResult = await supabase.rpc("get_my_app_access");
   if (accessResult.error) throw new Error("Unable to load app access.");
   const appAccess = Object.fromEntries((accessResult.data ?? []).map((grant) => [grant.app_key, grant.access_level]));
 

@@ -2,16 +2,14 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { isRoleKey } from "@/lib/app-access";
-import { getSessionProfile } from "@/lib/reimbursements/auth";
-import { VIEW_AS_COOKIE } from "@/lib/app-access";
+import { isRoleKey, VIEW_AS_COOKIE } from "@/lib/app-access";
 
-export async function startViewAs(role: string) {
-  const session = await getSessionProfile();
-  const isAdmin = session?.profile.role === "admin" || session?.viewAsRole;
-  if (!isAdmin || !isRoleKey(role) || role === "admin") throw new Error("Only administrators can view the app as another role.");
+// The cookie only takes effect for administrators: the session loader and the
+// database both ignore it for everyone else.
+export async function startViewAs(role: string, openHome: boolean) {
+  if (!isRoleKey(role) || role === "admin") throw new Error("Choose a role to view as.");
   (await cookies()).set(VIEW_AS_COOKIE, role, { httpOnly: true, sameSite: "lax", secure: true, path: "/" });
-  redirect("/");
+  if (openHome) redirect("/");
 }
 
 export async function stopViewAs() {
