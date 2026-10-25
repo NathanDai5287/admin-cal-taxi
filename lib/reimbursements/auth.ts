@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ACCESS_LEVELS, APP_OPTIONS, VIEW_AS_COOKIE, isRoleKey, roleWithAncestors, type AppKey, type AccessLevel, type RoleKey } from "@/lib/app-access";
+import { APP_OPTIONS, VIEW_AS_COOKIE, isRoleKey, type AppKey, type AccessLevel, type RoleKey } from "@/lib/app-access";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -134,17 +134,6 @@ async function claimInviteWithoutRpc({
   }
 }
 
-async function roleAppAccess(supabase: Awaited<ReturnType<typeof createClient>>, role: RoleKey) {
-  const { data, error } = await supabase.from("role_app_access").select("app_key, access_level").in("role_key", roleWithAncestors(role));
-  if (error) throw new Error("Unable to load app access.");
-  const appAccess: Partial<Record<AppKey, AccessLevel>> = {};
-  for (const { app_key, access_level } of data) {
-    const app = app_key as AppKey;
-    if (ACCESS_LEVELS.indexOf(access_level) > ACCESS_LEVELS.indexOf(appAccess[app] ?? "none")) appAccess[app] = access_level;
-  }
-  return appAccess;
-}
-
 // Returns the signed-in user and their profile, or null when there is no
 // valid auth session. Sessions are shared across *.cal.taxi in production.
 // A signed-in user with no profiles row is treated as role "none" (no access)
@@ -224,6 +213,10 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
     };
   }
 
+  const accessResult = await supabase.rpc("get_my_app_access");
+  if (accessResult.error) throw new Error("Unable to load app access.");
+  const appAccess = Object.fromEntries((accessResult.data ?? []).map((grant) => [grant.app_key, grant.access_level]));
+
   const viewAsRole = (await cookies()).get(VIEW_AS_COOKIE)?.value;
   if (profile.role === "admin" && !profile.removed_at && isRoleKey(viewAsRole) && viewAsRole !== "admin") {
     return {
@@ -231,14 +224,10 @@ const loadSessionProfile = async (): Promise<SessionProfile | null> => {
       email,
       avatarUrl,
       viewAsRole,
-      appAccess: await roleAppAccess(supabase, viewAsRole),
+      appAccess,
       profile: { id: profile.id, full_name: profile.full_name, role: "member" },
     };
   }
-
-  const accessResult = await supabase.rpc("get_my_app_access");
-  if (accessResult.error) throw new Error("Unable to load app access.");
-  const appAccess = Object.fromEntries((accessResult.data ?? []).map((grant) => [grant.app_key, grant.access_level]));
 
   return {
     userId,
