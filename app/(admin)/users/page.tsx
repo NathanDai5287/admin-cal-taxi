@@ -7,7 +7,7 @@ import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 
-export const metadata: Metadata = { title: "Users" };
+export const metadata: Metadata = { title: "People · Members" };
 export const dynamic = "force-dynamic";
 
 function formatDate(value: string) {

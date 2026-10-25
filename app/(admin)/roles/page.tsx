@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { AppNav } from "@/components/brand/app-nav";
-import { requireAppAccess } from "@/lib/reimbursements/auth";
+import { hasAppAccess, requireAppAccess } from "@/lib/reimbursements/auth";
 import { createClient } from "@/lib/reimbursements/supabase/server";
 import type { RoleAppAccess } from "@/lib/app-access";
 import { AccessMatrix } from "./access-matrix";
 import "./roles.css";
 
-export const metadata: Metadata = { title: "Roles" };
+export const metadata: Metadata = { title: "Roles · Members" };
 export const dynamic = "force-dynamic";
 
 export default async function RolesPage() {
@@ -16,8 +16,8 @@ export default async function RolesPage() {
   if (error) throw new Error("Unable to load role access. Please refresh and try again.");
   return (
     <div data-brand className="min-h-screen">
-      <AppNav homeHref="/" title="Theta Xi" subtitle="Admin" tabs={[
-        ...(session.appAccess.users !== "none" ? [{ href: "/users", label: "Users" }] : []),
+      <AppNav homeHref="/" title="Theta Xi" subtitle="Members" tabs={[
+        ...(hasAppAccess(session, "users") ? [{ href: "/users", label: "People" }] : []),
         { href: "/roles", label: "Roles" },
       ]} />
       <main className="roles-main">

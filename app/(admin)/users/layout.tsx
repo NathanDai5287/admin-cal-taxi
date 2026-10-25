@@ -24,9 +24,9 @@ export default async function UsersLayout({ children }: { children: React.ReactN
       <AppNav
         homeHref="/"
         title="Theta Xi"
-        subtitle="Admin"
+        subtitle="Members"
         tabs={[
-          { href: "/users", label: "Users" },
+          { href: "/users", label: "People" },
           ...(hasAppAccess(session, "roles") ? [{ href: "/roles", label: "Roles" }] : []),
         ]}
       />
