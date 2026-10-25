@@ -1236,7 +1236,7 @@
     @apply text-[11.5px] font-normal text-muted;
   }
   [data-brand] .spend-breakdown {
-    @apply mt-3 border-t border-rule pt-3;
+    @apply mt-2;
   }
   [data-brand] .spend-breakdown summary {
     @apply cursor-pointer text-[11.5px] font-semibold text-brand;
@@ -1397,26 +1397,41 @@
 }
 
 @layer components {
-  [data-brand] .plan-edit {
-    @apply cursor-pointer border-b border-dashed border-muted text-muted hover:border-brand hover:text-brand focus-visible:outline-2 focus-visible:outline-brand;
+  [data-brand] .plan-row-label {
+    @apply flex min-w-0 items-baseline gap-2;
   }
-  [data-brand] .plan-edit-form {
-    @apply mt-2 flex flex-wrap items-center justify-end gap-2;
+  [data-brand] .plan-row-badge {
+    @apply text-[10.5px] font-semibold not-italic uppercase tracking-[.08em] text-muted;
   }
-  [data-brand] .plan-edit-form .money-input {
-    @apply w-36;
+  [data-brand] .plan-row-amounts {
+    @apply flex items-baseline gap-1;
   }
-  [data-brand] .plan-edit-form .field-input {
+  [data-brand] .plan-menu {
+    @apply relative -my-1 ml-1 self-center;
+  }
+  [data-brand] .plan-menu-trigger {
+    @apply grid size-7 cursor-pointer place-items-center text-[16px] leading-none text-muted hover:bg-brand-light hover:text-brand focus-visible:outline-2 focus-visible:outline-brand aria-expanded:bg-brand-light aria-expanded:text-brand;
+  }
+  [data-brand] .plan-menu-panel {
+    @apply absolute right-0 top-full z-20 mt-1 grid min-w-44 gap-2 border border-rule bg-surface p-2 text-left font-normal shadow-[0_8px_24px_rgb(0_0_0/.08)];
+  }
+  [data-brand] .plan-menu-panel[role="menu"] {
+    @apply gap-0 p-1;
+  }
+  [data-brand] .plan-menu-panel[role="menu"] button {
+    @apply cursor-pointer px-3 py-2 text-left text-[13px] text-ink hover:bg-brand-light focus-visible:bg-brand-light focus-visible:outline-none;
+  }
+  [data-brand] .plan-menu-panel .field-input {
     @apply min-h-9 text-right text-[13px];
   }
-  [data-brand] .plan-edit-form button,
-  [data-brand] .plan-complete button {
-    @apply min-h-9 cursor-pointer border border-rule bg-surface px-3 text-[12px] font-semibold text-brand hover:border-brand hover:bg-brand-light disabled:cursor-wait disabled:opacity-60;
+  [data-brand] form.plan-menu-panel button {
+    @apply min-h-9 flex-1 cursor-pointer border border-rule bg-surface px-3 text-[12px] font-semibold text-brand hover:border-brand hover:bg-brand-light disabled:cursor-wait disabled:opacity-60;
   }
-  [data-brand] .plan-complete {
-    @apply flex flex-wrap items-center justify-end gap-3 text-[11.5px];
+  [data-brand] .plan-menu-error {
+    @apply absolute right-0 top-full z-10 mt-1 w-56 bg-surface p-2 text-right text-[12px] font-normal text-warn;
   }
-  [data-brand] .plan-edit-error {
-    @apply w-full text-right text-[12px] text-warn;
+  [data-brand] .spend-breakdown-empty {
+    @apply mt-2 text-[11.5px] text-muted;
   }
+}
 }

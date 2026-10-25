@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CompletionToggle, PlanAmountEditor } from "@/app/(admin)/finance/planning/plan-editors";
+import { CategoryMenu } from "@/app/(admin)/finance/planning/plan-editors";
 import { buildPlanVsActual } from "@/lib/finance/plan-vs-actual";
 import { categoryBudgetsFromRows, formatMoney, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
@@ -26,8 +26,8 @@ async function loadPlanVsActual() {
     supabase.from("reimbursement_budgets").select("*"),
     loadAllPages((from, to) => supabase.from("reimbursement_budget_entries").select("kind, amount, source").gte("budget_date", termStart).lte("budget_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("chapter_receivables").select("amount_assessed, waived_at").gte("due_date", termStart).lte("due_date", termEnd).order("id").range(from, to)),
-    loadAllPages((from, to) => supabase.from("chapter_dues_payment_events").select("amount, date_is_estimated").gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
-    loadAllPages((from, to) => supabase.from("reimbursements").select("id, category, amount, merchant, description, reimbursed_at, receipt_date, submitted_at, reimbursement_date_is_estimated").eq("status", "approved").order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("chapter_dues_payment_events").select("amount").gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
+    loadAllPages((from, to) => supabase.from("reimbursements").select("id, category, amount, merchant, description, reimbursed_at, receipt_date, submitted_at").eq("status", "approved").order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("reimbursement_manual_expenses").select("id, category, amount, description, expense_date").gte("expense_date", termStart).lte("expense_date", termEnd).order("id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_orders").select("planned_revenue, planned_fire_permit, status").gte("event_date", termStart).lte("event_date", termEnd).order("order_id").range(from, to)),
     loadAllPages((from, to) => supabase.from("hosting_finance_payments").select("amount, kind").is("reversed_at", null).gte("paid_date", termStart).lte("paid_date", termEnd).order("id").range(from, to)),
@@ -61,14 +61,12 @@ async function loadPlanVsActual() {
     ...actualReimbursements.map((row) => ({ category: row.category, id: row.id, receipt: true, description: row.merchant || row.description, amount: Number(row.amount), date: row.receipt_date ?? row.submitted_at.slice(0, 10) })),
     ...directExpenses.map((row) => ({ category: row.category, id: row.id, receipt: false, description: row.description, amount: Number(row.amount), date: row.expense_date })),
   ].sort((left, right) => right.date.localeCompare(left.date));
-  const estimatedActualDates = (duesPaymentsResult.data ?? []).filter((row) => row.date_is_estimated).length
-    + actualReimbursements.filter((row) => row.reimbursement_date_is_estimated).length;
 
-  return { termLabel, summary, budgets, completedCategories, items, estimatedActualDates };
+  return { termLabel, summary, budgets, completedCategories, items };
 }
 
 export async function PlanVsActual({ editable = false }: { editable?: boolean }) {
-  const { termLabel, summary, budgets, completedCategories, items, estimatedActualDates } = await loadPlanVsActual();
+  const { termLabel, summary, budgets, completedCategories, items } = await loadPlanVsActual();
 
   return (
     <div className="grid gap-7">
@@ -109,7 +107,7 @@ export async function PlanVsActual({ editable = false }: { editable?: boolean })
             />
           ))}
         </Breakdown>
-        <Breakdown title="Expenses by category" note={editable ? "Select a plan amount to change it" : "Includes approved reimbursements not yet paid"}>
+        <Breakdown title="Expenses by category" note="Includes approved reimbursements not yet paid">
           {summary.expenseBreakdown.map((row) => {
             const categoryItems = items.filter((item) => item.category === row.category);
             const completed = completedCategories.includes(row.category);
@@ -120,9 +118,10 @@ export async function PlanVsActual({ editable = false }: { editable?: boolean })
                 key={row.category}
                 kind="expense"
                 label={row.label}
-                planned={editable ? <PlanAmountEditor category={row.category} label={row.label} budget={budgets.get(row.category) ?? null} display={formatMoney(row.planned)} /> : formatMoney(row.planned)}
+                planned={formatMoney(row.planned)}
+                completed={completed}
                 plannedAmount={row.planned}
-                control={editable ? <CompletionToggle category={row.category} label={row.label} completed={completed} /> : completed ? <span className="text-[11.5px] text-brand">Completed</span> : null}
+                control={editable ? <CategoryMenu category={row.category} label={row.label} budget={budgets.get(row.category) ?? null} completed={completed} /> : null}
               >
                 <SpendingItems items={categoryItems} linked={editable} />
               </PlanBarRow>
@@ -132,7 +131,6 @@ export async function PlanVsActual({ editable = false }: { editable?: boolean })
       </div>
 
       {editable && summary.excludedLegacyDues.length ? <p className="border border-rule bg-surface px-4 py-3 text-[12px] text-muted">{summary.excludedLegacyDues.length} legacy manual dues {summary.excludedLegacyDues.length === 1 ? "entry is" : "entries are"} visible in Account Activity and excluded here to prevent double counting.</p> : null}
-      {editable && estimatedActualDates ? <p className="border border-rule bg-surface px-4 py-3 text-xs text-muted">{estimatedActualDates} legacy {estimatedActualDates === 1 ? "payment uses" : "payments use"} the best available historical date.</p> : null}
     </div>
   );
 }
@@ -145,7 +143,7 @@ function Breakdown({ title, note, children }: { title: string; note: string; chi
   return <section className="min-w-0 self-start border-t-[3px] border-brand bg-surface"><div className="flex flex-wrap items-baseline justify-between gap-2 border-x border-rule px-4 py-3"><h2 className="text-xs font-bold uppercase tracking-[.1em]">{title}</h2><span className="text-xs text-muted">{note}</span></div><div className="plan-grid">{children}</div></section>;
 }
 
-function PlanBarRow({ actual, hasPlan, href, kind, label, planned, plannedAmount, control, children }: {
+function PlanBarRow({ actual, hasPlan, href, kind, label, planned, plannedAmount, completed = false, control, children }: {
   actual: number;
   hasPlan: boolean;
   href?: string;
@@ -153,6 +151,7 @@ function PlanBarRow({ actual, hasPlan, href, kind, label, planned, plannedAmount
   label: string;
   planned: React.ReactNode;
   plannedAmount: number;
+  completed?: boolean;
   control?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -172,15 +171,14 @@ function PlanBarRow({ actual, hasPlan, href, kind, label, planned, plannedAmount
   return (
     <article className="plan-row">
       <div className="plan-row-head">
-        {href ? <Link className={`${labelClass} hover:underline`} href={href}>{label} →</Link> : <strong className={labelClass}>{label}</strong>}
-        <span>{formatMoney(actual)}{hasPlan || kind === "expense" ? <small> / {planned}</small> : null}</span>
+        <span className="plan-row-label">{href ? <Link className={`${labelClass} hover:underline`} href={href}>{label} →</Link> : <strong className={labelClass}>{label}</strong>}{completed ? <em className="plan-row-badge">Completed</em> : null}</span>
+        <span className="plan-row-amounts">{formatMoney(actual)}{hasPlan || kind === "expense" ? <small> / {planned}</small> : null}{control}</span>
       </div>
       <div className="spend-track" aria-hidden="true"><span className={tone} style={{ width: `${width}%` }} /></div>
       <div className={`spend-row-meta${tone ? ` ${tone}` : ""}`}>
         <span>{hasPlan ? (percent === null ? `${formatMoney(plannedAmount)} plan` : `${percent}% of plan`) : "No plan set"}</span>
         <span>{status}</span>
       </div>
-      {control ? <div className="mt-2 flex justify-end">{control}</div> : null}
       {children}
     </article>
   );
@@ -192,7 +190,7 @@ function formatItemDate(value: string) {
 }
 
 function SpendingItems({ items, linked }: { items: SpendingItem[]; linked: boolean }) {
-  if (!items.length) return null;
+  if (!items.length) return <p className="spend-breakdown-empty">No spending yet</p>;
   return (
     <details className="spend-breakdown">
       <summary>{items.length} {items.length === 1 ? "item makes" : "items make"} up this total</summary>
