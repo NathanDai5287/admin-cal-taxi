@@ -1,38 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/brand/button";
-import { updatePerson } from "@/app/(admin)/(members)/users/actions";
 import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole } from "@/lib/people";
 import type { AcademicYearOption, MemberRow } from "@/app/(admin)/(members)/users/members-table";
 
-export function PersonEditor({ member, academicYears, canChangeAccount, onClose }: {
+export function PersonEditor({ member, academicYears, canChangeAccount, onSave, onClose }: {
   member: MemberRow;
   academicYears: AcademicYearOption[];
   canChangeAccount: boolean;
+  onSave: (formData: FormData) => void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { dialog.current?.showModal(); }, []);
   const [membership, setMembership] = useState(member.membership ?? "");
   const [offices, setOffices] = useState<ExecutiveRole[]>(member.executiveRoles);
-  const [error, setError] = useState("");
-  const [pending, startTransition] = useTransition();
   const officesBlocked = membership !== "brother" && offices.length > 0;
-
-  function save(formData: FormData) {
-    setError("");
-    startTransition(async () => {
-      const result = await updatePerson(member.id, formData).catch(() => ({
-        error: "Unable to save this person. Please try again.",
-      }));
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      onClose();
-    });
-  }
 
   function toggleOffice(office: ExecutiveRole) {
     setOffices((current) => current.includes(office)
@@ -42,7 +26,7 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onClose 
 
   return (
     <dialog ref={dialog} className="person-dialog" aria-labelledby="person-dialog-title" onClose={onClose}>
-      <form onSubmit={(event) => { event.preventDefault(); save(new FormData(event.currentTarget)); }}>
+      <form onSubmit={(event) => { event.preventDefault(); onSave(new FormData(event.currentTarget)); }}>
         <header className="person-dialog-header">
           <div className="min-w-0">
             <h2 className="card-title" id="person-dialog-title">{member.fullName || member.email}</h2>
@@ -51,7 +35,7 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onClose 
           <button type="button" aria-label="Close" onClick={onClose}>×</button>
         </header>
 
-        <fieldset disabled={pending} className="person-dialog-section" aria-labelledby="person-roles-heading">
+        <fieldset className="person-dialog-section" aria-labelledby="person-roles-heading">
           <h3 className="person-dialog-heading" id="person-roles-heading">Roles</h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">
@@ -84,7 +68,7 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onClose 
           </div>
         </fieldset>
 
-        <fieldset disabled={pending} className="person-dialog-section sm:grid-cols-2" aria-labelledby="person-details-heading">
+        <fieldset className="person-dialog-section sm:grid-cols-2" aria-labelledby="person-details-heading">
           <h3 className="person-dialog-heading sm:col-span-2" id="person-details-heading">Details</h3>
           <div className="field">
             <label className="field-label" htmlFor="person-name">Name</label>
@@ -116,9 +100,8 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onClose 
         </fieldset>
 
         <footer className="person-dialog-footer">
-          {error ? <p className="form-message mr-auto" role="alert">{error}</p> : null}
-          <Button type="button" variant="secondary" onClick={onClose} disabled={pending}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={pending || officesBlocked}>{pending ? "Saving…" : "Save"}</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={officesBlocked}>Save</Button>
         </footer>
       </form>
     </dialog>

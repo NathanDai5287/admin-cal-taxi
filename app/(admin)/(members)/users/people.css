@@ -41,9 +41,12 @@
   margin-left: 8px;
 }
 
+[data-brand] .people-actions > * {
+  vertical-align: middle;
+}
+
 [data-brand] .people-actions .brand-button {
   height: 36px;
-  vertical-align: middle;
 }
 
 [data-brand] .people-table button:focus-visible {

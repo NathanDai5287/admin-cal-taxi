@@ -145,26 +145,25 @@ export async function updatePerson(userId: string, formData: FormData): Promise<
   if (role !== null && userId === session.userId) return { error: "You can't change your own account role." };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("admin_update_person", {
-    target_user_id: userId,
-    person_name: fullName,
-    person_contact_email: contactEmail,
-    person_phone: phone,
-    person_membership: membership,
-    person_executive_roles: executiveRoles,
-  });
-  if (error?.code === "23505") return { error: "Another person holds this office. Remove their assignment first." };
-  if (error) return { error: "Unable to save this person. Check the details and try again." };
-
-  const results = await Promise.all([
+  const [{ error }, ...otherResults] = await Promise.all([
+    supabase.rpc("admin_update_person", {
+      target_user_id: userId,
+      person_name: fullName,
+      person_contact_email: contactEmail,
+      person_phone: phone,
+      person_membership: membership,
+      person_executive_roles: executiveRoles,
+    }),
     supabase.rpc("admin_set_profile_discord_id", { target_user_id: userId, new_discord_user_id: discordUserId }),
     supabase.rpc("admin_set_profile_academic_term", { target_user_id: userId, new_academic_term_id: memberSinceTermId }),
     ...(role === null ? [] : [supabase.rpc("admin_set_profile_role", { target_user_id: userId, new_role: role })]),
   ]);
-  if (results.some((result) => result.error)) return { error: "Some changes were not saved. Please try again." };
-
   revalidatePath("/users");
   revalidatePath("/host");
   revalidatePath("/finance/accounts/receivable");
+  if (error?.code === "23505") return { error: "Another person holds this office. Remove their assignment first." };
+  if (error) return { error: "Unable to save this person. Check the details and try again." };
+  if (otherResults.some((result) => result.error)) return { error: "Some changes were not saved. Please try again." };
+
   return {};
 }

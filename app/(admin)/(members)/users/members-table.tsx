@@ -4,7 +4,7 @@ import "./people.css";
 
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 
-import { removeUser } from "@/app/(admin)/(members)/users/actions";
+import { removeUser, updatePerson } from "@/app/(admin)/(members)/users/actions";
 import { Button } from "@/components/brand/button";
 import { PersonEditor } from "@/app/(admin)/(members)/users/person-editor";
 import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
@@ -41,6 +41,21 @@ function RoleBadges({ member }: { member: MemberRow }) {
       {offices.map((office) => <span key={office} className="badge badge-approved">{office}</span>)}
     </span>
   );
+}
+
+function withFormChanges(member: MemberRow, formData: FormData): MemberRow {
+  const text = (name: string) => String(formData.get(name) ?? "").trim();
+  return {
+    ...member,
+    fullName: text("fullName"),
+    contactEmail: text("contactEmail").toLowerCase(),
+    phone: text("phone"),
+    membership: (text("membership") || null) as Membership | null,
+    executiveRoles: formData.getAll("executiveRoles").map(String) as ExecutiveRole[],
+    discordUserId: text("discordUserId"),
+    memberSinceTermId: text("memberSinceTermId"),
+    role: (formData.get("role") as MemberRow["role"] | null) ?? member.role,
+  };
 }
 
 function TrashIcon() {
@@ -132,8 +147,10 @@ export function MembersTable({
   canAssignAdmin: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const editingMember = members.find((member) => member.id === editingId);
-  const [optimisticMembers, removeOptimistic] = useOptimistic(members, (current, userId: string) => current.filter((member) => member.id !== userId));
+  const [optimisticMembers, applyOptimistic] = useOptimistic(members, (current, change: string | MemberRow) => typeof change === "string"
+    ? current.filter((member) => member.id !== change)
+    : current.map((member) => member.id === change.id ? change : member));
+  const editingMember = optimisticMembers.find((member) => member.id === editingId);
   const [, startTransition] = useTransition();
   const [error, setError] = useState("");
   const termLabels = new Map(academicYears.flatMap((year) => year.terms.map((term) => [term.id, term.label])));
@@ -141,8 +158,18 @@ export function MembersTable({
   function remove(userId: string) {
     setError("");
     startTransition(async () => {
-      removeOptimistic(userId);
+      applyOptimistic(userId);
       await removeUser(userId).catch(() => setError("Unable to remove that person. Please try again."));
+    });
+  }
+
+  function save(member: MemberRow, formData: FormData) {
+    setEditingId(null);
+    setError("");
+    startTransition(async () => {
+      applyOptimistic(withFormChanges(member, formData));
+      const result = await updatePerson(member.id, formData).catch(() => ({ error: "Unable to save this person. Please try again." }));
+      if (result.error) setError(`${userLabel(member.fullName, member.email)}: ${result.error}`);
     });
   }
 
@@ -152,7 +179,7 @@ export function MembersTable({
 
   return (
     <>
-      {editingMember && <PersonEditor key={editingMember.id} member={editingMember} academicYears={academicYears} canChangeAccount={canAssignAdmin && editingMember.id !== currentUserId} onClose={() => setEditingId(null)} />}
+      {editingMember && <PersonEditor key={editingMember.id} member={editingMember} academicYears={academicYears} canChangeAccount={canAssignAdmin && editingMember.id !== currentUserId} onSave={(formData) => save(editingMember, formData)} onClose={() => setEditingId(null)} />}
       {error ? <p className="form-message px-6 pb-3" role="alert">{error}</p> : null}
       <div className="table-scroll people-table-scroll" role="region" aria-label="People and roles" tabIndex={0}>
       <table className="data-table people-table">
