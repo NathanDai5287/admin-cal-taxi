@@ -495,6 +495,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                   <td><span className="payable-description" title={item.description}>{item.description}</span></td>
                   <td className="amount text-right">
                     <span className="amount-check">
+                      {item.requested_amount !== null && <s className="text-[11px] text-muted" title="Requested amount">{formatMoney(item.requested_amount)}</s>}
                       {formatMoney(item.amount)}
                       <span
                         aria-label={item.receipt_total === null

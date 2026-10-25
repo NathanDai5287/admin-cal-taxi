@@ -95,8 +95,9 @@ function useReviewStatus() {
 }
 
 export function ReviewStatusBadge() {
-  const { status } = useReviewStatus();
-  return <span className={`badge badge-${status}`}>{formatStatus(status)}</span>;
+  const { amount, requestedAmount, status } = useReviewStatus();
+  const amountChanged = status === "approved" && amount !== requestedAmount;
+  return <span className={`badge badge-${status}`}>{formatStatus(status)}{amountChanged && " · amount changed"}</span>;
 }
 
 export function ReviewDecisionButtons({ compact = false, disabled = false }: { compact?: boolean; disabled?: boolean }) {
