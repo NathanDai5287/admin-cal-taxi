@@ -1,4 +1,5 @@
 import type { ReimbursementStatus } from "@/lib/reimbursements/format";
+import type { EmailActivity } from "@/lib/email-tracking";
 import { formatMoney } from "@/lib/reimbursements/format";
 
 export type PayableDetailData = {
@@ -19,6 +20,7 @@ export type PayableDetailData = {
   totalsMatch: boolean;
   comparisonMessage: string;
   decisionNote: string;
+  emails: EmailActivity[];
   reimbursed: boolean;
   status: ReimbursementStatus;
 };
@@ -38,6 +40,7 @@ type PayableDetailSource = {
   denial_reason: string | null;
   approval_note: string | null;
   requested_amount: number | string | null;
+  emails: EmailActivity[];
   reimbursed: boolean;
   status: ReimbursementStatus;
 };
@@ -71,6 +74,7 @@ export function payableDetailData(row: PayableDetailSource, receiptUrl: string |
           ? `Automatic verification failed${row.failure_reason ? `: ${row.failure_reason}` : "."}`
           : "The totals differ and need manual review.",
     decisionNote: row.denial_reason ?? row.approval_note ?? "",
+    emails: row.emails,
     reimbursed: row.reimbursed,
     status: row.status,
   };

@@ -1,6 +1,7 @@
 import "server-only";
 import { createUntypedAdminClient } from "./reimbursements/supabase/admin";
 import { trackEmailBody } from "./email-tracking-links";
+import { loadAllPages } from "./reimbursements/load-all-pages";
 
 export type EmailActivity = {
   id: string; kind: string; related_id: string | null; recipient: string; subject: string; body_text: string | null; created_at: string; sent_at: string | null;
@@ -66,9 +67,24 @@ export async function recordEmailEvent(token: string, kind: "opened" | "clicked"
   if (result.error) throw new Error("Unable to record email activity.");
 }
 
+function activityQuery() {
+  return trackingDb().from("email_tracking_messages").select("id,kind,related_id,recipient,subject,body_text:body->>text,created_at,sent_at,failed_at,error,events:email_tracking_events(kind,url,occurred_at)").or("provider_id.not.is.null,failed_at.not.is.null").order("created_at", { ascending: false });
+}
+
+export async function loadReimbursementEmails() {
+  const byReimbursement = new Map<string, EmailActivity[]>();
+  if (!emailTrackingEnabled()) return byReimbursement;
+  const result = await loadAllPages<EmailActivity>((from, to) => activityQuery().eq("kind", "reimbursement").range(from, to));
+  if (result.error) throw new Error("Unable to load email activity.");
+  for (const message of result.data) {
+    byReimbursement.set(message.related_id!, [...byReimbursement.get(message.related_id!) ?? [], message]);
+  }
+  return byReimbursement;
+}
+
 export async function loadEmailActivity(relatedId?: string): Promise<EmailActivity[]> {
   if (!emailTrackingEnabled()) return [];
-  let query = trackingDb().from("email_tracking_messages").select("id,kind,related_id,recipient,subject,body_text:body->>text,created_at,sent_at,failed_at,error,events:email_tracking_events(kind,url,occurred_at)").or("provider_id.not.is.null,failed_at.not.is.null").order("created_at", { ascending: false }).limit(100);
+  let query = activityQuery().limit(100);
   if (relatedId) query = query.eq("related_id", relatedId);
   const result = await query;
   if (result.error) throw new Error("Unable to load email activity.");

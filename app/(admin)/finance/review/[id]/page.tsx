@@ -27,6 +27,6 @@ export default async function SubmissionReviewPage({ params }: { params: Promise
     getReceiptPreviewUrls([reimbursement.receipt_path], "full"),
     loadEmailActivity(reimbursement.id),
   ]);
-  const detail = payableDetailData(reimbursement, previewUrls.get(reimbursement.receipt_path) ?? null);
-  return <PayableDetailView detail={detail} emails={emails} fullReceiptUrl={fullUrls.get(reimbursement.receipt_path) ?? null} />;
+  const detail = payableDetailData({ ...reimbursement, emails }, previewUrls.get(reimbursement.receipt_path) ?? null);
+  return <PayableDetailView detail={detail} fullReceiptUrl={fullUrls.get(reimbursement.receipt_path) ?? null} />;
 }

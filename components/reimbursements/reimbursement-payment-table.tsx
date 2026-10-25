@@ -11,6 +11,7 @@ import {
   markReimbursementsPaid,
   setReimbursementPaid,
 } from "@/app/(admin)/finance/accounts/payable/actions";
+import type { EmailActivity } from "@/lib/email-tracking";
 import { formatMoney, formatStatus, type ReimbursementStatus } from "@/lib/reimbursements/format";
 import { ReimbursedCheckbox } from "@/components/reimbursements/reimbursed-checkbox";
 import { setPayableNavigationPreview } from "@/components/reimbursements/payable-navigation-preview";
@@ -22,6 +23,7 @@ export type PaymentTableRow = {
   category: string;
   description: string;
   denial_reason: string | null;
+  emails: EmailActivity[];
   approval_note: string | null;
   requested_amount: number | null;
   failure_reason: string | null;

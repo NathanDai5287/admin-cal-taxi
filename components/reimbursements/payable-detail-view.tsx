@@ -9,10 +9,9 @@ import { EditableDescription } from "@/components/reimbursements/editable-descri
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
 import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
 import { formatReimbursementDate, type ReimbursementCategory } from "@/lib/reimbursements/format";
-import type { EmailActivity } from "@/lib/email-tracking";
 import type { PayableDetailData } from "@/lib/reimbursements/payable-detail-data";
 
-export function PayableDetailView({ detail, emails, fullReceiptUrl = null }: { detail: PayableDetailData; emails?: EmailActivity[]; fullReceiptUrl?: string | null }) {
+export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: PayableDetailData; fullReceiptUrl?: string | null }) {
   const processingComplete = detail.status !== "pending";
   const fullSrc = fullReceiptUrl ?? `/api/reimbursements/receipts/${detail.id}/original`;
 
@@ -57,14 +56,14 @@ export function PayableDetailView({ detail, emails, fullReceiptUrl = null }: { d
             </div>
           </section>
 
-          {emails && <section className="card">
+          <section className="card">
             <div className="card-header"><span className="card-title">Emails to the member</span></div>
             <div className="border-t border-rule px-6">
-              {emails.length
-                ? emails.map((message) => <EmailRecord key={message.id} message={message} />)
+              {detail.emails.length
+                ? detail.emails.map((message) => <EmailRecord key={message.id} message={message} />)
                 : <p className="py-6 text-sm text-muted">No emails sent yet.</p>}
             </div>
-          </section>}
+          </section>
         </div>
 
         <aside className="receipt-sidebar">

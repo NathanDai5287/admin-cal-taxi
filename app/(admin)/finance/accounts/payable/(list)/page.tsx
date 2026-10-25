@@ -5,6 +5,7 @@ import { formatMoney } from "@/lib/reimbursements/format";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { loadAllPages } from "@/lib/reimbursements/load-all-pages";
 import { getReceiptPreviewUrls } from "@/lib/reimbursements/receipt-preview-urls";
+import { loadReimbursementEmails } from "@/lib/email-tracking";
 
 export const metadata = { title: "Accounts payable" };
 export const dynamic = "force-dynamic";
@@ -17,9 +18,13 @@ export default async function PayablePage() {
     .order("submitted_at", { ascending: false }).order("id", { ascending: false }).range(from, to));
   if (error) throw new Error(`Unable to load payables: ${error.message}`);
   const rows = data ?? [];
-  const previewUrls = await getReceiptPreviewUrls(rows.map((row) => row.receipt_path));
+  const [previewUrls, emails] = await Promise.all([
+    getReceiptPreviewUrls(rows.map((row) => row.receipt_path)),
+    loadReimbursementEmails(),
+  ]);
   const paymentRows = rows.map(({ receipt_path, ...row }) => ({
     ...row,
+    emails: emails.get(row.id) ?? [],
     receipt_preview_url: previewUrls.get(receipt_path) ?? null,
   }));
   const readyToPay = rows.filter((row) => row.status === "approved" && !row.reimbursed);
