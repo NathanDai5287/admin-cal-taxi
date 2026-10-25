@@ -7,7 +7,7 @@ import { RefreshWhile } from "@/components/navigation/refresh-while";
 import { EditableCategory } from "@/components/reimbursements/editable-category";
 import { EditableDescription } from "@/components/reimbursements/editable-description";
 import { ReceiptImage } from "@/components/reimbursements/receipt-image";
-import { ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
+import { PaidNotice, ReviewDecisionButtons, ReviewStatusBadge, ReviewStatusProvider } from "@/components/reimbursements/review-decision-buttons";
 import { formatReimbursementDate, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import type { PayableDetailData } from "@/lib/reimbursements/payable-detail-data";
 
@@ -16,7 +16,7 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
   const fullSrc = fullReceiptUrl ?? `/api/reimbursements/receipts/${detail.id}/original`;
 
   return (
-    <ReviewStatusProvider amount={detail.amountValue} initialNote={detail.decisionNote} reimbursementId={detail.id} requestedAmount={detail.requestedAmountValue} status={detail.status}>
+    <ReviewStatusProvider amount={detail.amountValue} initialNote={detail.decisionNote} reimbursed={detail.reimbursed} reimbursementId={detail.id} requestedAmount={detail.requestedAmountValue} status={detail.status}>
       <RefreshWhile active={!processingComplete} />
       <Link className="back-link mb-4 inline-flex" href="/finance/accounts/payable">← All reimbursements</Link>
       <div className="flex items-end justify-between gap-6 flex-wrap mb-6">
@@ -48,9 +48,9 @@ export function PayableDetailView({ detail, fullReceiptUrl = null }: { detail: P
           <section className="card">
             <div className="card-header"><span className="card-title">Review decision</span></div>
             <div className="review-actions border-t border-rule">
-              {detail.reimbursed && <p>This reimbursement has been paid. To change the decision, first mark it unpaid in the Paid column of the Reimbursements list.</p>}
+              <PaidNotice />
               <div className="status-actions">
-                <ReviewDecisionButtons disabled={detail.reimbursed || !processingComplete} />
+                <ReviewDecisionButtons disabled={!processingComplete} />
               </div>
               {!processingComplete && <p className="helper-text mt-3">Approval is available when automatic processing finishes.</p>}
             </div>
