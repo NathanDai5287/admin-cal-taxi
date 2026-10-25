@@ -1,6 +1,7 @@
 import "server-only";
 import { personContactEmail } from "./people";
-import { prepareTrackedEmail, recordEmailProvider } from "./email-tracking";
+import { prepareTrackedEmail, recordEmailFailure, recordEmailProvider } from "./email-tracking";
+import { sendEmailWithRetry } from "./email-send";
 import { createHash } from "node:crypto";
 import { backendKey, backendOrigin } from "./host-backend";
 import { getOrderFresh } from "./host-orders";
@@ -267,13 +268,15 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
     if (!claim.data) { errors.push("This email is already sending or needs review in Resend. Reload its delivery history."); continue; }
     try {
       const tracked = await prepareTrackedEmail(row.payload.body, { key: `hosting/${row.id}`, kind: "hosting", relatedId: orderId, recipient: row.recipient });
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST", headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json", "Idempotency-Key": `hosting/${row.id}` }, body: JSON.stringify(tracked.body), signal: AbortSignal.timeout(25_000),
-      });
-      const answer = await response.json() as { id?: string; message?: string };
-      if (!response.ok || !answer.id) throw new Error(answer.message || `Email service returned ${response.status}.`);
-      await recordEmailProvider(tracked.id, answer.id);
-      const saved = await db.from("hosting_email_deliveries").update({ status: "sent", provider_id: answer.id, sent_at: new Date().toISOString(), error: null }).eq("id", row.id);
+      let providerId: string;
+      try {
+        providerId = await sendEmailWithRetry(tracked.body, `hosting/${row.id}`);
+      } catch (error) {
+        await recordEmailFailure(tracked.id, error instanceof Error ? error.message : "Email delivery failed.");
+        throw error;
+      }
+      await recordEmailProvider(tracked.id, providerId);
+      const saved = await db.from("hosting_email_deliveries").update({ status: "sent", provider_id: providerId, sent_at: new Date().toISOString(), error: null }).eq("id", row.id);
       if (saved.error) throw new Error("Email accepted; delivery history could not be saved. Retry uses the same email key.");
       sent++;
     } catch (error) {

@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { z } from "zod";
 
 import { requireAdmin, requireAppAccess } from "@/lib/reimbursements/auth";
 import { categorySchema, categoryValues, type ReimbursementCategory } from "@/lib/reimbursements/format";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import type { EmailFailure } from "@/lib/email-send";
 import { sendDecisionEmail } from "@/lib/reimbursements/send-reimbursement-email";
 import { setExpenseCategoryCompleted } from "@/app/(admin)/finance/planning/actions";
 
@@ -15,7 +15,7 @@ export type ReviewDecision = { status: "approved" | "denied"; note: string; amou
 type DecidedRow = { id: string; status: ReviewDecision["status"]; amount: number; requested_amount: number | null; updated_at: string };
 
 export type StatusMutationResult =
-  | { ok: true; row: DecidedRow }
+  | { ok: true; row: DecidedRow; emailFailure?: EmailFailure }
   | { ok: false; message: string; completedCategory?: ReimbursementCategory };
 
 export async function setReimbursementStatus(
@@ -86,11 +86,11 @@ export async function setReimbursementStatus(
     return { ok: false, message: `${reopening ? "The category reopened, but approval failed. " : ""}That reimbursement is paid, changed, still processing, or no longer exists.` };
   }
 
-  after(() => sendDecisionEmail(data.id));
+  const email = await sendDecisionEmail(data.id);
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/reports");
   revalidatePath(`/finance/review/${parsed.data.id}`);
-  return { ok: true, row: { ...data, status: parsed.data.status } };
+  return { ok: true, row: { ...data, status: parsed.data.status }, ...(email?.sent === false ? { emailFailure: email } : {}) };
 }
 
 export async function updateDescription(formData: FormData) {

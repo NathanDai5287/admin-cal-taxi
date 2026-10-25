@@ -6,7 +6,9 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 
 import { setReimbursementStatus, type ReviewDecision } from "@/app/(admin)/finance/review/actions";
 import { Button } from "@/components/brand/button";
+import { ResendEmailButton } from "@/components/email/resend-email-button";
 import { DecisionDialog } from "@/components/reimbursements/decision-dialog";
+import type { EmailFailure } from "@/lib/email-send";
 import type { ReimbursementStatus } from "@/lib/reimbursements/format";
 import { ReopenApprovalDialog } from "@/components/reimbursements/reopen-approval-dialog";
 import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/format";
@@ -14,6 +16,7 @@ import { formatStatus, type ReimbursementCategory } from "@/lib/reimbursements/f
 type ReviewStatusState = {
   amount: number;
   change: (decision: ReviewDecision) => Promise<boolean>;
+  emailFailure: EmailFailure | null;
   error: string;
   note: string;
   pending: boolean;
@@ -35,6 +38,7 @@ export function ReviewStatusProvider({ amount, children, initialNote = "", reimb
   const [note, setNote] = useState(initialNote);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [emailFailure, setEmailFailure] = useState<EmailFailure | null>(null);
   const [reopenTarget, setReopenTarget] = useState<{ category: ReimbursementCategory; decision: ReviewDecision } | null>(null);
   const mutationId = useRef(0);
 
@@ -56,6 +60,7 @@ export function ReviewStatusProvider({ amount, children, initialNote = "", reimb
     setNote(decision.note);
     setPending(true);
     setError("");
+    setEmailFailure(null);
     let reopenRequired = false;
     try {
       const result = await setReimbursementStatus(reimbursementId, decision, reopenCategory);
@@ -64,6 +69,7 @@ export function ReviewStatusProvider({ amount, children, initialNote = "", reimb
         if (result.completedCategory) setReopenTarget({ category: result.completedCategory, decision });
         throw new Error(result.message);
       }
+      setEmailFailure(result.emailFailure ?? null);
       return true;
     } catch (reason) {
       if (mutationId.current === currentMutation) {
@@ -82,7 +88,7 @@ export function ReviewStatusProvider({ amount, children, initialNote = "", reimb
     if (reopenTarget && await change(reopenTarget.decision, reopenTarget.category)) setReopenTarget(null);
   }
 
-  return <ReviewStatusContext.Provider value={{ amount, change, error, note, pending, requestedAmount, status }}>
+  return <ReviewStatusContext.Provider value={{ amount, change, emailFailure, error, note, pending, requestedAmount, status }}>
     {children}
     <ReopenApprovalDialog category={reopenTarget?.category ?? null} error={error} pending={pending} onCancel={() => setReopenTarget(null)} onConfirm={reopenAndApprove} />
   </ReviewStatusContext.Provider>;
@@ -102,7 +108,7 @@ export function ReviewStatusBadge() {
 
 export function ReviewDecisionButtons({ compact = false, disabled = false }: { compact?: boolean; disabled?: boolean }) {
   const canWrite = useAppWriteAccess();
-  const { amount, change, error, note, pending, requestedAmount, status } = useReviewStatus();
+  const { amount, change, emailFailure, error, note, pending, requestedAmount, status } = useReviewStatus();
   const [decision, setDecision] = useState<ReviewDecision["status"] | null>(null);
 
   function confirm(next: ReviewDecision) {
@@ -121,6 +127,10 @@ export function ReviewDecisionButtons({ compact = false, disabled = false }: { c
       ? <p className="m-0 text-[13px] leading-relaxed text-muted"><span className="font-semibold text-ink">{status === "denied" ? "Denial reason:" : "Message to the member:"}</span> {note}</p>
       : null}
     {error ? <p className="form-message" role="alert">{error}</p> : null}
+    {emailFailure && !compact ? <div className="grid justify-items-start gap-2">
+      <p className="form-message" role="alert">The decision is saved, but the email to the member was not sent: {emailFailure.error}</p>
+      {emailFailure.messageId && <ResendEmailButton messageId={emailFailure.messageId} />}
+    </div> : null}
     {decision && <DecisionDialog
       amount={amount}
       onCancel={() => setDecision(null)}

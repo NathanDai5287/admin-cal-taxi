@@ -54,3 +54,6 @@ export function workflowDb() {
 
 export async function prepareTrackedEmail<T>(body: T) { return { id: "tracking-fixture", body }; }
 export async function recordEmailProvider() {}
+export async function recordEmailFailure() {}
+export async function loadUnsentEmail() { return null; }
+export function trackingAddress(token: string) { return { origin: "https://admin.example.test", token, secret: "test" }; }

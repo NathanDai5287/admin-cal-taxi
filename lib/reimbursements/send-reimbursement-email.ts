@@ -1,7 +1,6 @@
 import "server-only";
 
-import { Resend } from "resend";
-import { prepareTrackedEmail, recordEmailProvider } from "../email-tracking";
+import { sendTrackedEmail, type EmailResult } from "../email-send";
 import { escapeEmail } from "../host-email-template";
 import { formatMoney } from "./format";
 import { publicSiteUrls } from "./send-invite-email";
@@ -20,7 +19,7 @@ async function loadRequest(reimbursementId: string) {
   return member?.email ? { row, recipient: member.email } : null;
 }
 
-async function sendMemberEmail({ reimbursementId, recipient, subject, lines, event }: MemberEmail) {
+function sendMemberEmail({ reimbursementId, recipient, subject, lines, event }: MemberEmail) {
   const link = `${publicSiteUrls().submitUrl}/history/${reimbursementId}`;
   const html = `
     <div style="font-family:Georgia,Times,'Times New Roman',serif;line-height:1.5;color:#1a1714;max-width:520px">
@@ -30,28 +29,30 @@ async function sendMemberEmail({ reimbursementId, recipient, subject, lines, eve
   `.trim();
   const text = [...lines, `View your request: ${link}`].join("\n\n");
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) throw new Error("Reimbursement email is not configured. Set RESEND_API_KEY.");
   const from = process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <reimbursements@cal.taxi>";
-  const key = `reimbursement/${reimbursementId}/${event}`;
-  const tracked = await prepareTrackedEmail({ from, to: recipient, subject, text, html }, {
-    key, kind: "reimbursement", relatedId: reimbursementId, recipient,
+  return sendTrackedEmail({ from, to: recipient, subject, text, html }, {
+    key: `reimbursement/${reimbursementId}/${event}`, kind: "reimbursement", relatedId: reimbursementId, recipient,
   });
-  const result = await new Resend(apiKey).emails.send(tracked.body, { idempotencyKey: key });
-  if (result.error) throw new Error(`Reimbursement email failed: ${result.error.message}`);
-  await recordEmailProvider(tracked.id, result.data.id);
 }
 
-export async function sendDecisionEmail(reimbursementId: string) {
+async function neverThrow(send: () => Promise<EmailResult | null>): Promise<EmailResult | null> {
+  try {
+    return await send();
+  } catch (error) {
+    return { sent: false, messageId: null, error: error instanceof Error ? error.message : "The email could not be sent." };
+  }
+}
+
+export const sendDecisionEmail = (reimbursementId: string) => neverThrow(async () => {
   const request = await loadRequest(reimbursementId);
-  if (!request || (request.row.status !== "approved" && request.row.status !== "denied")) return;
+  if (!request || (request.row.status !== "approved" && request.row.status !== "denied")) return null;
   const { row } = request;
   const approved = row.status === "approved";
   const note = approved ? row.approval_note : row.denial_reason;
   const amountLine = approved
     ? `It was approved for ${formatMoney(row.amount)}${row.requested_amount === null ? "" : ` instead of the ${formatMoney(row.requested_amount)} you asked for`}.`
     : "It was denied.";
-  await sendMemberEmail({
+  return sendMemberEmail({
     reimbursementId, recipient: request.recipient, event: row.updated_at,
     subject: approved ? "Your reimbursement was approved" : "Your reimbursement was denied",
     lines: [
@@ -61,13 +62,13 @@ export async function sendDecisionEmail(reimbursementId: string) {
       ...(approved ? ["The treasurer will send the payment by Zelle."] : []),
     ],
   });
-}
+});
 
-export async function sendPaidEmail(reimbursementId: string) {
+export const sendPaidEmail = (reimbursementId: string) => neverThrow(async () => {
   const request = await loadRequest(reimbursementId);
-  if (!request?.row.reimbursed) return;
+  if (!request?.row.reimbursed) return null;
   const { row } = request;
-  await sendMemberEmail({
+  return sendMemberEmail({
     reimbursementId, recipient: request.recipient, event: `paid/${row.updated_at}`,
     subject: "Your reimbursement was paid",
     lines: [
@@ -75,4 +76,4 @@ export async function sendPaidEmail(reimbursementId: string) {
       `The treasurer sent ${formatMoney(row.amount)} by Zelle to ${row.payment_method}.`,
     ],
   });
-}
+});

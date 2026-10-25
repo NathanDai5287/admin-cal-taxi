@@ -7,6 +7,8 @@ import { z } from "zod";
 import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { categoryValues, formatCategory } from "@/lib/reimbursements/format";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
+import { resendTrackedEmail } from "@/lib/email-send";
+import { loadEmailActivity, loadUnsentEmail } from "@/lib/email-tracking";
 import { sendDecisionEmail, sendPaidEmail } from "@/lib/reimbursements/send-reimbursement-email";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -320,11 +322,40 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     annotations: { ...writeAnnotations, destructiveHint: true, idempotentHint: true },
   }, async ({ confirm, ...input }) => {
     const result = await write(supabase, "update_reimbursement", input, { confirmed: confirm });
-    const emails = [...(input.status ? [sendDecisionEmail(input.reimbursementId)] : []), ...(input.paid ? [sendPaidEmail(input.reimbursementId)] : [])];
-    await Promise.all(emails).catch((error: Error) => {
-      throw new Error(`The change was saved, but the email was not sent: ${error.message}`);
-    });
+    const emails = await Promise.all([
+      input.status ? sendDecisionEmail(input.reimbursementId) : null,
+      input.paid ? sendPaidEmail(input.reimbursementId) : null,
+    ]);
+    const failure = emails.find((email) => email?.sent === false);
+    if (failure?.sent === false) {
+      throw new Error(`The change was saved, but the email was not sent: ${failure.error}${failure.messageId ? ` Use resend_email with messageId ${failure.messageId} to try again.` : ""}`);
+    }
     return result;
+  });
+
+  server.registerTool("list_email_activity", {
+    description: "List sent and failed emails with their opens and link visits. Pass a reimbursement ID to see only its emails.",
+    inputSchema: z.object({ relatedId: z.string().max(200).optional() }),
+    annotations: readAnnotations,
+  }, async ({ relatedId }) => {
+    const permission = await supabase.rpc("is_mcp_admin");
+    if (permission.error || !permission.data) throw new Error("Administrator access is required.");
+    return jsonResult(await loadEmailActivity(relatedId));
+  });
+
+  server.registerTool("resend_email", {
+    description: "Send a failed invite or reimbursement email again. Hosting emails are sent again from the order.",
+    inputSchema: z.object({ messageId: z.uuid() }),
+    annotations: { ...writeAnnotations, openWorldHint: true },
+  }, async ({ messageId }) => {
+    const permission = await supabase.rpc("is_mcp_admin");
+    if (permission.error || !permission.data) throw new Error("Administrator access is required.");
+    const message = await loadUnsentEmail(messageId);
+    if (!message) throw new Error("That email no longer exists.");
+    if (message.kind === "hosting") throw new Error("Send hosting emails again from the order page.");
+    const result = await resendTrackedEmail(messageId);
+    if (!result.sent) throw new Error(`The email was not sent: ${result.error}`);
+    return jsonResult({ messageId, status: "sent" });
   });
 
   server.registerTool("create_reimbursement", {

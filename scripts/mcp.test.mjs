@@ -47,7 +47,8 @@ test("external MCP tools use provider idempotency and clean receipt storage", as
   assert.match(server, /mcp_create_reimbursement/);
   assert.match(server, /storage\.upload\(path, receipt\.bytes/);
   assert.match(discord, /enforce_nonce: true/);
-  assert.match(invites, /idempotencyKey:/);
+  assert.match(invites, /sendTrackedEmail\(/);
+  assert.match(invites, /`\$\{deliveryKey\}:\$\{index\}`\)/);
 });
 
 test("finance tools calculate the same read-only totals shown to administrators", () => {

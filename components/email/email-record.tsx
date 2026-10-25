@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ResendEmailButton } from "@/components/email/resend-email-button";
 import type { EmailActivity } from "@/lib/email-tracking";
 
 function activityTime(value: string) {
@@ -20,9 +21,12 @@ export function EmailRecord({ message }: { message: EmailActivity }) {
         <div>
         <h2 className="break-words text-base font-semibold text-ink">{message.subject}</h2>
         <p className="mt-1 break-all text-sm text-muted">{message.recipient}</p>
-        <p className="mt-2 text-sm text-muted">
-          Sent <time dateTime={message.sent_at ?? message.created_at}>{activityTime(message.sent_at ?? message.created_at)}</time>
-        </p>
+        {message.sent_at ? <p className="mt-2 text-sm text-muted">
+          Sent <time dateTime={message.sent_at}>{activityTime(message.sent_at)}</time>
+        </p> : <div className="mt-2 grid justify-items-start gap-2 text-sm">
+          <p className="text-warn"><span className="font-semibold">Not sent.</span> {message.error}</p>
+          {message.kind !== "hosting" && <ResendEmailButton messageId={message.id} />}
+        </div>}
         {message.kind === "hosting" && message.related_id && (
           <Link href={`/host/orders/${message.related_id}`} className="mt-2 inline-block py-2 text-sm text-brand underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand">View order</Link>
         )}

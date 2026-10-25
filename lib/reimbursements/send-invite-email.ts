@@ -1,8 +1,7 @@
 import "server-only";
 
-import { Resend } from "resend";
 import { randomUUID } from "node:crypto";
-import { prepareTrackedEmail, recordEmailProvider } from "../email-tracking";
+import { sendTrackedEmail } from "../email-send";
 
 type InviteRole = "member" | "admin";
 
@@ -65,29 +64,17 @@ function inviteCopy(role: InviteRole) {
 }
 
 export async function sendInviteEmails(emails: string[], role: InviteRole, requestId?: string) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("Invite email is not configured. Set RESEND_API_KEY.");
-  }
-
   const from = process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <invites@cal.taxi>";
-  const resend = new Resend(apiKey);
   const { subject, text, html } = inviteCopy(role);
 
   const deliveryKey = requestId || randomUUID();
   const results = await Promise.all(
-    emails.map(async (email, index) => {
-      const key = `${deliveryKey}:${index}`;
-      const tracked = await prepareTrackedEmail({ from, to: email, subject, text, html }, {
-        key: `invite/${key}`, kind: "invite", recipient: email,
-      });
-      const result = await resend.emails.send(tracked.body, { idempotencyKey: key });
-      if (result.data) await recordEmailProvider(tracked.id, result.data.id);
-      return result;
-    }),
+    emails.map((email, index) => sendTrackedEmail({ from, to: email, subject, text, html }, {
+      key: `invite/${deliveryKey}:${index}`, kind: "invite", recipient: email,
+    }, `${deliveryKey}:${index}`)),
   );
 
-  const failed = results.filter(({ error }) => error);
+  const failed = results.filter((result) => !result.sent);
   if (failed.length) {
     throw new Error(
       failed.length === emails.length

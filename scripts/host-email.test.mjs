@@ -31,10 +31,16 @@ test("a person signing after preview is skipped at send time", async () => {
   const result = await deliverHostingEmails(state.order.id, previews.map(p => p.id)); assert.equal(result.skipped, 1); assert.equal(result.sent, 0);
   state.revision.recipients[0].status = "NOT_SIGNED";
 });
-test("failed delivery retries use the exact frozen body and idempotency key", async () => {
+test("temporary email failures retry automatically with the exact frozen body and idempotency key", async () => {
   state.rows = []; const previews = await prepareHostingEmail(request); const calls = [];
   globalThis.fetch = async (_url, init) => { calls.push({ key: init.headers["Idempotency-Key"], body: init.body }); return calls.length === 1 ? Response.json({ message: "Temporary failure" }, { status: 503 }) : Response.json({ id: "provider_retry" }); };
-  assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).errors.length, 1);
+  assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1);
+  assert.equal(calls.length, 2); assert.deepEqual(calls[0], calls[1]);
+});
+test("a rejected email reports an error and a manual retry uses the exact frozen body and idempotency key", async () => {
+  state.rows = []; const previews = await prepareHostingEmail(request); const calls = [];
+  globalThis.fetch = async (_url, init) => { calls.push({ key: init.headers["Idempotency-Key"], body: init.body }); return calls.length === 1 ? Response.json({ message: "Invalid sender" }, { status: 422 }) : Response.json({ id: "provider_retry" }); };
+  assert.match((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).errors[0], /Invalid sender/);
   assert.equal((await deliverHostingEmails(state.order.id, previews.map(p => p.id))).sent, 1); assert.deepEqual(calls[0], calls[1]);
 });
 test("cancellation and changed order terms block previously prepared emails", async () => {

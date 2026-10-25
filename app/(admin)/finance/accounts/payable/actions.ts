@@ -1,13 +1,13 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/reimbursements/auth";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
+import type { EmailFailure } from "@/lib/email-send";
 import { sendPaidEmail } from "@/lib/reimbursements/send-reimbursement-email";
 
 export type ReimbursedMutationResult =
-  | { ok: true; row: { id: string; reimbursed: boolean; updated_at: string } }
+  | { ok: true; row: { id: string; reimbursed: boolean; updated_at: string }; emailFailure?: EmailFailure }
   | { ok: false; message: string };
 
 export async function updateReimbursed(formData: FormData) {
@@ -44,16 +44,17 @@ export async function setReimbursementPaid(
     return { ok: false, message: "Only approved reimbursements can have payments recorded." };
   }
 
-  if (data.reimbursed) after(() => sendPaidEmail(data.id));
+  const email = data.reimbursed ? await sendPaidEmail(data.id) : null;
   revalidatePath("/finance", "layout");
   revalidatePath(`/finance/review/${parsed.data.id}`);
   revalidatePath("/finance/reports");
-  return { ok: true, row: data };
+  return { ok: true, row: data, ...(email?.sent === false ? { emailFailure: email } : {}) };
 }
 
 export type BulkReimbursementResult =
   | {
       ok: true;
+      emailFailures: Array<EmailFailure & { reimbursementId: string }>;
       skippedIds: string[];
       updatedRows: Array<{ id: string; reimbursed: boolean; updated_at: string }>;
     }
@@ -88,9 +89,13 @@ export async function markReimbursementsPaid(
   const updatedIds = updatedRows.map((row) => row.id);
   const updatedIdSet = new Set(updatedIds);
   const skippedIds = ids.filter((id) => !updatedIdSet.has(id));
-  after(() => Promise.all(updatedIds.map(sendPaidEmail)));
+  const emailFailures = [];
+  for (const id of updatedIds) {
+    const email = await sendPaidEmail(id);
+    if (email?.sent === false) emailFailures.push({ ...email, reimbursementId: id });
+  }
 
   revalidatePath("/finance", "layout");
   revalidatePath("/finance/reports");
-  return { ok: true, skippedIds, updatedRows };
+  return { ok: true, emailFailures, skippedIds, updatedRows };
 }
