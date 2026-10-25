@@ -504,7 +504,7 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
                     >
                       {item.full_name}
                     </Link>
-                    <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</div>
+                    <div className="row-meta">{new Date(item.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/Los_Angeles" })}</div>
                   </td>
                   <td><span className="payable-description" title={item.description}>{item.description}</span></td>
                   <td className="amount text-right">

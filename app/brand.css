@@ -766,7 +766,7 @@
   }
   [data-brand] .payable-workspace {
     @apply grid gap-5 items-start;
-    grid-template-columns: 1032px minmax(220px, 300px);
+    grid-template-columns: minmax(0, 1032px) minmax(220px, 300px);
   }
   [data-brand] .payable-table-card {
     min-width: 0;
@@ -810,6 +810,9 @@
   }
   [data-brand] .payable-receipt-rail-footer span {
     @apply truncate;
+  }
+  [data-brand] .payable-receipt-rail-footer strong {
+    @apply shrink-0;
   }
   @media (min-width: 1320px) {
     [data-brand] .finance-main:has(.payable-page) {
