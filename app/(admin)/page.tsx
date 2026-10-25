@@ -92,7 +92,9 @@ export default async function Home({
   if (!accessibleApps.length) {
     return (
       <div data-brand className="min-h-screen">
-        <AccessDenied />
+        {hasAppAccess(session, "submit")
+          ? <AccessDenied title="Reimbursements" message="You can submit reimbursements on the member site." showSubmitLink />
+          : <AccessDenied />}
       </div>
     );
   }
