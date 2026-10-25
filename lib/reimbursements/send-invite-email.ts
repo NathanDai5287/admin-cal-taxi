@@ -75,7 +75,7 @@ export async function sendInviteEmails(emails: string[], role: InviteRole, reque
     throw new Error("Invite email is not configured. Set RESEND_API_KEY.");
   }
 
-  const from = process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <invites@cal.taxi>";
   const resend = new Resend(apiKey);
   const { subject, text, html } = inviteCopy(role);
 

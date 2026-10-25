@@ -94,7 +94,7 @@ export default async function UsersPage() {
           <Button variant="primary" type="submit">Invite</Button>
         </form>
         <p className="helper-text px-6 pb-5">
-          Separate email addresses with commas. New people show in the list at once, so you can set their roles before they sign in.
+          Separate email addresses with commas. Each person gets an email with a sign-in link. New people show in the list at once, so you can set their roles before they sign in.
         </p>
       </section>}
 
