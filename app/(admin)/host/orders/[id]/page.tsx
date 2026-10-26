@@ -73,6 +73,8 @@ export default async function OrderDetailPage({
   const financePromise = supabase.from("hosting_finance_orders").select("status, planned_revenue, planned_fire_permit").eq("order_id", id).maybeSingle();
   const paymentsPromise = supabase.from("hosting_finance_payments").select("id, kind, amount, paid_date, reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
   const depositsPromise = workflowDb().from("hosting_deposit_payments").select("id,amount,paid_date,reversed_at").eq("order_id", id).order("paid_date", { ascending: false });
+  const replyToPromise = hostingReplyTo();
+  const workflowPromise = loadWorkflow(id);
 
   let order;
   try {
@@ -96,15 +98,15 @@ export default async function OrderDetailPage({
 
   if (!order) notFound();
 
-  const replyTo = await hostingReplyTo();
   const status = deriveStatus(order);
-  const workflow = await loadWorkflow(id);
   const planPreview = hostingPlanFromOrder(order);
-  const [signing, financeResult, paymentsResult, depositsResult] = await Promise.all([
+  const [signing, financeResult, paymentsResult, depositsResult, replyTo, workflow] = await Promise.all([
     signingPromise,
     financePromise,
     paymentsPromise,
     depositsPromise,
+    replyToPromise,
+    workflowPromise,
   ]);
   if (financeResult.error || paymentsResult.error || depositsResult.error) throw new Error("Unable to load hosting finance details.");
   const deposits = (depositsResult.data ?? []) as { id: string; amount: number; paid_date: string; reversed_at: string | null }[];

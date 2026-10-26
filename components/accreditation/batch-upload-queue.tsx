@@ -97,7 +97,6 @@ export async function processQueuedDocument(options: {
       refresh();
       return;
     }
-    refresh();
     if (result.ok) {
       update(localId, { phase: "ready", message: result.message });
       return;

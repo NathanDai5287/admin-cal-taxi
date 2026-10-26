@@ -51,7 +51,6 @@ export function BatchPolicyUpload() {
         }
         updateItem(item.localId, { sourceId: result.id, phase: "queued", message: result.message });
         created.push({ localId: item.localId, sourceId: result.id });
-        router.refresh();
       }
       for (const document of created) {
         await processQueuedDocument({ localId: document.localId, sourceId: document.sourceId, update: updateItem, process: processPolicyBatchItem, refresh: router.refresh });

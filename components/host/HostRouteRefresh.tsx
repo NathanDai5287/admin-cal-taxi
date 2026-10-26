@@ -6,7 +6,7 @@ import { RefreshCurrentRoute } from "@/components/navigation/refresh-current-rou
 /** Refresh externally changed archive and inquiry data without polling the Create forms. */
 export function HostRouteRefresh() {
   const pathname = usePathname();
-  return pathname === "/host/inquiries" || pathname.startsWith("/host/orders")
+  return pathname === "/host/inquiries" || pathname === "/host/orders"
     ? <RefreshCurrentRoute />
     : null;
 }

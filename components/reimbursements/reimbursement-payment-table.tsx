@@ -192,7 +192,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
 
       patchRow(row.id, result.row);
       if (result.emailFailure) setMutationError(`Marked paid, but the email to ${row.full_name} was not sent: ${result.emailFailure.error} Open the request to send it again.`);
-      router.refresh();
     } catch (error) {
       patchRow(row.id, { reimbursed: previousReimbursed });
       setMutationError(error instanceof Error ? error.message : "Unable to change the payment state.");
@@ -342,7 +341,6 @@ export function ReimbursementPaymentTable({ rows }: { rows: PaymentTableRow[] })
         const names = result.emailFailures.map((failure) => paymentRows.find((row) => row.id === failure.reimbursementId)?.full_name).join(", ");
         setMutationError(`The paid email was not sent to ${names}. Open each request to send it again.`);
       }
-      router.refresh();
     } catch (error) {
       setRowOverrides((current) => {
         const next = new Map(current);
