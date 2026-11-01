@@ -24,6 +24,7 @@ import { decodeMcpReceipt } from "@/lib/mcp/receipt";
 import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
 import { listIssues } from "@/lib/nu-news/store";
 import { registerMailingTools } from "@/lib/mcp/mailing-list";
+import { registerHostingTools } from "@/lib/mcp/hosting";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AppKey, type RoleKey } from "@/lib/app-access";
 import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 
@@ -509,6 +510,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     const audit = await createAdminClient().from("mcp_audit_log").insert({ user_id: caller.userId, client_id: caller.clientId, tool_name: toolName, target_id: targetId });
     if (audit.error) throw new Error("The mailing list call could not be recorded.");
   });
+  registerHostingTools(server, supabase, caller);
   return server;
 }
 

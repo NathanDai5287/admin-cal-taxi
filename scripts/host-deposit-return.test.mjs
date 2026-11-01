@@ -6,6 +6,8 @@ import { z } from "zod";
 
 const source = await readFile(new URL("../app/(admin)/host/orders/email-actions.ts", import.meta.url), "utf8");
 const compiled = await transform(source, { loader: "ts", format: "cjs" });
+const serviceSource = await readFile(new URL("../lib/host-deposit-return.ts", import.meta.url), "utf8");
+const serviceCompiled = await transform(serviceSource, { loader: "ts", format: "cjs" });
 const orderId = "ord_return_test";
 const today = "2026-10-19";
 
@@ -68,6 +70,21 @@ function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = 
     },
     "@/lib/reimbursements/supabase/admin": { createAdminClient: () => db },
   };
+  const serviceModules = {
+    "server-only": {},
+    "./host-event": modules["@/lib/host-event"],
+    "./host-orders": modules["@/lib/host-orders"],
+    "./host-payment-schedule": modules["@/lib/host-payment-schedule"],
+    "./host-settlement": modules["@/lib/host-settlement"],
+    "./host-workflow": modules["@/lib/host-workflow"],
+    "./reimbursements/supabase/admin": modules["@/lib/reimbursements/supabase/admin"],
+  };
+  const serviceLoaded = { exports: {} };
+  new Function("require", "module", "exports", serviceCompiled.code)(name => {
+    assert.ok(name in serviceModules, `Unexpected service dependency: ${name}`);
+    return serviceModules[name];
+  }, serviceLoaded, serviceLoaded.exports);
+  modules["@/lib/host-deposit-return"] = serviceLoaded.exports;
   const loaded = { exports: {} };
   new Function("require", "module", "exports", compiled.code)(name => {
     assert.ok(name in modules, `Unexpected dependency: ${name}`);

@@ -10,9 +10,9 @@ import { build } from "esbuild";
 const testModules = {
   name: "nu-news-mcp-test-modules",
   setup(builder) {
-    builder.onResolve({ filter: /^(server-only|next\/headers|@\/lib\/reimbursements\/supabase\/admin)$/ }, (args) => ({ path: args.path, namespace: "test" }));
+    builder.onResolve({ filter: /^(server-only|next\/(headers|cache)|@\/lib\/reimbursements\/supabase\/admin)$/ }, (args) => ({ path: args.path, namespace: "test" }));
     builder.onLoad({ filter: /.*/, namespace: "test" }, (args) => ({
-      contents: args.path === "server-only" ? "" : args.path === "next/headers" ? "export const cookies = async () => ({ get: () => undefined });" : "export const createAdminClient = () => globalThis.nuNewsTestAdmin;",
+      contents: args.path === "server-only" ? "" : args.path === "next/headers" ? "export const cookies = async () => ({ get: () => undefined });" : args.path === "next/cache" ? "export const revalidateTag = () => {}; export const revalidatePath = () => {};" : "export const createAdminClient = () => globalThis.nuNewsTestAdmin;",
     }));
   },
 };
@@ -34,6 +34,11 @@ const NU_NEWS_TOOLS = [
 ];
 const READ_ONLY = ["list_nu_news_issues", "get_nu_news_issue", "get_nu_news_pdf_url"];
 const DESTRUCTIVE = ["remove_nu_news_article", "remove_nu_news_gallery_photo", "finalize_nu_news_issue", "delete_nu_news_draft"];
+const HOSTING_TOOLS = [
+  "list_hosting_orders", "get_hosting_order", "list_hosting_damage_history", "save_hosting_deposit_settlement",
+  "prepare_hosting_damage_evidence_uploads", "attach_hosting_damage_evidence", "remove_hosting_damage_evidence",
+  "prepare_hosting_settlement_email", "get_hosting_settlement_attachment", "send_hosting_settlement_email", "record_hosting_deposit_return",
+];
 const FINAL_ISSUE = "This issue is final and can no longer change.";
 
 const segmentOffset = (bytes, marker) => {
@@ -208,6 +213,27 @@ test("Nu News tools are listed with safety hints and the workflow", async () => 
   assert.deepEqual(tools.get("delete_nu_news_draft").inputSchema.required, ["issueId", "confirmSeason"]);
   assert.match(tools.get("delete_nu_news_draft").description, /only on drafts: final issues can never be deleted/);
   assert.deepEqual(tools.get("remove_nu_news_article").inputSchema.required, ["issueId", "articleId", "confirm"]);
+});
+
+test("hosting settlement tools expose the full guarded UI workflow", async () => {
+  const { request, refused } = connect();
+  const tools = new Map((await request("tools/list", {})).tools.map((tool) => [tool.name, tool]));
+  assert.deepEqual(HOSTING_TOOLS.filter(name => !tools.has(name)), []);
+  for (const name of ["list_hosting_orders", "get_hosting_order", "list_hosting_damage_history", "get_hosting_settlement_attachment"]) {
+    assert.equal(tools.get(name).annotations.readOnlyHint, true, name);
+  }
+  for (const name of ["remove_hosting_damage_evidence", "send_hosting_settlement_email", "record_hosting_deposit_return"]) {
+    assert.equal(tools.get(name).annotations.destructiveHint, true, name);
+    assert.ok(tools.get(name).inputSchema.required.includes("confirm"), `${name} requires confirmation`);
+  }
+  assert.equal(tools.get("send_hosting_settlement_email").annotations.openWorldHint, true);
+  assert.match(tools.get("prepare_hosting_settlement_email").description, /exact.*review/i);
+  assert.match(tools.get("send_hosting_settlement_email").description, /explicit approval/);
+  await refused("get_hosting_order", { orderId: "ord_test" }, /Host read access is required/);
+  await refused("save_hosting_deposit_settlement", {
+    orderId: "ord_test", refundMethod: "Zelle", refundDate: "2026-11-01",
+    items: [{ id: randomUUID(), category: "damage", description: "Trim", amount: 100, clubs: ["Alpha"] }],
+  }, /Host write access is required/);
 });
 
 test("Nu News tools reject OAuth callers without app access", async () => {
