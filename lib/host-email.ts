@@ -4,7 +4,7 @@ import { prepareTrackedEmail, recordEmailFailure, recordEmailProvider } from "./
 import { sendEmailWithRetry } from "./email-send";
 import { createHash } from "node:crypto";
 import { backendKey, backendOrigin } from "./host-backend";
-import { getOrderFresh } from "./host-orders";
+import { addDocument, getOrderFresh } from "./host-orders";
 import { listSigning, signingFile, syncSigning, type SigningRevision } from "./host-signing";
 import { currentRevision, contractWasSent, eventToday, type EmailKind } from "./host-event";
 import { hostingEmail } from "./host-email-template";
@@ -16,14 +16,14 @@ import type { Order } from "./host-orders-types";
 import { simplifyRentalLineItems } from "./host-rental-items";
 import { renderDepositReceiptPdf, renderRentalReceiptPdf, renderDepositReturnPdf, type DepositReturn, type ReceiptPayment } from "./host-payment-receipt-pdf";
 
-type Attachment = { filename: string; content: string };
+type Attachment = { filename: string; content: string; contentType?: string };
 type MessageBody = { from: string; to: string[]; reply_to: string; subject: string; html: string; text: string; attachments: Attachment[] };
-type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalReceiptStyle?: number; depositReturnStyle?: number; rentalInvoiceStyle?: number; sharedFinancialEmail?: boolean; refund?: { amount: number; date: string; method: string } };
+type FrozenEmail = { body: MessageBody; orderVersion: string; termsHash: string; revisionId: string; paymentsHash: string; invoiceDueDate?: string; depositReceiptStyle?: number; rentalReceiptStyle?: number; depositReturnStyle?: number; rentalInvoiceStyle?: number; sharedFinancialEmail?: boolean; refund?: { amount: number; date: string; method: string }; settlement?: { id: string; revision: number; creditMemo?: Omit<import("./host-orders-types").OrderDocument, "id"> } };
 type DeliveryRow = { id: string; order_id: string; revision_id: string; kind: EmailKind; recipient: string; status: string; payload: FrozenEmail; created_at: string; attempted_at: string | null };
 export type EmailPreview = { replyTo?: string; id: string; recipient: string; subject: string; html: string; attachments: string[]; status: string };
 export type EmailRequest = { orderId: string; revisionId: string; expectedUpdatedAt: string; kind: EmailKind; recipients?: string[]; refund?: { amount: number; date: string; method: string } };
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const termsHash = (order: Order) => hash({ clubName: order.clubName, eventDate: order.eventDate, rentalPrice: order.rentalPrice, depositAmount: order.depositAmount, snapshot: order.snapshot });
+export const hostingTermsHash = (order: Order) => hash({ clubName: order.clubName, eventDate: order.eventDate, rentalPrice: order.rentalPrice, depositAmount: order.depositAmount, snapshot: order.snapshot });
 function sameDepositReturn(recorded: DepositReturn | null, preview: DepositReturn | undefined) {
   return !!recorded && !!preview && recorded.amount === preview.amount && recorded.date === preview.date && recorded.method === preview.method;
 }
@@ -39,7 +39,7 @@ export async function hostingReplyTo() {
   if (error) throw new Error("Unable to load the hosting reply address.");
   return data ? personContactEmail(data) : "";
 }
-async function config() {
+export async function hostingEmailConfig() {
   if (!hostEmailConfigured()) throw new Error("Hosting email is not configured yet.");
   const replyTo = await hostingReplyTo();
   if (!replyTo) throw new Error("Assign a treasurer with an email in Users before preparing a hosting email.");
@@ -148,7 +148,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     if (!workflow.refund) throw new Error("Mark the deposit returned before reviewing its confirmation email.");
     if (!sameDepositReturn(workflow.refund, refund)) throw new Error("The deposit return changed. Reload before reviewing its confirmation email.");
   }
-  const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: termsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "deposit_receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
+  const suffix = input.kind === "reminder" ? eventToday() : ["invitation", "completed"].includes(input.kind) ? "once" : hash({ terms: hostingTermsHash(order), kind: input.kind, payments: input.kind === "receipt" || input.kind === "deposit_receipt" || input.kind === "refund" ? payments.hash : "", refund: input.refund });
   const requestKey = (email: string) => hash([order.id, revision.id, input.kind, email.toLowerCase(), suffix]);
   const keys = selected.map(person => requestKey(person.email));
   const db = workflowDb();
@@ -183,7 +183,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
       return archived.map(preview);
     }
     if (legacyRows.some(row => row.status !== "queued" || row.attempted_at)) throw new Error("This invoice has individual delivery history. It will not be resent as a new group email.");
-    const sender = await config();
+    const sender = await hostingEmailConfig();
     const invoiceAmount = input.kind === "deposit_invoice" ? order.depositAmount ?? undefined : input.kind === "rental_invoice" ? order.rentalPrice ?? undefined : undefined;
     let detail = ""; let attachments: Attachment[];
     if (input.kind === "deposit_receipt") {
@@ -207,7 +207,7 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
     }
     const invoiceDueDate = invoice ? orderInvoiceDueDate(order, input.kind as "deposit_invoice" | "rental_invoice") : undefined;
     const message = hostingEmail({ kind: input.kind, name: "everyone", organization: order.clubName, eventDate: order.eventDate, detail, invoiceAmount, invoiceDueDate, replyTo: sender.replyTo });
-    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}), ...(input.kind === "rental_invoice" ? { rentalInvoiceStyle: 2 } : {}), ...(input.kind === "receipt" ? { rentalReceiptStyle: 1 } : {}), ...(input.kind === "refund" ? { depositReturnStyle: 1 } : {}), ...(sharedFinancialEmail ? { sharedFinancialEmail: true } : {}), ...(input.refund ? { refund: input.refund } : {}) };
+    const payload: FrozenEmail = { body: { from: sender.from, to: recipients, reply_to: sender.replyTo, ...message, attachments }, orderVersion: order.updatedAt, termsHash: hostingTermsHash(order), revisionId: revision.id, paymentsHash: payments.hash, ...(invoiceDueDate ? { invoiceDueDate } : {}), ...(input.kind === "deposit_receipt" ? { depositReceiptStyle: 1 } : {}), ...(input.kind === "rental_invoice" ? { rentalInvoiceStyle: 2 } : {}), ...(input.kind === "receipt" ? { rentalReceiptStyle: 1 } : {}), ...(input.kind === "refund" ? { depositReturnStyle: 1 } : {}), ...(sharedFinancialEmail ? { sharedFinancialEmail: true } : {}), ...(input.refund ? { refund: input.refund } : {}) };
     const inserted = await db.from("hosting_email_deliveries").upsert({ request_key: groupKey, order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: recipients.join(", "), payload }, { onConflict: "request_key", ignoreDuplicates: true });
     if (inserted.error) throw new Error("Unable to save the shared email preview. No email was sent.");
     const saved = await db.from("hosting_email_deliveries").select("*").eq("order_id", order.id).eq("request_key", groupKey);
@@ -218,14 +218,14 @@ export async function prepareHostingEmail(input: EmailRequest): Promise<EmailPre
   if (existing.error) throw new Error("Unable to load saved previews.");
   const saved = (existing.data ?? []) as DeliveryRow[];
   if (saved.length === selected.length) return selected.map(person => preview(saved.find(row => row.recipient === person.email)!));
-  const sender = await config();
+  const sender = await hostingEmailConfig();
   let attachments: Attachment[] = [];
   if (input.kind === "invitation") attachments = [await exactFile(revision, "original")];
   if (input.kind === "completed") attachments = await Promise.all([exactFile(revision, "completed"), exactFile(revision, "audit")]);
   const pending = selected.filter(person => !saved.some(row => row.recipient === person.email)).map(person => {
     const message = hostingEmail({ kind: input.kind, name: person.name, organization: order.clubName, eventDate: order.eventDate, link: person.link, replyTo: sender.replyTo });
     const body: MessageBody = { from: sender.from, to: [person.email], reply_to: sender.replyTo, ...message, attachments };
-    const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: termsHash(order), revisionId: revision.id, paymentsHash: payments.hash };
+    const payload: FrozenEmail = { body, orderVersion: order.updatedAt, termsHash: hostingTermsHash(order), revisionId: revision.id, paymentsHash: payments.hash };
     return { request_key: requestKey(person.email), order_id: order.id, revision_id: revision.id, kind: input.kind, recipient: person.email, payload };
   });
   const inserted = await db.from("hosting_email_deliveries").upsert(pending, { onConflict: "request_key", ignoreDuplicates: true });
@@ -256,7 +256,13 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
   let sent = 0; let skipped = 0; const errors: string[] = [];
   for (const row of rows) {
     if (row.status === "sent") { sent++; continue; }
-    if (row.payload.termsHash !== termsHash(order)) { errors.push("Order terms changed. Prepare a fresh preview."); continue; }
+    if (row.payload.termsHash !== hostingTermsHash(order)) { errors.push("Order terms changed. Prepare a fresh preview."); continue; }
+    if (row.kind === "settlement") {
+      const current = await db.from("hosting_damage_settlements").select("revision,status").eq("id", row.payload.settlement?.id).eq("order_id", orderId).maybeSingle();
+      if (current.error || !current.data || current.data.revision !== row.payload.settlement?.revision || !["draft", "sent", "returned"].includes(current.data.status)) {
+        errors.push("The settlement changed. Prepare a fresh preview."); continue;
+      }
+    }
     if ((row.kind === "receipt" || row.kind === "deposit_receipt" || row.kind === "refund") && row.payload.paymentsHash !== payments.hash) { errors.push("Payment records changed. Prepare a fresh preview."); continue; }
     if ((row.kind === "invitation" || row.kind === "reminder") && (revision.state !== "awaiting_signatures" || revision.recipients.find(p => p.email === row.recipient)?.status === "SIGNED")) { skipped++; continue; }
     // Recheck cancellation immediately before each delivery, including batch retries.
@@ -289,6 +295,16 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
   }
   if (sent > 0) {
     try { await ensureHostingForecast(order); } catch (e) { errors.push(e instanceof Error ? e.message : "Forecast update failed."); }
+    if (rows[0].kind === "settlement" && rows[0].payload.settlement) {
+      const settlement = rows[0].payload.settlement;
+      const recorded = await db.from("hosting_damage_settlements").update({ status: "sent", notice_sent_at: new Date().toISOString() })
+        .eq("id", settlement.id).eq("order_id", orderId).eq("revision", settlement.revision).in("status", ["draft", "sent"]);
+      if (recorded.error) errors.push("The email was sent, but the settlement status could not be recorded.");
+      if (settlement.creditMemo && !order.documents.some(document => document.kind === "credit_memo" && document.number === settlement.creditMemo!.number)) {
+        try { await addDocument(orderId, { ...settlement.creditMemo, expectedUpdatedAt: order.updatedAt }); }
+        catch { errors.push("The email was sent, but the credit memo could not be added to the order archive. Retry this sent preview to archive it."); }
+      }
+    }
   }
   return { sent, skipped, errors };
 }

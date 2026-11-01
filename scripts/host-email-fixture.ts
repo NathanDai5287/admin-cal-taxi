@@ -6,6 +6,7 @@ export const state = {
   cancelled: false, refund: null as { amount: number; date: string; method: string } | null, syncs: 0, forecasts: 0, files: 0, rows: [] as Record<string, unknown>[], rentals: [] as Record<string, unknown>[], deposits: [] as Record<string, unknown>[],
 };
 export async function getOrderFresh() { return structuredClone(state.order); }
+export async function addDocument(_orderId: string, document: Record<string, unknown>) { state.order.documents.push(document as never); return structuredClone(state.order); }
 export async function listSigning() { return [structuredClone(state.revision)]; }
 export async function syncSigning() { state.syncs++; return structuredClone(state.revision); }
 export async function signingFile() { state.files++; return new Response("exact approved PDF bytes"); }

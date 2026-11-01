@@ -24,8 +24,8 @@ import { relativeTimelineDate, timelineDay, paymentCompletionDate, type Timeline
 
 const timelineAction = "inline-flex min-h-8 items-center gap-1.5 py-1 text-[12px] font-medium text-brand underline underline-offset-4 hover:text-ink disabled:cursor-not-allowed disabled:text-muted disabled:no-underline";
 
-export default function OrderTimeline({ financePanel, order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "", paymentHistory = [] }: {
-  financePanel: ReactNode; order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
+export default function OrderTimeline({ financePanel, settlementPanel, settlementActive = false, order, revisions, workflow, today, emailConfigured, signingUnavailable = false, rentalPaid, depositPaid = 0, permitPaid, permitTotal, previewReplyTo = "", paymentHistory = [] }: {
+  financePanel: ReactNode; settlementPanel?: ReactNode; settlementActive?: boolean; order: Order; revisions: SigningRevision[]; workflow: EventWorkflow; today: string; emailConfigured: boolean; signingUnavailable?: boolean;
   rentalPaid: number; depositPaid?: number; permitPaid: number; permitTotal: number; previewReplyTo?: string; paymentHistory?: TimelinePayment[];
 }) {
   const canWrite = useAppWriteAccess();
@@ -100,6 +100,9 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
       rows[0]?.attachments.forEach((_name, i) => { void documents.load(`/api/host/emails/${rows[0].id}/files/${i}`).catch(() => {}); });
     }).catch(() => {});
     return request;
+  // Revision identity is intentionally part of the cache boundary even though
+  // the callback reads its derived ID; a replacement envelope must rememoize.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documents, cache, scope, order, revisionId, revision, refund]);
   useEffect(() => {
     if (!allowed) return;
@@ -262,12 +265,14 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
             {workflow.refund ? "Returned" : "Not returned"}
           </span>
         </div>
-        {!workflow.refund && <>
+        {!workflow.refund && !settlementActive && <>
           <Button compact variant="secondary" className="mt-2" disabled={!canWrite || busy || cancelled || signingUnavailable || !wasSent || !canReturnDeposit || rentalPaid < (order.rentalPrice ?? Infinity) || depositPaid <= 0} onClick={() => { void markReturned(); }}>Mark returned</Button>
           <p className="mt-1 text-[12px] text-muted">{!canReturnDeposit ? "After the event ends" : rentalPaid < (order.rentalPrice ?? Infinity) ? "After full rental payment" : depositPaid <= 0 ? "After the deposit is received" : "Record after you return the deposit."}</p>
         </>}
+        {!workflow.refund && settlementActive && <a className={`${timelineAction} mt-2`} href="#deposit-settlement">Manage settlement below</a>}
       </section>
     </div>
+    <div id="deposit-settlement" className="scroll-mt-6">{settlementPanel}</div>
     <div className="mt-7">
     <OrderDateStrip dates={timelineDates} undated={undated} today={today} endDate={schedule.eventEndDate} />
     </div>
@@ -324,7 +329,8 @@ export default function OrderTimeline({ financePanel, order, revisions, workflow
       {!rentalBeforeEvent && rentalMilestones}
       <Milestone title="Return deposit" amount={workflow.refund ? `${fmtUSD(workflow.refund.amount)} returned` : fmtUSD(depositPaid)} detail={depositReturnDueDate ? <Deadline date={depositReturnDueDate} label={depositReturnDeadline} today={today} /> : depositReturnDeadline} done={!!workflow.refund} last>
         {workflow.refund && <p className="text-[12px] text-muted">Returned {formatDateISO(workflow.refund.date)}</p>}
-        {emailButton("refund", "Review deposit return confirmation", wasSent && !!workflow.refund)}
+        {!settlementActive && emailButton("refund", "Review deposit return confirmation", wasSent && !!workflow.refund)}
+        {settlementActive && <a className={timelineAction} href="#deposit-settlement">View itemized settlement</a>}
       </Milestone>
     </ol>
 

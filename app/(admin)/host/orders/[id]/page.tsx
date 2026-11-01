@@ -29,6 +29,10 @@ import DeleteOrderButton from "./DeleteOrderButton";
 import WorkspaceActions from "./WorkspaceActions";
 import HostingFinancePanel from "./HostingFinancePanel";
 import OrderDetailHeader from "./OrderDetailHeader";
+import DepositSettlementPanel from "./DepositSettlementPanel";
+import { loadClubDamageHistory, loadDepositSettlement } from "@/lib/host-settlement";
+import { sharedStateFromSnapshot } from "@/lib/host-state-model";
+import { orderPaymentSchedule } from "@/lib/host-payment-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -100,17 +104,24 @@ export default async function OrderDetailPage({
 
   const status = deriveStatus(order);
   const planPreview = hostingPlanFromOrder(order);
-  const [signing, financeResult, paymentsResult, depositsResult, replyTo, workflow] = await Promise.all([
+  const savedState = sharedStateFromSnapshot(order.snapshot);
+  const orderClubs = savedState.clubs.length ? savedState.clubs : [order.clubName];
+  const settlementPromise = loadDepositSettlement(id);
+  const historyPromise = loadClubDamageHistory(orderClubs, id);
+  const [signing, financeResult, paymentsResult, depositsResult, replyTo, workflow, settlement, damageHistory] = await Promise.all([
     signingPromise,
     financePromise,
     paymentsPromise,
     depositsPromise,
     replyToPromise,
     workflowPromise,
+    settlementPromise,
+    historyPromise,
   ]);
   if (financeResult.error || paymentsResult.error || depositsResult.error) throw new Error("Unable to load hosting finance details.");
   const deposits = (depositsResult.data ?? []) as { id: string; amount: number; paid_date: string; reversed_at: string | null }[];
   const depositPaid = deposits.filter(p => !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0);
+  const rentalPaid = (paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Los_Angeles",
     year: "numeric",
@@ -149,13 +160,22 @@ export default async function OrderDetailPage({
           previewRevenue={planPreview.plannedRevenue}
           today={today}
         />
-      } order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
+      } settlementActive={!!settlement} settlementPanel={order.depositAmount && order.depositAmount > 0 ? <DepositSettlementPanel
+          key={`${settlement?.id ?? "new"}:${settlement?.revision ?? 0}:${settlement?.evidence.length ?? 0}:${settlement?.status ?? "none"}`}
+          orderId={order.id}
+          depositAmount={order.depositAmount}
+          clubs={orderClubs}
+          today={today}
+          settlement={settlement}
+          history={damageHistory}
+          canSettle={!workflow.cancelledAt && order.statusOverride !== "cancelled" && today >= orderPaymentSchedule(order).eventEndDate && depositPaid >= order.depositAmount && rentalPaid >= (order.rentalPrice ?? Infinity)}
+        /> : null} order={order} revisions={signing.revisions} workflow={workflow} today={today} emailConfigured={hostEmailConfigured()} previewReplyTo={replyTo} signingUnavailable={signing.failed}
         paymentHistory={[
           ...deposits.filter(payment => !payment.reversed_at).map(payment => ({ kind: "deposit", amount: Number(payment.amount), date: payment.paid_date })),
           ...(paymentsResult.data ?? []).filter(payment => !payment.reversed_at).map(payment => ({ kind: payment.kind, amount: Number(payment.amount), date: payment.paid_date })),
         ]}
         depositPaid={depositPaid}
-        rentalPaid={(paymentsResult.data ?? []).filter(p => p.kind === "revenue" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
+        rentalPaid={rentalPaid}
         permitPaid={(paymentsResult.data ?? []).filter(p => p.kind === "fire_permit" && !p.reversed_at).reduce((n, p) => n + Number(p.amount), 0)}
         permitTotal={Number(financeResult.data?.planned_fire_permit ?? planPreview.plannedFirePermit)} />
       <ButtonLink href={`/host/email-activity?order=${order.id}`} variant="text">View email opens and link visits</ButtonLink>

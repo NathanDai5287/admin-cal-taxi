@@ -9,6 +9,7 @@ import { getOrderFresh } from "@/lib/host-orders";
 import { ensureHostingForecast, loadWorkflow, workflowDb } from "@/lib/host-workflow";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { orderPaymentSchedule } from "@/lib/host-payment-schedule";
+import { loadDepositSettlement } from "@/lib/host-settlement";
 
 const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "deposit_receipt", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().max(120) }).optional() });
 function failure(error: unknown) { return { ok: false as const, error: error instanceof Error ? error.message : "Request failed. Please retry." }; }
@@ -17,7 +18,7 @@ export async function recordHostingDepositReturnAction(orderId: string) {
   await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId);
-    const [order, workflow] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId)]);
+    const [order, workflow, settlement] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId), loadDepositSettlement(orderId)]);
     if (!order || order.statusOverride === "cancelled" || workflow.cancelledAt) throw new Error("This order cannot return a deposit.");
     if (workflow.refund) return { ok: true as const, data: workflow.refund };
     const date = eventToday();
@@ -28,14 +29,24 @@ export async function recordHostingDepositReturnAction(orderId: string) {
       createAdminClient().from("hosting_finance_payments").select("amount").eq("order_id", orderId).eq("kind", "revenue").is("reversed_at", null),
     ]);
     if (deposits.error || rentals.error) throw new Error("Unable to verify recorded payments.");
-    const amount = (deposits.data ?? []).reduce((total, payment) => total + Number(payment.amount), 0);
+    const depositPaid = (deposits.data ?? []).reduce((total, payment) => total + Number(payment.amount), 0);
     const rentalPaid = (rentals.data ?? []).reduce((total, payment) => total + Number(payment.amount), 0);
-    if (amount <= 0) throw new Error("Record the received deposit before marking it returned.");
+    if (depositPaid <= 0) throw new Error("Record the received deposit before marking it returned.");
     if (rentalPaid < (order.rentalPrice ?? Infinity)) throw new Error("Record the full rental payment before returning the deposit.");
+    if (settlement && (settlement.status !== "sent" || !settlement.noticeSentAt)) throw new Error("Send the settlement notice before recording the return.");
+    const deductions = settlement?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
+    const amount = Math.max((settlement?.depositAmount ?? depositPaid) - deductions, 0);
+    const returnDate = settlement?.refundDate ?? date;
+    const returnMethod = settlement?.refundMethod.trim() || "Zelle";
+    if (returnDate > date) throw new Error("Mark the deposit returned on or after the planned return date.");
     const state = await db.from("hosting_event_state").upsert({ order_id: orderId }, { onConflict: "order_id", ignoreDuplicates: true });
     if (state.error) throw new Error("Unable to save the deposit return.");
-    const saved = await db.from("hosting_event_state").update({ refund_amount: amount, refund_date: date, refund_method: null }).eq("order_id", orderId).is("refund_amount", null).is("cancelled_at", null);
+    const saved = await db.from("hosting_event_state").update({ refund_amount: amount, refund_date: returnDate, refund_method: returnMethod }).eq("order_id", orderId).is("refund_amount", null).is("cancelled_at", null);
     if (saved.error) throw new Error("Unable to save the deposit return.");
+    if (settlement) {
+      const settled = await db.from("hosting_damage_settlements").update({ status: "returned", returned_at: new Date().toISOString() }).eq("id", settlement.id).eq("status", "sent");
+      if (settled.error) throw new Error("The return was recorded, but the settlement could not be completed. Reload before retrying.");
+    }
     const current = await loadWorkflow(orderId);
     if (!current.refund || current.cancelledAt) throw new Error("The order changed. Reload before recording the deposit return.");
     refresh(orderId);

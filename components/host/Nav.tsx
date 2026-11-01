@@ -3,6 +3,7 @@ import { AppNav } from "@/components/brand/app-nav";
 const tabs = [
   { href: "/host", label: "Create" },
   { href: "/host/orders", label: "Orders" },
+  { href: "/host/damage", label: "Damage history" },
   { href: "/host/inquiries", label: "Inquiries" },
   { href: "/host/email-activity", label: "Email activity" },
 ];

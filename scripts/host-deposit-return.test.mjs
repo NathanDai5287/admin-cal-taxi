@@ -9,7 +9,7 @@ const compiled = await transform(source, { loader: "ts", format: "cjs" });
 const orderId = "ord_return_test";
 const today = "2026-10-19";
 
-function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = null, rentalPaid = 1400, eventEndDate = "2026-10-16", timing = "day_before", refund = null, depositReceived = 275 } = {}) {
+function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = null, rentalPaid = 1400, eventEndDate = "2026-10-16", timing = "day_before", refund = null, depositReceived = 275, settlement = null } = {}) {
   const calls = { authorizations: [], tables: [], writes: [], emails: [], invalidations: [] };
   const state = { order_id: orderId, refund_amount: refund?.amount ?? null, refund_date: refund?.date ?? null, refund_method: refund?.method ?? null, cancelled_at: cancelledAt };
   const tables = {
@@ -25,6 +25,7 @@ function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = 
       { order_id: orderId, amount: 999, kind: "fire_permit", reversed_at: null },
     ],
     hosting_event_state: [state],
+    hosting_damage_settlements: settlement ? [{ id: settlement.id, status: settlement.status, returned_at: null }] : [],
   };
   const db = { from(table) {
     assert.ok(table in tables, `Unexpected table: ${table}`);
@@ -58,6 +59,7 @@ function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = 
     "@/lib/host-orders": { getOrderFresh: async () => ({ id: orderId, statusOverride, rentalPrice: 1400, depositAmount: 300, snapshot: { rentalPaymentTiming: timing } }) },
     "@/lib/host-event": { eventToday: () => today },
     "@/lib/host-payment-schedule": { orderPaymentSchedule: () => ({ eventEndDate }) },
+    "@/lib/host-settlement": { loadDepositSettlement: async () => settlement },
     "@/lib/host-signing": {},
     "@/lib/host-email": { prepareHostingEmail: rejectEmail, deliverHostingEmails: rejectEmail, sendCompletedContract: rejectEmail },
     "@/lib/host-workflow": {
@@ -76,7 +78,7 @@ function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = 
 
 test("marking returns all active received deposits today without sending emails or transferring money", async () => {
   const { markReturned, calls, state } = depositReturn();
-  assert.deepEqual(await markReturned(), { ok: true, data: { amount: 275, date: today, method: null } });
+  assert.deepEqual(await markReturned(), { ok: true, data: { amount: 275, date: today, method: "Zelle" } });
   assert.deepEqual(calls.authorizations, [["host", "write"]]);
   assert.equal(state.refund_amount, 275);
   assert.deepEqual(calls.writes.map(write => write.table), ["hosting_event_state", "hosting_event_state"]);
@@ -97,6 +99,19 @@ test("marking requires a received deposit, full rental payment, and the event to
     assert.deepEqual(calls.writes, []);
     assert.deepEqual(calls.emails, []);
   }
+});
+
+test("itemized settlements return only the balance and must be sent first", async () => {
+  const draft = { id: "settlement_test", status: "draft", noticeSentAt: null, depositAmount: 250, refundDate: today, refundMethod: "Zelle", items: [{ amount: 100 }, { amount: 50 }] };
+  const blocked = depositReturn({ settlement: draft });
+  assert.match((await blocked.markReturned()).error, /Send the settlement notice/);
+  assert.deepEqual(blocked.calls.writes, []);
+
+  const sent = { ...draft, status: "sent", noticeSentAt: `${today}T12:00:00Z` };
+  const completed = depositReturn({ settlement: sent });
+  assert.deepEqual(await completed.markReturned(), { ok: true, data: { amount: 100, date: today, method: "Zelle" } });
+  assert.equal(completed.state.refund_amount, 100);
+  assert.equal(completed.calls.writes.at(-1).table, "hosting_damage_settlements");
 });
 
 test("read-only access cannot read payment records or record a return", async () => {
