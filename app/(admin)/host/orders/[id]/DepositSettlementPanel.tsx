@@ -167,7 +167,7 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
 
   return <section className="border-b border-rule py-5" aria-label="Security deposit settlement">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 className="text-lg font-semibold">Security deposit settlement</h2><p className="mt-1 text-[12px] text-muted">{settlement?.status === "returned" ? "Completed record" : settlement?.status === "sent" ? "Notice sent · evidence and deductions locked" : "Draft · changes remain private until you send"}</p></div>
+      <div><h2 className="text-lg font-semibold">Security deposit settlement</h2><p className="mt-1 text-[12px] text-muted">{settlement?.status === "returned" ? "Completed record" : settlement?.status === "sent" ? "Notice sent · evidence and deductions locked" : "Draft"}</p></div>
       <div className="text-right text-[12px] tabular-nums"><p className="text-muted">Deposit {money(depositAmount)}</p><p className="mt-1 font-semibold text-ink">Return {money(refund)}</p></div>
     </div>
 
