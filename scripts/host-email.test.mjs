@@ -471,3 +471,35 @@ test("deposit return PDFs upgrade queued previews while keeping delivery identit
   assert.deepEqual(state.rows, frozen);
   state.rows = []; state.rentals = []; state.refund = null;
 });
+
+
+test("sending one settlement blocks older edited previews while sent retries stay safe", async () => {
+  state.rows = [];
+  state.settlements = [{ id: "settlement", order_id: state.order.id, revision: 1, status: "draft" }];
+  await prepareHostingEmail(request);
+  const original = state.rows[0];
+  original.kind = "settlement";
+  original.payload.sharedFinancialEmail = true;
+  original.payload.settlement = { id: "settlement", revision: 1 };
+  original.payload.body.to = state.order.snapshot.contractSigners.map(person => person.email);
+  original.recipient = original.payload.body.to.join(", ");
+  const edited = structuredClone(original);
+  edited.id = crypto.randomUUID();
+  edited.request_key = "edited-settlement";
+  edited.payload.body.text = "Edited settlement notice";
+  state.rows.push(edited);
+  let sends = 0;
+  globalThis.fetch = async () => { sends++; return Response.json({ id: "provider-settlement" }); };
+  try {
+    assert.equal((await deliverHostingEmails(state.order.id, [edited.id])).sent, 1);
+    assert.equal(state.settlements[0].status, "sent");
+    for (const status of ["sent", "returned"]) {
+      state.settlements[0].status = status;
+      const blocked = await deliverHostingEmails(state.order.id, [original.id]);
+      assert.equal(blocked.sent, 0);
+      assert.match(blocked.errors[0], /already sent/);
+    }
+    assert.equal((await deliverHostingEmails(state.order.id, [edited.id])).sent, 1);
+    assert.equal(sends, 1);
+  } finally { state.rows = []; state.settlements = []; }
+});

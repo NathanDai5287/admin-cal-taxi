@@ -262,6 +262,7 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
       if (current.error || !current.data || current.data.revision !== row.payload.settlement?.revision || !["draft", "sent", "returned"].includes(current.data.status)) {
         errors.push("The settlement changed. Prepare a fresh preview."); continue;
       }
+      if (current.data.status !== "draft") { errors.push("The settlement notice was already sent. Retry its sent preview to complete any pending records."); continue; }
     }
     if ((row.kind === "receipt" || row.kind === "deposit_receipt" || row.kind === "refund") && row.payload.paymentsHash !== payments.hash) { errors.push("Payment records changed. Prepare a fresh preview."); continue; }
     if ((row.kind === "invitation" || row.kind === "reminder") && (revision.state !== "awaiting_signatures" || revision.recipients.find(p => p.email === row.recipient)?.status === "SIGNED")) { skipped++; continue; }

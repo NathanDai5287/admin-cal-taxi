@@ -3,7 +3,7 @@ export const state = {
   order: { id: "ord_test", updatedAt: "2026-10-01T12:00:00Z", clubName: "Sample Club", eventDate: "2026-10-16", rentalPrice: 1400, depositAmount: 300, snapshot: { contractSigners: [{ email: "one@example.test" }, { email: "two@example.test" }] }, documents: [], statusOverride: null },
   revision: { id: "sig_test", order_id: "ord_test", revision: 1, state: "awaiting_signatures", envelope_id: "envelope_existing", created_at: "2026-10-01T12:00:00Z", signedCount: 0, totalCount: 2, files: { original: true, completed: false, audit: false }, recipients: [{ name: "One", email: "one@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/one" }, { name: "Two", email: "two@example.test", status: "NOT_SIGNED", link: "https://example.test/sign/two" }] },
   treasurerEmail: "host@example.test",
-  cancelled: false, refund: null as { amount: number; date: string; method: string } | null, syncs: 0, forecasts: 0, files: 0, rows: [] as Record<string, unknown>[], rentals: [] as Record<string, unknown>[], deposits: [] as Record<string, unknown>[],
+  cancelled: false, refund: null as { amount: number; date: string; method: string } | null, syncs: 0, forecasts: 0, files: 0, rows: [] as Record<string, unknown>[], rentals: [] as Record<string, unknown>[], deposits: [] as Record<string, unknown>[], settlements: [] as Record<string, unknown>[],
 };
 export async function getOrderFresh() { return structuredClone(state.order); }
 export async function addDocument(_orderId: string, document: Record<string, unknown>) { state.order.documents.push(document as never); return structuredClone(state.order); }
@@ -31,7 +31,7 @@ export function workflowDb() {
           for (const insert of inserts) if (!state.rows.some(r => r.request_key === insert.request_key)) state.rows.push({ id: crypto.randomUUID(), created_at: new Date().toISOString(), attempted_at: null, status: "queued", ...insert });
           return { data: null, error: null };
         }
-        const rows = state.rows.filter(r => filters.every(f => f(r)));
+        const rows = (table === "hosting_damage_settlements" ? state.settlements : state.rows).filter(r => filters.every(f => f(r)));
         if (mode === "update") rows.forEach(row => Object.assign(row, patch));
         return { data: structuredClone(rows), error: null };
       };
