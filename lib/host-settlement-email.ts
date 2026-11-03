@@ -52,7 +52,9 @@ async function creditMemo(order: NonNullable<Awaited<ReturnType<typeof getOrderF
     kind: "credit_memo", number, filename, amount, generatedAt: new Date().toISOString(),
     payload, sourceSnapshot: order.snapshot, generationReceipt: response.headers.get("x-document-receipt") ?? undefined,
   };
-  return { attachment: { filename, content: bytes.toString("base64"), contentType: "application/pdf" }, document };
+  return { attachment: { filename, content: bytes.toString("base64"), contentType: "application/pdf" }, document,
+    style: response.headers.get("x-deposit-settlement-style") ?? "itemized-v1",
+  };
 }
 
 export async function prepareHostingSettlementEmail(input: { orderId: string; settlementRevision: number; message?: { subject: string; text: string } }) {
@@ -108,8 +110,13 @@ export async function prepareHostingSettlementEmail(input: { orderId: string; se
   const subject = input.message?.subject ?? `Security Deposit Settlement · ${order.clubName} · ${formatDateISO(order.eventDate)}`;
   const text = input.message?.text ?? defaultText;
   const html = input.message ? `<!doctype html><html><body style="margin:0;background:#f5f6f8;color:#17253a;font-family:Arial,sans-serif"><div style="max-width:600px;margin:32px auto;background:white;padding:36px;line-height:1.6;white-space:pre-wrap">${escapeEmail(text)}</div></body></html>` : defaultHtml;
-  const requestKey = hash(["settlement-itemized-v2", order.id, revision.id, settlement.id, settlement.revision, recipients.slice().sort(), subject, text]);
-  const existing = await db.from("hosting_email_deliveries").select("*").eq("request_key", requestKey).maybeSingle();
+  const requestParts = ["settlement-itemized-v2", order.id, revision.id, settlement.id, settlement.revision, recipients.slice().sort(), subject, text];
+  const legacyKey = hash(requestParts);
+  const legacy = await db.from("hosting_email_deliveries").select("*").eq("request_key", legacyKey).maybeSingle();
+  if (legacy.error) throw new Error("The saved settlement preview could not be loaded.");
+  const legacyWasAttempted = legacy.data && (legacy.data.status !== "queued" || legacy.data.attempted_at);
+  const requestKey = memo.style === "itemized-v1" || legacyWasAttempted ? legacyKey : hash([...requestParts, memo.style]);
+  const existing = requestKey === legacyKey ? legacy : await db.from("hosting_email_deliveries").select("*").eq("request_key", requestKey).maybeSingle();
   if (existing.error) throw new Error("The saved settlement preview could not be loaded.");
   if (!existing.data) {
     const payload = {

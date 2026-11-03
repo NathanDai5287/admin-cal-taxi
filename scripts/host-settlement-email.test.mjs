@@ -8,7 +8,7 @@ const source = await readFile(new URL("../lib/host-settlement-email.ts", import.
 const compiled = await transform(source, { loader: "ts", format: "cjs" });
 const today = "2026-11-03";
 
-function fixture({ depositAmount = 300, refundDate = "2026-11-01", refundMethod = "Zelle", refund = null, failedPhoto = false, itemizedPdf = true } = {}) {
+function fixture({ depositAmount = 300, refundDate = "2026-11-01", refundMethod = "Zelle", refund = null, failedPhoto = false, itemizedPdf = true, pdfStyle = null } = {}) {
   const settlement = { id: "settlement", revision: 1, depositAmount, refundDate, refundMethod, items: [
     { description: "Door casing and surrounding drywall repair", amount: 100 },
     { description: "Clogged toilet: clearing and cleaning", amount: 80 },
@@ -32,7 +32,7 @@ function fixture({ depositAmount = 300, refundDate = "2026-11-01", refundMethod 
         order: () => query,
         maybeSingle: async () => ({ data: result()[0] ?? null }),
         single: async () => ({ data: result()[0] }),
-        insert: async row => { rows.push({ ...row, id: `delivery-${rows.length}`, status: "prepared" }); return {}; },
+        insert: async row => { rows.push({ ...row, id: `delivery-${rows.length}`, status: "queued", attempted_at: null }); return {}; },
         then: resolve => Promise.resolve({ data: result() }).then(resolve),
       };
       return query;
@@ -57,13 +57,13 @@ function fixture({ depositAmount = 300, refundDate = "2026-11-01", refundMethod 
   const loaded = { exports: {} };
   const fetchPdf = async (_, options) => {
     payloads.push(JSON.parse(options.body));
-    return new Response("%PDF-test", { headers: { "content-type": "application/pdf", "x-deposit-settlement": itemizedPdf ? "itemized-v1" : "", "content-disposition": 'attachment; filename="credit.pdf"' } });
+    return new Response(`%PDF-${pdfStyle ?? "legacy"}`, { headers: { "content-type": "application/pdf", "x-deposit-settlement": itemizedPdf ? "itemized-v1" : "", ...(pdfStyle ? { "x-deposit-settlement-style": pdfStyle } : {}), "content-disposition": 'attachment; filename="credit.pdf"' } });
   };
   new Function("require", "module", "exports", "fetch", compiled.code)(name => {
     assert.ok(name in modules, `Unexpected dependency: ${name}`);
     return modules[name];
   }, loaded, loaded.exports, fetchPdf);
-  return { prepare: message => loaded.exports.prepareHostingSettlementEmail({ orderId: order.id, settlementRevision: 1, message }), deliveries, payloads };
+  return { prepare: message => loaded.exports.prepareHostingSettlementEmail({ orderId: order.id, settlementRevision: 1, message }), deliveries, payloads, setPdfStyle: style => { pdfStyle = style; } };
 }
 
 test("partial retention freezes an itemized PDF and every evidence photo without claiming payment", async () => {
@@ -128,6 +128,33 @@ test("missing evidence prevents a sendable preview", async () => {
   const { prepare, deliveries } = fixture({ failedPhoto: true });
   await assert.rejects(prepare(), /could not be attached/);
   assert.equal(deliveries.length, 0);
+});
+
+
+test("a new PDF style refreshes an unattempted preview and keeps retries stable", async () => {
+  const { prepare, deliveries, setPdfStyle } = fixture();
+  const [original] = await prepare();
+  const originalPayload = structuredClone(deliveries[0].payload);
+  setPdfStyle("hierarchy-v1");
+  const [updated] = await prepare();
+  assert.notEqual(updated.id, original.id);
+  assert.deepEqual(deliveries[0].payload, originalPayload);
+  assert.notEqual(deliveries[1].payload.body.attachments[0].content, originalPayload.body.attachments[0].content);
+  assert.equal((await prepare())[0].id, updated.id);
+});
+
+test("PDF style updates preserve sent and attempted legacy previews", async () => {
+  for (const status of ["queued", "sending", "sent", "failed", "uncertain"]) {
+    const { prepare, deliveries, setPdfStyle } = fixture();
+    const [original] = await prepare();
+    deliveries[0].status = status;
+    deliveries[0].attempted_at = today;
+    const originalPayload = structuredClone(deliveries[0].payload);
+    setPdfStyle("hierarchy-v1");
+    assert.equal((await prepare())[0].id, original.id);
+    assert.deepEqual(deliveries[0].payload, originalPayload);
+    assert.equal(deliveries.length, 1);
+  }
 });
 
 
