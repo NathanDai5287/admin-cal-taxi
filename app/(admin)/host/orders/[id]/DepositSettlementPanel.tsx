@@ -40,8 +40,8 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
   const router = useRouter();
   const [open, setOpen] = useState(!!settlement);
   const [items, setItems] = useState<EditorItem[]>(() => settlement?.items.map(item => ({ ...item, amount: item.amount.toFixed(2) })) ?? [newItem(clubs)]);
-  const [refundMethod, setRefundMethod] = useState(settlement?.refundMethod || "Zelle");
-  const [refundDate, setRefundDate] = useState(settlement?.refundDate || today);
+  const [refundMethod, setRefundMethod] = useState(settlement?.refundMethod ?? "Zelle");
+  const [refundDate, setRefundDate] = useState(settlement ? settlement.refundDate ?? "" : today);
   const [busy, setBusy] = useState<"save" | "upload" | "prepare" | "send" | "return" | "remove" | null>(null);
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState<(EmailPreview & { text: string }) | null>(null);
@@ -67,7 +67,10 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     if (Math.round(total * 100) > Math.round(depositAmount * 100)) throw new Error("Deductions cannot exceed the deposit.");
   }
   async function save() {
-    if (savedVersion?.signature === formSignature) return savedVersion;
+    if (savedVersion?.signature === formSignature) {
+      setMessage("Draft saved.");
+      return savedVersion;
+    }
     setBusy("save"); setMessage(""); setPreview(null);
     try {
       validItems();
@@ -77,7 +80,7 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
       });
       if (!result.ok) throw new Error(result.error);
       setSavedVersion({ ...result.data, signature: formSignature });
-      setMessage("Settlement saved.");
+      setMessage("Draft saved.");
       return result.data;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The settlement could not be saved.");
@@ -126,6 +129,7 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
       if (!result.ok) throw new Error(result.error);
       setPreview(result.data[0]);
       setEmailDraft({ subject: result.data[0].subject, text: result.data[0].text });
+      setMessage("Email and credit memo ready to review.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "The email could not be prepared."); }
     finally { setBusy(null); }
   }

@@ -88,6 +88,22 @@ test("full retention generates a zero-refund itemized PDF without refund details
   assert.match(preview.text, /no balance remains to return/);
 });
 
+test("partial refund review works without a planned method or date", async () => {
+  const { prepare, payloads } = fixture({ refundDate: null, refundMethod: "" });
+  const [preview] = await prepare();
+  assert.equal(payloads[0].refund_method, "a payment method to be confirmed");
+  assert.match(preview.text, /We will return the remaining \$120\.00\./);
+  assert.doesNotMatch(preview.text, /via Zelle| by |was returned/);
+  assert.equal(preview.attachments.length, 4);
+});
+
+test("partial refund review includes only the provided return details", async () => {
+  const methodOnly = await fixture({ refundDate: null }).prepare();
+  assert.match(methodOnly[0].text, /We will return the remaining \$120\.00 via Zelle\./);
+  const dateOnly = await fixture({ refundMethod: "" }).prepare();
+  assert.match(dateOnly[0].text, /We will return the remaining \$120\.00 by 2026-11-01\./);
+});
+
 test("payment wording uses the recorded refund instead of the planned return", async () => {
   const { prepare } = fixture({ refund: { amount: 120, date: "2026-11-02", method: "Cash" } });
   const [preview] = await prepare();

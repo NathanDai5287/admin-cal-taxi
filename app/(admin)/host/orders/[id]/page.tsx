@@ -161,7 +161,7 @@ export default async function OrderDetailPage({
           today={today}
         />
       } settlementActive={!!settlement} settlementPanel={order.depositAmount && order.depositAmount > 0 ? <DepositSettlementPanel
-          key={`${settlement?.id ?? "new"}:${settlement?.revision ?? 0}:${settlement?.evidence.length ?? 0}:${settlement?.status ?? "none"}`}
+          key={order.id}
           orderId={order.id}
           depositAmount={order.depositAmount}
           clubs={orderClubs}

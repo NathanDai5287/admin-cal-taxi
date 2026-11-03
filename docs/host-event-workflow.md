@@ -105,6 +105,8 @@ The credit memo uses the hosting invoice template and lists the original deposit
 Full retention also produces a credit memo, with a zero refund.
 
 Review email and credit memo prepares the exact PDF and photo attachments without sending.
+Review works before a return date or method is chosen; the message includes only the saved return details.
+Save draft confirms saved changes and unchanged drafts without resetting the settlement editor.
 Edit email changes the subject or message; Update preview freezes the revised email before Send settlement email becomes available.
 Saving, preparing, and sending do not transfer money.
 
