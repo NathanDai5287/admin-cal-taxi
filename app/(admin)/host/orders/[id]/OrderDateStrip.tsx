@@ -51,7 +51,7 @@ export default function OrderDateStrip({ dates, undated, today, endDate }: { dat
 
   return <div ref={strip} className="relative mb-3 min-w-0" onMouseLeave={() => setSelection(null)}>
     <div className="mb-2 flex min-h-8 items-center justify-between gap-2 text-[11px] text-muted">
-      <p>Key dates · One tick per day</p>
+      <p>Overview</p>
       {undated.length > 0 && <button type="button" aria-label="Milestones with no date" aria-describedby={selection?.day === null ? tooltipId : undefined}
         className="min-h-8 px-2 underline decoration-dashed underline-offset-4 focus-visible:outline-2 focus-visible:outline-brand"
         onMouseEnter={event => showDetails(null, event.currentTarget)} onFocus={event => showDetails(null, event.currentTarget)} onClick={event => showDetails(null, event.currentTarget)} onBlur={() => setSelection(null)}>
