@@ -62,10 +62,10 @@ export async function removeHostingEvidenceAction(input: { orderId: string; evid
   } catch (error) { return failure(error); }
 }
 
-export async function prepareHostingSettlementEmailAction(input: { orderId: string; settlementRevision: number }) {
+export async function prepareHostingSettlementEmailAction(input: { orderId: string; settlementRevision: number; message?: { subject: string; text: string } }) {
   await requireAppAccess("host", "write");
   try {
-    const parsed = z.object({ orderId: orderIdSchema, settlementRevision: z.number().int().positive() }).parse(input);
+    const parsed = z.object({ orderId: orderIdSchema, settlementRevision: z.number().int().positive(), message: z.object({ subject: z.string().trim().min(1).max(300), text: z.string().trim().min(1).max(20000) }).optional() }).parse(input);
     return { ok: true as const, data: await prepareHostingSettlementEmail(parsed) };
   } catch (error) { return failure(error); }
 }

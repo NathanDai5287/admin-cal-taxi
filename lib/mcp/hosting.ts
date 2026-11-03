@@ -122,10 +122,10 @@ export function registerHostingTools(server: McpServer, supabase: McpSupabase, c
 
   server.registerTool("prepare_hosting_settlement_email", {
     description: "Generate and freeze the exact security-deposit email, credit memo, and evidence attachments without sending. Return the complete text and HTML for review. Show the user the recipients, subject, exact text, deductions, return amount, and attachments before calling send_hosting_settlement_email.",
-    inputSchema: z.object({ orderId, settlementRevision: z.number().int().positive() }), annotations: write,
-  }, async ({ orderId: id, settlementRevision }) => {
+    inputSchema: z.object({ orderId, settlementRevision: z.number().int().positive(), message: z.object({ subject: z.string().trim().min(1).max(300), text: z.string().trim().min(1).max(20000) }).optional() }), annotations: write,
+  }, async ({ orderId: id, settlementRevision, message }) => {
     await authorize(supabase, caller, "prepare_hosting_settlement_email", "write", id);
-    const previews = await prepareHostingSettlementEmail({ orderId: id, settlementRevision });
+    const previews = await prepareHostingSettlementEmail({ orderId: id, settlementRevision, message });
     const preview = previews[0];
     const saved = await workflowDb().from("hosting_email_deliveries").select("payload").eq("id", preview.id).single();
     if (saved.error) throw new Error("The frozen settlement email could not be loaded.");

@@ -44,9 +44,11 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
   const [refundDate, setRefundDate] = useState(settlement?.refundDate || today);
   const [busy, setBusy] = useState<"save" | "upload" | "prepare" | "send" | "return" | "remove" | null>(null);
   const [message, setMessage] = useState("");
-  const [preview, setPreview] = useState<EmailPreview | null>(null);
+  const [preview, setPreview] = useState<(EmailPreview & { text: string }) | null>(null);
+  const [emailDraft, setEmailDraft] = useState<{ subject: string; text: string } | null>(null);
+  const emailChanged = !!preview && !!emailDraft && (preview.subject !== emailDraft.subject || preview.text !== emailDraft.text);
   const editable = !settlement || settlement.status === "draft";
-  const total = useMemo(() => items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0), [items]);
+  const total = useMemo(() => items.reduce((sum, item) => sum + Math.round((Number(item.amount) || 0) * 100), 0) / 100, [items]);
   const formSignature = JSON.stringify({ items, refundMethod, refundDate });
   const [savedVersion, setSavedVersion] = useState(() => settlement ? { id: settlement.id, revision: settlement.revision, signature: formSignature } : null);
   const refund = Math.max(depositAmount - total, 0);
@@ -65,10 +67,10 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     if (Math.round(total * 100) > Math.round(depositAmount * 100)) throw new Error("Deductions cannot exceed the deposit.");
   }
   async function save() {
-    validItems();
     if (savedVersion?.signature === formSignature) return savedVersion;
     setBusy("save"); setMessage(""); setPreview(null);
     try {
+      validItems();
       const result = await saveHostingSettlementAction({
         orderId, refundMethod, refundDate: refundDate || null,
         items: items.map(item => ({ ...item, amount: Number(item.amount) })),
@@ -114,20 +116,21 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     if (!result.ok) { setMessage(result.error); return; }
     setMessage("Photo removed."); router.refresh();
   }
-  async function prepareEmail() {
-    setBusy("prepare"); setMessage(""); setPreview(null);
+  async function prepareEmail(message?: { subject: string; text: string }) {
+    setBusy("prepare"); setMessage("");
     try {
       const saved = await save();
       if (!saved) return;
       setBusy("prepare");
-      const result = await prepareHostingSettlementEmailAction({ orderId, settlementRevision: saved.revision });
+      const result = await prepareHostingSettlementEmailAction({ orderId, settlementRevision: saved.revision, message });
       if (!result.ok) throw new Error(result.error);
       setPreview(result.data[0]);
+      setEmailDraft({ subject: result.data[0].subject, text: result.data[0].text });
     } catch (error) { setMessage(error instanceof Error ? error.message : "The email could not be prepared."); }
     finally { setBusy(null); }
   }
   async function send() {
-    if (!preview) return;
+    if (!preview || emailChanged) return;
     if (!window.confirm(`Send this itemized settlement to ${preview.recipient}?`)) return;
     setBusy("send"); setMessage("");
     try {
@@ -140,12 +143,13 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     finally { setBusy(null); }
   }
   async function markReturned() {
-    if (!window.confirm(`Confirm that ${money(refund)} was returned via ${refundMethod} on ${formatDateISO(refundDate)}?`)) return;
+    const confirmation = refund === 0 ? "Complete this settlement with the full deposit retained and no refund?" : `Confirm that you returned ${money(refund)} via ${refundMethod} today?`;
+    if (!window.confirm(confirmation)) return;
     setBusy("return"); setMessage("");
     const result = await recordHostingDepositReturnAction(orderId);
     setBusy(null);
     if (!result.ok) { setMessage(result.error); return; }
-    setMessage("Deposit return recorded."); router.refresh();
+    setMessage(refund === 0 ? "Settlement completed. No refund was due." : "Deposit return recorded."); router.refresh();
   }
 
   if (!open) return <section className="border-b border-rule py-4" aria-label="Security deposit settlement">
@@ -181,22 +185,41 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     {editable && <button type="button" className="mt-3 text-[12px] font-medium text-brand hover:text-ink" disabled={!!busy || items.length >= 25} onClick={() => setItems(current => [...current, newItem(clubs)])}>+ Add deduction</button>}
 
     <div className="mt-5 grid gap-5 border-t border-rule pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-      <label className="text-[12px] text-muted">Return method<input className={`${field} mt-1 w-full text-ink`} value={refundMethod} disabled={!editable || !!busy} maxLength={120} onChange={event => { setRefundMethod(event.target.value); setPreview(null); }} /></label>
-      <label className="text-[12px] text-muted">Return date<input className={`${field} mt-1 w-full text-ink`} type="date" value={refundDate} disabled={!editable || !!busy} onChange={event => { setRefundDate(event.target.value); setPreview(null); }} /></label>
+      {refund > 0 && <label className="text-[12px] text-muted">Return method<input className={`${field} mt-1 w-full text-ink`} value={refundMethod} disabled={!editable || !!busy} maxLength={120} onChange={event => { setRefundMethod(event.target.value); setPreview(null); }} /></label>}
+      {refund > 0 && <label className="text-[12px] text-muted">Planned return date<input className={`${field} mt-1 w-full text-ink`} type="date" value={refundDate} disabled={!editable || !!busy} onChange={event => { setRefundDate(event.target.value); setPreview(null); }} /></label>}
       <dl className="grid grid-cols-[auto_auto] content-start gap-x-5 gap-y-1 text-[12px] tabular-nums"><dt className="text-muted">Deductions</dt><dd className="text-right">{money(total)}</dd><dt className="font-semibold">Return</dt><dd className="text-right font-semibold">{money(refund)}</dd></dl>
     </div>
 
     <div className="mt-4 flex flex-wrap items-center gap-3">
       {editable && <Button compact variant="secondary" disabled={!canWrite || !!busy} onClick={() => { void save(); }}>{busy === "save" ? "Saving…" : "Save draft"}</Button>}
       {editable && <Button compact disabled={!canWrite || !!busy || !canSettle} onClick={() => { void prepareEmail(); }}>{busy === "prepare" ? "Preparing…" : "Review email and credit memo"}</Button>}
-      {settlement && settlement.status !== "returned" && refundDate <= today && <Button compact variant="text" disabled={!canWrite || !!busy || !settlement.noticeSentAt} onClick={() => { void markReturned(); }}>{busy === "return" ? "Recording…" : `Mark ${money(refund)} returned`}</Button>}
-      {settlement && settlement.status !== "returned" && !settlement.noticeSentAt && <span className="text-[11px] text-muted">Send the notice before recording the return.</span>}
+      {settlement && settlement.status !== "returned" && <Button compact variant="text" disabled={!canWrite || !!busy || !settlement.noticeSentAt} onClick={() => { void markReturned(); }}>{busy === "return" ? "Recording…" : refund === 0 ? "Complete settlement" : `Mark ${money(refund)} returned`}</Button>}
+      {settlement && settlement.status !== "returned" && !settlement.noticeSentAt && <span className="text-[11px] text-muted">Send the notice before completing the settlement.</span>}
     </div>
     {message && <p role="status" aria-live="polite" className="mt-3 text-[13px] [overflow-wrap:anywhere]">{message}</p>}
 
     {preview && <div className="mt-5 grid gap-5 border-t border-rule pt-5 lg:grid-cols-[minmax(0,1fr)_15rem]">
-      <div><div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-[12px]"><span className="text-muted">To</span><span className="[overflow-wrap:anywhere]">{preview.recipient}</span><span className="text-muted">Subject</span><span>{preview.subject}</span></div><iframe title="Settlement email preview" sandbox="allow-same-origin" srcDoc={preview.html} className="mt-3 h-[32rem] w-full border-0 bg-white" /></div>
-      <div><h3 className="text-sm font-semibold">Attachments</h3><ul className="mt-2 space-y-2 text-[12px]">{preview.attachments.map((name, index) => <li key={`${name}-${index}`}><a className="text-brand underline underline-offset-4" href={`/api/host/emails/${preview.id}/files/${index}`} target="_blank" rel="noreferrer">{name}</a></li>)}</ul><Button className="mt-5 w-full" compact disabled={!!busy || preview.status === "sent"} onClick={() => { void send(); }}>{busy === "send" ? "Sending…" : preview.status === "sent" ? "Already sent" : "Send settlement email"}</Button></div>
+      <div>
+        <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-[12px]">
+          <span className="text-muted">To</span><span className="[overflow-wrap:anywhere]">{preview.recipient}</span>
+          <span className="text-muted">Subject</span><span>{preview.subject}</span>
+        </div>
+        {emailDraft && editable && <details className="mt-4">
+          <summary className="cursor-pointer text-[13px] font-medium text-brand">Edit email</summary>
+          <div className="mt-3 space-y-3">
+            <label className="block text-[12px] text-muted">Email subject
+              <input className={`${field} mt-1 w-full text-ink`} value={emailDraft.subject} disabled={!!busy} maxLength={300} onChange={event => setEmailDraft({ ...emailDraft, subject: event.target.value })} />
+            </label>
+            <label className="block text-[12px] text-muted">Email message
+              <textarea className="field-input mt-1 min-h-64 w-full text-[13px] text-ink" value={emailDraft.text} disabled={!!busy} maxLength={20000} onChange={event => setEmailDraft({ ...emailDraft, text: event.target.value })} />
+            </label>
+            <Button compact variant="secondary" disabled={!!busy || !emailChanged} onClick={() => { void prepareEmail(emailDraft); }}>Update preview</Button>
+          </div>
+        </details>}
+        {emailChanged && <p className="mt-3 text-[12px] text-muted">Update the preview before sending your changes.</p>}
+        <iframe title="Settlement email preview" sandbox="allow-same-origin" srcDoc={preview.html} className="mt-3 h-[32rem] w-full border-0 bg-white" />
+      </div>
+      <div><h3 className="text-sm font-semibold">Attachments</h3><ul className="mt-2 space-y-2 text-[12px]">{preview.attachments.map((name, index) => <li key={`${name}-${index}`}><a className="text-brand underline underline-offset-4" href={`/api/host/emails/${preview.id}/files/${index}`} target="_blank" rel="noreferrer">{name}</a></li>)}</ul><Button className="mt-5 w-full" compact disabled={!canWrite || !!busy || emailChanged || preview.status === "sent"} onClick={() => { void send(); }}>{busy === "send" ? "Sending…" : preview.status === "sent" ? "Already sent" : "Send settlement email"}</Button></div>
     </div>}
     <History history={history} />
   </section>;

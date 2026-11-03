@@ -96,3 +96,18 @@ The initial finish review requested payment failure handling. The implementation
 The implementation session recorded 28 passing targeted tests across `scripts/host-event.test.mjs`, `scripts/host-email.test.mjs`, `scripts/host-preview-cache.test.mjs`, `scripts/host-order-signing.test.mjs`, and `scripts/finance-plan.test.mjs`, and a passing final production build after the feedback placement fix. The read-only preservation verifier passed checks for the approved original PDF, existing envelope/revision identities, six personal-link hashes, and stored terms/documents before deployment. These checks do not establish deployment completion; the deployed ref/commit and preservation must be checked after production rollout.
 
 Cold iframe fixture measurements showed the local email draft in 15.5 ms on desktop and 17.2 ms on mobile while preview network responses were deliberately delayed by 1,800 ms. That measures draft rendering in the fixture, not authenticated server preparation, PDF generation, or production latency. The final fixture checks reported no page errors and exactly one action-feedback announcement on each viewport. Desktop physical interaction checks covered actions and payment retry. Mobile preview switching used DOM-dispatched events because headless iframe hit testing was unstable; this does not establish touch interaction evidence.
+
+
+## Itemized security deposit settlement
+
+The order's Security deposit settlement section records each deduction and its photos.
+The credit memo uses the hosting invoice template and lists the original deposit, each deduction, total retained, and remaining refund.
+Full retention also produces a credit memo, with a zero refund.
+
+Review email and credit memo prepares the exact PDF and photo attachments without sending.
+Edit email changes the subject or message; Update preview freezes the revised email before Send settlement email becomes available.
+Saving, preparing, and sending do not transfer money.
+
+The planned return date is a promise, not proof of payment.
+Mark returned confirms payment on the current day.
+Full retention uses Complete settlement and records no refund.

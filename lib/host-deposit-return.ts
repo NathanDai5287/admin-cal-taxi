@@ -26,9 +26,8 @@ export async function recordHostingDepositReturn(orderId: string) {
   if (settlement && (settlement.status !== "sent" || !settlement.noticeSentAt)) throw new Error("Send the settlement notice before recording the return.");
   const deductions = settlement?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
   const amount = Math.max((settlement?.depositAmount ?? depositPaid) - deductions, 0);
-  const returnDate = settlement?.refundDate ?? date;
-  const returnMethod = settlement?.refundMethod.trim() || "Zelle";
-  if (returnDate > date) throw new Error("Mark the deposit returned on or after the planned return date.");
+  const returnDate = date;
+  const returnMethod = amount === 0 ? "No refund" : settlement?.refundMethod.trim() || "Zelle";
   const state = await db.from("hosting_event_state").upsert({ order_id: orderId }, { onConflict: "order_id", ignoreDuplicates: true });
   if (state.error) throw new Error("Unable to save the deposit return.");
   const saved = await db.from("hosting_event_state").update({ refund_amount: amount, refund_date: returnDate, refund_method: returnMethod }).eq("order_id", orderId).is("refund_amount", null).is("cancelled_at", null);

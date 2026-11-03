@@ -163,3 +163,18 @@ test("existing return details stay unchanged when marking again", async () => {
   assert.deepEqual(calls.tables, []);
   assert.deepEqual(calls.writes, []);
 });
+
+
+test("confirmation records the actual day rather than the planned date", async () => {
+  const settlement = { id: "settlement_test", status: "sent", noticeSentAt: today, depositAmount: 250, refundDate: "2026-10-22", refundMethod: "Zelle", items: [{ amount: 180 }] };
+  const { markReturned } = depositReturn({ settlement });
+  assert.deepEqual(await markReturned(), { ok: true, data: { amount: 70, date: today, method: "Zelle" } });
+});
+
+test("full retention completes without a refund method or planned date", async () => {
+  const settlement = { id: "settlement_test", status: "sent", noticeSentAt: today, depositAmount: 180, refundDate: null, refundMethod: "", items: [{ amount: 100 }, { amount: 80 }] };
+  const { markReturned, calls } = depositReturn({ settlement });
+  assert.deepEqual(await markReturned(), { ok: true, data: { amount: 0, date: today, method: "No refund" } });
+  assert.equal(calls.writes.at(-1).value.status, "returned");
+  assert.deepEqual(calls.emails, []);
+});
