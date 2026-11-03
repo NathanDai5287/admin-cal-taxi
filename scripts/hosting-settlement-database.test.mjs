@@ -19,6 +19,7 @@ async function database() {
     create table hosting_email_deliveries(kind text not null, constraint hosting_email_deliveries_kind_check check(kind in ('refund')));
   `);
   await db.exec(await readFile(new URL("../supabase/migrations/20261101000000_hosting_damage_settlements.sql", import.meta.url), "utf8"));
+  await db.exec(await readFile(new URL("../supabase/migrations/20261103000000_hosting_return_details_at_payment.sql", import.meta.url), "utf8"));
   await db.exec(`
     insert into profiles values('00000000-0000-4000-8000-000000000001',null);
     insert into hosting_finance_orders values('ord_settlement','confirmed');
@@ -70,4 +71,21 @@ test("sent settlements are immutable and zero-dollar returns are valid", async (
   await db.exec("insert into hosting_event_state(order_id,refund_amount,refund_date,refund_method) values('ord_settlement',0,'2026-11-01','Deposit retained')");
   const state = await db.query("select refund_amount from hosting_event_state where order_id='ord_settlement'");
   assert.equal(Number(state.rows[0].refund_amount), 0);
+});
+
+test("unscheduled settlements keep actual refund details in the payment record", async (t) => {
+  const db = await database();
+  t.after(() => db.close());
+  const settlementId = (await save(db)).rows[0].id;
+  await db.query("update hosting_damage_settlements set refund_date=null,refund_method='',status='sent' where id=$1", [settlementId]);
+  const sent = await db.query("select refund_date,refund_method from hosting_damage_settlements where id=$1", [settlementId]);
+  assert.deepEqual(sent.rows, [{ refund_date: null, refund_method: "" }]);
+  await assert.rejects(db.exec("insert into hosting_event_state(order_id,refund_amount) values('ord_settlement',100)"), /check constraint/);
+  await db.exec("insert into hosting_event_state(order_id,refund_amount,refund_date,refund_method) values('ord_settlement',100,'2026-11-03','Zelle')");
+  await db.query("update hosting_damage_settlements set status='returned' where id=$1", [settlementId]);
+  const payment = await db.query("select refund_amount,refund_method from hosting_event_state where order_id='ord_settlement'");
+  assert.equal(Number(payment.rows[0].refund_amount), 100);
+  assert.equal(payment.rows[0].refund_method, "Zelle");
+  await assert.rejects(db.query("update hosting_damage_settlements set status='invalid' where id=$1", [settlementId]), /check constraint/);
+  await assert.rejects(db.query("update hosting_damage_settlements set refund_method=$2 where id=$1", [settlementId, "x".repeat(121)]), /check constraint/);
 });
