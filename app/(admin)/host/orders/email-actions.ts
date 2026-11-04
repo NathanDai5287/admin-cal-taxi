@@ -12,11 +12,12 @@ import { recordHostingDepositReturn } from "@/lib/host-deposit-return";
 const requestSchema = z.object({ orderId: z.string().min(1).max(200), revisionId: z.string().startsWith("sig_").max(200), expectedUpdatedAt: z.string().max(100), kind: z.enum(["invitation", "reminder", "completed", "deposit_invoice", "rental_invoice", "deposit_receipt", "receipt", "refund"]), recipients: z.array(z.string().email()).max(40).optional(), refund: z.object({ amount: z.number().positive(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), method: z.string().trim().max(120) }).optional() });
 function failure(error: unknown) { return { ok: false as const, error: error instanceof Error ? error.message : "Request failed. Please retry." }; }
 function refresh(orderId: string) { revalidatePath(`/host/orders/${orderId}`); revalidatePath("/host/orders"); revalidatePath("/finance/planning"); }
-export async function recordHostingDepositReturnAction(orderId: string) {
+export async function recordHostingDepositReturnAction(orderId: string, method = "Zelle") {
   await requireAppAccess("host", "write");
   try {
     z.string().min(1).max(200).parse(orderId);
-    const refund = await recordHostingDepositReturn(orderId);
+    const returnMethod = z.string().trim().min(1).max(120).parse(method);
+    const refund = await recordHostingDepositReturn(orderId, returnMethod);
     refresh(orderId);
     return { ok: true as const, data: refund };
   } catch (error) { return failure(error); }

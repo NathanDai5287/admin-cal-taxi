@@ -87,7 +87,7 @@ export function registerHostingTools(server: McpServer, supabase: McpSupabase, c
   });
 
   server.registerTool("save_hosting_deposit_settlement", {
-    description: "Create or replace an editable itemized security-deposit settlement. Use stable UUIDs for item IDs and preserve them across edits so attached evidence stays associated. This saves a private draft and does not generate or send email. Deductions may not exceed the deposit.",
+    description: "Create or replace an editable itemized security-deposit settlement. Choose the return method later when recording payment; no planned return date is needed. Use stable UUIDs for item IDs and preserve them across edits so attached evidence stays associated. This saves a private draft and does not generate or send email. Deductions may not exceed the deposit.",
     inputSchema: hostingSettlementInputSchema, annotations: write,
   }, async (input) => {
     await authorize(supabase, caller, "save_hosting_deposit_settlement", "write", input.orderId);
@@ -160,10 +160,10 @@ export function registerHostingTools(server: McpServer, supabase: McpSupabase, c
   });
 
   server.registerTool("record_hosting_deposit_return", {
-    description: "Record that the remaining deposit balance was actually returned. This does not transfer money. The itemized notice must already be sent and the planned return date must have arrived. Read get_hosting_order, state the exact amount/method/date, and obtain explicit confirmation first.",
-    inputSchema: z.object({ orderId, confirm: z.literal(true) }), annotations: confirmed,
-  }, async ({ orderId: id }) => {
+    description: "Record that the remaining deposit balance was actually returned today. The method defaults to Zelle and can be chosen now. This does not transfer money. The itemized notice must already be sent. Read get_hosting_order, state the exact amount, method, and today's date, and obtain explicit confirmation first.",
+    inputSchema: z.object({ orderId, method: z.string().trim().min(1).max(120).default("Zelle"), confirm: z.literal(true) }), annotations: confirmed,
+  }, async ({ orderId: id, method }) => {
     await authorize(supabase, caller, "record_hosting_deposit_return", "write", id);
-    return result(await recordHostingDepositReturn(id));
+    return result(await recordHostingDepositReturn(id, method));
   });
 }

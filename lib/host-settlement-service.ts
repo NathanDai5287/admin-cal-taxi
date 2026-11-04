@@ -17,8 +17,8 @@ const itemSchema = z.object({
 });
 export const hostingSettlementInputSchema = z.object({
   orderId: orderIdSchema,
-  refundMethod: z.string().trim().max(120),
-  refundDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  refundMethod: z.string().trim().max(120).default(""),
+  refundDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   items: z.array(itemSchema).min(1).max(25),
 });
 

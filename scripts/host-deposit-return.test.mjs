@@ -90,7 +90,7 @@ function depositReturn({ readOnly = false, cancelledAt = null, statusOverride = 
     assert.ok(name in modules, `Unexpected dependency: ${name}`);
     return modules[name];
   }, loaded, loaded.exports);
-  return { markReturned: () => loaded.exports.recordHostingDepositReturnAction(orderId), calls, state };
+  return { markReturned: method => loaded.exports.recordHostingDepositReturnAction(orderId, method), calls, state };
 }
 
 test("marking returns all active received deposits today without sending emails or transferring money", async () => {
@@ -166,9 +166,24 @@ test("existing return details stay unchanged when marking again", async () => {
 
 
 test("confirmation records the actual day rather than the planned date", async () => {
-  const settlement = { id: "settlement_test", status: "sent", noticeSentAt: today, depositAmount: 250, refundDate: "2026-10-22", refundMethod: "Zelle", items: [{ amount: 180 }] };
+  const settlement = { id: "settlement_test", status: "sent", noticeSentAt: today, depositAmount: 250, refundDate: "2026-10-22", refundMethod: "Cash", items: [{ amount: 180 }] };
   const { markReturned } = depositReturn({ settlement });
   assert.deepEqual(await markReturned(), { ok: true, data: { amount: 70, date: today, method: "Zelle" } });
+});
+
+test("the actual return method is chosen at confirmation without changing old planned details", async () => {
+  const settlement = { id: "settlement_test", status: "sent", noticeSentAt: today, depositAmount: 250, refundDate: "2026-10-22", refundMethod: "Zelle", items: [{ amount: 180 }] };
+  const { markReturned, calls } = depositReturn({ settlement });
+  assert.deepEqual(await markReturned(" Cash "), { ok: true, data: { amount: 70, date: today, method: "Cash" } });
+  assert.equal(settlement.refundDate, "2026-10-22");
+  assert.equal(settlement.refundMethod, "Zelle");
+  assert.deepEqual(calls.emails, []);
+});
+
+test("empty actual return methods cannot record payment", async () => {
+  const { markReturned, calls } = depositReturn();
+  assert.equal((await markReturned(" ")).ok, false);
+  assert.deepEqual(calls.writes, []);
 });
 
 test("full retention completes without a refund method or planned date", async () => {

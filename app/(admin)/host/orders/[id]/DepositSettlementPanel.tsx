@@ -22,16 +22,16 @@ import {
 type EditorItem = { id: string; category: DamageCategory; description: string; amount: string; clubs: string[] };
 const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 const field = "field-input !min-h-9 !py-1.5 !text-[13px]";
+const defaultReturnMethod = "Zelle";
 
 function newItem(clubs: string[]): EditorItem {
   return { id: crypto.randomUUID(), category: "damage", description: "", amount: "", clubs: [...clubs] };
 }
 
-export default function DepositSettlementPanel({ orderId, depositAmount, clubs, today, settlement, history, canSettle }: {
+export default function DepositSettlementPanel({ orderId, depositAmount, clubs, settlement, history, canSettle }: {
   orderId: string;
   depositAmount: number;
   clubs: string[];
-  today: string;
   settlement: DepositSettlement | null;
   history: ClubDamageHistory[];
   canSettle: boolean;
@@ -40,8 +40,6 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
   const router = useRouter();
   const [open, setOpen] = useState(!!settlement);
   const [items, setItems] = useState<EditorItem[]>(() => settlement?.items.map(item => ({ ...item, amount: item.amount.toFixed(2) })) ?? [newItem(clubs)]);
-  const [refundMethod, setRefundMethod] = useState(settlement?.refundMethod ?? "Zelle");
-  const [refundDate, setRefundDate] = useState(settlement ? settlement.refundDate ?? "" : today);
   const [busy, setBusy] = useState<"save" | "upload" | "prepare" | "send" | "return" | "remove" | null>(null);
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState<(EmailPreview & { text: string }) | null>(null);
@@ -49,7 +47,7 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
   const emailChanged = !!preview && !!emailDraft && (preview.subject !== emailDraft.subject || preview.text !== emailDraft.text);
   const editable = !settlement || settlement.status === "draft";
   const total = useMemo(() => items.reduce((sum, item) => sum + Math.round((Number(item.amount) || 0) * 100), 0) / 100, [items]);
-  const formSignature = JSON.stringify({ items, refundMethod, refundDate });
+  const formSignature = JSON.stringify(items);
   const [savedVersion, setSavedVersion] = useState(() => settlement ? { id: settlement.id, revision: settlement.revision, signature: formSignature } : null);
   const refund = Math.max(depositAmount - total, 0);
   const evidenceByItem = new Map(items.map(item => [item.id, settlement?.evidence.filter(file => file.itemId === item.id) ?? []]));
@@ -75,7 +73,7 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     try {
       validItems();
       const result = await saveHostingSettlementAction({
-        orderId, refundMethod, refundDate: refundDate || null,
+        orderId, refundMethod: settlement?.refundMethod ?? "", refundDate: settlement?.refundDate ?? null,
         items: items.map(item => ({ ...item, amount: Number(item.amount) })),
       });
       if (!result.ok) throw new Error(result.error);
@@ -147,10 +145,10 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     finally { setBusy(null); }
   }
   async function markReturned() {
-    const confirmation = refund === 0 ? "Complete this settlement with the full deposit retained and no refund?" : `Confirm that you returned ${money(refund)} via ${refundMethod} today?`;
+    const confirmation = refund === 0 ? "Complete this settlement with the full deposit retained and no refund?" : `Confirm that you returned ${money(refund)} via ${defaultReturnMethod} today?`;
     if (!window.confirm(confirmation)) return;
     setBusy("return"); setMessage("");
-    const result = await recordHostingDepositReturnAction(orderId);
+    const result = await recordHostingDepositReturnAction(orderId, defaultReturnMethod);
     setBusy(null);
     if (!result.ok) { setMessage(result.error); return; }
     setMessage(refund === 0 ? "Settlement completed. No refund was due." : "Deposit return recorded."); router.refresh();
@@ -188,17 +186,15 @@ export default function DepositSettlementPanel({ orderId, depositAmount, clubs, 
     </div>
     {editable && <button type="button" className="mt-3 text-[12px] font-medium text-brand hover:text-ink" disabled={!!busy || items.length >= 25} onClick={() => setItems(current => [...current, newItem(clubs)])}>+ Add deduction</button>}
 
-    <div className="mt-5 grid gap-5 border-t border-rule pt-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-      {refund > 0 && <label className="text-[12px] text-muted">Return method<input className={`${field} mt-1 w-full text-ink`} value={refundMethod} disabled={!editable || !!busy} maxLength={120} onChange={event => { setRefundMethod(event.target.value); setPreview(null); }} /></label>}
-      {refund > 0 && <label className="text-[12px] text-muted">Planned return date<input className={`${field} mt-1 w-full text-ink`} type="date" value={refundDate} disabled={!editable || !!busy} onChange={event => { setRefundDate(event.target.value); setPreview(null); }} /></label>}
+    <div className="mt-5 flex flex-wrap items-end justify-between gap-5 border-t border-rule pt-4">
       <dl className="grid grid-cols-[auto_auto] content-start gap-x-5 gap-y-1 text-[12px] tabular-nums"><dt className="text-muted">Deductions</dt><dd className="text-right">{money(total)}</dd><dt className="font-semibold">Return</dt><dd className="text-right font-semibold">{money(refund)}</dd></dl>
     </div>
 
     <div className="mt-4 flex flex-wrap items-center gap-3">
       {editable && <Button compact variant="secondary" disabled={!canWrite || !!busy} onClick={() => { void save(); }}>{busy === "save" ? "Saving…" : "Save draft"}</Button>}
       {editable && <Button compact disabled={!canWrite || !!busy || !canSettle} onClick={() => { void prepareEmail(); }}>{busy === "prepare" ? "Preparing…" : "Review email and credit memo"}</Button>}
-      {settlement && settlement.status !== "returned" && <Button compact variant="text" disabled={!canWrite || !!busy || !settlement.noticeSentAt} onClick={() => { void markReturned(); }}>{busy === "return" ? "Recording…" : refund === 0 ? "Complete settlement" : `Mark ${money(refund)} returned`}</Button>}
-      {settlement && settlement.status !== "returned" && !settlement.noticeSentAt && <span className="text-[11px] text-muted">Send the notice before completing the settlement.</span>}
+      {settlement && settlement.status !== "returned" && <Button compact variant={settlement.noticeSentAt ? "primary" : "secondary"} disabled={!canWrite || !!busy || !settlement.noticeSentAt} onClick={() => { void markReturned(); }}>{busy === "return" ? "Recording…" : refund === 0 ? "Complete settlement" : `Mark ${money(refund)} returned`}</Button>}
+      {settlement && settlement.status !== "returned" && !settlement.noticeSentAt && <span className="text-[11px] text-muted">Send the settlement email before marking the deposit returned.</span>}
     </div>
     {message && <p role="status" aria-live="polite" className="mt-3 text-[13px] [overflow-wrap:anywhere]">{message}</p>}
 

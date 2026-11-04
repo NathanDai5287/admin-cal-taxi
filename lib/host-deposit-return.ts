@@ -7,7 +7,7 @@ import { loadDepositSettlement } from "./host-settlement";
 import { loadWorkflow, workflowDb } from "./host-workflow";
 import { createAdminClient } from "./reimbursements/supabase/admin";
 
-export async function recordHostingDepositReturn(orderId: string) {
+export async function recordHostingDepositReturn(orderId: string, method = "Zelle") {
   const [order, workflow, settlement] = await Promise.all([getOrderFresh(orderId), loadWorkflow(orderId), loadDepositSettlement(orderId)]);
   if (!order || order.statusOverride === "cancelled" || workflow.cancelledAt) throw new Error("This order cannot return a deposit.");
   if (workflow.refund) return workflow.refund;
@@ -27,7 +27,7 @@ export async function recordHostingDepositReturn(orderId: string) {
   const deductions = settlement?.items.reduce((total, item) => total + item.amount, 0) ?? 0;
   const amount = Math.max((settlement?.depositAmount ?? depositPaid) - deductions, 0);
   const returnDate = date;
-  const returnMethod = amount === 0 ? "No refund" : settlement?.refundMethod.trim() || "Zelle";
+  const returnMethod = amount === 0 ? "No refund" : method;
   const state = await db.from("hosting_event_state").upsert({ order_id: orderId }, { onConflict: "order_id", ignoreDuplicates: true });
   if (state.error) throw new Error("Unable to save the deposit return.");
   const saved = await db.from("hosting_event_state").update({ refund_amount: amount, refund_date: returnDate, refund_method: returnMethod }).eq("order_id", orderId).is("refund_amount", null).is("cancelled_at", null);

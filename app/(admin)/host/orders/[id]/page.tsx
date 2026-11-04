@@ -165,7 +165,6 @@ export default async function OrderDetailPage({
           orderId={order.id}
           depositAmount={order.depositAmount}
           clubs={orderClubs}
-          today={today}
           settlement={settlement}
           history={damageHistory}
           canSettle={!workflow.cancelledAt && order.statusOverride !== "cancelled" && today >= orderPaymentSchedule(order).eventEndDate && depositPaid >= order.depositAmount && rentalPaid >= (order.rentalPrice ?? Infinity)}

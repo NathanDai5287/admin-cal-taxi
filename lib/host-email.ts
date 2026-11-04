@@ -258,14 +258,11 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
     if (row.status === "sent") { sent++; continue; }
     if (row.payload.termsHash !== hostingTermsHash(order)) { errors.push("Order terms changed. Prepare a fresh preview."); continue; }
     if (row.kind === "settlement") {
-      const current = await db.from("hosting_damage_settlements").select("revision,status,refund_date,refund_method").eq("id", row.payload.settlement?.id).eq("order_id", orderId).maybeSingle();
+      const current = await db.from("hosting_damage_settlements").select("revision,status").eq("id", row.payload.settlement?.id).eq("order_id", orderId).maybeSingle();
       if (current.error || !current.data || current.data.revision !== row.payload.settlement?.revision || !["draft", "sent", "returned"].includes(current.data.status)) {
         errors.push("The settlement changed. Prepare a fresh preview."); continue;
       }
       if (current.data.status !== "draft") { errors.push("The settlement notice was already sent. Retry its sent preview to complete any pending records."); continue; }
-      if (row.payload.settlement?.creditMemo?.amount !== 0 && (!current.data.refund_date || !current.data.refund_method.trim())) {
-        errors.push("Choose a return method and planned date before sending this notice."); continue;
-      }
     }
     if ((row.kind === "receipt" || row.kind === "deposit_receipt" || row.kind === "refund") && row.payload.paymentsHash !== payments.hash) { errors.push("Payment records changed. Prepare a fresh preview."); continue; }
     if ((row.kind === "invitation" || row.kind === "reminder") && (revision.state !== "awaiting_signatures" || revision.recipients.find(p => p.email === row.recipient)?.status === "SIGNED")) { skipped++; continue; }
@@ -301,9 +298,7 @@ export async function deliverHostingEmails(orderId: string, ids: string[]) {
     try { await ensureHostingForecast(order); } catch (e) { errors.push(e instanceof Error ? e.message : "Forecast update failed."); }
     if (rows[0].kind === "settlement" && rows[0].payload.settlement) {
       const settlement = rows[0].payload.settlement;
-      const recorded = await db.from("hosting_damage_settlements").update({ status: "sent", notice_sent_at: new Date().toISOString(),
-        ...(settlement.creditMemo?.amount === 0 ? { refund_date: eventToday(), refund_method: "No refund" } : {}),
-      })
+      const recorded = await db.from("hosting_damage_settlements").update({ status: "sent", notice_sent_at: new Date().toISOString() })
         .eq("id", settlement.id).eq("order_id", orderId).eq("revision", settlement.revision).in("status", ["draft", "sent"]);
       if (recorded.error) errors.push("The email was sent, but the settlement status could not be recorded.");
       if (settlement.creditMemo && !order.documents.some(document => document.kind === "credit_memo" && document.number === settlement.creditMemo!.number)) {

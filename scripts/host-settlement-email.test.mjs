@@ -97,17 +97,19 @@ test("partial refund review works without a planned method or date", async () =>
   assert.equal(preview.attachments.length, 4);
 });
 
-test("partial refund review includes only the provided return details", async () => {
-  const methodOnly = await fixture({ refundDate: null }).prepare();
-  assert.match(methodOnly[0].text, /We will return the remaining \$120\.00 via Zelle\./);
-  const dateOnly = await fixture({ refundMethod: "" }).prepare();
-  assert.match(dateOnly[0].text, /We will return the remaining \$120\.00 by 2026-11-01\./);
+test("legacy planned details do not become payment promises in the notice or credit memo", async () => {
+  const { prepare, payloads } = fixture({ refundMethod: "Cash", refundDate: "2026-11-10" });
+  const [preview] = await prepare();
+  assert.match(preview.text, /We will return the remaining \$120\.00\./);
+  assert.doesNotMatch(preview.text, /via Cash|by 2026-11-10/);
+  assert.equal(payloads[0].refund_method, "a payment method to be confirmed");
 });
 
 test("payment wording uses the recorded refund instead of the planned return", async () => {
-  const { prepare } = fixture({ refund: { amount: 120, date: "2026-11-02", method: "Cash" } });
+  const { prepare, payloads } = fixture({ refund: { amount: 120, date: "2026-11-02", method: "Cash" } });
   const [preview] = await prepare();
   assert.match(preview.text, /was returned via Cash on 2026-11-02/);
+  assert.equal(payloads[0].refund_method, "Cash");
 });
 
 test("edited email creates an exact escaped preview with the same attachments and stable retries", async () => {

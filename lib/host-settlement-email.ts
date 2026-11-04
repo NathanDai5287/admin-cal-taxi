@@ -24,13 +24,13 @@ function filenameFrom(response: Response, fallback: string) {
   return /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? fallback;
 }
 
-async function creditMemo(order: NonNullable<Awaited<ReturnType<typeof getOrderFresh>>>, settlement: NonNullable<Awaited<ReturnType<typeof loadDepositSettlement>>>, amount: number) {
+async function creditMemo(order: NonNullable<Awaited<ReturnType<typeof getOrderFresh>>>, settlement: NonNullable<Awaited<ReturnType<typeof loadDepositSettlement>>>, amount: number, returnedMethod?: string) {
   const depositNumber = order.documents.filter(document => document.kind === "deposit_invoice" && !document.stale).sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))[0]?.number;
   const defaults = defaultDocuments(order, depositNumber);
   const payload: Record<string, unknown> = {
     ...defaults.payloads.credit_memo,
     amount: amount.toFixed(2),
-    refund_method: amount > 0 ? settlement.refundMethod.trim() || "a payment method to be confirmed" : "No refund",
+    refund_method: amount > 0 ? returnedMethod || "a payment method to be confirmed" : "No refund",
     refund_description: "Security deposit settlement with itemized deductions.",
     deposit_amount: settlement.depositAmount.toFixed(2),
     deductions: settlement.items.map(item => ({ description: item.description, amount: item.amount.toFixed(2) })),
@@ -85,7 +85,7 @@ export async function prepareHostingSettlementEmail(input: { orderId: string; se
 
   const total = settlement.items.reduce((sum, item) => sum + Math.round(item.amount * 100), 0) / 100;
   const refund = Math.max(settlement.depositAmount - total, 0);
-  const memo = await creditMemo(order, settlement, refund);
+  const memo = await creditMemo(order, settlement, refund, workflow.refund?.method);
   const evidenceRows = await db.from("hosting_damage_evidence").select("storage_path,filename,content_type").eq("settlement_id", settlement.id).order("created_at");
   if (evidenceRows.error) throw new Error("Settlement evidence could not be loaded.");
   const evidence = await Promise.all((evidenceRows.data ?? []).map(async row => {
@@ -96,11 +96,9 @@ export async function prepareHostingSettlementEmail(input: { orderId: string; se
   const attachments = [memo.attachment, ...evidence];
   const sender = await hostingEmailConfig();
   const alreadyReturned = !!workflow.refund;
-  const plannedMethod = settlement.refundMethod.trim() ? ` via ${settlement.refundMethod.trim()}` : "";
-  const plannedDate = settlement.refundDate ? ` by ${formatDateISO(settlement.refundDate)}` : "";
   const action = refund === 0 ? "The full security deposit was applied to the itemized deductions; no balance remains to return."
     : alreadyReturned ? `The remaining ${money(refund)} was returned via ${workflow.refund!.method} on ${formatDateISO(workflow.refund!.date)}.`
-      : `We will return the remaining ${money(refund)}${plannedMethod}${plannedDate}.`;
+      : `We will return the remaining ${money(refund)}.`;
   const lines = settlement.items.map(item => `- ${item.description}: ${money(item.amount)}`).join("\n");
   const attached = evidence.length ? "The itemized credit memo and photographs are attached." : "The itemized credit memo is attached.";
   const defaultText = `Hello everyone,\n\nThank you for hosting your event at Theta Xi on ${formatDateISO(order.eventDate)}. During our post-event inspection, we found damage requiring repair and remediation. Under Section 05 of the Hosting Contract, these costs have been deducted from the ${money(settlement.depositAmount)} security deposit.\n\n${lines}\n\nTotal deductions: ${money(total)}\nDeposit credited for return: ${money(refund)}\n\n${action}\n\n${attached} Please reply with any questions about these deductions.\n\nBest,\nTheta Xi Hosting\nNu Chapter · UC Berkeley\n2639 Durant Ave, Berkeley, CA 94704\n${sender.replyTo}\nhttps://cal.taxi`;

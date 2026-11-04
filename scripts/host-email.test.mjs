@@ -504,31 +504,27 @@ test("sending one settlement blocks older edited previews while sent retries sta
   } finally { state.rows = []; state.settlements = []; }
 });
 
-test("unscheduled partial notices cannot send and full retention records no refund details", async () => {
-  state.rows = [];
-  state.settlements = [{ id: "settlement", order_id: state.order.id, revision: 1, status: "draft", refund_date: null, refund_method: "" }];
-  await prepareHostingEmail(request);
-  const row = state.rows[0];
-  row.kind = "settlement";
-  row.payload.sharedFinancialEmail = true;
-  row.payload.settlement = { id: "settlement", revision: 1, creditMemo: { kind: "credit_memo", number: "CM-FULL", amount: 120 } };
-  row.payload.body.to = state.order.snapshot.contractSigners.map(person => person.email);
-  row.recipient = row.payload.body.to.join(", ");
-  let sends = 0;
-  globalThis.fetch = async () => { sends++; return Response.json({ id: "provider-settlement" }); };
+test("partial and full retention notices send without recording refund details", async () => {
   const documents = state.order.documents;
   try {
-    const blocked = await deliverHostingEmails(state.order.id, [row.id]);
-    assert.equal(blocked.sent, 0);
-    assert.match(blocked.errors[0], /before sending this notice/);
-    assert.equal(sends, 0);
-    assert.equal(state.settlements[0].status, "draft");
-    row.payload.settlement.creditMemo.amount = 0;
-    assert.equal((await deliverHostingEmails(state.order.id, [row.id])).sent, 1);
-    assert.equal(sends, 1);
-    assert.equal(state.settlements[0].status, "sent");
-    assert.match(state.settlements[0].refund_date, /^\d{4}-\d{2}-\d{2}$/);
-    assert.equal(state.settlements[0].refund_method, "No refund");
-    assert.equal(state.refund, null);
+    for (const amount of [120, 0]) {
+      state.rows = [];
+      state.settlements = [{ id: "settlement", order_id: state.order.id, revision: 1, status: "draft", refund_date: null, refund_method: "" }];
+      await prepareHostingEmail(request);
+      const row = state.rows[0];
+      row.kind = "settlement";
+      row.payload.sharedFinancialEmail = true;
+      row.payload.settlement = { id: "settlement", revision: 1, creditMemo: { kind: "credit_memo", number: `CM-${amount}`, amount } };
+      row.payload.body.to = state.order.snapshot.contractSigners.map(person => person.email);
+      row.recipient = row.payload.body.to.join(", ");
+      let sends = 0;
+      globalThis.fetch = async () => { sends++; return Response.json({ id: "provider-settlement" }); };
+      assert.equal((await deliverHostingEmails(state.order.id, [row.id])).sent, 1);
+      assert.equal(sends, 1);
+      assert.equal(state.settlements[0].status, "sent");
+      assert.equal(state.settlements[0].refund_date, null);
+      assert.equal(state.settlements[0].refund_method, "");
+      assert.equal(state.refund, null);
+    }
   } finally { state.rows = []; state.settlements = []; state.order.documents = documents; }
 });
