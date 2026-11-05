@@ -1105,8 +1105,8 @@
   [data-brand] .receipt-dialog-actions {
     @apply grid grid-cols-2 gap-2 border-t border-rule px-4 py-3.5;
   }
-  [data-brand] .receipt-dialog-actions form,
-  [data-brand] .receipt-dialog-actions button {
+  [data-brand] .receipt-dialog-actions > form,
+  [data-brand] .receipt-dialog-actions > button {
     @apply w-full;
   }
   [data-brand] .receipt-dialog-actions > p {
