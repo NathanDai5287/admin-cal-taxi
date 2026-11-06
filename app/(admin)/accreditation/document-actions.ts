@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
+import { deleteSavedForm } from "@/lib/accreditation/saved-forms";
 import { finishExampleUpload, loadDocumentLibrary, loadDocumentWorkspace, performDocumentRequest, processExampleStep, renameDocumentFamily, reserveExampleBatch, seedDocumentExample, startExampleDocument } from "@/lib/accreditation/document-store";
 
 async function access(write = true) {
@@ -53,4 +54,8 @@ export async function requestDocumentChange(input: unknown) {
 export async function createDocumentFromExisting(input: unknown) {
   const session = await access();
   return result(() => seedDocumentExample(session.userId, input));
+}
+export async function deleteAccreditationSavedForm(id: string) {
+  await access();
+  return result(() => deleteSavedForm(id));
 }

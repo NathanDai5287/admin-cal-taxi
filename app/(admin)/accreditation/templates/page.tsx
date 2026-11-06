@@ -1,4 +1,5 @@
-import { requireAppAccess } from "@/lib/reimbursements/auth";
+import { requireAppAccess, hasAppAccess } from "@/lib/reimbursements/auth";
+import { DeleteSavedForm } from "../delete-saved-form";
 import { Button } from "@/components/brand/button";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { startTemplateSubmission, uploadTemplate } from "../actions";
@@ -29,7 +30,7 @@ function displayStatus(template: Record<string, unknown>) {
 }
 
 export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ template?: string; family?: string; result?: string }> }) {
-  await requireAppAccess("accreditation");
+  const session = await requireAppAccess("accreditation");
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [familiesResult, templatesResult] = await Promise.all([
@@ -37,7 +38,8 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
     supabase.from("accreditation_templates").select("*").order("created_at", { ascending: false }),
   ]);
   const families = familiesResult.data ?? [];
-  const templates = templatesResult.data ?? [];
+  const visibleFamilies = new Set(families.map((family: { id: string }) => family.id));
+  const templates = (templatesResult.data ?? []).filter((template: { template_family_id: string }) => visibleFamilies.has(template.template_family_id));
   const selectedTemplate = templates.find((template: Record<string, unknown>) => template.id === params.template) ?? templates.find((template: Record<string, unknown>) => params.family && template.template_family_id === params.family && template.is_active) ?? templates.find((template: Record<string, unknown>) => template.is_active) ?? templates[0] ?? null;
   const selectedFamily = selectedTemplate ? families.find((family: Record<string, unknown>) => family.id === selectedTemplate.template_family_id) : null;
   const familyTemplates = new Map<string, Record<string, unknown>>();
@@ -90,6 +92,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
               {selectedTemplate.is_active ? <form action={startTemplateSubmission}><input type="hidden" name="templateFamilyId" value={String(selectedFamily.id)} /><Button type="submit">Start submission</Button></form> : <p className="text-sm text-warn">This form is still being prepared.</p>}
               <a className="text-sm font-bold text-brand hover:underline" href={`/api/accreditation/templates/${selectedTemplate.id}`}>Download original</a>
             </div>
+            {hasAppAccess(session, "accreditation", "write") && <DeleteSavedForm id={String(selectedFamily.id)} name={String(selectedFamily.name)} />}
           </div> : <div className="card-body border-t border-rule text-sm text-muted">Save a blank form to start building your reusable library.</div>}
         </div>
       </section>

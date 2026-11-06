@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/brand/button";
+import { DeleteSavedForm } from "../delete-saved-form";
 import type { DocumentLibraryData, DocumentExample, DocumentFamily } from "@/lib/accreditation/document-ui-types";
 import { beginExampleDocument, completeDocumentUpload, createDocumentFromExisting, processDocumentExample, refreshDocumentLibrary, reserveDocumentBatch, updateDocumentFamily } from "../document-actions";
 
@@ -101,6 +102,7 @@ export function DocumentLibrary({ initial, canWrite }: { initial: DocumentLibrar
       </nav>
       {family ? <section className="min-w-0 space-y-6" key={family.id}>
         <FamilySettings key={family.name} family={family} canWrite={canWrite} busy={busy} save={(name, guidance) => act(async () => { const result = await updateDocumentFamily({ id: family.id, name, guidance }); if (!result.ok) throw new Error(result.error); await refresh(); })} />
+        {canWrite && <DeleteSavedForm id={family.id} name={family.name} disabled={busy} onDeleted={async () => { paused.current = true; const next = await refresh(); setSelected(next.families[0]?.id ?? ""); setChosen(null); }} />}
         <section className="space-y-3"><h2 className="text-lg font-bold">Examples</h2>
           {examples.map(example => <article key={example.id} className="border-b border-rule pb-4 space-y-2">
             <div className="flex items-start gap-3"><input aria-label={`Use ${example.original_name}`} type="checkbox" className="mt-1" checked={selectedIds.includes(example.id)} disabled={example.status !== "ready" || busy || !canWrite} onChange={event => setChosen(event.target.checked ? [...selectedIds, example.id] : selectedIds.filter(id => id !== example.id))} /><div className="min-w-0 flex-1"><a className="font-semibold text-brand underline break-words" href={`/api/accreditation/examples/${example.id}`}>{example.original_name}</a><p className="text-xs text-muted mt-1">{example.status === "uploading" ? "Waiting for upload" : example.status === "ready" ? "Ready" : `${example.completedPages} of ${example.page_count ?? "?"} pages read · ${example.status}`}</p></div>

@@ -10,6 +10,11 @@ then start a draft. Describe the desired changes, edit the resulting text/tables
 and generate a PDF. Edits save after a short pause; **Save edits** saves immediately.
 Approval archives the reviewed PDF separately. Older PDFs remain downloadable.
 
+Use **Delete saved form** on a dashboard card, document type, or legacy template
+to remove it from the reusable library. Its uploaded examples and templates are
+retained for existing submissions. Those submissions remain accessible under
+**Submissions from deleted forms** on the dashboard for their academic year.
+
 ## Processing and quotas
 
 Files upload directly to private Supabase storage using short-lived signed upload

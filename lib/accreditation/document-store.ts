@@ -133,11 +133,13 @@ export async function loadDocumentLibrary() {
     db.from("accreditation_examples").select("id,batch_id,family_id,original_name,size_bytes,status,page_count,analysis,error,retry_after,units,accreditation_example_batches(family_id)").order("created_at", { ascending: true }),
     db.from("academic_years").select("id,label,starts_on,ends_on,academic_terms(id,label,starts_on,ends_on)").order("starts_on", { ascending: false }),
     db.from("accreditation_runs").select("id,template_family_id,title,status,cycle_id,term_id").eq("workflow_mode", "example_document").order("created_at", { ascending: false }),
-    db.from("accreditation_templates").select("id,original_name").order("created_at", { ascending: false }),
+    db.from("accreditation_templates").select("id,original_name,accreditation_template_families!inner(archived_at)").is("accreditation_template_families.archived_at", null).order("created_at", { ascending: false }),
     db.from("accreditation_artifacts").select("id,filename").eq("kind", "approved").order("created_at", { ascending: false }),
   ]);
   const [families, examples, years, runs, templates, approved] = results.map(checked);
-  return { families, examples: (examples as Array<ExampleRow & { accreditation_example_batches: { family_id: string | null } }>).map(({ units, accreditation_example_batches, ...row }) => ({ ...row, uploadFamilyId: accreditation_example_batches.family_id, completedPages: units.length })), years, runs, templates, approved };
+  const visibleFamilyIds = new Set((families as Array<{ id: string }>).map(family => family.id));
+  const visibleExamples = (examples as Array<ExampleRow & { accreditation_example_batches: { family_id: string | null } }>).filter(example => visibleFamilyIds.has(example.family_id));
+  return { families, examples: visibleExamples.map(({ units, accreditation_example_batches, ...row }) => ({ ...row, uploadFamilyId: accreditation_example_batches.family_id, completedPages: units.length })), years, runs, templates, approved };
 }
 
 export async function loadDocumentWorkspace(runIdValue: string) {
