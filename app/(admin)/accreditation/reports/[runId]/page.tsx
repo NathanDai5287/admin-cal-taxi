@@ -1,4 +1,7 @@
-import { requireAppAccess } from "@/lib/reimbursements/auth";
+import { requireAppAccess, hasAppAccess } from "@/lib/reimbursements/auth";
+import { loadDocumentWorkspace } from "@/lib/accreditation/document-store";
+import type { DocumentWorkspaceData } from "@/lib/accreditation/document-ui-types";
+import { DocumentWorkspace } from "../../documents/document-workspace";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -11,6 +14,7 @@ import { approveReport, createSuccessorRun, generateDraft } from "../../actions"
 import { TemplateSubmissionChat } from "./template-submission-chat";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 180;
 
 function label(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -34,7 +38,7 @@ export default async function ReportWorkspace({
   params: Promise<{ runId: string }>;
   searchParams: Promise<{ result?: string }>;
 }) {
-  await requireAppAccess("accreditation");
+  const session = await requireAppAccess("accreditation");
   const [{ runId }, query] = await Promise.all([params, searchParams]);
   const supabase = createAccreditationAdminClient();
   const runResult = await supabase.from("accreditation_runs")
@@ -46,6 +50,10 @@ export default async function ReportWorkspace({
   }
   if (!runResult.data) notFound();
   const run = runResult.data;
+  if (run.workflow_mode === "example_document") {
+    const workspace = await loadDocumentWorkspace(runId) as DocumentWorkspaceData;
+    return <>{query.result && RESULT_MESSAGES[query.result] ? <p role="status" className="form-message mb-5">{RESULT_MESSAGES[query.result]}</p> : null}<DocumentWorkspace key={`${runId}-${run.status}`} initial={workspace} canWrite={hasAppAccess(session, "accreditation", "write")} /></>;
+  }
   const definition = getReportDefinition(run.report_key);
   if (run.template_family_id) {
     let templateQuery = supabase.from("accreditation_templates").select("id,analysis,format");

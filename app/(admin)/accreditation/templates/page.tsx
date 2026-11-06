@@ -33,7 +33,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
   const [familiesResult, templatesResult] = await Promise.all([
-    supabase.from("accreditation_template_families").select("*").is("archived_at", null).order("created_at", { ascending: false }),
+    supabase.from("accreditation_template_families").select("*").eq("workflow_mode", "legacy").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("accreditation_templates").select("*").order("created_at", { ascending: false }),
   ]);
   const families = familiesResult.data ?? [];
@@ -51,7 +51,8 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
     <div className="space-y-7">
       <section>
         <p className="page-eyebrow">Accreditation forms</p>
-        <h1 className="page-title">Template library</h1>
+        <h1 className="page-title">Legacy templates</h1>
+        <a href="/accreditation/documents" className="inline-block my-3 font-bold text-brand underline">Create PDFs from previous examples</a>
         <p className="page-lede">Save each official form once. Generate a fresh draft using chapter guidance and prior submissions, adjust the details, and download the completed file.</p>
       </section>
 

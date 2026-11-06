@@ -20,6 +20,8 @@ export type StructuredGenerationRequest = {
   instructions: string;
   input: string;
   schema: Record<string, unknown>;
+  maxOutputTokens?: number;
+  singleAttempt?: boolean;
 };
 
 export type StructuredStreamOptions = { signal?: AbortSignal };
@@ -63,6 +65,7 @@ class OpenAILanguageModelProvider implements LanguageModelProvider {
       const response = await this.client.responses.create({
         model: this.model,
         store: false,
+        ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
         instructions: request.instructions,
         input: request.input,
         text: {
@@ -73,12 +76,12 @@ class OpenAILanguageModelProvider implements LanguageModelProvider {
             schema: request.schema,
           },
         },
-      }).catch(aiError);
+      }, request.singleAttempt ? { maxRetries: 0, timeout: 150_000 } : {}).catch(aiError);
       try {
         const value: unknown = JSON.parse(response.output_text ?? "");
         if (!matchesSchema(value, request.schema)) throw new Error("Invalid structure.");
         return value;
-      } catch { if (attempt === 1) throw new Error("The model returned malformed output twice. Please retry."); }
+      } catch { if (attempt === 1 || request.singleAttempt) throw new Error("The model returned malformed output. Please retry."); }
     }
     throw new Error("No structured response.");
   }

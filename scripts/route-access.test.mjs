@@ -8,7 +8,7 @@ const { routeAccess } = await import(`data:text/javascript;base64,${Buffer.from(
 
 async function files(directory) {
   const entries = await readdir(directory, { recursive: true, withFileTypes: true });
-  return entries.filter((entry) => entry.isFile()).map((entry) => `${entry.parentPath}/${entry.name}`);
+  return entries.filter((entry) => entry.isFile()).map((entry) => `${entry.parentPath}/${entry.name}`.replaceAll("\\", "/"));
 }
 
 function urlPath(file) {

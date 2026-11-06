@@ -22,7 +22,7 @@ export default async function AccreditationLayout({ children }: { children: Reac
         tabs={[
           { href: "/accreditation", label: "Dashboard" },
           { href: "/accreditation/library", label: "Evidence" },
-          { href: "/accreditation/templates", label: "Templates" },
+          { href: "/accreditation/documents", label: "Document types" },
         ]}
       />
       <main className="max-w-[1180px] mx-auto px-6 py-8"><AppAccessBoundary access={session.appAccess.accreditation}>{children}</AppAccessBoundary></main>

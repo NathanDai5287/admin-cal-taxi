@@ -18,7 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new Response(await download.data.arrayBuffer(), { headers: {
     "Cache-Control": "private, no-store",
     "Content-Type": artifact.data.mime_type,
-    "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(artifact.data.filename)}`,
+    "Content-Disposition": `${new URL(_request.url).searchParams.get("inline") === "1" && artifact.data.mime_type === "application/pdf" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(artifact.data.filename)}`,
+    "X-Content-Type-Options": "nosniff",
     "X-Content-SHA256": artifact.data.sha256,
   } });
 }

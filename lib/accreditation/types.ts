@@ -121,6 +121,7 @@ export type TemplateFamily = {
   id: string;
   name: string;
   description: string;
+  workflow_mode?: "legacy" | "example_document";
   archived_at?: string | null;
 };
 
