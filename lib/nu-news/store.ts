@@ -42,10 +42,10 @@ export async function listIssues() {
   return data;
 }
 
-export async function pdfUrl(issue: StoredIssue, expiresInSeconds: number) {
+export async function pdfUrl(issue: StoredIssue, expiresInSeconds: number, download = true) {
   const storage = createAdminClient().storage.from(NU_NEWS_BUCKET);
   const { data } = issue.final_pdf_path
-    ? await storage.createSignedUrl(issue.final_pdf_path, expiresInSeconds, { download: pdfFileName(issue.season) })
+    ? await storage.createSignedUrl(issue.final_pdf_path, expiresInSeconds, download ? { download: pdfFileName(issue.season) } : {})
     : await storage.createSignedUrl(previewPath(issue.id), expiresInSeconds);
   return data?.signedUrl ?? null;
 }

@@ -10,6 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!session || !hasAppAccess(session, "nu-news")) return new Response("Forbidden", { status: 403 });
   const issue = z.uuid().safeParse(id).success ? await loadIssue(id) : null;
   if (!issue) return new Response("Not found", { status: 404 });
+  if (!issue.finalized_at && session.appAccess["nu-news"] !== "write") return new Response("Not found", { status: 404 });
 
   const url = await pdfUrl(issue, 60);
   if (!url) return new Response("PDF unavailable", { status: 404 });
