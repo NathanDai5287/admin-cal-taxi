@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { broadcastSchema, listSchema, renderBroadcast, type Broadcast, type BroadcastInput, type MailingGroup } from "./broadcast";
 import type { Database } from "@/lib/reimbursements/supabase/database.types";
 import { loadIssue } from "@/lib/nu-news/store";
+import { syncConnectOptOuts } from "./connect-suppression";
 
 const idSchema = z.uuid();
 const db = () => createAdminClient();
@@ -70,6 +71,7 @@ export function broadcastSender() { return process.env.RESEND_BROADCAST_FROM_EMA
 export async function prepareBroadcast(id: string, version: string) {
   let row = await getBroadcast(id);
   const resend = provider();
+  await syncConnectOptOuts(resend);
   if (row.status === "draft") {
     if (row.updated_at !== version) throw new Error("The draft changed. Reload and review it first.");
     if (!row.list_id || !row.subject || !row.body || !row.postal_address || !row.reply_to) throw new Error("Choose a list and add a subject, body, reply-to email, and mailing address before preparing.");
@@ -131,6 +133,7 @@ export async function sendBroadcast(id: string, version: string, confirm: boolea
   if (row.status === "sent") return row;
   if (row.status !== "ready" || row.updated_at !== version || !row.resend_id) throw new Error("Reload and review the prepared broadcast before sending.");
   const resend = provider();
+  await syncConnectOptOuts(resend);
   const remote = checked(await resend.broadcasts.get(row.resend_id));
   if (remote.status !== "draft") throw new Error("This broadcast was already queued or sent in Resend. Check its status instead of sending again.");
   if (remote.html !== renderBroadcast(row) || remote.subject !== row.subject || remote.from !== row.sender || remote.segment_id !== row.segment_id

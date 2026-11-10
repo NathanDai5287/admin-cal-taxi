@@ -25,6 +25,10 @@ function fixture(status = "ready") {
     const q = { select: () => q, order: () => q, limit: () => q, range: () => q, eq: (k, v) => { filters.push([k, v]); return q; }, update: (v) => { operation = "update"; value = v; return q; }, insert: (v) => { operation = "insert"; value = v; return q; }, upsert: (v) => { operation = "upsert"; value = v; return q; },
       single: async () => execute(true), maybeSingle: async () => execute(true), then: (resolve) => Promise.resolve(execute(false)).then(resolve) };
     function execute(single) {
+      if (table === "connect_members") {
+        if (operation === "update") s.suppressions = [];
+        return { data: s.suppressions ?? [], error: null };
+      }
       if (table === "newsletter_events") return { data: s.events ?? [], error: null };
       if (table === "nu_news_publications") {
         if (operation === "upsert") { s.public = true; return { data: [{ issue_id: value.issue_id }], error: null }; }
@@ -41,7 +45,7 @@ function fixture(status = "ready") {
   s.provider = {
     domains: { list: async () => ({ data: { data: [{ id: "domain", name: "cal.taxi" }] }, error: null }), get: async () => ({ data: { status: "verified", open_tracking: true, click_tracking: true }, error: null }) },
     segments: { create: async () => ({ data: { id: "segment" }, error: null }) },
-    contacts: { imports: { create: async (payload) => { s.importCalls++; s.importPayload = payload; return { data: { id: "import" }, error: null }; }, get: async () => ({ data: { status: "completed", counts: { total: 800, failed: s.failImport ? 1 : 0 } }, error: null }) } },
+    contacts: { update: async () => ({ data: null, error: s.failSuppression ? { name: "application_error" } : null }), imports: { create: async (payload) => { s.importCalls++; s.importPayload = payload; return { data: { id: "import" }, error: null }; }, get: async () => ({ data: { status: "completed", counts: { total: 800, failed: s.failImport ? 1 : 0 } }, error: null }) } },
     broadcasts: { create: async () => { s.createCalls++; return { data: { id: "remote" }, error: null }; },
       get: async () => ({ data: { status: "draft", html: s.remoteChanged ? "changed" : renderBroadcast(row), from: row.sender, subject: row.subject, segment_id: row.segment_id, reply_to: [row.reply_to] }, error: null }),
       send: async () => { s.sendCalls++; if (s.failSend) throw new Error("timeout"); return { data: { id: "remote" }, error: null }; } },
@@ -83,6 +87,14 @@ test("ambiguous send failures remain in review and cannot be retried", async () 
   assert.equal(s.row.status, "review");
   await assert.rejects(store.sendBroadcast(id, s.row.updated_at, true), /review/);
   assert.equal(s.sendCalls, 1);
+});
+test("pending alumni opt-outs sync before sending; provider failures stop prepared broadcasts", async () => {
+  const s = fixture(); s.suppressions = [{ profile_id: "person", email: "alumnus@example.com" }]; s.failSuppression = true;
+  await assert.rejects(store.sendBroadcast(id, "v1", true), /opt-outs/);
+  assert.equal(s.sendCalls, 0); assert.equal(s.row.status, "ready");
+  s.failSuppression = false;
+  await store.sendBroadcast(id, "v1", true);
+  assert.equal(s.sendCalls, 1); assert.deepEqual(s.suppressions, []);
 });
 test("800 recipients import in one job without overriding subscription status; preparation never sends", async () => {
   const s = fixture("draft"); s.row.resend_id = null; s.row.import_id = null;

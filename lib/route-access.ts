@@ -13,6 +13,7 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   "/site": "public",
   "/demo": "public",
   "/public-site": "public",
+  "/connect": "public",
   "/auth": "public",
   "/reimbursements/login": "public",
   "/reimbursements/auth": "public",

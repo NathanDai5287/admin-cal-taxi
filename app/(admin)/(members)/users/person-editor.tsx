@@ -85,6 +85,10 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onSave, 
               ))}
             </select>
           </div>
+          <div className="field"><label className="field-label" htmlFor="person-first-name">First name</label><input id="person-first-name" name="firstName" className="field-input" defaultValue={member.firstName ?? ""} maxLength={100} /></div>
+          <div className="field"><label className="field-label" htmlFor="person-last-name">Last name</label><input id="person-last-name" name="lastName" className="field-input" defaultValue={member.lastName ?? ""} maxLength={100} /></div>
+          <div className="field"><label className="field-label" htmlFor="person-roll">Roll number</label><input id="person-roll" name="rollNumber" className="field-input" defaultValue={member.rollNumber ?? ""} placeholder="Nu 1048" maxLength={20} /></div>
+          <div className="field"><label className="field-label" htmlFor="person-graduation">Graduation year</label><input id="person-graduation" name="graduationYear" className="field-input" type="number" min={1900} max={2200} defaultValue={member.graduationYear ?? ""} /></div>
           <div className="field">
             <label className="field-label" htmlFor="person-email">Contact email</label>
             <input className="field-input" id="person-email" name="contactEmail" type="email" defaultValue={member.contactEmail} maxLength={254} placeholder={member.email} />

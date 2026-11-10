@@ -1,0 +1,26 @@
+.connect-shell {
+  background: var(--color-page, #f5f5f7);
+}
+.connect-shell main {
+  min-height: 65vh;
+}
+.connect-shell .field-input {
+  min-width: 0;
+}
+.connect-shell input[type="checkbox"] {
+  accent-color: #075985;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.connect-shell :focus-visible {
+  outline: 2px solid #075985;
+  outline-offset: 4px;
+}
+.connect-shell ::selection {
+  color: #101014;
+  background: #b8dcf3;
+}
+.connect-shell input {
+  caret-color: #075985;
+}

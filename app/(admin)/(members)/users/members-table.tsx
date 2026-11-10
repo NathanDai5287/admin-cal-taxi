@@ -13,6 +13,10 @@ import { userLabel } from "@/lib/reimbursements/user-label";
 export type MemberRow = {
   id: string;
   fullName: string;
+  firstName?: string;
+  lastName?: string;
+  rollNumber?: string;
+  graduationYear?: number | null;
   email: string;
   contactEmail: string;
   phone: string;
@@ -49,6 +53,10 @@ function withFormChanges(member: MemberRow, formData: FormData): MemberRow {
     ...member,
     fullName: text("fullName"),
     contactEmail: text("contactEmail").toLowerCase(),
+    firstName: text("firstName"),
+    lastName: text("lastName"),
+    rollNumber: text("rollNumber"),
+    graduationYear: text("graduationYear") ? Number(text("graduationYear")) : null,
     phone: text("phone"),
     membership: (text("membership") || null) as Membership | null,
     executiveRoles: formData.getAll("executiveRoles").map(String) as ExecutiveRole[],
@@ -200,6 +208,7 @@ export function MembersTable({
                 <td className="people-identity">
                   <span className="people-name">{userLabel(member.fullName, member.email)}{isYou ? <span className="font-normal text-muted"> (you)</span> : null}</span>
                   <span className="people-contact">{member.contactEmail || member.email}{member.phone ? ` · ${member.phone}` : ""}</span>
+                  {(member.rollNumber || member.graduationYear) && <span className="people-contact">{[member.rollNumber, member.graduationYear ? `Class of ${member.graduationYear}` : ""].filter(Boolean).join(" · ")}</span>}
                   {!member.hasSignedIn && <span className="people-status text-caution">{member.statusLabel}</span>}
                 </td>
                 <td data-label="Roles"><RoleBadges member={member} /></td>
