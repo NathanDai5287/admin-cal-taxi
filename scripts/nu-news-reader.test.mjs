@@ -38,7 +38,7 @@ test("readers get a completed PDF directory with no drafts or editing instructio
   fixture();
   const html = renderToStaticMarkup(await routes.directory());
   assert.match(html, /Fall 2026/);
-  assert.match(html, /Semester \+ year/);
+  assert.match(html, /Newsletter issues/);
   assert.match(html, new RegExp(`/nu-news/${id}/pdf`));
   assert.doesNotMatch(html, /Spring 2027|New issue|<th scope="col">Date|<th scope="col">Status|check the preview/);
 });

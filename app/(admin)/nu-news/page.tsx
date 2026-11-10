@@ -14,16 +14,44 @@ export default async function NuNewsPage() {
   const allIssues = await listIssues();
   const issues = canWrite ? allIssues : allIssues.filter((issue) => issue.finalized_at);
 
+  if (!canWrite) {
+    return (
+      <div className="nu-news-directory">
+        <header className="nu-news-directory-heading">
+          <h1 className="page-title">Nu News</h1>
+          <p className="page-lede">The Nu Chapter newsletter.</p>
+        </header>
+        {issues.length === 0 ? (
+          <p className="nu-news-empty">No completed issues yet.</p>
+        ) : (
+          <ul className="nu-news-issue-list" aria-label="Newsletter issues">
+            {issues.map((issue) => (
+              <li key={issue.id} className="nu-news-issue-row">
+                <Link className="nu-news-read-issue" href={`/nu-news/${issue.id}`}>
+                  <span className="nu-news-issue-season">{issue.season}</span>
+                  <span className="nu-news-read-label">View PDF<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12h15m-6-6 6 6-6 6" /></svg></span>
+                </Link>
+                <a className="nu-news-download" href={`/nu-news/${issue.id}/pdf`} aria-label={`Download ${issue.season} PDF`} title={`Download ${issue.season} PDF`}>
+                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-8">
       <div className="nu-news-heading flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="page-title">Nu News</h1>
-          <p className="page-lede">{canWrite ? "Enter each semester’s newsletter, check the preview, then finalize it. A final issue and its PDF never change." : "Read the completed Nu News PDF for each semester."}</p>
+          <p className="page-lede">Enter each semester’s newsletter, check the preview, then finalize it. A final issue and its PDF never change.</p>
         </div>
-        {canWrite && <form action={createIssue} className="nu-news-create">
+        <form action={createIssue} className="nu-news-create">
           <Button type="submit">New issue</Button>
-        </form>}
+        </form>
       </div>
 
       <section className="nu-news-archive" aria-labelledby="issues-heading">
@@ -32,23 +60,23 @@ export default async function NuNewsPage() {
           <span className="nu-news-count">{issues.length} {issues.length === 1 ? "issue" : "issues"}</span>
         </div>
         {issues.length === 0 ? (
-          <p className="nu-news-empty">{canWrite ? "No issues yet. Select New issue to start the first one." : "No completed issues yet."}</p>
+          <p className="nu-news-empty">No issues yet. Select New issue to start the first one.</p>
         ) : (
           <div className="table-scroll border-t border-rule">
             <table className="data-table nu-news-table">
               <thead>
                 <tr>
-                  <th scope="col">Semester + year</th>
-                  {canWrite && <th scope="col">Date</th>}
-                  <th scope="col">{canWrite ? "Status" : "PDF"}</th>
+                  <th scope="col">Issue</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {issues.map((issue) => (
                   <tr key={issue.id}>
                     <td><Link className="nu-news-issue-link" href={`/nu-news/${issue.id}`}>{issue.season}<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12h15m-6-6 6 6-6 6" /></svg></Link></td>
-                    {canWrite && <td>{formatReimbursementDate(issue.issue_date)}</td>}
-                    <td>{canWrite ? (issue.finalized_at ? <span className="badge badge-approved">Final</span> : <span className="badge">Draft</span>) : <a className="text-brand underline" href={`/nu-news/${issue.id}/pdf`} aria-label={`Download ${issue.season} PDF`}>Download PDF</a>}</td>
+                    <td>{formatReimbursementDate(issue.issue_date)}</td>
+                    <td>{issue.finalized_at ? <span className="badge badge-approved">Final</span> : <span className="badge">Draft</span>}</td>
                   </tr>
                 ))}
               </tbody>

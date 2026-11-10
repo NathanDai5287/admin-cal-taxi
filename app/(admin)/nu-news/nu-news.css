@@ -20,6 +20,92 @@
   line-height: 1.7;
 }
 
+.nu-news-directory {
+  max-width: 760px;
+  margin: 8px auto 0;
+}
+
+.nu-news-directory-heading {
+  margin-bottom: 32px;
+}
+
+.nu-news .nu-news-directory-heading .page-lede {
+  margin: 8px 0 0;
+}
+
+.nu-news-issue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-rule);
+}
+
+.nu-news-issue-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.nu-news-read-issue {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 88px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--color-ink);
+}
+
+.nu-news-issue-season {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.nu-news-read-label {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-brand);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.nu-news-read-issue:hover .nu-news-issue-season {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+.nu-news-download {
+  display: inline-flex;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+}
+
+.nu-news-download:hover {
+  background: var(--color-surface);
+  color: var(--color-brand);
+}
+
+.nu-news-read-issue:focus-visible,
+.nu-news-download:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+}
+
+.nu-news-directory > .nu-news-empty {
+  padding: 24px 0;
+}
+
 .nu-news-archive {
   border-top: 2px solid var(--color-brand);
   border-bottom: 1px solid var(--color-rule);
@@ -166,6 +252,23 @@
 }
 
 @media (max-width: 640px) {
+  .nu-news-directory {
+    margin-top: 0;
+  }
+
+  .nu-news-issue-row {
+    gap: 8px;
+  }
+
+  .nu-news-read-issue {
+    min-height: 80px;
+    gap: 16px;
+  }
+
+  .nu-news-issue-season {
+    font-size: 18px;
+  }
+
   .nu-news > header > div:last-child {
     gap: 12px;
     padding-inline: 16px 180px;

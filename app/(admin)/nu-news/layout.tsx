@@ -29,7 +29,7 @@ export default async function NuNewsLayout({ children }: { children: React.React
     <div data-brand className="nu-news min-h-screen">
       <AppNav homeHref="/nu-news" title="Theta Xi" subtitle="Nu News" />
       <main className="nu-news-main max-w-[1080px] mx-auto px-6 py-8">
-        {await nuNewsIsSetUp() ? <AppAccessBoundary access={session.appAccess["nu-news"]}>{children}</AppAccessBoundary> : (
+        {await nuNewsIsSetUp() ? <AppAccessBoundary access={session.appAccess["nu-news"]} showReadOnlyNotice={false}>{children}</AppAccessBoundary> : (
           <section className="card">
             <div className="card-header">
               <h1 className="card-title">Setup needed</h1>
