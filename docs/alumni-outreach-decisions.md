@@ -44,6 +44,31 @@ This is the running record of the alumni outreach discussion. Update it as decis
 - Alumni should have access to selected tools, including Nu News. Exact access levels and reader experience remain to be defined.
 - Mailing-list enrollment and access to privileged administrative tools are separate concerns.
 
+### Approved email templates
+
+- The user approved the proposed templates: named invitation, anonymous invitation, replacement-email verification code, and welcome after enrollment.
+- Named invitation subject: “{{inviter_first_name}} invited you to reconnect with Theta Xi.” Anonymous invitation subject: “An invitation to reconnect with the Nu Chapter of Theta Xi.”
+- Invitation action: “Choose your preferences,” opening Join, Use a different email, and No thanks. Explain that subscription requires acceptance.
+- Verification subject: “Verify your email for the Nu Chapter of Theta Xi.” Include the code, destination email, expiration, and instructions to ignore an unsolicited request without subscribing that address.
+- Welcome subject: “You’re connected with the Nu Chapter of Theta Xi.” Confirm the subscribed address and offer “Invite your brothers,” Manage preferences, and Unsubscribe. Add Read Nu News once the reader experience is ready.
+- The template proposal uses a 15-minute verification code, replacing the earlier 24-hour verification-link recommendation. Attempt limits and resend rules remain to be designed.
+- Declines, duplicate referrals, admin revocations, and unsubscribes use on-page feedback rather than additional automatic emails. A changed address receives the welcome only after verification/enrollment.
+
+## Invite your brothers page: proposed plan, awaiting review
+
+- Audience: an enrolled alumnus, arriving directly after joining or from the welcome email. Sending requires verification and enrollment; later visits need secure access rather than reuse of the original invitation as a permanent credential.
+- Extend the existing chapter visual system with a calm, mobile-friendly single-column form, chapter identity, and no private admin sidebar.
+- Heading: “Invite your brothers.” Explain that the chapter sends a personal invitation and recipients choose whether to join.
+- One multiline email field accepts newline-, comma-, or semicolon-separated addresses. Do not require the inviter to supply other people's names or roll numbers; recipients enter their own details.
+- Show valid recipient count, remove duplicate entries within the pasted batch, and identify malformed addresses before sending. Preserve input on errors.
+- Offer “Include my name in these invitations,” with the actual profile name and a named/anonymous email preview. The checkbox default is still open.
+- Primary action: “Review invitations.” Review shows submitted addresses, sender, exact subject/body preview, attribution choice, and an explicit “Send invitations” button. Keep review inline on the same page with an Edit action.
+- Explain before sending: previously invited or opted-out addresses will not receive another invitation; each recipient receives an individual email without seeing other recipients.
+- After processing, show a neutral confirmation and “Invite more brothers.” Do not reveal existing subscription, decline, replacement-address, or other private status, or claim every submitted address received mail.
+- Handle empty input, malformed addresses, pending send, success, sending limits, invalid access, and partial/uncertain delivery without losing input or causing duplicate invitation sends. Never label accepted provider requests as confirmed delivery.
+- Proposed initial limits: 20 addresses per batch and 50 new invitations per person per day. These numbers are suggestions, not agreed requirements.
+- Do not add recipient membership lookup, a public directory, a referral leaderboard, or editable invitation copy to the initial page. These are scope recommendations, not separate user decisions.
+
 ## Recommendations proposed, not yet confirmed
 
 - Let alumni subscribe without a login; link a subsequent verified sign-in to the existing person record rather than creating a duplicate.
@@ -51,7 +76,7 @@ This is the running record of the alumni outreach discussion. Update it as decis
 - Preserve existing full names during migration rather than blindly splitting them. Do not merge profiles automatically based on self-reported roll numbers.
 - Keep the inviter's identity internally even when omitted from the email.
 - Use a chapter-controlled sender with a monitored reply-to address.
-- Keep original invitation links valid until accepted, declined, or revoked; expire replacement-email verification after 24 hours. Code expiration and retry rules still need a specific design.
+- Keep original invitation links valid until accepted, declined, or revoked. The approved email proposal uses a 15-minute replacement-email verification code; retry rules still need a specific design.
 - Opening an invitation must not change enrollment state; email scanners can open links.
 - Limit revocation to admins; let inviters report mistakes rather than withdraw another person's invitation themselves.
 - Retain declines and unsubscribe history; do not reinvite or silently resubscribe these addresses.
@@ -97,6 +122,8 @@ Pending decisions:
 7. Expanded scope to shared alumni profiles and selected tool access, including Nu News; requested a mailing-specific sender and consideration of Resend marketing.
 8. Requested this ongoing decision log.
 9. Chose `connect@cal.taxi` as the sending address, with display name “Nu Chapter of Theta Xi.”
+10. Approved the proposed invitation, verification-code, and welcome email templates.
+11. Requested a plan for the “Invite your brothers” page; the proposed page above awaits review.
 
 ## Implementation status
 
