@@ -40,7 +40,17 @@ test("readers get a completed PDF directory with no drafts or editing instructio
   assert.match(html, /Fall 2026/);
   assert.match(html, /Newsletter issues/);
   assert.match(html, new RegExp(`/nu-news/${id}/pdf`));
+  assert.match(html, /pdf\?view=1/);
+  assert.match(html, /target="_blank"/);
+  assert.equal((html.match(/<a /g) ?? []).length, 1);
   assert.doesNotMatch(html, /Spring 2027|New issue|<th scope="col">Date|<th scope="col">Status|check the preview/);
+});
+test("the reader link opens the storage PDF without forcing a download", async () => {
+  const state = fixture();
+  const response = await routes.pdf(new Request(`https://cal.taxi/nu-news/${id}/pdf?view=1`), context);
+  assert.equal(response.status, 307);
+  assert.equal(response.headers.get("location"), "https://storage.example.test/final.pdf");
+  assert.deepEqual(state.pdfArgs.slice(1), [60, false]);
 });
 test("reader empty state refers only to completed issues", async () => {
   const state = fixture(); state.issues = state.issues.slice(1);

@@ -27,6 +27,7 @@
 
 .nu-news-directory-heading {
   margin-bottom: 32px;
+  padding-inline: 20px;
 }
 
 .nu-news .nu-news-directory-heading .page-lede {
@@ -41,21 +42,22 @@
 }
 
 .nu-news-issue-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   border-bottom: 1px solid var(--color-rule);
 }
 
 .nu-news-read-issue {
+  box-sizing: border-box;
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   min-height: 88px;
+  padding: 20px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
   color: var(--color-ink);
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
 .nu-news-issue-season {
@@ -65,41 +67,37 @@
   overflow-wrap: anywhere;
 }
 
-.nu-news-read-label {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
+.nu-news-read-issue:is(:hover, :focus-visible) .nu-news-issue-season {
   color: var(--color-brand);
-  font-size: 13px;
-  font-weight: 550;
 }
 
-.nu-news-read-issue:hover .nu-news-issue-season {
-  color: var(--color-brand);
-  text-decoration: underline;
-  text-underline-offset: 5px;
-}
-
-.nu-news-download {
+.nu-news-open-icon {
   display: inline-flex;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   color: var(--color-muted);
 }
 
-.nu-news-download:hover {
+.nu-news-read-issue:is(:hover, :focus-visible) {
   background: var(--color-surface);
+}
+
+.nu-news-read-issue:is(:hover, :focus-visible) .nu-news-open-icon {
   color: var(--color-brand);
 }
 
-.nu-news-read-issue:focus-visible,
-.nu-news-download:focus-visible {
+.nu-news-read-issue:focus-visible {
   outline: 2px solid var(--color-brand);
-  outline-offset: 4px;
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nu-news-read-issue {
+    transition: none;
+  }
 }
 
 .nu-news-directory > .nu-news-empty {
@@ -252,16 +250,16 @@
 }
 
 @media (max-width: 640px) {
+  .nu-news-directory-heading {
+    padding-inline: 16px;
+  }
   .nu-news-directory {
     margin-top: 0;
   }
 
-  .nu-news-issue-row {
-    gap: 8px;
-  }
-
   .nu-news-read-issue {
     min-height: 80px;
+    padding: 16px;
     gap: 16px;
   }
 
