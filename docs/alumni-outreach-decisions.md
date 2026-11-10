@@ -31,6 +31,7 @@ This is the running record of the alumni outreach discussion. Update it as decis
 ### Sender identity and inviter attribution
 
 - Use the chapter name “Nu Chapter of Theta Xi.”
+- Chosen sending identity: `Nu Chapter of Theta Xi <connect@cal.taxi>`. Domain verification and production configuration are still pending; this choice alone does not configure delivery or a reply inbox.
 - Invitations should describe an alumni referral; allow inviters to choose whether their name appears in the outgoing invitation.
 - Named example, subject to final copy: “Nathan Dai, a fellow alumnus, invited you to reconnect with the Nu Chapter of Theta Xi.”
 - Anonymous example, subject to final copy: “A fellow alumnus invited you to reconnect with the Nu Chapter of Theta Xi.”
@@ -73,7 +74,7 @@ Repository inspection on November 10, 2026 found:
 
 Pending decisions:
 
-- Choose and verify the mailing sender address and reply-to inbox. The user wants a mailing-specific sender and is interested in Resend's marketing tools.
+- Verify and configure the chosen mailing sender, `connect@cal.taxi`, and choose a monitored reply-to inbox. The user wants a mailing-specific sender and is interested in Resend's marketing tools.
 - Proposed split: Broadcasts for subscribed alumni newsletters and announcements; individual sending for recipient-specific invitations and verification codes. Confirm handling of invitation opt-outs and provider suppression before implementing.
 - Decide whether a separate sending subdomain is warranted; a different address alone does not isolate domain reputation.
 
@@ -95,6 +96,7 @@ Pending decisions:
 6. Chose chapter wording and optional inviter name disclosure.
 7. Expanded scope to shared alumni profiles and selected tool access, including Nu News; requested a mailing-specific sender and consideration of Resend marketing.
 8. Requested this ongoing decision log.
+9. Chose `connect@cal.taxi` as the sending address, with display name “Nu Chapter of Theta Xi.”
 
 ## Implementation status
 
