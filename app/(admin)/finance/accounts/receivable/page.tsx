@@ -51,7 +51,7 @@ export default async function DuesPage() {
       .range(from, to)),
     loadAllPages((from, to) => supabase
       .from("chapter_dues_payment_events")
-      .select("id, receivable_id, amount, paid_date, date_is_estimated, created_at")
+      .select("id, receivable_id, amount, paid_date, date_is_estimated, created_at, recorder_name")
       .order("paid_date", { ascending: false })
       .order("created_at", { ascending: false })
       .order("id", { ascending: true })
@@ -74,7 +74,7 @@ export default async function DuesPage() {
   const paymentsByBalance = new Map<string, DuesPaymentEvent[]>();
   for (const payment of paymentsResult.data) {
     const payments = paymentsByBalance.get(payment.receivable_id) ?? [];
-    payments.push({ id: payment.id, amount: Number(payment.amount), paidDate: payment.paid_date, dateIsEstimated: payment.date_is_estimated, createdAt: payment.created_at });
+    payments.push({ id: payment.id, amount: Number(payment.amount), paidDate: payment.paid_date, dateIsEstimated: payment.date_is_estimated, createdAt: payment.created_at, recorderName: payment.recorder_name });
     paymentsByBalance.set(payment.receivable_id, payments);
   }
 

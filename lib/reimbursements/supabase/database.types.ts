@@ -319,6 +319,8 @@ export type Database = {
       chapter_dues_payment_events: {
         Row: {
           id: string;
+          recorded_by: string | null;
+          recorder_name: string | null;
           receivable_id: string;
           amount: number;
           paid_date: string;

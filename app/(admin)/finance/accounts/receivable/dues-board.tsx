@@ -34,6 +34,7 @@ export type DuesRow = {
 
 export type DuesPaymentEvent = {
   id: string;
+  recorderName: string | null;
   amount: number;
   paidDate: string;
   dateIsEstimated: boolean;

@@ -355,45 +355,12 @@ export async function addDuesPayment(
   if (!parsed.success) return actionError("Check the payment amount and date.");
 
   const supabase = await createClient();
-  let { data: recorded, error } = await supabase.rpc("record_dues_payment", {
+  const { data: recorded, error } = await supabase.rpc("record_dues_payment", {
     p_receivable_id: parsed.data.id,
     p_payment_amount: parsed.data.paymentAmount,
     p_payment_date: parsed.data.paymentDate,
     p_request_id: parsed.data.requestId,
   });
-
-  // Safe rollout fallback while the atomic RPC migration is being applied.
-  // Compare-and-swap on updated_at prevents two old/new deployments or tabs
-  // from overwriting the same balance after reading it concurrently.
-  if (error?.code === "PGRST202") {
-    const admin = createAdminClient();
-    error = null;
-    recorded = false;
-    for (let attempt = 0; attempt < 4 && !recorded; attempt += 1) {
-      const current = await admin.from("chapter_receivables")
-        .select("amount_assessed, amount_paid, updated_at")
-        .eq("id", parsed.data.id)
-        .maybeSingle();
-      if (current.error) {
-        error = current.error;
-        break;
-      }
-      if (!current.data) break;
-      const nextPaid = Number(current.data.amount_paid) + parsed.data.paymentAmount;
-      if (nextPaid > Number(current.data.amount_assessed)) break;
-      const updated = await admin.from("chapter_receivables")
-        .update({ amount_paid: nextPaid })
-        .eq("id", parsed.data.id)
-        .eq("updated_at", current.data.updated_at)
-        .select("id")
-        .maybeSingle();
-      if (updated.error) {
-        error = updated.error;
-        break;
-      }
-      recorded = Boolean(updated.data);
-    }
-  }
 
   if (error) return actionError("The payment could not be recorded.");
   if (!recorded) return actionError("This balance changed. Refresh and try again.");

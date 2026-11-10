@@ -9,6 +9,7 @@ export function DuesPaymentHistory({ payments }: { payments: DuesPaymentEvent[] 
         <div>
           <strong>{payment.amount < 0 ? "Payment reversal" : "Payment recorded"}</strong>
           <p><time dateTime={payment.paidDate}>{new Date(`${payment.paidDate}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}</time>{payment.dateIsEstimated && <span className="dues-estimated-date">Estimated date</span>}</p>
+          <p>{payment.recorderName ? `Recorded by ${payment.recorderName}` : "Recorder unavailable"}</p>
         </div>
         <span className="dues-history-amount">{formatMoney(payment.amount)}</span>
       </li>)}
