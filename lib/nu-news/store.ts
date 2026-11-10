@@ -35,11 +35,26 @@ export async function loadIssue(id: string) {
 export async function listIssues() {
   const { data, error } = await createAdminClient()
     .from("nu_news_issues")
-    .select("id, season, issue_date, preview_made_at, finalized_at, finalized_by_name")
+    .select("id, season, issue_date, preview_made_at, finalized_at, finalized_by_name, final_pdf_path")
     .order("issue_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Unable to load Nu News issues: ${error.message}`);
   return data;
+}
+
+// Sign the archive in one Storage request, after the page has checked access.
+// Never sign drafts here, even when the caller can edit them.
+export async function directoryPdfUrls(issues: { finalized_at: string | null; final_pdf_path: string | null }[], expiresInSeconds: number) {
+  // Start the clock before signing, allowing a minute for skew/download startup.
+  const expiresAt = Date.now() + Math.max(0, expiresInSeconds - 60) * 1000;
+  const empty = { urls: {} as Record<string, string>, expiresAt };
+  const paths = issues.filter((issue) => issue.finalized_at && issue.final_pdf_path).map((issue) => issue.final_pdf_path!);
+  if (!paths.length) return empty;
+  const { data, error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).createSignedUrls(paths, expiresInSeconds);
+  // Keep the authenticated redirect as a fallback if signing is unavailable.
+  if (error) return empty;
+  const urls: Record<string, string> = Object.fromEntries((data ?? []).flatMap((file) => file.path && file.signedUrl && !file.error ? [[file.path, file.signedUrl]] : []));
+  return { urls, expiresAt };
 }
 
 export async function pdfUrl(issue: StoredIssue, expiresInSeconds: number, download = true) {
