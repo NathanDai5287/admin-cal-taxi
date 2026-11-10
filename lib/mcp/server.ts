@@ -22,7 +22,7 @@ import {
 import { MAX_MCP_PHOTO_MB } from "@/lib/mcp/nu-news-photo";
 import { decodeMcpReceipt } from "@/lib/mcp/receipt";
 import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
-import { listIssues } from "@/lib/nu-news/store";
+import { listIssues, loadIssue } from "@/lib/nu-news/store";
 import { registerMailingTools } from "@/lib/mcp/mailing-list";
 import { registerHostingTools } from "@/lib/mcp/hosting";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AppKey, type RoleKey } from "@/lib/app-access";
@@ -521,10 +521,16 @@ async function authorizeNuNewsCall(supabase: Supabase, caller: McpCaller, toolNa
   const requiredAccess = readTools.includes(toolName) ? "read" : "write";
   const { data: allowed, error } = await supabase.rpc("has_mcp_app_access", { app_key: "nu-news", required_access: requiredAccess });
   if (error || !allowed) throw new Error(`Nu News ${requiredAccess} access is required.`);
+  const writeAccess = requiredAccess === "write" ? true : await supabase.rpc("has_mcp_app_access", { app_key: "nu-news", required_access: "write" }).then(({ data, error }) => !error && data === true);
+  if (!writeAccess && issueId) {
+    const issue = await loadIssue(issueId);
+    if (!issue?.finalized_at || !issue.final_pdf_path) throw new Error("No completed Nu News issue has that ID.");
+  }
   const audit = await createAdminClient().from("mcp_audit_log").insert({
     user_id: caller.userId, client_id: caller.clientId, tool_name: toolName, target_id: issueId, request_id: requestId,
   });
   if (audit.error) throw new Error("The Nu News call could not be recorded.");
+  return writeAccess;
 }
 
 const NU_NEWS_WORKFLOW = "Workflow: create_nu_news_issue; fill it with update_nu_news_issue and add_nu_news_article; "
@@ -542,10 +548,10 @@ const ATTACH_PHOTO = "Pass the path from prepare_nu_news_photo_upload after you 
 const LINK_LIFETIME = `The signed link expires after ${MCP_LINK_SECONDS / 60} minutes.`;
 
 function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpCaller) {
-  const authorized = <Input extends NuNewsTarget>(toolName: string, run: (input: Input) => Promise<unknown>) => (
+  const authorized = <Input extends NuNewsTarget>(toolName: string, run: (input: Input, canWrite: boolean) => Promise<unknown>) => (
     async (input: Input) => {
-      await authorizeNuNewsCall(supabase, caller, toolName, input);
-      return jsonResult(await run(input));
+      const canWrite = await authorizeNuNewsCall(supabase, caller, toolName, input);
+      return jsonResult(await run(input, canWrite));
     }
   );
 
@@ -563,8 +569,8 @@ function registerNuNewsTools(server: McpServer, supabase: Supabase, caller: McpC
       + `and who finalized each and when. ${NU_NEWS_WORKFLOW}`,
     inputSchema: z.object({}),
     annotations: readAnnotations,
-  }, authorized("list_nu_news_issues", async () => ({
-    issues: (await listIssues()).map((issue) => ({ ...issue, status: issueStatus(issue) })),
+  }, authorized("list_nu_news_issues", async (_, canWrite) => ({
+    issues: (await listIssues()).filter((issue) => canWrite || (issue.finalized_at && issue.final_pdf_path)).map((issue) => ({ ...issue, status: issueStatus(issue) })),
   })));
 
   server.registerTool("get_nu_news_issue", {

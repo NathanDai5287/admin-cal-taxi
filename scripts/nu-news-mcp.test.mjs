@@ -413,3 +413,11 @@ test("read-only OAuth clients can list issues but cannot preview, upload, or cha
   assert.equal(admin.tables.nu_news_issues.length, 0);
   assert.equal(admin.files.size, 0);
 });
+test("read-only OAuth clients cannot list drafts or request draft details and PDF links", async () => {
+  const { admin, ok, refused } = connect({ access: "read" });
+  const draftId = randomUUID();
+  admin.tables.nu_news_issues.push({ id: draftId, season: "Draft", finalized_at: null, final_pdf_path: null });
+  assert.deepEqual((await ok("list_nu_news_issues", {})).issues, []);
+  await refused("get_nu_news_issue", { issueId: draftId }, /No completed Nu News/);
+  await refused("get_nu_news_pdf_url", { issueId: draftId }, /No completed Nu News/);
+});

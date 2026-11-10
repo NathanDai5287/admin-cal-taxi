@@ -35,7 +35,7 @@ export async function loadIssue(id: string) {
 export async function listIssues() {
   const { data, error } = await createAdminClient()
     .from("nu_news_issues")
-    .select("id, season, issue_date, preview_made_at, finalized_at, finalized_by_name")
+    .select("id, season, issue_date, preview_made_at, finalized_at, finalized_by_name, final_pdf_path")
     .order("issue_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new Error(`Unable to load Nu News issues: ${error.message}`);

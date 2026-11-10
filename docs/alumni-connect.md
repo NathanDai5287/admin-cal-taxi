@@ -22,6 +22,7 @@ No production schema, DNS, inbox, Resend settings, subscriber data, or mail deli
 - If a verified replacement already has an unused invitation, that invitation is retired and its history retained. Separate established profiles require chapter reconciliation; they are never silently merged.
 - The welcome email links to `/connect`. Returning subscribers request an email code rather than reuse the consumed invitation as an account credential. Invite batches support 20 recipients; each inviter can create up to 50 invitations in a rolling 24 hours. The name checkbox starts checked and can be turned off before review/send.
 - `/connect/news` respects the person's existing Nu News role grants and only serves completed issues. No editor or drafts are exposed to Connect readers.
+- Existing read-only Nu News MCP clients are also restricted to completed issues; draft listing, details, and PDF links require write access.
 - Recipients can unsubscribe from the welcome link or from Connect. Invites, unsubscribe links, and sessions have separate credentials; opening an unsubscribe link only displays a confirmation form.
 
 ## Profile and login linking
@@ -47,3 +48,5 @@ All Connect profile foreign keys follow the existing provisional-profile UUID ch
 - `node scripts/alumni-connect-preview.mjs`: loopback-only preview at `http://127.0.0.1:4182`; `/accept` shows illustrative defaults. It blocks production dependencies and substitutes all email/server actions. Desktop/mobile browser checks cover review/send, editable defaults, replacement code gating, overflow, and browser errors.
 
 Live delivery and Google-provider linking should be exercised in an isolated staging project after applying migrations and configuring the verified sender. They were not exercised against production during implementation.
+
+The broader Nu News suite has an unrelated local failure in `scripts/nu-news.test.mjs`: “a typst CLI build of the same input has the same pages and text.” The same failure was reproduced from an archived, unchanged baseline; it compares the installed Typst CLI output to the Node compiler output. The Connect tests, Nu News reader/database/MCP checks, members tests, broadcast tests, targeted lint, TypeScript, and production build pass.
