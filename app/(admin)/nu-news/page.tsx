@@ -27,12 +27,11 @@ export default async function NuNewsPage() {
           <ul className="nu-news-issue-list" aria-label="Newsletter issues">
             {issues.map((issue) => (
               <li key={issue.id} className="nu-news-issue-row">
-                <Link className="nu-news-read-issue" href={`/nu-news/${issue.id}`}>
+                <a className="nu-news-read-issue" href={`/nu-news/${issue.id}/pdf?view=1`} target="_blank" rel="noopener noreferrer" aria-label={`Open ${issue.season} PDF in a new tab`}>
                   <span className="nu-news-issue-season">{issue.season}</span>
-                  <span className="nu-news-read-label">View PDF<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12h15m-6-6 6 6-6 6" /></svg></span>
-                </Link>
-                <a className="nu-news-download" href={`/nu-news/${issue.id}/pdf`} aria-label={`Download ${issue.season} PDF`} title={`Download ${issue.season} PDF`}>
-                  <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg>
+                  <span className="nu-news-open-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7" /></svg>
+                  </span>
                 </a>
               </li>
             ))}

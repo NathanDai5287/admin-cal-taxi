@@ -41,15 +41,12 @@
 }
 
 .nu-news-issue-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   border-bottom: 1px solid var(--color-rule);
 }
 
 .nu-news-read-issue {
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
   min-height: 88px;
   align-items: center;
@@ -65,39 +62,33 @@
   overflow-wrap: anywhere;
 }
 
-.nu-news-read-label {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-brand);
-  font-size: 13px;
-  font-weight: 550;
-}
-
 .nu-news-read-issue:hover .nu-news-issue-season {
   color: var(--color-brand);
   text-decoration: underline;
   text-underline-offset: 5px;
 }
 
-.nu-news-download {
+.nu-news-open-icon {
   display: inline-flex;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--color-rule);
   color: var(--color-muted);
 }
 
-.nu-news-download:hover {
+.nu-news-read-issue:hover {
   background: var(--color-surface);
+}
+
+.nu-news-read-issue:hover .nu-news-open-icon {
+  border-color: var(--color-brand);
   color: var(--color-brand);
 }
 
-.nu-news-read-issue:focus-visible,
-.nu-news-download:focus-visible {
+.nu-news-read-issue:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 4px;
 }
@@ -254,10 +245,6 @@
 @media (max-width: 640px) {
   .nu-news-directory {
     margin-top: 0;
-  }
-
-  .nu-news-issue-row {
-    gap: 8px;
   }
 
   .nu-news-read-issue {
