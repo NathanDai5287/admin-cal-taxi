@@ -1,0 +1,117 @@
+.connect-invite-form {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.connect-invite-form > [role="status"] {
+  font-variant-numeric: tabular-nums;
+}
+.connect-recipient {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.connect-recipient + .connect-recipient {
+  border-top: 1px solid var(--color-rule);
+  padding-top: 24px;
+}
+.connect-recipient-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+}
+.connect-recipient-heading h3 {
+  font-size: 15px;
+  font-weight: 650;
+  margin: 0;
+}
+.connect-identity-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+[data-brand] .connect-invite-form .field-label {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--color-ink);
+  text-transform: none;
+  letter-spacing: 0;
+}
+[data-brand] .connect-invite-form .field-input {
+  min-height: 44px;
+  font-size: 16px;
+  caret-color: var(--color-brand);
+}
+.connect-invite-form .field-input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+[data-brand] .connect-invite-form .brand-button {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  min-height: 44px;
+}
+.connect-attribution {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+}
+.connect-attribution input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--color-brand);
+}
+.connect-invite-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-rule);
+}
+.connect-invite-footer > div {
+  flex-shrink: 0;
+}
+.connect-invite-footer p {
+  max-width: 44ch;
+}
+.connect-email-preview {
+  padding: 20px 0;
+  border-block: 1px solid var(--color-rule);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.connect-email-preview p {
+  margin: 12px 0 0;
+  max-width: 65ch;
+}
+.connect-invite-form :focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+}
+.connect-invite-form ::selection {
+  background: var(--color-brand-light);
+  color: var(--color-ink);
+}
+@media (max-width: 480px) {
+  .connect-invite-footer {
+    display: grid;
+  }
+  .connect-identity-fields {
+    gap: 14px 12px;
+  }
+  .connect-invite-footer .brand-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 359px) {
+  .connect-identity-fields {
+    grid-template-columns: 1fr;
+  }
+}

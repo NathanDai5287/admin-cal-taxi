@@ -20,15 +20,15 @@ export default async function MembersLayout({ children }: { children: React.Reac
   }
 
   return (
-    <div data-brand className="min-h-screen">
+    <div data-brand className="members-shell min-h-screen">
       <AppNav
         homeHref="/"
         title="Theta Xi"
         subtitle="Members"
         tabs={[
           { href: "/users", label: "People" },
-          { href: "/users/alumni", label: "Alumni Connect" },
           { href: "/roles", label: "Roles" },
+          { href: "/users/alumni", label: "Alumni Connect" },
         ]}
       />
       <main className="max-w-[1440px] mx-auto px-4 py-6 sm:px-6 sm:py-8">{children}</main>

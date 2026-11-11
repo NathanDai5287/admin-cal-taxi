@@ -159,3 +159,12 @@ The reviewed production migration has now been applied and the dedicated verifie
 - Add searchable/paginated oversight, provider preference reconciliation, and possible-duplicate flags. Never merge people based solely on self-reported names or roll numbers.
 - Production sender is `Nu Chapter of Theta Xi <connect@cal.taxi>` with a dedicated Resend key; the reply-to is the chapter's published `calthetaxi@gmail.com`. Hosting sender settings are preserved.
 - The user authorized committing, pushing and deploying these fixes on main. No invitations to known alumni are sent by validation or deployment; admins review and send the initial batches themselves.
+
+## UI simplification — November 10, 2026
+
+- Replace raw, separated email lists with structured brother entries. Show email, first name, last name, roll number, and graduation year; only email is required. Add another brother creates another entry. This supersedes the earlier bulk-paste proposal.
+- Show “You can send __ more invitations today” while preserving the rolling 24-hour server limit.
+- Separate the admin page into Invite brothers, Invitations, and Alumni views. Keep search, records, provider checks, and status help within their relevant management view.
+- Show the invitation preview during review, before the final Send invitations action. Preserve name attribution and all consent, verification, deduplication, and removal behavior.
+- Place Alumni Connect after Roles in the Members tabs and keep all tabs usable on narrow screens.
+- Validated desktop/mobile layouts, dark theme, structured multi-person payloads and review/send using local fixtures; no live invitations sent.

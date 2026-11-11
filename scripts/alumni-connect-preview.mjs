@@ -18,16 +18,24 @@ await build({
   import { InviteForm } from './components/alumni-connect/invite-form';
   import { AcceptanceForm } from './app/connect/public-forms';
   import Layout from './app/connect/layout';
+  import AdminPage from './app/(admin)/(members)/users/alumni/page';
+  import MembersLayout from './app/(admin)/(members)/layout';
+  if (location.pathname.startsWith('/users/alumni')) {
+    const content = await AdminPage({searchParams:Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)))});
+    createRoot(document.getElementById('root')).render(await MembersLayout({children:content}));
+  } else {
   const accept = location.pathname === '/accept';
   createRoot(document.getElementById('root')).render(<Layout>
     <h1 className="page-title">{accept ? 'Reconnect with your chapter' : 'Invite your brothers'}</h1>
     <p className="page-lede mb-8">{accept ? 'A fellow alumnus invited you to stay connected with the Nu Chapter of Theta Xi.' : 'Help your brothers reconnect with the chapter. We’ll email each person an invitation. They choose whether to join.'}</p>
     {accept ? <AcceptanceForm invitation={'A'.repeat(43)} email="alex@example.com" defaults={{first_name:'Alex',last_name:'Brother',roll_number:'Nu 1048',graduation_year:2027}}/> : <InviteForm inviterName="Nathan Dai" action={async input => { window.previewInvites = input; return {ok:true,message:'Preview only: invitations processed. No email was sent.'}; }}/>}
   </Layout>);
+  }
 `,
   },
   outfile: path.join(output, "app.js"),
   bundle: true,
+  format: "esm",
   jsx: "automatic",
   alias: { "@": root },
   define: { "process.env.NODE_ENV": '"development"' },
@@ -36,7 +44,10 @@ await build({
       name: "fixtures-only",
       setup(b) {
         b.onResolve(
-          { filter: /^(next\/link|next\/navigation)$|(^|\/)actions$/ },
+          {
+            filter:
+              /^(next\/link|next\/image|next\/navigation)$|(^|\/)actions$|lib\/reimbursements\/auth$|lib\/alumni-connect\/server$/,
+          },
           ({ path: name }) => ({ path: name, namespace: "fixture" }),
         );
         b.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path: name }) => ({
@@ -44,10 +55,19 @@ await build({
           resolveDir: root,
           contents:
             name === "next/link"
-              ? "export default function Link(p){return <a {...p}/>;}"
-              : name === "next/navigation"
-                ? "export const useRouter=()=>({push:()=>{},refresh:()=>{}});"
-                : `
+              ? "export default function Link({prefetch,...p}){return <a {...p}/>;}"
+              : name === "next/image"
+                ? "export default function Image({unoptimized,...p}){return <img {...p}/>;}"
+                : name.endsWith("lib/reimbursements/auth")
+                  ? `const session={userId:'preview',profile:{full_name:'Nathan Dai',role:'admin'},appAccess:{users:'write'}};export const getSessionProfile=async()=>session; export const requireAppAccess=async()=>session;export const hasAppAccess=()=>true;`
+                  : name.endsWith("lib/alumni-connect/server")
+                    ? `export const referralWindowStart=()=>'';export const db=()=>({from:()=>{const result={data:[],count:0,error:null};const chain=new Proxy({}, {get:(_,key)=>key==='then'?(resolve)=>resolve(result):()=>chain});return chain;}});`
+                    : name === "next/navigation"
+                      ? "export const useRouter=()=>({push:()=>{},refresh:()=>{},prefetch:()=>{}});export const usePathname=()=>location.pathname;export const redirect=()=>{};"
+                      : `
+      export async function seedAlumniInvitations(input){window.previewInvites=input;return {ok:true,message:'Preview only: invitations processed. No email was sent.'};}
+      export async function manageConnectRecord(){return {ok:true,message:'Preview only.'};}
+      export async function syncConnectProvider(){return {ok:true,message:'Preview only.'};}
       export async function acceptConnectInvitation(token,input){window.previewAcceptance=input;return {ok:true,message:'Preview only: joined.'};}
       export async function declineConnectInvitation(){return {ok:true,message:'You haven’t been subscribed.'};}
       export async function requestConnectCode(){return {ok:true,message:'Preview code: 123456'};}
@@ -72,12 +92,21 @@ const css = await postcss([tailwind()]).process(
 );
 await writeFile(
   path.join(output, "styles.css"),
-  css.css + "\n" + (await readFile("app/connect/connect.css", "utf8")),
+  css.css +
+    "\n" +
+    (await readFile("app/connect/connect.css", "utf8")) +
+    "\n" +
+    (await readFile(path.join(output, "app.css"), "utf8")),
 );
 const html =
-  '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect local preview</title><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script src="/app.js"></script></body></html>';
+  '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Connect local preview</title><link rel="stylesheet" href="/styles.css"></head><body><div id="root"></div><script type="module" src="/app.js"></script></body></html>';
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url, `http://127.0.0.1:${port}`).pathname;
+  if (pathname === "/taxi-icon.png") {
+    response.setHeader("Content-Type", "image/png");
+    response.end(await readFile("public/taxi-icon.png"));
+    return;
+  }
   const file =
     pathname === "/app.js"
       ? "app.js"
