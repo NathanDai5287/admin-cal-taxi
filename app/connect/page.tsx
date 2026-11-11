@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ButtonLink } from "@/components/brand/button";
 import { InviteForm } from "@/components/alumni-connect/invite-form";
 import { ConnectToast } from "@/components/alumni-connect/connect-toast";
 import {
@@ -58,9 +58,9 @@ export default async function ConnectPage({
           </p>
         </div>
         {person.canReadNews && (
-          <Link className="connect-news-link" href="/connect/news">
+          <ButtonLink className="connect-news-link" href="/connect/news">
             Read Nu News
-          </Link>
+          </ButtonLink>
         )}
       </header>
       {person.subscribed ? (

@@ -179,3 +179,5 @@ The reviewed production migration has now been applied and the dedicated verifie
 - Consolidate the Connect page’s account controls into collapsed Subscription settings. Place Read Nu News beside the introduction.
 - Replace the post-join banner with a green, dismissible toast that disappears after eight seconds. Keep the page heading Invite your brothers. Blocking join errors use red inline recovery information.
 - Validation: 35 Connect tests, lint, production build, desktop/mobile fixtures, dark theme, toast dismissal/timeout, success/blocked outcomes, follow-on invitation navigation, concise sending results, and collapsed settings. No live email was sent by these checks.
+
+- Follow-up: promote Read Nu News from an underlined link to a filled chapter-blue button near the Connect heading, retaining the existing permission check and destination.
