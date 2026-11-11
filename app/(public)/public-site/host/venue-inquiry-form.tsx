@@ -12,6 +12,7 @@ import styles from "./venue-inquiry.module.css";
 const initialValues: VenueInquiryFormValues = {
   contactName: "",
   email: "",
+  phone: "",
   organization: "",
   eventType: "",
   eventDate: "",
@@ -54,6 +55,10 @@ export function VenueInquiryForm() {
       </div>
 
       <div className={styles.twoColumns}>
+        <label>
+          Phone number
+          <input autoComplete="tel" defaultValue={state.values.phone} maxLength={30} name="phone" required type="tel" />
+        </label>
         <label>
           Organization
           <input autoComplete="organization" defaultValue={state.values.organization} maxLength={160} name="organization" required />

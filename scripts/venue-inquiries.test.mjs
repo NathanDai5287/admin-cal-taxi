@@ -11,6 +11,7 @@ import {
 const validInquiry = {
   contactName: "Avery Chen",
   email: "AVERY@EXAMPLE.ORG",
+  phone: "(510) 555-0123",
   organization: "Berkeley Student Group",
   eventType: "Club or student event",
   eventDate: "2026-10-15",
@@ -22,6 +23,7 @@ test("normalizes a valid venue inquiry", () => {
   const result = venueInquirySchema.parse(validInquiry);
 
   assert.equal(result.email, "avery@example.org");
+  assert.equal(result.phone, "(510) 555-0123");
   assert.equal(result.guestCount, 80);
 });
 
@@ -66,6 +68,16 @@ test("returns a clear recovery message for an invalid email", () => {
 
   assert.equal(result.success, false);
   assert.equal(venueInquiryValidationMessage(result.error), "Enter a valid email address.");
+});
+
+test("requires a phone number", () => {
+  const result = venueInquirySchema.safeParse({
+    ...validInquiry,
+    phone: "",
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(venueInquiryValidationMessage(result.error), "Enter a valid phone number.");
 });
 
 test("returns a clear recovery message for an invalid guest count", () => {

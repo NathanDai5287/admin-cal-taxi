@@ -14,6 +14,7 @@ export type VenueInquiryFormState = {
 export type VenueInquiryFormValues = {
   contactName: string;
   email: string;
+  phone: string;
   organization: string;
   eventType: string;
   eventDate: string;
@@ -24,6 +25,7 @@ export type VenueInquiryFormValues = {
 const emptyValues: VenueInquiryFormValues = {
   contactName: "",
   email: "",
+  phone: "",
   organization: "",
   eventType: "",
   eventDate: "",
@@ -51,6 +53,7 @@ export async function submitVenueInquiry(
   const values = {
     contactName: textValue(formData, "contactName"),
     email: textValue(formData, "email"),
+    phone: textValue(formData, "phone"),
     organization: textValue(formData, "organization"),
     eventType: textValue(formData, "eventType"),
     eventDate: textValue(formData, "eventDate"),

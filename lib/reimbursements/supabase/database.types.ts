@@ -121,6 +121,7 @@ export type Database = {
           id: string;
           contact_name: string;
           email: string;
+          phone: string | null;
           organization: string;
           event_type: string;
           event_date: string | null;
@@ -133,6 +134,7 @@ export type Database = {
           id?: string;
           contact_name: string;
           email: string;
+          phone?: string | null;
           organization: string;
           event_type: string;
           event_date?: string | null;

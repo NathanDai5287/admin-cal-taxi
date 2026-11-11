@@ -13,6 +13,7 @@ export type VenueInquiry = {
   id: string;
   contactName: string;
   email: string;
+  phone: string | null;
   organization: string;
   eventType: string;
   eventDate: string | null;
@@ -51,6 +52,7 @@ export async function saveVenueInquiry(input: VenueInquiryInput, source: string)
   const { error } = await supabase.from("venue_inquiries").insert({
     contact_name: input.contactName,
     email: input.email,
+    phone: input.phone,
     organization: input.organization,
     event_type: input.eventType,
     event_date: input.eventDate || null,
@@ -69,7 +71,7 @@ export async function listVenueInquiries(): Promise<VenueInquiry[]> {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("venue_inquiries")
-    .select("id, contact_name, email, organization, event_type, event_date, guest_count, details, submitted_at")
+    .select("id, contact_name, email, phone, organization, event_type, event_date, guest_count, details, submitted_at")
     .order("submitted_at", { ascending: false });
 
   if (error) {
@@ -83,6 +85,7 @@ function mapVenueInquiry(inquiry: {
   id: string;
   contact_name: string;
   email: string;
+  phone: string | null;
   organization: string;
   event_type: string;
   event_date: string | null;
@@ -94,6 +97,7 @@ function mapVenueInquiry(inquiry: {
     id: inquiry.id,
     contactName: inquiry.contact_name,
     email: inquiry.email,
+    phone: inquiry.phone,
     organization: inquiry.organization,
     eventType: inquiry.event_type,
     eventDate: inquiry.event_date,

@@ -13,6 +13,7 @@ const optionalGuestCount = z.union([
 export const venueInquirySchema = z.object({
   contactName: z.string().trim().min(2, "Enter your name.").max(120, "Keep your name under 120 characters."),
   email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254, "Keep your email under 254 characters."),
+  phone: z.string().trim().min(7, "Enter a valid phone number.").max(30, "Keep your phone number under 30 characters."),
   organization: z.string().trim().min(2, "Enter your organization.").max(160, "Keep your organization under 160 characters."),
   eventType: z.string().trim().min(2, "Enter an event type.").max(80, "Keep the event type under 80 characters."),
   eventDate: optionalDate,

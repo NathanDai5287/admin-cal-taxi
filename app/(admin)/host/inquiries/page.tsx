@@ -54,6 +54,10 @@ export default async function VenueInquiriesPage() {
                     <dd><a href={`mailto:${inquiry.email}`}>{inquiry.email}</a></dd>
                   </div>
                   <div>
+                    <dt>Phone number</dt>
+                    <dd>{inquiry.phone ? <a href={`tel:${inquiry.phone}`}>{inquiry.phone}</a> : "Not provided"}</dd>
+                  </div>
+                  <div>
                     <dt>Preferred date</dt>
                     <dd>{formatEventDate(inquiry.eventDate)}</dd>
                   </div>
