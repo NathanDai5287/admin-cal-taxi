@@ -36,6 +36,7 @@ This is the running record of the alumni outreach discussion. Update it as decis
 - Named example, subject to final copy: “Nathan Dai, a fellow alumnus, invited you to reconnect with the Nu Chapter of Theta Xi.”
 - Anonymous example, subject to final copy: “A fellow alumnus invited you to reconnect with the Nu Chapter of Theta Xi.”
 - Attribution checkbox default has not been agreed.
+  Implementation default: checked, with the exact name displayed and an option to turn it off before review/send.
 
 ### Profiles and permissions
 
@@ -62,7 +63,7 @@ This is the running record of the alumni outreach discussion. Update it as decis
 - The template proposal uses a 15-minute verification code, replacing the earlier 24-hour verification-link recommendation. Attempt limits and resend rules remain to be designed.
 - Declines, duplicate referrals, admin revocations, and unsubscribes use on-page feedback rather than additional automatic emails. A changed address receives the welcome only after verification/enrollment.
 
-## Invite your brothers page: proposed plan, awaiting review
+## Invite your brothers page: implementation plan
 
 - Audience: an enrolled alumnus, arriving directly after joining or from the welcome email. Sending requires verification and enrollment; later visits need secure access rather than reuse of the original invitation as a permanent credential.
 - Extend the existing chapter visual system with a calm, mobile-friendly single-column form, chapter identity, and no private admin sidebar.
@@ -70,13 +71,13 @@ This is the running record of the alumni outreach discussion. Update it as decis
 - Use repeatable recipient entries: required email, plus optional first name, last name, roll number, and graduation year. An “Add details” expansion can keep email-only entries compact. Add another recipient and remove-entry actions support multiple invitations.
 - Preserve a bulk email-paste option accepting newline-, comma-, or semicolon-separated addresses. Convert pasted addresses into recipient entries so the inviter can optionally add details to any person before review.
 - Show valid recipient count, remove duplicate entries within the pasted batch, and identify malformed addresses before sending. Preserve input on errors.
-- Offer “Include my name in these invitations,” with the actual profile name and a named/anonymous email preview. The checkbox default is still open.
+- Offer “Include my name in these invitations,” checked by default, with the actual profile name and a named/anonymous email preview. This is the implementation choice for the previously open default.
 - Primary action: “Review invitations.” Review shows submitted addresses and any supplied profile defaults, sender, exact subject/body preview, attribution choice, and an explicit “Send invitations” button. Keep review inline on the same page with an Edit action.
 - On acceptance, introduce editable defaults with “Check your details — your inviter filled in what they knew.” Do not expose existing profile data to the inviter when preparing these entries.
 - Explain before sending: previously invited or opted-out addresses will not receive another invitation; each recipient receives an individual email without seeing other recipients.
 - After processing, show a neutral confirmation and “Invite more brothers.” Do not reveal existing subscription, decline, replacement-address, or other private status, or claim every submitted address received mail.
 - Handle empty input, malformed addresses, pending send, success, sending limits, invalid access, and partial/uncertain delivery without losing input or causing duplicate invitation sends. Never label accepted provider requests as confirmed delivery.
-- Proposed initial limits: 20 addresses per batch and 50 new invitations per person per day. These numbers are suggestions, not agreed requirements.
+- Initial implementation limits: 20 addresses per batch and 50 new invitations per person in a rolling 24 hours. These are adjustable implementation choices based on the proposed limits.
 - Do not add recipient membership lookup, a public directory, a referral leaderboard, or editable invitation copy to the initial page. These are scope recommendations, not separate user decisions.
 
 ## Recommendations proposed, not yet confirmed
@@ -119,6 +120,7 @@ Pending decisions:
 - The alumni migration seeds reimbursement submission access but no Nu News access. This describes repository defaults, not verified live settings.
 - The existing Nu News app lists drafts as well as final issues. Simply granting its current read access would not necessarily deliver a published-newsletter-only experience.
 - Proposed alumni experience: read published Nu News issues, without editing or access to unpublished drafts. Confirm this scope and enforce it on every relevant page, data request, and download.
+  Implementation uses the existing completed-issue reader policy: finalized issues with final PDFs, with matching database/storage restrictions. Public publication remains a separate existing workflow.
 - Automatic subscription should not automatically grant access to sensitive tools on the strength of an unverified alumni claim. Determine whether published-news access is sufficient or whether additional membership validation is needed for future tools.
 
 ## Decision history
@@ -135,7 +137,25 @@ Pending decisions:
 10. Approved the proposed invitation, verification-code, and welcome email templates.
 11. Requested a plan for the “Invite your brothers” page; the proposed page above awaits review.
 12. Required inviters to be able to supply any subset of collected profile fields, used as editable defaults when the recipient accepts. Revised the email-only entry proposal accordingly.
+13. Requested implementation and a pull request. Implemented on a review branch; production migration, sender setup, and deployment remain separate.
 
 ## Implementation status
 
-This discussion has not yet implemented or deployed the referral feature, profile changes, sender configuration, or alumni Nu News access. The existing application findings above are context, not a claim that these decisions have shipped.
+Implementation is ready for pull-request review: People → Alumni Connect, optional recipient details and review, personal invitation acceptance/decline, replacement-email codes, permanent alias deduplication, shared profile fields, code-based returning access, Nu News reading, and admin removal/revocation. See [alumni-connect.md](alumni-connect.md) for configuration, recovery behavior, and validation.
+
+The implementation uses long-lived unused invitations, 15-minute codes, seven-day Connect sessions, admin-only revocation, and checked-by-default name attribution. These resolve earlier open implementation details without claiming that every recommendation above was separately approved.
+
+The reviewed production migration has now been applied and the dedicated verified sender configured. Existing profile, reimbursement, contact and broadcast row counts were preserved; only the managed Connect list was added. No alumni invitation or subscriber records were created during validation. Deployment proceeds through the reviewed origin/main commit.
+
+## Review resolutions and production authorization
+
+- Reviewed the comments in `~/Downloads/a.txt`; see [alumni-connect-review.md](alumni-connect-review.md) for every finding, its validation, and the few deliberately rejected suggestions.
+- Preserve privacy with aggregate sending totals rather than revealing individual subscription or decline status.
+- Existing active mailing-list/Resend contacts suppress redundant invitations; an address-book contact alone does not establish consent.
+- Verify the sender and API permissions before reserving a batch. Unknown sends remain permanently deduplicated; only definitively rejected, unsent invitations can be explicitly released by an admin.
+- Empty managed lists are valid, including after the last subscriber leaves. Other mailing lists retain their existing minimum-size constraint.
+- Self-service Connect profiles are capped at Nu News read, independent of ordinary Alumni reimbursement permissions. A People editor can explicitly verify membership to enable standard role permissions.
+- Admin removals require confirmation and can be reversed without sending a new invitation. Rejoining mail always requires the recipient's explicit consent.
+- Add searchable/paginated oversight, provider preference reconciliation, and possible-duplicate flags. Never merge people based solely on self-reported names or roll numbers.
+- Production sender is `Nu Chapter of Theta Xi <connect@cal.taxi>` with a dedicated Resend key; the reply-to is the chapter's published `calthetaxi@gmail.com`. Hosting sender settings are preserved.
+- The user authorized committing, pushing and deploying these fixes on main. No invitations to known alumni are sent by validation or deployment; admins review and send the initial batches themselves.

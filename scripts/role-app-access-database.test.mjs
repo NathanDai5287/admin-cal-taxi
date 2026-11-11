@@ -27,7 +27,9 @@ async function setupDatabase(t) {
   `);
   const directory = new URL("../supabase/migrations/", import.meta.url);
   for (const migration of (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()) {
-    const sql = (await readFile(new URL(migration, directory), "utf8")).replace("create extension if not exists pgcrypto;", "");
+    // Normalize Windows checkouts before migrations that patch function bodies
+    // using literal newline sequences; execute the same SQL as an LF checkout.
+    const sql = (await readFile(new URL(migration, directory), "utf8")).replaceAll("\r\n", "\n").replace("create extension if not exists pgcrypto;", "");
     await db.exec(sql).catch((error) => { throw new Error(`${migration}: ${error.message}`); });
   }
   return db;
@@ -69,7 +71,7 @@ test("role app grants enforce database, storage, RPC, and OAuth boundaries", asy
   assert.equal(await access(db, "finance"), true);
   assert.equal(await access(db, "finance", "write"), false);
   assert.equal(await access(db, "users"), false);
-  assert.equal((await db.query("select * from storage.objects where bucket_id = 'nu-news'")).rows.length, 1);
+  assert.equal((await db.query("select * from storage.objects where bucket_id = 'nu-news'")).rows.length, 0); // Readers cannot fetch unpublished source assets.
   await assert.rejects(db.query("insert into storage.objects(bucket_id, name) values ('nu-news', 'blocked.jpg')"), /row-level security/);
   assert.equal((await db.query("update profiles set full_name = 'Blocked' where id = $1 returning id", [member])).rows.length, 0);
   await assert.rejects(grant(db, "brother", "users", "write"), /Write access/);

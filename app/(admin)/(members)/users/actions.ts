@@ -7,6 +7,7 @@ import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { parseInviteEmails } from "@/lib/reimbursements/invite-emails";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createClient } from "@/lib/reimbursements/supabase/server";
+import { identitySchema } from "@/lib/alumni-connect/model";
 
 const inviteRoles = ["member", "admin"] as const;
 const termIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -123,6 +124,8 @@ export async function removeUser(userId: string) {
 
 export async function updatePerson(userId: string, formData: FormData): Promise<{ error?: string }> {
   const session = await requireAppAccess("users", "write");
+  const identity = identitySchema.safeParse({ first_name: formData.get("firstName") ?? "", last_name: formData.get("lastName") ?? "", roll_number: formData.get("rollNumber") ?? "", graduation_year: formData.get("graduationYear") ?? "" });
+  if (!identity.success) return { error: identity.error.issues[0].message };
   const fullName = String(formData.get("fullName") ?? "").trim();
   const contactEmail = String(formData.get("contactEmail") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();
@@ -157,6 +160,7 @@ export async function updatePerson(userId: string, formData: FormData): Promise<
     }),
     supabase.rpc("admin_set_profile_discord_id", { target_user_id: userId, new_discord_user_id: discordUserId }),
     supabase.rpc("admin_set_profile_academic_term", { target_user_id: userId, new_academic_term_id: memberSinceTermId }),
+    supabase.rpc("admin_set_person_identity", { target_id: userId, details: {...identity.data, approve_connect: formData.has("approveConnect")} }),
     ...(role === null ? [] : [supabase.rpc("admin_set_profile_role", { target_user_id: userId, new_role: role })]),
   ]);
   revalidatePath("/users");

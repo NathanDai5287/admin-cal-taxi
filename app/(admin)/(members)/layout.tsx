@@ -27,6 +27,7 @@ export default async function MembersLayout({ children }: { children: React.Reac
         subtitle="Members"
         tabs={[
           { href: "/users", label: "People" },
+          { href: "/users/alumni", label: "Alumni Connect" },
           { href: "/roles", label: "Roles" },
         ]}
       />

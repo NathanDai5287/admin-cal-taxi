@@ -11,6 +11,12 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      connect_members: {
+        Row: { profile_id: string; email: string; subscribed: boolean; blocked: boolean; suppression_pending: boolean; unsubscribe_hash: string; created_at: string };
+        Insert: { profile_id: string; email: string; unsubscribe_hash: string; subscribed?: boolean; blocked?: boolean; suppression_pending?: boolean };
+        Update: { subscribed?: boolean; blocked?: boolean; suppression_pending?: boolean };
+        Relationships: [];
+      };
       newsletter_events: {
         Row: { id: number; issue_id: string; broadcast_id: string | null; kind: string; visitor_id: string; occurred_at: string };
         Insert: { issue_id: string; broadcast_id?: string | null; kind: string; visitor_id: string };
@@ -448,6 +454,11 @@ export type Database = {
       profiles: {
         Row: {
           id: string;
+          first_name: string;
+          last_name: string;
+          roll_number: string;
+          graduation_year: number | null;
+          connect_only: boolean;
           full_name: string;
           email: string;
           contact_email: string;
@@ -463,6 +474,11 @@ export type Database = {
         };
         Insert: {
           id: string;
+          first_name?: string;
+          last_name?: string;
+          roll_number?: string;
+          graduation_year?: number | null;
+          connect_only?: boolean;
           full_name?: string;
           email?: string;
           contact_email?: string;
@@ -478,6 +494,11 @@ export type Database = {
         };
         Update: {
           id?: string;
+          first_name?: string;
+          last_name?: string;
+          roll_number?: string;
+          graduation_year?: number | null;
+          connect_only?: boolean;
           full_name?: string;
           email?: string;
           contact_email?: string;
@@ -676,6 +697,7 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      admin_set_person_identity: { Args: { target_id: string; details: Json }; Returns: undefined };
       get_my_app_access: {
         Args: Record<string, never>;
         Returns: { app_key: string; access_level: "none" | "read" | "write" }[];
