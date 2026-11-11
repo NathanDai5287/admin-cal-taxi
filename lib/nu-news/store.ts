@@ -42,6 +42,21 @@ export async function listIssues() {
   return data;
 }
 
+// Sign the archive in one Storage request, after the page has checked access.
+// Never sign drafts here, even when the caller can edit them.
+export async function directoryPdfUrls(issues: { finalized_at: string | null; final_pdf_path: string | null }[], expiresInSeconds: number) {
+  // Start the clock before signing, allowing a minute for skew/download startup.
+  const expiresAt = Date.now() + Math.max(0, expiresInSeconds - 60) * 1000;
+  const empty = { urls: {} as Record<string, string>, expiresAt };
+  const paths = issues.filter((issue) => issue.finalized_at && issue.final_pdf_path).map((issue) => issue.final_pdf_path!);
+  if (!paths.length) return empty;
+  const { data, error } = await createAdminClient().storage.from(NU_NEWS_BUCKET).createSignedUrls(paths, expiresInSeconds);
+  // Keep the authenticated redirect as a fallback if signing is unavailable.
+  if (error) return empty;
+  const urls: Record<string, string> = Object.fromEntries((data ?? []).flatMap((file) => file.path && file.signedUrl && !file.error ? [[file.path, file.signedUrl]] : []));
+  return { urls, expiresAt };
+}
+
 export async function pdfUrl(issue: StoredIssue, expiresInSeconds: number, download = true) {
   const storage = createAdminClient().storage.from(NU_NEWS_BUCKET);
   const { data } = issue.final_pdf_path

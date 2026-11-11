@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { Button } from "@/components/brand/button";
 import { createIssue } from "@/app/(admin)/nu-news/actions";
-import { listIssues } from "@/lib/nu-news/store";
+import { directoryPdfUrls, listIssues } from "@/lib/nu-news/store";
+import { PdfIssueLink } from "./pdf-issue-link";
 import { requireAppAccess } from "@/lib/reimbursements/auth";
 import { formatReimbursementDate } from "@/lib/reimbursements/format";
 
@@ -15,8 +16,12 @@ export default async function NuNewsPage() {
   const issues = canWrite ? allIssues : allIssues.filter((issue) => issue.finalized_at);
 
   if (!canWrite) {
+    const expiresInSeconds = 3600;
+    const { urls, expiresAt } = await directoryPdfUrls(issues, expiresInSeconds);
+    const firstUrl = Object.values(urls)[0];
     return (
       <div className="nu-news-directory">
+        {firstUrl && <link rel="preconnect" href={new URL(firstUrl).origin} crossOrigin="anonymous" />}
         <header className="nu-news-directory-heading">
           <h1 className="page-title">Nu News</h1>
           <p className="page-lede">The Nu Chapter newsletter.</p>
@@ -27,12 +32,12 @@ export default async function NuNewsPage() {
           <ul className="nu-news-issue-list" aria-label="Newsletter issues">
             {issues.map((issue) => (
               <li key={issue.id} className="nu-news-issue-row">
-                <a className="nu-news-read-issue" href={`/nu-news/${issue.id}/pdf?view=1`} target="_blank" rel="noopener noreferrer" aria-label={`Open ${issue.season} PDF in a new tab`}>
+                <PdfIssueLink id={issue.id} season={issue.season} url={issue.final_pdf_path ? urls[issue.final_pdf_path] : undefined} expiresAt={expiresAt}>
                   <span className="nu-news-issue-season">{issue.season}</span>
                   <span className="nu-news-open-icon" aria-hidden="true">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7" /></svg>
                   </span>
-                </a>
+                </PdfIssueLink>
               </li>
             ))}
           </ul>
