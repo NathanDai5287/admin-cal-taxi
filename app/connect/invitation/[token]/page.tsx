@@ -1,5 +1,5 @@
 import { loadInvitation } from "@/lib/alumni-connect/server";
-import { AcceptanceForm } from "../../public-forms";
+import { AcceptanceForm, LoginForm } from "../../public-forms";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export default async function InvitationPage({
@@ -17,9 +17,13 @@ export default async function InvitationPage({
           This invitation has already been used, declined, or withdrawn. If you
           joined, you can sign in to Connect with your mailing email.
         </p>
-        <a href="/connect" className="text-brand underline">
-          Open Connect
-        </a>
+        {invitation?.status === "accepted" ? (
+          <LoginForm />
+        ) : (
+          <a href="https://cal.taxi" className="text-brand underline">
+            Visit the chapter website
+          </a>
+        )}
       </div>
     );
   return (
@@ -38,6 +42,17 @@ export default async function InvitationPage({
         email={invitation.email}
         defaults={invitation.defaults}
       />
+      <details className="text-sm">
+        <summary className="cursor-pointer text-brand">
+          Why did I receive this? / This isn’t me
+        </summary>
+        <p>
+          A fellow alumnus supplied this email to help the chapter reconnect.
+          You are not subscribed until you accept. If the invitation was a
+          mistake, select No thanks; this address will not receive another
+          invitation.
+        </p>
+      </details>
     </div>
   );
 }

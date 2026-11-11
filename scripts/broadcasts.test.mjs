@@ -167,3 +167,5 @@ test("migration protects mailing data and seeds the approved draft without sendi
   await assert.rejects(db.query("update mailing_broadcasts set status='ready'"), /immutable/);
   await assert.rejects(db.query("delete from mailing_broadcasts"), /immutable/);
 });
+
+test("an empty managed list is rejected before a remote segment or import is prepared",async()=>{const s=fixture('draft');s.group.recipients=[];await assert.rejects(store.prepareBroadcast(id,'v1'),/no subscribers/);assert.equal(s.importCalls,0);assert.equal(s.row.status,'draft');});

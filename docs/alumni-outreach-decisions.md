@@ -146,3 +146,16 @@ Implementation is ready for pull-request review: People → Alumni Connect, opti
 The implementation uses long-lived unused invitations, 15-minute codes, seven-day Connect sessions, admin-only revocation, and checked-by-default name attribution. These resolve earlier open implementation details without claiming that every recommendation above was separately approved.
 
 No production migration, sender/inbox configuration, subscriber changes, or live email sending has been performed. Applying the migration and configuring the verified sender are required before release.
+
+## Review resolutions and production authorization
+
+- Reviewed the comments in `~/Downloads/a.txt`; see [alumni-connect-review.md](alumni-connect-review.md) for every finding, its validation, and the few deliberately rejected suggestions.
+- Preserve privacy with aggregate sending totals rather than revealing individual subscription or decline status.
+- Existing active mailing-list/Resend contacts suppress redundant invitations; an address-book contact alone does not establish consent.
+- Verify the sender and API permissions before reserving a batch. Unknown sends remain permanently deduplicated; only definitively rejected, unsent invitations can be explicitly released by an admin.
+- Empty managed lists are valid, including after the last subscriber leaves. Other mailing lists retain their existing minimum-size constraint.
+- Self-service Connect profiles are capped at Nu News read, independent of ordinary Alumni reimbursement permissions. A People editor can explicitly verify membership to enable standard role permissions.
+- Admin removals require confirmation and can be reversed without sending a new invitation. Rejoining mail always requires the recipient's explicit consent.
+- Add searchable/paginated oversight, provider preference reconciliation, and possible-duplicate flags. Never merge people based solely on self-reported names or roll numbers.
+- Production sender is `Nu Chapter of Theta Xi <connect@cal.taxi>` with a dedicated Resend key; the reply-to is the chapter's published `calthetaxi@gmail.com`. Hosting sender settings are preserved.
+- The user authorized committing, pushing and deploying these fixes on main. No invitations to known alumni are sent by validation or deployment; admins review and send the initial batches themselves.

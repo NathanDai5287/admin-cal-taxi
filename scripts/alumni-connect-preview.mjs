@@ -53,6 +53,7 @@ await build({
       export async function requestConnectCode(){return {ok:true,message:'Preview code: 123456'};}
       export async function verifyConnectCode(code){return {ok:code==='123456',message:code==='123456'?'Email verified.':'Incorrect code.'};}
       export async function unsubscribeConnect(){return {ok:true,message:'Preview only: unsubscribed.'};}
+      export async function resubscribeConnect(){return {ok:true,message:'Preview only: rejoined.'};}
     `,
         }));
         b.onResolve(

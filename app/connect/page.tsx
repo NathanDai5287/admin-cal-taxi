@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { InviteForm } from "@/components/alumni-connect/invite-form";
-import { getConnectPerson } from "@/lib/alumni-connect/server";
+import {
+  getConnectPerson,
+  db,
+  referralWindowStart,
+} from "@/lib/alumni-connect/server";
 import { inviteBrothers, signOutConnect } from "./actions";
-import { LoginForm, UnsubscribeForm } from "./public-forms";
+import { LoginForm, UnsubscribeForm, RejoinForm } from "./public-forms";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -21,8 +25,9 @@ export default async function ConnectPage({
         <div>
           <h1 className="page-title">Stay connected with your brothers</h1>
           <p className="page-lede">
-            Already joined? Sign in with your mailing email to invite brothers
-            and manage your subscription.
+            Alumni Connect keeps your contact details current for Nu News and
+            chapter updates. Already joined? Sign in with your mailing email to
+            invite brothers and manage your subscription.
           </p>
         </div>
         <LoginForm />
@@ -32,6 +37,12 @@ export default async function ConnectPage({
         </p>
       </div>
     );
+  const { count } = await db()
+    .from("connect_invitations")
+    .select("id", { count: "exact", head: true })
+    .eq("inviter_id", person.id)
+    .gte("created_at", referralWindowStart());
+  const remaining = Math.max(0, 50 - (count ?? 0));
   return (
     <div className="grid gap-8">
       {params.joined === "1" && (
@@ -46,10 +57,21 @@ export default async function ConnectPage({
           an invitation. They choose whether to join.
         </p>
       </header>
-      <InviteForm inviterName={person.fullName} action={inviteBrothers} />
+      {person.subscribed ? (
+        <InviteForm
+          inviterName={person.fullName}
+          action={inviteBrothers}
+          remaining={remaining}
+        />
+      ) : (
+        <RejoinForm />
+      )}
       <section className="border-t border-rule pt-6 grid gap-4">
         <h2 className="card-title">Your connection</h2>
-        <p className="m-0 break-all">Subscribed as {person.email}</p>
+        <p className="m-0 break-all">
+          {person.subscribed ? "Subscribed" : "Not subscribed"} as{" "}
+          {person.email}
+        </p>
         {person.canReadNews && (
           <Link className="text-brand underline" href="/connect/news">
             Read Nu News

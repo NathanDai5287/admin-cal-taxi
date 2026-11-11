@@ -17,6 +17,7 @@ export type MemberRow = {
   lastName?: string;
   rollNumber?: string;
   graduationYear?: number | null;
+  connectOnly?: boolean;
   email: string;
   contactEmail: string;
   phone: string;
@@ -57,6 +58,7 @@ function withFormChanges(member: MemberRow, formData: FormData): MemberRow {
     lastName: text("lastName"),
     rollNumber: text("rollNumber"),
     graduationYear: text("graduationYear") ? Number(text("graduationYear")) : null,
+    connectOnly: member.connectOnly && !formData.has("approveConnect"),
     phone: text("phone"),
     membership: (text("membership") || null) as Membership | null,
     executiveRoles: formData.getAll("executiveRoles").map(String) as ExecutiveRole[],

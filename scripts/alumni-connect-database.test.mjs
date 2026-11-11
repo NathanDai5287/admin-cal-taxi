@@ -7,20 +7,51 @@ import { PGlite } from "@electric-sql/pglite";
 async function database(t) {
   const db = new PGlite();
   t.after(() => db.close());
+  const broadcastMigration = await readFile(
+    new URL(
+      "../supabase/migrations/20261014160000_mailing_broadcasts.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const mailingListsDdl = broadcastMigration.match(
+    /create table public\.mailing_lists \([\s\S]*?\n\);/,
+  )[0];
+  const roleDdl = (
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261014150000_role_app_access.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    )
+  ).split("create function public.get_my_app_access()")[0];
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
-    create table public.profiles(id uuid primary key, email text not null unique, contact_email text not null default '', full_name text not null default '', role text not null default 'none', membership text, removed_at timestamptz, has_signed_in boolean not null default false);
+    create table public.profiles(id uuid primary key, email text not null unique, contact_email text not null default '', full_name text not null default '', role text not null default 'none', membership text constraint profiles_membership_check check(membership in ('brother','associate_member')), executive_roles text[] not null default '{}', removed_at timestamptz, has_signed_in boolean not null default false);
     create schema auth; create table auth.users(id uuid primary key, email text);
-    create table public.role_app_access(role_key text, app_key text, access_level text, primary key(role_key, app_key));
+    create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('test.uid',true),'')::uuid $$;
+    create function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('test.jwt',true),''),'{}')::jsonb $$;
+    create function public.view_as_roles() returns text[] language sql as $$ select null::text[] $$;
+    ${roleDdl}
     create function public.has_app_access(text,text) returns boolean language sql as $$ select current_setting('test.admin', true) = 'yes' $$;
     create schema storage;
     create table storage.objects(id uuid, bucket_id text, name text);
     create table public.nu_news_issues(id uuid, finalized_at timestamptz, final_pdf_path text);
-    create table public.mailing_lists(id uuid primary key, name text, recipients jsonb);
+    ${mailingListsDdl}
     create table public.mailing_list_contacts(first_name text, last_name text, email text, contact_key text generated always as ('email:' || email) stored unique);
     grant all on public.profiles, public.mailing_lists, public.mailing_list_contacts to service_role;
     insert into public.profiles(id,email,full_name,role) values ('00000000-0000-4000-8000-000000000001','admin@example.com','Admin Brother','admin');
   `);
+  await db.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261026000000_alumni_membership.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   await db.exec(
     await readFile(
       new URL(
@@ -393,13 +424,169 @@ test("read permissions cannot expose draft newsletters or source assets through 
 test("known aliases claim provisional profiles and cannot create a second established account", async (t) => {
   const db = await database(t);
   const inv = await invite(db);
-  await call(db, "request_code", { email: "school@example.com", purpose: "change", invitation_hash: inv.credential, token_hash: "replacement", code_hash: "correct" });
-  await call(db, "verify_code", { token_hash: "replacement", code_hash: "correct" });
-  const accepted = await accept(db, inv, { email: "school@example.com", verification_hash: "replacement" });
+  await call(db, "request_code", {
+    email: "school@example.com",
+    purpose: "change",
+    invitation_hash: inv.credential,
+    token_hash: "replacement",
+    code_hash: "correct",
+  });
+  await call(db, "verify_code", {
+    token_hash: "replacement",
+    code_hash: "correct",
+  });
+  const accepted = await accept(db, inv, {
+    email: "school@example.com",
+    verification_hash: "replacement",
+  });
   await db.exec("reset role");
   const account = randomUUID();
-  await db.query("insert into auth.users(id,email) values ($1,'brother@example.com')", [account]);
-  assert.equal((await db.query("select email from public.profiles where id=$1", [accepted.profile_id])).rows[0].email, "brother@example.com");
-  await db.query("update public.profiles set id=$1,has_signed_in=true where id=$2", [account, accepted.profile_id]);
-  await assert.rejects(db.query("insert into auth.users(id,email) values ($1,'school@example.com')", [randomUUID()]), /original sign-in account or a Connect email code/);
+  await db.query(
+    "insert into auth.users(id,email) values ($1,'brother@example.com')",
+    [account],
+  );
+  assert.equal(
+    (
+      await db.query("select email from public.profiles where id=$1", [
+        accepted.profile_id,
+      ])
+    ).rows[0].email,
+    "brother@example.com",
+  );
+  await db.query(
+    "update public.profiles set id=$1,has_signed_in=true where id=$2",
+    [account, accepted.profile_id],
+  );
+  await assert.rejects(
+    db.query(
+      "insert into auth.users(id,email) values ($1,'school@example.com')",
+      [randomUUID()],
+    ),
+    /original sign-in account or a Connect email code/,
+  );
+});
+
+test("real role defaults cannot give self-service Connect profiles reimbursement access", async (t) => {
+  const db = await database(t);
+  const inv = await invite(db);
+  const accepted = await accept(db, inv);
+  await db.query("select set_config('test.uid',$1,false)", [
+    accepted.profile_id,
+  ]);
+  const grants = (
+    await db.query(
+      "select * from public.get_my_app_access() where access_level <> 'none'",
+    )
+  ).rows;
+  assert.deepEqual(grants, [{ app_key: "nu-news", access_level: "read" }]);
+  await db.exec(
+    `select set_config('test.jwt','{"client_id":"test-client"}',false)`,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "select public.has_mcp_app_access('submit','write') allowed",
+      )
+    ).rows[0].allowed,
+    false,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "select public.has_mcp_app_access('nu-news','read') allowed",
+      )
+    ).rows[0].allowed,
+    true,
+  );
+});
+test("real mailing-list constraint allows empty Connect list and last-member opt-outs without breaking People removal", async (t) => {
+  const db = await database(t);
+  assert.deepEqual(
+    (await db.query("select recipients from public.mailing_lists")).rows[0]
+      .recipients,
+    [],
+  );
+  await db.query("update public.profiles set removed_at=now() where id=$1", [
+    admin,
+  ]);
+  await db.query("update public.profiles set removed_at=null where id=$1", [
+    admin,
+  ]);
+  const inv = await invite(db);
+  const accepted = await accept(db, inv);
+  assert.equal((await call(db, "block", { id: accepted.profile_id })).ok, true);
+  assert.deepEqual(
+    (await db.query("select recipients from public.mailing_lists")).rows[0]
+      .recipients,
+    [],
+  );
+  assert.equal(
+    (await call(db, "unblock", { id: accepted.profile_id })).ok,
+    true,
+  );
+  assert.equal(
+    (await db.query("select subscribed from public.connect_members")).rows[0]
+      .subscribed,
+    false,
+  );
+  assert.equal(
+    (await call(db, "resubscribe", { id: accepted.profile_id })).ok,
+    true,
+  );
+  assert.equal(
+    (await call(db, "unsubscribe", { token_hash: "unsubscribe" })).ok,
+    true,
+  );
+});
+test("unknown destructive targets never report success and unsent recovery cannot release unknown sends", async (t) => {
+  const db = await database(t);
+  const id = randomUUID();
+  for (const command of ["revoke", "block", "unblock", "release_not_sent"])
+    assert.equal((await call(db, command, { id })).ok, false);
+  assert.equal(
+    (await call(db, "unsubscribe", { token_hash: "missing" })).ok,
+    false,
+  );
+  const inv = await invite(db);
+  await db.query(
+    "update public.connect_invitations set delivery='uncertain' where id=$1",
+    [inv.id],
+  );
+  assert.equal((await call(db, "release_not_sent", { id: inv.id })).ok, false);
+  await db.query(
+    "update public.connect_invitations set delivery='not_sent' where id=$1",
+    [inv.id],
+  );
+  assert.equal((await call(db, "release_not_sent", { id: inv.id })).ok, true);
+  assert.ok((await invite(db)).id);
+});
+test("existing subscriber lists skip redundant invitations but an address book alone is not consent", async (t) => {
+  const db = await database(t);
+  await db.query(
+    "insert into public.mailing_lists(id,name,recipients) values ($1,'Existing',$2)",
+    [randomUUID(), JSON.stringify([{ email: "existing@example.com" }])],
+  );
+  assert.equal((await invite(db, "existing@example.com")).id, undefined);
+  await db.query(
+    "insert into public.mailing_list_contacts(first_name,email) values ('Known','known@example.com')",
+  );
+  assert.ok((await invite(db, "known@example.com")).id);
+});
+test("invitation defaults reject arbitrary JSON keys and malformed typed values", async (t) => {
+  const db = await database(t);
+  await assert.rejects(
+    call(db, "invite", {
+      actor: admin,
+      admin: true,
+      include_name: true,
+      recipients: [
+        {
+          email: "bad@example.com",
+          token_hash: "bad",
+          defaults: { role: "admin" },
+        },
+      ],
+    }),
+    /check constraint/,
+  );
 });

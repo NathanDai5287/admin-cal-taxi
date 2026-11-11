@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import {
   CONNECT_SENDER,
   blankRecipient,
   identityLabels,
   invitationBatchSchema,
+  prepareRecipients,
   invitationCopy,
   parseEmailPaste,
   type ConnectResult,
@@ -17,13 +19,21 @@ export function InviteForm({
   inviterName,
   action,
   disabled = false,
+  remaining = 50,
 }: {
   inviterName: string;
   action: (input: unknown) => Promise<ConnectResult>;
   disabled?: boolean;
+  remaining?: number;
 }) {
-  const [recipients, setRecipients] = useState<InviteRecipient[]>([
-    { ...blankRecipient },
+  const router = useRouter();
+  type Row = InviteRecipient & { rowId: string };
+  const makeRow = (r: InviteRecipient = blankRecipient): Row => ({
+    ...r,
+    rowId: crypto.randomUUID(),
+  });
+  const [recipients, setRecipients] = useState<Row[]>([
+    { ...blankRecipient, rowId: "initial" },
   ]);
   const [paste, setPaste] = useState("");
   const [includeName, setIncludeName] = useState(true);
@@ -49,23 +59,42 @@ export function InviteForm({
     );
   }
   function validate() {
-    const result = invitationBatchSchema.safeParse({
-      recipients,
-      include_name: includeName,
-    });
-    if (!result.success) {
-      setNotice({ ok: false, message: result.error.issues[0].message });
+    try {
+      const normalized = prepareRecipients(recipients);
+      const result = invitationBatchSchema.parse({
+        recipients: normalized,
+        include_name: includeName,
+      });
+      if (result.recipients.length > remaining)
+        throw new Error(
+          `You have ${remaining} new invitations remaining today. Reduce this batch or try tomorrow.`,
+        );
+      setRecipients(
+        result.recipients.map((r) => ({
+          ...r,
+          rowId:
+            recipients.find((old) => old.email.trim().toLowerCase() === r.email)
+              ?.rowId ?? crypto.randomUUID(),
+        })),
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Check your recipient details.";
+      setNotice({ ok: false, message });
+      const row = message.match(/^Row (\d+)/);
+      if (row)
+        document.getElementById(`recipient-${Number(row[1]) - 1}`)?.focus();
       return;
     }
-    setRecipients([
-      ...new Map(result.data.recipients.map((r) => [r.email, r])).values(),
-    ]);
     setNotice(null);
     setReview(true);
   }
   return (
     <form
       className="grid gap-6"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         if (!review) {
@@ -79,9 +108,11 @@ export function InviteForm({
               include_name: includeName,
             });
             setNotice(result);
+            router.refresh();
+            if (result.redirect) router.push(result.redirect);
             if (result.ok) {
               setReview(false);
-              setRecipients([{ ...blankRecipient }]);
+              setRecipients([makeRow()]);
             }
           } catch {
             setNotice({
@@ -93,6 +124,9 @@ export function InviteForm({
         });
       }}
     >
+      <p className="helper-text m-0" role="status">
+        {remaining} new invitations remaining in the rolling 24-hour allowance.
+      </p>
       <fieldset
         disabled={disabled || pending}
         className="grid min-w-0 gap-6 border-0 p-0 m-0"
@@ -126,7 +160,7 @@ export function InviteForm({
           </section>
         ) : (
           <>
-            <details className="border-b border-rule pb-4">
+            <details open className="border-b border-rule pb-4">
               <summary className="cursor-pointer font-semibold">
                 Paste several email addresses
               </summary>
@@ -155,7 +189,12 @@ export function InviteForm({
                     ];
                     if (merged.length > 20)
                       throw new Error("Invite up to 20 people at a time.");
-                    setRecipients(merged);
+                    setRecipients(
+                      merged.map((r) => ({
+                        ...r,
+                        rowId: (r as Row).rowId || crypto.randomUUID(),
+                      })),
+                    );
                     setPaste("");
                     setNotice(null);
                   } catch (error) {
@@ -175,7 +214,7 @@ export function InviteForm({
             {recipients.map((recipient, index) => (
               <section
                 className="grid gap-3 border-b border-rule pb-5"
-                key={index}
+                key={recipient.rowId}
                 aria-label={`Recipient ${index + 1}`}
               >
                 <div className="flex flex-wrap items-end gap-3">
@@ -190,7 +229,6 @@ export function InviteForm({
                       className="field-input w-full"
                       id={`recipient-${index}`}
                       type="email"
-                      required
                       maxLength={254}
                       value={recipient.email}
                       onChange={(e) => update(index, "email", e.target.value)}
@@ -211,7 +249,11 @@ export function InviteForm({
                 </div>
                 <details>
                   <summary className="cursor-pointer text-sm text-brand">
-                    Add details <span className="text-muted">(optional)</span>
+                    Add details{" "}
+                    {recipient.roll_number || recipient.graduation_year
+                      ? ` · ${[recipient.roll_number, recipient.graduation_year ? `Class of ${recipient.graduation_year}` : ""].filter(Boolean).join(" · ")}`
+                      : ""}
+                    <span className="text-muted">(optional)</span>
                   </summary>
                   <div className="grid sm:grid-cols-2 gap-4 mt-4">
                     {Object.entries(identityLabels).map(([field, label]) => (
@@ -262,9 +304,7 @@ export function InviteForm({
               <Button
                 variant="secondary"
                 disabled={recipients.length >= 20}
-                onClick={() =>
-                  setRecipients((r) => [...r, { ...blankRecipient }])
-                }
+                onClick={() => setRecipients((r) => [...r, makeRow()])}
               >
                 Add another brother
               </Button>

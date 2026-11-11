@@ -16,6 +16,7 @@ import {
   requestCode,
   sendInvitations,
   sendWelcome,
+  provider,
   setSession,
   token,
   validToken,
@@ -31,7 +32,7 @@ const message = (error: unknown) =>
 export async function inviteBrothers(input: unknown): Promise<ConnectResult> {
   try {
     const person = await getConnectPerson();
-    if (!person)
+    if (!person || !person.subscribed)
       return {
         ok: false,
         message: "Sign in to Connect before inviting your brothers.",
@@ -55,7 +56,8 @@ export async function requestConnectCode(
       ok: true,
       message: invitation
         ? "Check that email for a verification code."
-        : "If this address has an active Connect subscription, a sign-in code is on its way.",
+        : "If this address has an available Connect profile, a sign-in code is on its way.",
+      retryAfter: 60,
     };
   } catch (error) {
     return { ok: false, message: message(error) };
@@ -165,7 +167,13 @@ export async function unsubscribeConnect(
     if (credential) {
       if (!validToken(credential))
         throw new Error("This unsubscribe link is unavailable.");
-      await command("unsubscribe", { token_hash: hash(credential) });
+      const result = await command<{ ok: boolean }>("unsubscribe", {
+        token_hash: hash(credential),
+      });
+      if (!result.ok)
+        throw new Error(
+          "This unsubscribe link is unavailable. Nothing was changed. Sign in to Connect to manage your subscription.",
+        );
     } else {
       const person = await getConnectPerson();
       if (!person) throw new Error("Sign in to manage your subscription.");
@@ -175,13 +183,45 @@ export async function unsubscribeConnect(
         .eq("profile_id", person.id)
         .single();
       if (error || !data) throw new Error("Please try again.");
-      await command("unsubscribe", { token_hash: data.unsubscribe_hash });
+      const result = await command<{ ok: boolean }>("unsubscribe", {
+        token_hash: data.unsubscribe_hash,
+      });
+      if (!result.ok)
+        throw new Error("Subscription not found. Nothing was changed.");
     }
     (await cookies()).set(CONNECT_COOKIE, "", { path: "/connect", maxAge: 0 });
     return {
       ok: true,
       message:
         "You’re unsubscribed. You won’t receive further Connect invitations or updates.",
+    };
+  } catch (error) {
+    return { ok: false, message: message(error) };
+  }
+}
+export async function resubscribeConnect(): Promise<ConnectResult> {
+  try {
+    const person = await getConnectPerson();
+    if (!person) throw new Error("Sign in with your mailing email to rejoin.");
+    const result = await provider().contacts.update({
+      email: person.email,
+      unsubscribed: false,
+    });
+    if (result.error && result.error.name !== "not_found")
+      throw new Error(
+        "Your email preferences could not be updated. Please try again.",
+      );
+    const changed = await command<{ ok: boolean }>("resubscribe", {
+      id: person.id,
+    });
+    if (!changed.ok)
+      throw new Error(
+        "Your subscription is unavailable. Please contact the chapter.",
+      );
+    return {
+      ok: true,
+      message: "You’re subscribed again.",
+      redirect: "/connect",
     };
   } catch (error) {
     return { ok: false, message: message(error) };

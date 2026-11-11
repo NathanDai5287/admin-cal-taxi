@@ -458,6 +458,7 @@ export type Database = {
           last_name: string;
           roll_number: string;
           graduation_year: number | null;
+          connect_only: boolean;
           full_name: string;
           email: string;
           contact_email: string;
@@ -477,6 +478,7 @@ export type Database = {
           last_name?: string;
           roll_number?: string;
           graduation_year?: number | null;
+          connect_only?: boolean;
           full_name?: string;
           email?: string;
           contact_email?: string;
@@ -496,6 +498,7 @@ export type Database = {
           last_name?: string;
           roll_number?: string;
           graduation_year?: number | null;
+          connect_only?: boolean;
           full_name?: string;
           email?: string;
           contact_email?: string;

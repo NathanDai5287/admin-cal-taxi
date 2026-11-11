@@ -19,7 +19,7 @@ export default async function UsersPage() {
   const [profilesResult, yearsResult, termsResult] = await Promise.all([
     loadAllPages((from, to) => supabase
       .from("profiles")
-      .select("id, full_name, first_name, last_name, roll_number, graduation_year, email, contact_email, phone, membership, executive_roles, role, has_signed_in, discord_user_id, member_since_term_id, created_at")
+      .select("id, full_name, first_name, last_name, roll_number, graduation_year, connect_only, email, contact_email, phone, membership, executive_roles, role, has_signed_in, discord_user_id, member_since_term_id, created_at")
       .is("removed_at", null)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
@@ -115,6 +115,7 @@ export default async function UsersPage() {
             lastName: profile.last_name,
             rollNumber: profile.roll_number,
             graduationYear: profile.graduation_year,
+            connectOnly: profile.connect_only,
             email: profile.email,
             contactEmail: profile.contact_email,
             phone: profile.phone,

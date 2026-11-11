@@ -84,6 +84,7 @@ export async function prepareBroadcast(id: string, version: string) {
     if (!sender || sender.includes("resend.dev")) throw new Error("Configure a verified sender in RESEND_BROADCAST_FROM_EMAIL or RESEND_FROM_EMAIL.");
     await requireSenderTracking(resend, sender);
     const group = checked(await db().from("mailing_lists").select("*").eq("id", row.list_id).single()) as unknown as MailingGroup;
+    if (!group.recipients.length) throw new Error("This mailing list has no subscribers yet. Wait for alumni to join before preparing a broadcast.");
     row = checked(await db().from("mailing_broadcasts").update({ status: "preparing", sender, recipient_count: group.recipients.length })
       .eq("id", id).eq("status", "draft").eq("updated_at", version).select("*").single()) as unknown as Broadcast;
     try {

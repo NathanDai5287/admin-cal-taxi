@@ -160,7 +160,7 @@ export async function updatePerson(userId: string, formData: FormData): Promise<
     }),
     supabase.rpc("admin_set_profile_discord_id", { target_user_id: userId, new_discord_user_id: discordUserId }),
     supabase.rpc("admin_set_profile_academic_term", { target_user_id: userId, new_academic_term_id: memberSinceTermId }),
-    supabase.rpc("admin_set_person_identity", { target_id: userId, details: identity.data }),
+    supabase.rpc("admin_set_person_identity", { target_id: userId, details: {...identity.data, approve_connect: formData.has("approveConnect")} }),
     ...(role === null ? [] : [supabase.rpc("admin_set_profile_role", { target_user_id: userId, new_role: role })]),
   ]);
   revalidatePath("/users");

@@ -23,7 +23,10 @@ export default function ConnectLayout({
       </header>
       <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">{children}</main>
       <footer className="mx-auto max-w-3xl px-5 py-8 text-sm text-muted">
-        Theta Xi · Nu Chapter · UC Berkeley
+        Theta Xi · Nu Chapter · UC Berkeley ·{" "}
+        <a href="https://cal.taxi" className="underline">
+          Chapter website
+        </a>
       </footer>
     </div>
   );

@@ -37,6 +37,7 @@ export function PersonEditor({ member, academicYears, canChangeAccount, onSave, 
 
         <fieldset className="person-dialog-section" aria-labelledby="person-roles-heading">
           <h3 className="person-dialog-heading" id="person-roles-heading">Roles</h3>
+          {member.connectOnly && <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="approveConnect" className="mt-1"/><span>Verify chapter membership and enable standard role permissions. Until verified, this profile can only read Nu News; mailing enrollment does not grant reimbursement access.</span></label>}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="field">
               <label className="field-label" htmlFor="person-membership">Membership</label>

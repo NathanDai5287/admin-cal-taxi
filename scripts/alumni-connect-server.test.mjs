@@ -36,6 +36,7 @@ const server = await import(
   `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`
 );
 process.env.RESEND_CONNECT_API_KEY = "test-only";
+process.env.NODE_ENV = "test";
 process.env.ALUMNI_CONNECT_URL = "https://chapter.example.test";
 function fixture() {
   const s = (globalThis.connectTest = {
@@ -83,6 +84,12 @@ function fixture() {
     },
   };
   s.resend = {
+    domains: {
+      list: async () => ({
+        data: { data: [{ name: "cal.taxi", status: "verified" }] },
+        error: null,
+      }),
+    },
     emails: {
       send: async (body, options) => {
         s.sent.push({ body, options });
@@ -177,3 +184,71 @@ test("existing provider opt-outs are retained without an invitation", async () =
   assert.equal(result.ok, true);
   assert.equal(s.sent.length, 0);
 });
+
+test("invalid sender or restricted Contacts credentials fail before reserving any email", async () => {
+  const s = fixture();
+  s.resend.domains.list = async () => ({
+    data: null,
+    error: { name: "restricted_api_key" },
+  });
+  await assert.rejects(
+    server.sendInvitations(
+      "actor",
+      { recipients: [recipient], include_name: true },
+      true,
+    ),
+    /full-access/,
+  );
+  assert.equal(s.commands.length, 0);
+  assert.equal(s.sent.length, 0);
+  const c = fixture();
+  c.resend.contacts.get = async () => ({
+    data: null,
+    error: { name: "restricted_api_key" },
+  });
+  await assert.rejects(
+    server.sendInvitations(
+      "actor",
+      { recipients: [recipient], include_name: true },
+      true,
+    ),
+    /No invitations were reserved/,
+  );
+  assert.equal(c.commands.length, 0);
+  assert.equal(c.sent.length, 0);
+});
+test("existing subscribed Resend contacts are skipped and totals distinguish no-op from sending", async () => {
+  const s = fixture();
+  s.resend.contacts.get = async () => ({
+    data: { unsubscribed: false },
+    error: null,
+  });
+  const result = await server.sendInvitations(
+    "actor",
+    { recipients: [recipient], include_name: true },
+    true,
+  );
+  assert.deepEqual(result.counts, {
+    sent: 0,
+    skipped: 1,
+    notSent: 0,
+    uncertain: 0,
+  });
+  assert.equal(s.sent.length, 0);
+});
+test("explicit provider rejections are confirmed not-sent, not uncertain", async () => {
+  const s = fixture();
+  s.resend.emails.send = async () => ({
+    data: null,
+    error: { name: "validation_error" },
+  });
+  const result = await server.sendInvitations(
+    "actor",
+    { recipients: [recipient], include_name: true },
+    true,
+  );
+  assert.equal(result.counts.notSent, 1);
+  assert.equal(result.counts.uncertain, 0);
+});
+
+test("provider 5xx failures stay uncertain and cannot become releasable unsent records",async()=>{const s=fixture();s.resend.emails.send=async()=>({data:null,error:{name:'application_error',statusCode:503}});const result=await server.sendInvitations('actor',{recipients:[recipient],include_name:true},true);assert.equal(result.counts.uncertain,1);assert.equal(result.counts.notSent,0);});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
 import {
@@ -15,7 +15,18 @@ import {
   requestConnectCode,
   unsubscribeConnect,
   verifyConnectCode,
+  resubscribeConnect,
 } from "./actions";
+
+function useCooldown() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (seconds <= 0) return;
+    const timer = setTimeout(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [seconds]);
+  return [seconds, setSeconds] as const;
+}
 
 function Notice({ result }: { result: ConnectResult | null }) {
   return (
@@ -31,6 +42,7 @@ function Notice({ result }: { result: ConnectResult | null }) {
 }
 
 export function LoginForm() {
+  const [cooldown, setCooldown] = useCooldown();
   const router = useRouter();
   const [email, setEmail] = useState(""),
     [code, setCode] = useState(""),
@@ -48,6 +60,7 @@ export function LoginForm() {
               ? await verifyConnectCode(code)
               : await requestConnectCode(email);
             setResult(r);
+            if (r.retryAfter) setCooldown(r.retryAfter);
             if (r.ok) {
               if (r.redirect) {
                 router.push(r.redirect);
@@ -98,12 +111,14 @@ export function LoginForm() {
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || (!sent && cooldown > 0)}>
           {pending
             ? "Please wait…"
             : sent
               ? "Sign in"
-              : "Email me a sign-in code"}
+              : cooldown > 0
+                ? `Request another code in ${cooldown}s`
+                : "Email me a sign-in code"}
         </Button>
         {sent && (
           <Button
@@ -133,6 +148,7 @@ export function AcceptanceForm({
   email: string;
   defaults: Partial<InviteRecipient>;
 }) {
+  const [cooldown, setCooldown] = useCooldown();
   const router = useRouter();
   const [details, setDetails] = useState<InviteRecipient>({
     ...blankRecipient,
@@ -152,6 +168,7 @@ export function AcceptanceForm({
       try {
         const r = await action();
         setResult(r);
+        if (r.retryAfter) setCooldown(r.retryAfter);
         if (r.ok) after?.();
         if (r.redirect) {
           router.push(r.redirect);
@@ -165,7 +182,19 @@ export function AcceptanceForm({
       }
     });
   }
-  if (finished) return <Notice result={result} />;
+  if (finished)
+    return (
+      <div className="grid gap-4">
+        <Notice result={result} />
+        <a className="text-brand underline" href="https://cal.taxi">
+          Visit the chapter website
+        </a>
+        <p className="helper-text">
+          If this was a mistake, contact the chapter. This invitation will not
+          be sent again.
+        </p>
+      </div>
+    );
   return (
     <form
       className="grid gap-6"
@@ -256,6 +285,7 @@ export function AcceptanceForm({
                 <div>
                   <Button
                     variant="secondary"
+                    disabled={cooldown > 0}
                     onClick={() =>
                       run(
                         () => requestConnectCode(details.email, invitation),
@@ -263,7 +293,11 @@ export function AcceptanceForm({
                       )
                     }
                   >
-                    {codeSent ? "Send a new code" : "Send verification code"}
+                    {cooldown > 0
+                      ? `Request another code in ${cooldown}s`
+                      : codeSent
+                        ? "Send a new code"
+                        : "Send verification code"}
                   </Button>
                 </div>
                 {codeSent && (
@@ -322,6 +356,11 @@ export function AcceptanceForm({
             disabled={
               changed && verifiedEmail !== details.email.trim().toLowerCase()
             }
+            aria-describedby={
+              changed && verifiedEmail !== details.email.trim().toLowerCase()
+                ? "accept-verification-help"
+                : undefined
+            }
           >
             Join mailing list
           </Button>
@@ -338,6 +377,12 @@ export function AcceptanceForm({
           </Button>
         </div>
       </fieldset>
+      {changed && verifiedEmail !== details.email.trim().toLowerCase() && (
+        <p id="accept-verification-help" className="helper-text">
+          Send a code to your new email and verify it before joining. Codes last
+          15 minutes; wait 60 seconds between requests.
+        </p>
+      )}
       <Notice result={result} />
     </form>
   );
@@ -376,6 +421,50 @@ export function UnsubscribeForm({ credential }: { credential?: string }) {
           </Button>
         </div>
       )}
+      <Notice result={result} />
+    </form>
+  );
+}
+
+export function RejoinForm() {
+  const [consent, setConsent] = useState(false),
+    [result, setResult] = useState<ConnectResult | null>(null),
+    [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!consent) return;
+        start(async () => {
+          const r = await resubscribeConnect();
+          setResult(r);
+          if (r.ok) router.refresh();
+        });
+      }}
+    >
+      <p>
+        You are not currently subscribed. Rejoin only if you want chapter emails
+        again.
+      </p>
+      <label className="flex gap-3">
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          required
+        />
+        <span>
+          I want to receive Nu News, chapter updates and alumni event
+          invitations again.
+        </span>
+      </label>
+      <div>
+        <Button type="submit" disabled={pending || !consent}>
+          Rejoin mailing list
+        </Button>
+      </div>
       <Notice result={result} />
     </form>
   );

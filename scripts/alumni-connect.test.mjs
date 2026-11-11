@@ -14,6 +14,7 @@ const {
   acceptanceSchema,
   parseEmailPaste,
   invitationCopy,
+  prepareRecipients,
 } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`
 );
@@ -87,4 +88,31 @@ test("anonymous invitation copy does not leak the inviter's name", () => {
   const copy = invitationCopy("Nathan Dai", true);
   assert.match(copy.subject, /Nathan invited/);
   assert.match(copy.introduction, /Nathan Dai/);
+});
+
+test("whitespace, bare roll digits, blank rows and Gmail-style paste work without losing defaults", () => {
+  const row = {
+    email: "  ALEX@example.com ",
+    first_name: "Alex",
+    roll_number: "1048",
+  };
+  const prepared = prepareRecipients([
+    row,
+    {
+      email: "",
+      first_name: "",
+      last_name: "",
+      roll_number: "",
+      graduation_year: null,
+      rowId: "stable-ui-row",
+    },
+  ]);
+  assert.equal(prepared.length, 1);
+  assert.equal(prepared[0].email, "alex@example.com");
+  assert.equal(prepared[0].roll_number, "Nu 1048");
+  assert.equal(
+    parseEmailPaste("Alex Brother <alex@example.com>")[0].email,
+    "alex@example.com",
+  );
+  assert.throws(() => prepareRecipients([{ ...row, email: "" }]), /Row 1/);
 });
