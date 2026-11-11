@@ -3,7 +3,6 @@ version: 1
 slug: "app-admin-mailing-list-page-tsx"
 primary_target: "app/(admin)/mailing-list/page.tsx"
 related_targets:
-  - "app/(admin)/mailing-list/broadcast-workspace.tsx"
   - "app/(public)/public-site/news/[id]/page.tsx"
 ---
 
@@ -22,3 +21,5 @@ Constraints: per-app read/write access and MCP grants apply; public routes expos
 ## Finish evidence
 
 Desktop and mobile screenshots in `.impeccable/review/` validate the actual broadcast, list, and public-reader components with local fixtures. They do not verify live database publication or delivery; the owner applies the migration separately. The finish verdict is pass / ship, limited to confirmation of the two reviewed fixes: permission-state controls are disabled and the public download action uses an SVG icon. This ordinary extension retains the incumbent private operating UI and public reading styles; no shared tokens or system changes were approved.
+
+Retired at the user’s request: the standalone mailing UI has been removed and `/mailing-list` redirects to `/users/alumni?view=alumni`. The public newsletter reader and shared delivery/data remain. The direction and finish evidence above describe the former UI.

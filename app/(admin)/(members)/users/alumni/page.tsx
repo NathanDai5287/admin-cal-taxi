@@ -25,6 +25,15 @@ const deliveries: Record<string, string> = {
   not_sent: "Confirmed not sent",
 };
 const PAGE = 50;
+type DirectoryDetails = {
+  profile_id: string;
+  first_name: string;
+  last_name: string;
+  roll_number: string;
+  graduation_year: number | null;
+  invited_count: number;
+  invited_by: string;
+};
 export default async function AlumniInvitationsPage({
   searchParams,
 }: {
@@ -95,16 +104,33 @@ export default async function AlumniInvitationsPage({
         </p>
       </section>
     );
-  const { data: duplicates } = members.data?.length
-    ? await client.rpc("connect_duplicate_candidates", {
-        profile_ids: members.data.map((m) => m.profile_id),
-      })
-    : { data: [] };
-  const duplicateMap = new Map<string, string>(
-    (duplicates ?? []).map((d: { profile_id: string; matches: string }) => [
-      d.profile_id,
-      d.matches,
+  const profileIds =
+    view === "alumni" ? (members.data?.map((m) => m.profile_id) ?? []) : [];
+  const [duplicateResult, directoryResult] = profileIds.length
+    ? await Promise.all([
+        client.rpc("connect_duplicate_candidates", { profile_ids: profileIds }),
+        client.rpc("connect_alumni_directory_details", {
+          profile_ids: profileIds,
+        }),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+  if (directoryResult.error)
+    throw new Error(
+      "Unable to load alumni details. Please refresh and try again.",
+    );
+  const directory = new Map<string, DirectoryDetails>(
+    (directoryResult.data ?? []).map((person: DirectoryDetails) => [
+      person.profile_id,
+      person,
     ]),
+  );
+  const duplicateMap = new Map<string, string>(
+    (duplicateResult.data ?? []).map(
+      (d: { profile_id: string; matches: string }) => [d.profile_id, d.matches],
+    ),
   );
   const pages = Math.max(
     1,
@@ -116,7 +142,9 @@ export default async function AlumniInvitationsPage({
   const href = (p: number) =>
     `/users/alumni?${new URLSearchParams({ q, delivery, view, page: String(p) })}`;
   return (
-    <div className="alumni-admin">
+    <div
+      className={`alumni-admin${view === "alumni" ? " alumni-admin--directory" : ""}`}
+    >
       <header>
         <h1 className="page-title">Alumni Connect</h1>
         <p className="page-lede">
@@ -278,33 +306,51 @@ export default async function AlumniInvitationsPage({
           )}
           {view === "alumni" && (
             <section className="grid gap-4">
-              <h2 className="alumni-section-title">
-                Alumni ({members.count ?? 0})
-              </h2>
-              {canWrite && !!members.data?.length && (
-                <AdminConnectAction
-                  label="Check this page against Resend"
-                  explanation="Read Resend preferences for these profiles and record provider opt-outs locally. This sends no email."
-                  action={syncConnectProvider.bind(
-                    null,
-                    members.data.map((m) => m.profile_id),
-                  )}
-                />
-              )}
+              <div className="alumni-directory-toolbar">
+                <h2 className="alumni-section-title">
+                  Alumni ({members.count ?? 0})
+                </h2>
+                {canWrite && !!members.data?.length && (
+                  <AdminConnectAction
+                    label="Refresh statuses"
+                    explanation="Read Resend preferences for these profiles and record provider opt-outs locally. This sends no email."
+                    action={syncConnectProvider.bind(
+                      null,
+                      members.data.map((m) => m.profile_id),
+                    )}
+                  />
+                )}
+              </div>
               {!!members.data?.length && (
-                <div className="table-scroll">
-                  <table className="data-table">
+                <div
+                  className="table-scroll alumni-directory-scroll"
+                  role="region"
+                  aria-label="Alumni directory"
+                  tabIndex={0}
+                >
+                  <table className="data-table alumni-directory-table">
                     <thead>
                       <tr>
+                        <th>First name</th>
+                        <th>Last name</th>
                         <th>Email</th>
+                        <th>Roll number</th>
+                        <th>Class of</th>
+                        <th>Invites sent</th>
+                        <th>Invited by</th>
                         <th>Status</th>
-                        <th>Resend checked</th>
-                        <th>Action</th>
+                        {canWrite && <th>Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {members.data?.map((m) => (
                         <tr key={m.profile_id}>
+                          <td>
+                            {directory.get(m.profile_id)?.first_name || "—"}
+                          </td>
+                          <td>
+                            {directory.get(m.profile_id)?.last_name || "—"}
+                          </td>
                           <td>
                             {m.email}
                             {duplicateMap.has(m.profile_id) && (
@@ -315,39 +361,69 @@ export default async function AlumniInvitationsPage({
                               </p>
                             )}
                           </td>
-                          <td>
-                            {m.blocked
-                              ? "Access removed"
-                              : m.subscribed
-                                ? "Subscribed locally"
-                                : "Unsubscribed"}
+                          <td className="whitespace-nowrap">
+                            {directory.get(m.profile_id)?.roll_number || "—"}
                           </td>
                           <td>
-                            {m.provider_checked_at
-                              ? new Date(
-                                  m.provider_checked_at,
-                                ).toLocaleDateString()
-                              : "Not yet checked"}
+                            {directory.get(m.profile_id)?.graduation_year ??
+                              "—"}
+                          </td>
+                          <td className="alumni-invite-count">
+                            {directory.get(m.profile_id)?.invited_count ?? 0}
                           </td>
                           <td>
-                            {canWrite && (
-                              <AdminConnectAction
-                                label={
-                                  m.blocked ? "Restore access" : "Remove access"
-                                }
-                                explanation={
-                                  m.blocked
-                                    ? "Allow code sign-in again. This sends no invitation and does not restore mailing consent. The profile must first be active in People."
-                                    : "Stop Connect mail and referrals and revoke sessions. Access can be restored later; invitation history is retained."
-                                }
-                                action={manageConnectRecord.bind(
-                                  null,
-                                  m.blocked ? "unblock" : "block",
-                                  m.profile_id,
-                                )}
-                              />
-                            )}
+                            {directory.get(m.profile_id)?.invited_by ||
+                              "Chapter"}
                           </td>
+                          <td>
+                            <span
+                              className="alumni-member-status"
+                              data-state={
+                                m.blocked
+                                  ? "blocked"
+                                  : m.subscribed
+                                    ? "subscribed"
+                                    : "unsubscribed"
+                              }
+                            >
+                              {m.blocked
+                                ? "Access removed"
+                                : m.subscribed
+                                  ? "Subscribed"
+                                  : "Unsubscribed"}
+                            </span>
+                            <span className="alumni-provider-check">
+                              {m.provider_checked_at
+                                ? `Checked ${new Date(m.provider_checked_at).toLocaleDateString()}`
+                                : "Not checked"}
+                            </span>
+                          </td>
+                          {canWrite && (
+                            <td>
+                              <details className="alumni-row-actions">
+                                <summary aria-label={`Manage ${m.email}`}>
+                                  Manage
+                                </summary>
+                                <AdminConnectAction
+                                  label={
+                                    m.blocked
+                                      ? "Restore access"
+                                      : "Remove access"
+                                  }
+                                  explanation={
+                                    m.blocked
+                                      ? "Allow code sign-in again. This sends no invitation and does not restore mailing consent. The profile must first be active in People."
+                                      : "Stop Connect mail and referrals and revoke sessions. Access can be restored later; invitation history is retained."
+                                  }
+                                  action={manageConnectRecord.bind(
+                                    null,
+                                    m.blocked ? "unblock" : "block",
+                                    m.profile_id,
+                                  )}
+                                />
+                              </details>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

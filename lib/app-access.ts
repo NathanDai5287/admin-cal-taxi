@@ -8,7 +8,8 @@ export const APP_OPTIONS = [
   { key: "accreditation", label: "Accreditation", href: "/accreditation" },
   { key: "ask-policy", label: "Ask Policy", href: "/ask-policy" },
   { key: "nu-news", label: "Nu News", href: "/nu-news" },
-  { key: "mailing-list", label: "Mailing List", href: "/mailing-list" },
+  // Retain the shared delivery permission for Nu News and MCP broadcasts.
+  { key: "mailing-list", label: "Broadcast email", href: "/nu-news" },
   { key: "users", label: "Members", href: "/users" },
   { key: "connections", label: "Connected AI clients", href: "/connections" },
   { key: "policy", label: "Policy assistant", href: "/policy" },

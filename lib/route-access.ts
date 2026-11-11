@@ -37,7 +37,7 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   "/email-activity": ["host"],
   "/finance": ["finance"],
   "/host": ["host"],
-  "/mailing-list": ["mailing-list"],
+  "/mailing-list": ["users"],
   "/nu-news": ["nu-news"],
   "/policy": ["policy"],
   "/roles": ["users"],

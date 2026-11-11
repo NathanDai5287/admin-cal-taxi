@@ -41,11 +41,6 @@ const ADMIN_APPS = [
     label: "Nu News",
     description: "Semester newsletter: writing, photos, previews, and the final PDF",
   },
-  {
-    href: "/mailing-list",
-    label: "Mailing List",
-    description: "Contact records, quick entry, and CSV or spreadsheet imports",
-  },
   { href: "/users", label: "Members", description: "Invite people, assign roles, and set what each role can access" },
   { href: "/submit", label: "Reimbursements", description: "Submit chapter expenses and review your requests" },
   {

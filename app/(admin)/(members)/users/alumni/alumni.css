@@ -154,3 +154,72 @@
     padding-left: 0;
   }
 }
+
+.alumni-admin--directory {
+  max-width: 1320px;
+}
+.alumni-directory-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.alumni-directory-scroll {
+  max-width: 100%;
+}
+[data-brand] .alumni-directory-table {
+  min-width: 1050px;
+}
+[data-brand] .alumni-directory-table th {
+  padding: 12px 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+[data-brand] .alumni-directory-table td {
+  padding: 12px 10px;
+  font-size: 13px;
+  vertical-align: top;
+}
+.alumni-directory-table td:first-child {
+  font-weight: 600;
+}
+.alumni-invite-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.alumni-member-status {
+  font-weight: 550;
+  white-space: nowrap;
+}
+.alumni-member-status[data-state="subscribed"] {
+  color: var(--color-ok);
+}
+.alumni-member-status[data-state="blocked"] {
+  color: var(--color-warn);
+}
+.alumni-provider-check {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.alumni-row-actions summary {
+  cursor: pointer;
+  color: var(--color-brand);
+  min-height: 28px;
+  white-space: nowrap;
+}
+.alumni-row-actions > div {
+  min-width: 200px;
+  margin-top: 8px;
+}
+@media (max-width: 600px) {
+  .alumni-directory-toolbar {
+    align-items: flex-start;
+  }
+}

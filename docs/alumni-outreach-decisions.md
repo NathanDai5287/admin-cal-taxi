@@ -183,3 +183,13 @@ The reviewed production migration has now been applied and the dedicated verifie
 - Follow-up: promote Read Nu News from an underlined link to a filled chapter-blue button near the Connect heading, retaining the existing permission check and destination.
 
 - Follow-up: remove the About subscriptions and access disclosure from the admin Alumni view, as requested. Keep operational details in documentation.
+
+## Alumni directory and Mailing List retirement — November 10, 2026
+
+- Replace the email-only Alumni table with compact first name, last name, email, roll number, graduation year, invitations sent, inviter, subscription status, and row management actions. Keep provider-check dates secondary to status.
+- Count invitations accepted by the email service (or already accepted by a recipient) across the full referral history. Exclude confirmed failures, reservations, and unconfirmed sends without acceptance. Resolve the original inviter through the alias ledger so replacement addresses do not duplicate rows or lose attribution.
+- Load identity and referral totals with a service-only read RPC for the current page. Retain People app permissions; these administrative details are not exposed through public Connect access.
+- Retire the standalone Mailing List screens and remove its Apps tile. Old `/mailing-list` URLs redirect to the Alumni directory using People access. Alumni Connect replaces the old contact/list-management UI.
+- Preserve contacts, mailing lists, broadcasts, shared suppression/delivery/publication libraries and existing broadcast permissions. Label the retained delivery permission Broadcast email. The former standalone broadcast composer is removed; existing MCP broadcast tools remain available.
+
+- Validation passed: 36 Connect tests (including >1,000 referral counts and service-only directory access), existing access/broadcast suites, lint, and production build. Desktop/mobile fixtures confirm compact rows, all identity/referral columns, row actions, and contained horizontal table scrolling. No live messages were sent.

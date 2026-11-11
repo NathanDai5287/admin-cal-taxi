@@ -1,3 +1,5 @@
+> The standalone Mailing List app has been retired in favor of [Alumni Connect](alumni-connect.md). Old `/mailing-list` URLs now redirect to the Alumni directory. The contact editor, list editor, and standalone broadcast composer are removed. Existing data and shared delivery/MCP/publication functions remain. The instructions below document the retained underlying system and its former UI.
+
 # Mailing List
 
 People with Mailing List access can open **Mailing List** on the admin home page or go to `/mailing-list`.

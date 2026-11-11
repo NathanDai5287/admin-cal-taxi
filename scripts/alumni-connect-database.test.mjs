@@ -61,6 +61,15 @@ async function database(t) {
       "utf8",
     ),
   );
+  await db.exec(
+    await readFile(
+      new URL(
+        "../supabase/migrations/20261110010000_connect_alumni_directory.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
   await db.exec("set role service_role");
   return db;
 }
@@ -270,13 +279,39 @@ test("existing confirmed profiles retain membership, privileges and identity; re
 });
 test("a removed existing profile cannot accept, and failed acceptance leaves its invitation unused", async (t) => {
   const db = await database(t);
-  await db.query("insert into public.profiles(id,email,removed_at,role,has_signed_in) values ($1,$2,now(),'member',true)", ["00000000-0000-4000-8000-000000000002", "removed@example.com"]);
+  await db.query(
+    "insert into public.profiles(id,email,removed_at,role,has_signed_in) values ($1,$2,now(),'member',true)",
+    ["00000000-0000-4000-8000-000000000002", "removed@example.com"],
+  );
   const inv = await invite(db, "removed@example.com");
   await assert.rejects(accept(db, inv), /restore your access/);
-  assert.equal((await db.query("select status from public.connect_invitations where id=$1",[inv.id])).rows[0].status,"pending");
-  assert.equal((await db.query("select count(*)::int n from public.connect_members")).rows[0].n,0);
-  assert.equal((await db.query("select count(*)::int n from public.connect_sessions")).rows[0].n,0);
-  assert.equal((await db.query("select removed_at is not null as removed from public.profiles where email='removed@example.com'")).rows[0].removed,true);
+  assert.equal(
+    (
+      await db.query(
+        "select status from public.connect_invitations where id=$1",
+        [inv.id],
+      )
+    ).rows[0].status,
+    "pending",
+  );
+  assert.equal(
+    (await db.query("select count(*)::int n from public.connect_members"))
+      .rows[0].n,
+    0,
+  );
+  assert.equal(
+    (await db.query("select count(*)::int n from public.connect_sessions"))
+      .rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await db.query(
+        "select removed_at is not null as removed from public.profiles where email='removed@example.com'",
+      )
+    ).rows[0].removed,
+    true,
+  );
 });
 
 test("only active subscribers can refer; admin removal blocks referrals and login codes", async (t) => {
@@ -599,5 +634,59 @@ test("invitation defaults reject arbitrary JSON keys and malformed typed values"
       ],
     }),
     /check constraint/,
+  );
+});
+
+test("admin alumni directory shows identity and original inviter once per profile, with full-history sent counts", async (t) => {
+  const db = await database(t);
+  const inv = await invite(db);
+  const person = await accept(db, inv);
+  await db.query(
+    "insert into public.connect_email_history(email,invitation_id,profile_id) values ('alias@example.com',$1,$2)",
+    [inv.id, person.profile_id],
+  );
+  await db.query(
+    "update public.profiles set full_name='Chapter Admin' where id=$1",
+    [admin],
+  );
+  await db.query(
+    `insert into public.connect_invitations(token_hash,email,inviter_id,delivery)
+    select 'sent-' || n, 'sent-' || n || '@example.com', $1, 'sent' from generate_series(1,1001) n`,
+    [person.profile_id],
+  );
+  await db.query(
+    `insert into public.connect_invitations(token_hash,email,inviter_id,delivery,status) values
+    ('failed','failed@example.com',$1,'not_sent','pending'),
+    ('reserved','reserved@example.com',$1,'reserved','pending'),
+    ('unknown','unknown@example.com',$1,'uncertain','pending'),
+    ('accepted-unknown','accepted-unknown@example.com',$1,'uncertain','accepted')`,
+    [person.profile_id],
+  );
+  const result = await db.query(
+    "select * from public.connect_alumni_directory_details($1)",
+    [[person.profile_id]],
+  );
+  assert.equal(result.rows.length, 1);
+  assert.equal(Number(result.rows[0].invited_count), 1002);
+  assert.equal(result.rows[0].invited_by, "Chapter Admin");
+  assert.equal(result.rows[0].first_name, details.first_name);
+  assert.equal(result.rows[0].last_name, details.last_name);
+  assert.equal(result.rows[0].roll_number, details.roll_number);
+  assert.equal(result.rows[0].graduation_year, details.graduation_year);
+  assert.equal(
+    (
+      await db.query(
+        "select * from public.connect_alumni_directory_details($1)",
+        [[admin]],
+      )
+    ).rows.length,
+    0,
+  );
+  await db.exec("reset role; set role authenticated");
+  await assert.rejects(
+    db.query("select * from public.connect_alumni_directory_details($1)", [
+      [person.profile_id],
+    ]),
+    /permission denied/,
   );
 });
