@@ -138,6 +138,16 @@ export async function acceptConnectInvitation(
       redirect: "/connect?joined=1",
     };
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Please contact the chapter to restore your access"
+    )
+      return {
+        ok: false,
+        reason: "profile_removed",
+        message:
+          "This email is linked to a chapter profile whose access was removed. A chapter administrator needs to restore that profile before you can join.",
+      };
     return { ok: false, message: message(error) };
   }
 }

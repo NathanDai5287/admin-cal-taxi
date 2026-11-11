@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { JoinedConfirmation } from "@/components/alumni-connect/joined-confirmation";
 import { Button } from "@/components/brand/button";
 import {
   blankRecipient,
@@ -161,6 +162,7 @@ export function AcceptanceForm({
     [verifiedEmail, setVerifiedEmail] = useState("");
   const [result, setResult] = useState<ConnectResult | null>(null),
     [finished, setFinished] = useState(false),
+    [joined, setJoined] = useState(false),
     [pending, start] = useTransition();
   const changed = details.email.trim().toLowerCase() !== email;
   function run(action: () => Promise<ConnectResult>, after?: () => void) {
@@ -170,7 +172,7 @@ export function AcceptanceForm({
         setResult(r);
         if (r.retryAfter) setCooldown(r.retryAfter);
         if (r.ok) after?.();
-        if (r.redirect) {
+        if (r.ok && r.redirect && !after) {
           router.push(r.redirect);
           router.refresh();
         }
@@ -182,6 +184,34 @@ export function AcceptanceForm({
       }
     });
   }
+  if (joined)
+    return <JoinedConfirmation email={details.email.trim().toLowerCase()} />;
+  if (result?.reason === "profile_removed")
+    return (
+      <section
+        className="connect-outcome"
+        aria-labelledby="connect-blocked-title"
+        data-tone="error"
+      >
+        <div role="alert">
+          <h2 id="connect-blocked-title">You haven’t been subscribed</h2>
+          <p>{result.message}</p>
+        </div>
+        <p>
+          Your invitation is still unused. Once your profile is restored, open
+          this same link to try again.
+        </p>
+        <a
+          className="brand-button btn-primary"
+          href="mailto:calthetaxi@gmail.com?subject=Alumni%20Connect%20access"
+        >
+          Contact the chapter
+        </a>
+        <Button variant="text" onClick={() => setResult(null)}>
+          Back to your details
+        </Button>
+      </section>
+    );
   if (finished)
     return (
       <div className="grid gap-4">
@@ -200,7 +230,10 @@ export function AcceptanceForm({
       className="grid gap-6"
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => acceptConnectInvitation(invitation, { ...details, consent }));
+        run(
+          () => acceptConnectInvitation(invitation, { ...details, consent }),
+          () => setJoined(true),
+        );
       }}
     >
       <p className="text-muted m-0">

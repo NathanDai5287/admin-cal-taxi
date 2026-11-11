@@ -268,6 +268,17 @@ test("existing confirmed profiles retain membership, privileges and identity; re
     0,
   );
 });
+test("a removed existing profile cannot accept, and failed acceptance leaves its invitation unused", async (t) => {
+  const db = await database(t);
+  await db.query("insert into public.profiles(id,email,removed_at,role,has_signed_in) values ($1,$2,now(),'member',true)", ["00000000-0000-4000-8000-000000000002", "removed@example.com"]);
+  const inv = await invite(db, "removed@example.com");
+  await assert.rejects(accept(db, inv), /restore your access/);
+  assert.equal((await db.query("select status from public.connect_invitations where id=$1",[inv.id])).rows[0].status,"pending");
+  assert.equal((await db.query("select count(*)::int n from public.connect_members")).rows[0].n,0);
+  assert.equal((await db.query("select count(*)::int n from public.connect_sessions")).rows[0].n,0);
+  assert.equal((await db.query("select removed_at is not null as removed from public.profiles where email='removed@example.com'")).rows[0].removed,true);
+});
+
 test("only active subscribers can refer; admin removal blocks referrals and login codes", async (t) => {
   const db = await database(t);
   const inv = await invite(db);

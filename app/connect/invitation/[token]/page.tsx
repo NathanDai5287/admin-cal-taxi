@@ -1,4 +1,9 @@
-import { loadInvitation } from "@/lib/alumni-connect/server";
+import {
+  loadInvitation,
+  getConnectPerson,
+  db,
+} from "@/lib/alumni-connect/server";
+import { JoinedConfirmation } from "@/components/alumni-connect/joined-confirmation";
 import { AcceptanceForm, LoginForm } from "../../public-forms";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,6 +14,22 @@ export default async function InvitationPage({
 }) {
   const { token } = await params;
   const invitation = await loadInvitation(token);
+  // Setting the session cookie in the acceptance action rerenders this page.
+  // Keep the confirmation visible to the recipient instead of replacing it
+  // with "Invitation unavailable" as soon as the invitation is consumed.
+  if (invitation?.status === "accepted") {
+    const person = await getConnectPerson();
+    if (person?.subscribed) {
+      const { data: owned, error } = await db()
+        .from("connect_email_history")
+        .select("email")
+        .eq("invitation_id", invitation.id)
+        .eq("profile_id", person.id)
+        .limit(1)
+        .maybeSingle();
+      if (!error && owned) return <JoinedConfirmation email={person.email} />;
+    }
+  }
   if (!invitation || invitation.status !== "pending")
     return (
       <div className="grid gap-4">

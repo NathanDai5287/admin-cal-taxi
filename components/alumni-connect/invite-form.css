@@ -97,6 +97,32 @@
   background: var(--color-brand-light);
   color: var(--color-ink);
 }
+.connect-send-result {
+  border-top: 1px solid var(--color-rule);
+  padding-top: 20px;
+  display: grid;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.connect-send-result p {
+  margin: 0;
+}
+.connect-send-result .connect-result-title {
+  font-weight: 650;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.connect-send-result details {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.connect-send-result summary {
+  cursor: pointer;
+  min-height: 32px;
+  display: list-item;
+}
 @media (max-width: 480px) {
   .connect-invite-footer {
     display: grid;

@@ -168,3 +168,14 @@ The reviewed production migration has now been applied and the dedicated verifie
 - Show the invitation preview during review, before the final Send invitations action. Preserve name attribution and all consent, verification, deduplication, and removal behavior.
 - Place Alumni Connect after Roles in the Members tabs and keep all tabs usable on narrow screens.
 - Validated desktop/mobile layouts, dark theme, structured multi-person payloads and review/send using local fixtures; no live invitations sent.
+
+## Join outcomes and follow-up feedback — November 10, 2026
+
+- A test join was rejected because its email belonged to a previously removed People profile. Preserve the removal; the user explicitly chose to test with another email rather than restore that profile. No production profile or invitation state was changed during diagnosis.
+- A removed profile must receive an explicit “You haven’t been subscribed” outcome, explanation, chapter contact action, and confirmation that the invitation remains unused.
+- Successful acceptance shows persistent confirmation with Invite your brothers as the next action. Keep this confirmation when the session cookie causes the accepted invitation page to render again; require both an active subscriber session and matching invitation ownership.
+- Change future invitation emails and their review preview to “Reconnect with Nu Chapter.” Existing delivered emails retain their original text.
+- Replace the long aggregate sending paragraph with a concise result such as “1 invitation sent.” Hide zero counts, show meaningful skipped/failed/unknown counts separately, and keep provider-delivery caveats inside Sending details. Individual preferences remain private.
+- Consolidate the Connect page’s account controls into collapsed Subscription settings. Place Read Nu News beside the introduction.
+- Replace the post-join banner with a green, dismissible toast that disappears after eight seconds. Keep the page heading Invite your brothers. Blocking join errors use red inline recovery information.
+- Validation: 35 Connect tests, lint, production build, desktop/mobile fixtures, dark theme, toast dismissal/timeout, success/blocked outcomes, follow-on invitation navigation, concise sending results, and collapsed settings. No live email was sent by these checks.

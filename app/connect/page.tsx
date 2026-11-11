@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { InviteForm } from "@/components/alumni-connect/invite-form";
+import { ConnectToast } from "@/components/alumni-connect/connect-toast";
 import {
   getConnectPerson,
   db,
@@ -45,50 +46,49 @@ export default async function ConnectPage({
   const remaining = Math.max(0, 50 - (count ?? 0));
   return (
     <div className="grid gap-8">
-      {params.joined === "1" && (
-        <p role="status" className="border border-rule p-4">
-          You’re subscribed. Welcome back, {person.fullName}.
-        </p>
+      {params.joined === "1" && person.subscribed && (
+        <ConnectToast message={`Chapter updates will go to ${person.email}.`} />
       )}
-      <header>
-        <h1 className="page-title">Invite your brothers</h1>
-        <p className="page-lede">
-          Help your brothers reconnect with the chapter. We’ll email each person
-          an invitation. They choose whether to join.
-        </p>
-      </header>
-      {person.subscribed ? (
-        <InviteForm
-          inviterName={person.fullName}
-          action={inviteBrothers}
-          remaining={remaining}
-        />
-      ) : (
-        <RejoinForm />
-      )}
-      <section className="border-t border-rule pt-6 grid gap-4">
-        <h2 className="card-title">Your connection</h2>
-        <p className="m-0 break-all">
-          {person.subscribed ? "Subscribed" : "Not subscribed"} as{" "}
-          {person.email}
-        </p>
+      <header className="connect-home-heading">
+        <div>
+          <h1 className="page-title">Invite your brothers</h1>
+          <p className="page-lede">
+            Help your brothers reconnect with the chapter. We’ll email each
+            person an invitation. They choose whether to join.
+          </p>
+        </div>
         {person.canReadNews && (
-          <Link className="text-brand underline" href="/connect/news">
+          <Link className="connect-news-link" href="/connect/news">
             Read Nu News
           </Link>
         )}
-        <details>
-          <summary className="cursor-pointer text-sm">
-            Manage subscription
-          </summary>
+      </header>
+      {person.subscribed ? (
+        <section aria-label="Invite your brothers" className="grid gap-5">
+          <InviteForm
+            inviterName={person.fullName}
+            action={inviteBrothers}
+            remaining={remaining}
+          />
+        </section>
+      ) : (
+        <RejoinForm />
+      )}
+      <details id="your-connection" className="connect-settings">
+        <summary>Subscription settings</summary>
+        <div className="grid gap-4 pt-4">
+          <p className="m-0 text-sm break-all">
+            {person.subscribed ? "Subscribed" : "Not subscribed"} as{" "}
+            {person.email}
+          </p>
           <UnsubscribeForm />
-        </details>
-        <form action={signOutConnect}>
-          <button className="text-sm text-brand underline" type="submit">
-            Sign out
-          </button>
-        </form>
-      </section>
+          <form action={signOutConnect}>
+            <button className="text-sm text-brand underline" type="submit">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </details>
     </div>
   );
 }

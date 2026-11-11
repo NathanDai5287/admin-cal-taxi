@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { createUntypedAdminClient } from "@/lib/reimbursements/supabase/admin";
 import {
   CONNECT_SENDER,
+  CONNECT_INVITATION_CTA,
   invitationBatchSchema,
   invitationCopy,
   type InviteRecipient,
@@ -113,7 +114,7 @@ export async function loadInvitation(value: string) {
   if (!validToken(value)) return null;
   const { data, error } = await db()
     .from("connect_invitations")
-    .select("email,defaults,status,inviter_name,include_name")
+    .select("id,email,defaults,status,inviter_name,include_name")
     .eq("token_hash", hash(value))
     .maybeSingle();
   if (error)
@@ -121,6 +122,7 @@ export async function loadInvitation(value: string) {
       "Invitations are temporarily unavailable. Please try again.",
     );
   return data as {
+    id: string;
     email: string;
     defaults: Partial<InviteRecipient>;
     status: string;
@@ -256,7 +258,7 @@ export async function sendInvitations(
         copy.subject,
         `${copy.introduction}\n\nJoin our mailing list for Nu News, chapter updates, and invitations to alumni events.\n\nYou can join using this email, choose a different address, or decline. You won’t be subscribed unless you accept.\n\nOnce you join, you can invite brothers you know.\n\nThis invitation was sent to ${invitation.email} because a fellow alumnus referred you.`,
         {
-          label: "Choose your preferences",
+          label: CONNECT_INVITATION_CTA,
           url: `${origin}/connect/invitation/${credentials.get(invitation.email)}`,
         },
         `connect/invite/${invitation.id}`,

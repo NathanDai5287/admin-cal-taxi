@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parseRecipients } from "@/lib/mailing-list/broadcast";
 
 export const CONNECT_SENDER = "Nu Chapter of Theta Xi <connect@cal.taxi>";
+export const CONNECT_INVITATION_CTA = "Reconnect with Nu Chapter";
 const name = z.string().trim().max(100).default("");
 export const identitySchema = z.object({
   first_name: name,
@@ -64,6 +65,7 @@ export type ConnectResult = {
   message: string;
   redirect?: string;
   retryAfter?: number;
+  reason?: "profile_removed";
   counts?: {
     sent: number;
     skipped: number;

@@ -19,10 +19,13 @@ await build({
   import { AcceptanceForm } from './app/connect/public-forms';
   import Layout from './app/connect/layout';
   import AdminPage from './app/(admin)/(members)/users/alumni/page';
+  import ConnectPage from './app/connect/page';
   import MembersLayout from './app/(admin)/(members)/layout';
   if (location.pathname.startsWith('/users/alumni')) {
     const content = await AdminPage({searchParams:Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)))});
     createRoot(document.getElementById('root')).render(await MembersLayout({children:content}));
+  } else if (location.pathname === '/connect') {
+    createRoot(document.getElementById('root')).render(<Layout>{await ConnectPage({searchParams:Promise.resolve(Object.fromEntries(new URLSearchParams(location.search)))})}</Layout>);
   } else {
   const accept = location.pathname === '/accept';
   createRoot(document.getElementById('root')).render(<Layout>
@@ -61,14 +64,15 @@ await build({
                 : name.endsWith("lib/reimbursements/auth")
                   ? `const session={userId:'preview',profile:{full_name:'Nathan Dai',role:'admin'},appAccess:{users:'write'}};export const getSessionProfile=async()=>session; export const requireAppAccess=async()=>session;export const hasAppAccess=()=>true;`
                   : name.endsWith("lib/alumni-connect/server")
-                    ? `export const referralWindowStart=()=>'';export const db=()=>({from:()=>{const result={data:[],count:0,error:null};const chain=new Proxy({}, {get:(_,key)=>key==='then'?(resolve)=>resolve(result):()=>chain});return chain;}});`
+                    ? `export const getConnectPerson=async()=>({id:'preview',subscribed:true,email:'alex@example.com',fullName:'Alex Brother',canReadNews:true});export const referralWindowStart=()=>'';export const db=()=>({from:()=>{const result={data:[],count:0,error:null};const chain=new Proxy({}, {get:(_,key)=>key==='then'?(resolve)=>resolve(result):()=>chain});return chain;}});`
                     : name === "next/navigation"
-                      ? "export const useRouter=()=>({push:()=>{},refresh:()=>{},prefetch:()=>{}});export const usePathname=()=>location.pathname;export const redirect=()=>{};"
+                      ? "export const useRouter=()=>({push:url=>{location.href=url;},refresh:()=>{},prefetch:()=>{}});export const usePathname=()=>location.pathname;export const redirect=()=>{};"
                       : `
-      export async function seedAlumniInvitations(input){window.previewInvites=input;return {ok:true,message:'Preview only: invitations processed. No email was sent.'};}
+      export async function seedAlumniInvitations(input){window.previewInvites=input;return {ok:true,message:'Preview only: invitations processed. No email was sent.',counts:{sent:input.recipients.length,skipped:0,notSent:0,uncertain:0}};}
+      export const inviteBrothers=seedAlumniInvitations;export async function signOutConnect(){}
       export async function manageConnectRecord(){return {ok:true,message:'Preview only.'};}
       export async function syncConnectProvider(){return {ok:true,message:'Preview only.'};}
-      export async function acceptConnectInvitation(token,input){window.previewAcceptance=input;return {ok:true,message:'Preview only: joined.'};}
+      export async function acceptConnectInvitation(token,input){window.previewAcceptance=input;return location.search.includes('blocked=1') ? {ok:false,reason:'profile_removed',message:'This email is linked to a chapter profile whose access was removed. A chapter administrator needs to restore that profile before you can join.'} : {ok:true,message:'Preview only: joined.',redirect:'/connect?joined=1'};}
       export async function declineConnectInvitation(){return {ok:true,message:'You haven’t been subscribed.'};}
       export async function requestConnectCode(){return {ok:true,message:'Preview code: 123456'};}
       export async function verifyConnectCode(code){return {ok:code==='123456',message:code==='123456'?'Email verified.':'Incorrect code.'};}

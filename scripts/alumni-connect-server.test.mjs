@@ -121,6 +121,8 @@ test("each personal invitation uses connect sender, optional attribution and has
     "Nu Chapter of Theta Xi <connect@cal.taxi>",
   );
   assert.doesNotMatch(s.sent[0].body.text, /Nathan Dai/);
+  assert.match(s.sent[0].body.html, /Reconnect with Nu Chapter/);
+  assert.doesNotMatch(s.sent[0].body.html, /Choose your preferences/);
   assert.match(
     s.sent[0].body.text,
     /https:\/\/chapter.example.test\/connect\/invitation\/[\w-]{43}/,

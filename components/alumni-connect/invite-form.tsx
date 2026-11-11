@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/brand/button";
+import { InvitationResult } from "./invitation-result";
 import "./invite-form.css";
 import {
   CONNECT_SENDER,
+  CONNECT_INVITATION_CTA,
   blankRecipient,
   identityLabels,
   invitationBatchSchema,
@@ -275,7 +277,7 @@ export function InviteForm({
               Join our mailing list for Nu News, chapter updates, and
               invitations to alumni events.
             </p>
-            <p className="text-brand font-semibold">Choose your preferences</p>
+            <p className="text-brand font-semibold">{CONNECT_INVITATION_CTA}</p>
             <p className="text-sm text-muted">
               You can join using this email, choose a different address, or
               decline. You won’t be subscribed unless you accept.
@@ -301,14 +303,7 @@ export function InviteForm({
           </div>
         </div>
       </fieldset>
-      {notice && (
-        <p
-          className={`border border-rule p-4 m-0 ${notice.ok ? "text-ink" : "text-warn"}`}
-          role={notice.ok ? "status" : "alert"}
-        >
-          {notice.message}
-        </p>
-      )}
+      {notice && <InvitationResult result={notice} />}
     </form>
   );
 }

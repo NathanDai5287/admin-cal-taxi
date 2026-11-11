@@ -24,3 +24,111 @@
 .connect-shell input {
   caret-color: #075985;
 }
+.connect-outcome {
+  display: grid;
+  justify-items: start;
+  gap: 20px;
+  padding-block: 28px;
+  border-block: 1px solid var(--color-rule);
+}
+.connect-outcome h2 {
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+.connect-outcome p {
+  margin: 0;
+  max-width: 65ch;
+  line-height: 1.6;
+}
+.connect-outcome .brand-button {
+  min-height: 44px;
+}
+.connect-home-heading {
+  display: grid;
+  gap: 16px;
+}
+.connect-home-heading .page-lede {
+  margin-bottom: 0;
+}
+.connect-news-link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.connect-settings {
+  border-top: 1px solid var(--color-rule);
+  padding-top: 16px;
+  font-size: 14px;
+}
+.connect-settings > summary {
+  cursor: pointer;
+  color: var(--color-muted);
+  min-height: 44px;
+  align-content: center;
+}
+
+.connect-outcome[data-tone="success"] h2 {
+  color: var(--color-ok);
+}
+.connect-outcome[data-tone="error"] h2 {
+  color: var(--color-warn);
+}
+.connect-toast {
+  position: fixed;
+  z-index: 60;
+  bottom: 24px;
+  right: 24px;
+  width: min(400px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-ok-light);
+  color: var(--color-ok);
+  border: 1px solid var(--color-ok);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.connect-toast > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.connect-toast > div {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.connect-toast p {
+  margin: 0;
+}
+.connect-toast .connect-toast-title {
+  font-size: 14px;
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+.connect-toast button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: -4px -4px 0 0;
+  cursor: pointer;
+}
+.connect-toast button:hover {
+  background: var(--color-surface);
+}
+@media (max-width: 600px) {
+  .connect-toast {
+    bottom: 16px;
+    right: 16px;
+  }
+}
