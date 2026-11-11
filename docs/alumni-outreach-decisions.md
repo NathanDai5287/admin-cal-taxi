@@ -181,3 +181,5 @@ The reviewed production migration has now been applied and the dedicated verifie
 - Validation: 35 Connect tests, lint, production build, desktop/mobile fixtures, dark theme, toast dismissal/timeout, success/blocked outcomes, follow-on invitation navigation, concise sending results, and collapsed settings. No live email was sent by these checks.
 
 - Follow-up: promote Read Nu News from an underlined link to a filled chapter-blue button near the Connect heading, retaining the existing permission check and destination.
+
+- Follow-up: remove the About subscriptions and access disclosure from the admin Alumni view, as requested. Keep operational details in documentation.

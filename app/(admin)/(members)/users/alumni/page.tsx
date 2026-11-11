@@ -281,16 +281,6 @@ export default async function AlumniInvitationsPage({
               <h2 className="alumni-section-title">
                 Alumni ({members.count ?? 0})
               </h2>
-              <details className="alumni-help">
-                <summary>About subscriptions and access</summary>
-                <p className="helper-text">
-                  Subscription status is local until checked against Resend.
-                  Restore access never resubscribes someone: they must sign in
-                  and explicitly rejoin. Known addresses remain deduplicated; an
-                  unrelated new address cannot reliably be identified as the
-                  same person.
-                </p>
-              </details>
               {canWrite && !!members.data?.length && (
                 <AdminConnectAction
                   label="Check this page against Resend"
