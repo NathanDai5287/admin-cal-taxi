@@ -145,7 +145,7 @@ Implementation is ready for pull-request review: People → Alumni Connect, opti
 
 The implementation uses long-lived unused invitations, 15-minute codes, seven-day Connect sessions, admin-only revocation, and checked-by-default name attribution. These resolve earlier open implementation details without claiming that every recommendation above was separately approved.
 
-No production migration, sender/inbox configuration, subscriber changes, or live email sending has been performed. Applying the migration and configuring the verified sender are required before release.
+The reviewed production migration has now been applied and the dedicated verified sender configured. Existing profile, reimbursement, contact and broadcast row counts were preserved; only the managed Connect list was added. No alumni invitation or subscriber records were created during validation. Deployment proceeds through the reviewed origin/main commit.
 
 ## Review resolutions and production authorization
 
