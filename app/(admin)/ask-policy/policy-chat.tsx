@@ -215,6 +215,8 @@ export function PolicyChat({
     setInput("");
     setError("");
 
+    textarea.current?.focus({ preventScroll: true });
+
     startTransition(async () => {
       const form = new FormData();
       form.set("message", content);
@@ -378,7 +380,7 @@ export function PolicyChat({
             <form onSubmit={(event) => { event.preventDefault(); submit(); }} className="ask-policy-composer flex items-end gap-2 p-2">
               <input ref={fileInput} type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.docx,.xlsx,.txt,.md,.csv,.json" className="sr-only" disabled={!canWrite || pending || Boolean(busyChatId)} onChange={(event) => { addAttachments(Array.from(event.target.files ?? [])); event.target.value = ""; }} tabIndex={-1} />
               <button type="button" onClick={() => fileInput.current?.click()} disabled={!canWrite || pending || Boolean(busyChatId)} className="flex h-10 w-10 shrink-0 items-center justify-center text-muted hover:bg-canvas hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40" aria-label="Attach files or images" title="Attach files or images"><PaperclipIcon /></button>
-              <textarea ref={textarea} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} disabled={!canWrite || pending || Boolean(busyChatId)} rows={1} maxLength={4000} placeholder="Ask about accreditation…" className="max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted" aria-label="Message" />
+              <textarea ref={textarea} value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} disabled={!canWrite || Boolean(busyChatId)} rows={1} maxLength={4000} placeholder="Ask about accreditation…" className="max-h-40 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-muted" aria-label="Message" />
               <button type="submit" disabled={!canWrite || pending || Boolean(busyChatId) || !input.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center bg-action text-white transition-colors hover:bg-action-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message"><SendIcon /></button>
             </form>
             <p className="mt-3 text-center text-[11px] leading-relaxed text-muted">Chats are saved to your account. Attachments are temporary; use Add evidence to store a source. <Link href="/accreditation" className="font-semibold text-brand underline underline-offset-2">Create documents</Link></p>
