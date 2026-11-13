@@ -8,6 +8,7 @@ export type BatchCreateResult = {
 };
 
 export type BatchProcessResult = {
+  queued?: boolean;
   ok: boolean;
   retryable: boolean;
   message: string;

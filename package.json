@@ -9,7 +9,7 @@
     "dev": "next dev",
     "preview:host": "node scripts/host-local-preview.mjs",
     "discord-bot": "node --env-file-if-exists=.env.local scripts/discord-bot.mjs",
-    "test:accreditation": "node --test scripts/accreditation.test.mjs scripts/accreditation-chat.test.mjs scripts/accreditation-evidence-delete.test.mjs scripts/accreditation-chat-dates.test.mjs scripts/accreditation-template-drafting.test.mjs scripts/accreditation-template-context.test.mjs scripts/accreditation-document.test.mjs scripts/accreditation-document-ai.test.mjs scripts/accreditation-document-database.test.mjs scripts/accreditation-document-access.test.mjs scripts/accreditation-saved-forms.test.mjs",
+    "test:accreditation": "node --test scripts/accreditation.test.mjs scripts/ingestion-database.test.mjs scripts/ingestion-pdf.test.mjs scripts/accreditation-chat.test.mjs scripts/accreditation-evidence-delete.test.mjs scripts/accreditation-chat-dates.test.mjs scripts/accreditation-template-drafting.test.mjs scripts/accreditation-template-context.test.mjs scripts/accreditation-document.test.mjs scripts/accreditation-document-ai.test.mjs scripts/accreditation-document-database.test.mjs scripts/accreditation-document-access.test.mjs scripts/accreditation-saved-forms.test.mjs",
     "test:dues": "node --test scripts/dues-fees.test.mjs scripts/dues-bulk-edit-database.test.mjs scripts/dues-payments-database.test.mjs scripts/dues-payment-plans.test.mjs scripts/dues-payment-plans-database.test.mjs scripts/dues-balance-notes-database.test.mjs scripts/dues-scheduling-database.test.mjs",
     "test:members": "node --test scripts/academic-calendar.test.mjs scripts/dues-charge-errors.test.mjs scripts/invite-emails.test.mjs scripts/member-discord-ids.test.mjs scripts/member-status.test.mjs scripts/pending-profile-names.test.mjs scripts/user-label.test.mjs scripts/managed-people-database.test.mjs scripts/invite-reconciliation.test.mjs",
     "test:receipt": "node --test scripts/clipboard-image.test.mjs scripts/image-preview.test.mjs scripts/manual-expense-receipt.test.mjs",
@@ -26,7 +26,8 @@
     "test:broadcasts": "node --test scripts/broadcasts.test.mjs scripts/newsletter-routes.test.mjs",
     "test:nu-news": "node --test scripts/nu-news.test.mjs scripts/nu-news-database.test.mjs scripts/nu-news-mcp.test.mjs scripts/nu-news-reader.test.mjs scripts/nu-news-pdf-links.test.mjs",
     "test:finance": "node --test scripts/finance-plan.test.mjs scripts/expense-category-plan-database.test.mjs scripts/expense-category-actions.test.mjs && bash scripts/finance-plan-database.test.sh",
-    "test:access": "node --test scripts/app-access.test.mjs scripts/bulk-app-access-database.test.mjs scripts/reimbursement-management-access.test.mjs scripts/role-app-access-database.test.mjs scripts/mailing-list-actions.test.mjs scripts/nu-news-mcp.test.mjs"
+    "test:access": "node --test scripts/app-access.test.mjs scripts/bulk-app-access-database.test.mjs scripts/reimbursement-management-access.test.mjs scripts/role-app-access-database.test.mjs scripts/mailing-list-actions.test.mjs scripts/nu-news-mcp.test.mjs",
+    "ingestion:worker": "node --env-file=.env.local scripts/run-ingestion-worker.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
@@ -47,6 +48,7 @@
     "next": "16.3.5",
     "openai": "^7.17.0",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "6.5.438",
     "pizzip": "^3.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",

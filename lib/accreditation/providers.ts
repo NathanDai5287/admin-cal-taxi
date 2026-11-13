@@ -149,10 +149,10 @@ export type AccreditationProviders = {
   ocr: OcrProvider | null;
 };
 
-export function getAccreditationProviders(): AccreditationProviders {
+export function getAccreditationProviders(options: { singleAttempt?: boolean } = {}): AccreditationProviders {
   const provider = (process.env.ACCREDITATION_AI_PROVIDER ?? "gemini").toLowerCase();
   if (process.env.ACCREDITATION_EMBEDDING_DIMENSIONS && process.env.ACCREDITATION_EMBEDDING_DIMENSIONS !== "768") throw new Error("Embedding dimensions must be 768.");
-  const gemini = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+  const gemini = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, ...(options.singleAttempt ? { httpOptions: { timeout: 150_000, retryOptions: { attempts: 1 } } } : {}) }) : null;
   const ocr = gemini ? new GeminiOcrProvider(gemini, process.env.ACCREDITATION_OCR_MODEL ?? "gemini-3.8-flash") : null;
   if (provider === "openai" && process.env.OPENAI_API_KEY) return {
     language: new OpenAILanguageModelProvider(process.env.OPENAI_API_KEY, process.env.ACCREDITATION_LLM_MODEL ?? "gpt-5-mini"),

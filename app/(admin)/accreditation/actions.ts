@@ -272,10 +272,10 @@ export async function processAccreditationBatchItem(idValue: string): Promise<Ba
   const id = uuid.safeParse(idValue);
   if (!id.success) return { ok: false, retryable: false, message: "The uploaded evidence ID is invalid." };
   try {
-    await processDocument(id.data, false, true);
+    const processing = await processDocument(id.data, false, true);
     revalidatePath("/accreditation/library");
     revalidatePath("/ask-policy/evidence");
-    return { ok: true, retryable: false, message: "Embedding complete." };
+    return { ok: true, queued: processing?.queued, retryable: false, message: processing?.queued ? "Queued; processing continues after you leave this page." : "Embedding complete." };
   } catch (error) {
     revalidatePath("/accreditation/library");
     revalidatePath("/ask-policy/evidence");
@@ -288,8 +288,9 @@ export async function reprocessSource(formData: FormData) {
   await requireAccreditationAdmin();
   const returnPath = evidenceReturnPath(formData);
   const id = uuid.parse(formData.get("sourceId"));
+  let queued = false;
   try {
-    await processDocument(id, false, formData.get("signatureFree") === "on");
+    queued = Boolean((await processDocument(id, false, formData.get("signatureFree") === "on"))?.queued);
   } catch {
     revalidatePath("/accreditation/library");
     revalidatePath("/ask-policy/evidence");
@@ -297,7 +298,7 @@ export async function reprocessSource(formData: FormData) {
   }
   revalidatePath("/accreditation/library");
   revalidatePath("/ask-policy/evidence");
-  redirect(`${returnPath}?result=reembedded`);
+  redirect(`${returnPath}?result=${queued ? "queued_progress_saved" : "reembedded"}`);
 }
 
 export async function archiveSource(formData: FormData) {

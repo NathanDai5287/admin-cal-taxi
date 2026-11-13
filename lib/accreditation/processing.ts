@@ -3,8 +3,10 @@ import { extractSource } from "./extract";
 import { getAccreditationProviders } from "./providers";
 import { createAccreditationAdminClient } from "./supabase";
 import type { ExtractedChunk } from "./types";
+import { enqueueDocument, ingestionEnabled } from "./ingestion";
 
 export async function processDocument(sourceId: string, policy = false, signatureFree = false) {
+  if (ingestionEnabled()) return { queued: true, jobId: await enqueueDocument(sourceId, policy, signatureFree) };
   const db = createAccreditationAdminClient();
   const table = policy ? "policy_documents" : "accreditation_sources";
   const chunkTable = policy ? "policy_chunks" : "accreditation_source_chunks";

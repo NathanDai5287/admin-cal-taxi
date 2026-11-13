@@ -71,7 +71,7 @@ export default async function proxy(request: NextRequest) {
   }
 
   // Machine-to-machine endpoint performs its own constant-time secret check.
-  if (pathname === "/api/webhooks/reimbursements" || pathname.startsWith("/api/mcp")) {
+  if (pathname === "/api/accreditation/ingestion" || pathname === "/api/webhooks/reimbursements" || pathname.startsWith("/api/mcp")) {
     return NextResponse.next();
   }
 

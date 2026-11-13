@@ -3,6 +3,7 @@
 import { memo, useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/brand/button";
+import { IngestionProgress } from "@/components/accreditation/ingestion-progress";
 import { EVIDENCE_SEARCH_LIMIT, type EvidenceSource } from "@/lib/accreditation/evidence-list";
 import { archiveSource, deleteSource, reprocessSource } from "../actions";
 
@@ -74,6 +75,7 @@ const EvidenceTable = memo(function EvidenceTable({
               : source.report_key ? source.report_key.replaceAll("_", " ") : "All forms"}</td>
             <td>
               <span className={`badge ${source.status === "ready" ? "badge-approved" : source.status === "failed" ? "badge-denied" : "badge-pending"}`}>{source.status}</span>
+              <IngestionProgress sourceId={source.id} type="accreditation" />
               {source.processing_total > 0 ? <p className="mt-1 text-xs text-muted">{source.processing_completed}/{source.processing_total} passages embedded</p> : null}
             </td>
             <td>

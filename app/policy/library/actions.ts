@@ -46,9 +46,9 @@ export async function processPolicyBatchItem(idValue: string): Promise<BatchProc
   const id = z.string().uuid().safeParse(idValue);
   if (!id.success) return { ok: false, retryable: false, message: "The uploaded policy ID is invalid." };
   try {
-    await processDocument(id.data, true, true);
+    const processing = await processDocument(id.data, true, true);
     revalidatePath("/policy/library");
-    return { ok: true, retryable: false, message: "Embedding complete. Review before publishing." };
+    return { ok: true, queued: processing?.queued, retryable: false, message: processing?.queued ? "Queued; processing continues after you leave this page." : "Embedding complete. Review before publishing." };
   } catch (error) {
     revalidatePath("/policy/library");
     const retryable = isRetryableAiError(error);
@@ -87,8 +87,9 @@ export async function editPolicy(form: FormData) {
 export async function reprocessPolicy(form: FormData) {
   await policyAdmin();
   const id = z.string().uuid().parse(form.get("id"));
-  try { await processDocument(id, true, form.get("signatureFree") === "on"); } catch { finish("Processing failed. Review the source error and retry later."); }
-  finish("Draft processing complete.");
+  let queued = false;
+  try { queued = Boolean((await processDocument(id, true, form.get("signatureFree") === "on"))?.queued); } catch { finish("Processing failed. Review the source error and retry later."); }
+  finish(queued ? "Queued; progress is saved and processing continues in the worker." : "Draft processing complete.");
 }
 
 export async function publishPolicy(form: FormData) {

@@ -22,6 +22,8 @@ export type BatchQueueItem = {
 };
 
 type ProgressRow = {
+  ingestion_message?: string;
+  ingestion_status?: string;
   id: string;
   processing_completed?: number;
   processing_total?: number;
@@ -55,7 +57,9 @@ export function useBatchUploadQueue(type: "policy" | "accreditation") {
           if (!row) return item;
           const completed = Number(row.processing_completed ?? 0);
           const total = Number(row.processing_total ?? 0);
-          return { ...item, completed, total, attempt: Math.max(item.attempt, Number(row.processing_attempts ?? 0)) };
+          return { ...item, completed, total, message: row.ingestion_message ?? item.message,
+            phase: row.ingestion_status === "complete" ? "ready" : ["failed", "paused", "cancelled"].includes(row.ingestion_status ?? "") ? "failed" : item.phase,
+            attempt: Math.max(item.attempt, Number(row.processing_attempts ?? 0)) };
         }));
       } catch {
         // The processing action remains authoritative; a missed poll is harmless.
@@ -98,7 +102,7 @@ export async function processQueuedDocument(options: {
       return;
     }
     if (result.ok) {
-      update(localId, { phase: "ready", message: result.message });
+      update(localId, { phase: result.queued ? "embedding" : "ready", message: result.message });
       return;
     }
     if (!result.retryable || attempt === MAX_PROCESSING_ATTEMPTS - 1) {
