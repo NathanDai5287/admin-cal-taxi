@@ -15,7 +15,7 @@ function checked(result: { data: any; error: { message: string } | null }): any 
   if (result.error) throw new Error(result.error.message);
   return result.data;
 }
-export async function enqueueDocument(sourceId: string, policy: boolean, signatureFree: boolean) {
+export async function enqueueDocument(sourceId: string, policy: boolean, signatureFree: boolean, forceEmbeddings = false) {
   if (!signatureFree) throw new Error("Confirm this source and its text contain no signatures.");
   const db = createAccreditationAdminClient();
   const source = checked(await db.from(policy ? "policy_documents" : "accreditation_sources").select("*").eq("id", sourceId).single());
@@ -28,6 +28,7 @@ export async function enqueueDocument(sourceId: string, policy: boolean, signatu
     extraction: "native-first-v1", chunking: "page-3200-v1",
     ocr: providers.ocr?.model ?? null,
     profile: embedding.profile, model: embedding.model, provider: embedding.name, dimensions: embedding.dimensions,
+    ...(forceEmbeddings ? { force_embeddings: true } : {}),
   };
   return checked(await db.rpc("ingestion_enqueue", { p_source: sourceId, p_policy: policy, p_config: config }));
 }
@@ -62,7 +63,7 @@ export async function runIngestionWorker() {
           if (chunks.length) {
             const checkpoints = checked(await db.from(policy ? "policy_embedding_checkpoints" : "accreditation_embedding_checkpoints").select("ordinal,embedding").eq("source_id", sourceId).eq("embedding_profile", job.config.profile));
             await commit("chunks", chunks.map((c: { ordinal: number; content: string; locator: unknown; embedding_v2: unknown; embedding_profile: string }) => {
-              const vector = c.embedding_profile === job.config.profile ? c.embedding_v2 : checkpoints.find((p: { ordinal: number }) => p.ordinal === c.ordinal)?.embedding;
+              const vector = job.config.force_embeddings ? undefined : c.embedding_profile === job.config.profile ? c.embedding_v2 : checkpoints.find((p: { ordinal: number }) => p.ordinal === c.ordinal)?.embedding;
               return { ...c, request_hash: requestHash(c.content), embedding: typeof vector === "string" ? JSON.parse(vector) : vector ?? undefined };
             }));
           } else {

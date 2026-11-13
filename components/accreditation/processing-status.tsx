@@ -41,5 +41,5 @@ export function ProcessingBadge({ sourceId, status, type }: { sourceId: string; 
   const rows = useProcessingStatuses(type, [sourceId]);
   const row = rows[sourceId];
   const label = row?.ingestion_status ?? (["processing", "pending"].includes(status) ? "Uploaded—not queued" : status);
-  return <span className={`badge ${label === "complete" || label === "ready" ? "badge-approved" : label === "failed" ? "badge-denied" : "badge-pending"}`}>{label}</span>;
+  return <span className={`badge ${label === "running" ? "border-brand/30 bg-brand-light text-brand" : label === "complete" || label === "ready" ? "badge-approved" : label === "failed" ? "badge-denied" : "badge-pending"}`}>{label === "running" ? "Processing" : label}</span>;
 }

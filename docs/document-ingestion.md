@@ -26,7 +26,13 @@ embedding checkpoints are reused. PDFs without saved chunks start native-text
 extraction page by page, using Gemini only for uncertain/image-containing pages.
 Partial output is kept in private staging tables until atomic activation.
 
-Library status shows the saved stage and counts. Reprocess resumes a paused job.
+Library status shows the saved stage, page/passage counts, and stage progress bar.
+Start processing queues a new upload; Resume processing continues a paused job.
+These actions update in place without navigating. Active jobs have a disabled
+primary action. Processing options is a bordered dropdown: after the current pass
+finishes, Regenerate embeddings reuses saved text and deliberately requests new
+vectors. Re-extract page retries a native-text page. Both rebuild operations are
+rejected server-side while a pass is active, including concurrent requests.
 Initial status is server-loaded. Rows and the upload queue share batched status
 checks (up to 20 IDs per request), only for active jobs, at 15-second intervals.
 Waiting jobs sleep until their retry time. Idle and terminal documents have no

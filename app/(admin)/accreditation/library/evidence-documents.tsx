@@ -5,9 +5,10 @@ import { ProcessingBadge, processingMonitor } from "@/components/accreditation/p
 import { memo, useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/brand/button";
+import { ProcessingAction } from "@/components/accreditation/processing-action";
 import { IngestionProgress } from "@/components/accreditation/ingestion-progress";
 import { EVIDENCE_SEARCH_LIMIT, type EvidenceSource } from "@/lib/accreditation/evidence-list";
-import { archiveSource, deleteSource, reprocessSource } from "../actions";
+import { archiveSource, deleteSource } from "../actions";
 
 type Family = { id: string; label: string };
 type SearchState = {
@@ -50,7 +51,6 @@ const EvidenceTable = memo(function EvidenceTable({
   families,
   emptyMessage,
   id,
-  basePath,
   onDeleted,
 }: {
   sources: EvidenceSource[];
@@ -78,15 +78,10 @@ const EvidenceTable = memo(function EvidenceTable({
             <td>
               <ProcessingBadge sourceId={source.id} status={source.status} type="accreditation" />
               <IngestionProgress sourceId={source.id} type="accreditation" />
-              {source.processing_total > 0 ? <p className="mt-1 text-xs text-muted">{source.processing_completed}/{source.processing_total} passages embedded</p> : null}
+
             </td>
             <td>
-              {source.status !== "archived" ? <form action={reprocessSource} className="space-y-2">
-                <input type="hidden" name="sourceId" value={source.id} />
-                <input type="hidden" name="returnTo" value={basePath} />
-                <label className="block text-xs"><input name="signatureFree" type="checkbox" required /> Source and text contain no signatures</label>
-                <Button type="submit" variant="secondary" compact className="rounded-full">Reprocess / re-embed</Button>
-              </form> : null}
+              {source.status !== "archived" ? <ProcessingAction sourceId={source.id} type="accreditation" status={source.status} /> : null}
               {source.status !== "archived" ? <form action={archiveSource}>
                 <input type="hidden" name="sourceId" value={source.id} />
                 <button className="text-xs font-bold text-muted hover:text-ink" type="submit">Archive</button>

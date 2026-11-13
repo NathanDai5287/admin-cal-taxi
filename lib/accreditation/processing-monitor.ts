@@ -3,6 +3,7 @@ export type ProcessingStatus = {
   ingestion_status?: string; ingestion_message?: string;
   ingestion_job?: { id: string; status: string; stage: string; next_retry_at?: string } | null;
   processing_completed?: number; processing_total?: number; processing_attempts?: number;
+  pages_completed?: number; pages_total?: number;
 };
 export type StatusMap = Record<string, ProcessingStatus>;
 export const EMPTY_STATUSES: StatusMap = {};

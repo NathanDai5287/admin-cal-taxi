@@ -25,12 +25,16 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   `);
   for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql", "20260927000000_resumable_document_embeddings.sql", "20260928000000_ai_template_onboarding.sql", "20261113000000_document_ingestion_jobs.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
   await db.exec(await readFile(new URL('../supabase/migrations/20261113010000_ingestion_status_summary.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261113020000_ingestion_progress_actions.sql',import.meta.url),'utf8'));
   const id = randomUUID();
   await db.query("insert into policy_documents(id,content_hash,storage_path,original_name,mime_type) values($1,'hash','path','fixture.pdf','application/pdf')", [id]);
   const config = { profile: 'test', provider: 'gemini', model: 'fixture' };
   const enqueue = async () => (await db.query('select ingestion_enqueue($1,true,$2) as id', [id, config])).rows[0].id;
   const job = await enqueue();
   assert.equal(await enqueue(), job);
+  await assert.rejects(db.query('select ingestion_enqueue($1,true,$2)',[id,{...config,force_embeddings:true}]),/already active/);
+  await assert.rejects(db.query('select ingestion_manage($1,1)',[job]),/Processing is active/);
+  assert.equal((await db.query('select status from document_ingestion_jobs where id=$1',[job])).rows[0].status,'queued');
   let token;
   const claim = async () => {
     token = randomUUID();
@@ -66,6 +70,7 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   assert.equal((await db.query('select count(*)::int as n from policy_chunks where source_id=$1',[id])).rows[0].n,90);
   const summary=(await db.query('select ingestion_status_summary($1,true) as rows',[[id]])).rows[0].rows;
   assert.equal(summary[0].active,false);assert.equal(summary[0].processing_completed,90);assert.equal(summary[0].ingestion_status,'complete');
+  assert.equal(summary[0].pages_completed,51);assert.equal(summary[0].pages_total,51);
   assert.ok(!JSON.stringify(summary).includes('request_hash'));
   const id2=randomUUID();
   await db.query("insert into policy_documents(id,content_hash,storage_path,original_name,mime_type) values($1,'hash','path2','fixture.pdf','application/pdf')",[id2]);
