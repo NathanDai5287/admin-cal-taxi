@@ -1,4 +1,6 @@
 "use client";
+import { ProcessingBadge, processingMonitor } from "@/components/accreditation/processing-status";
+
 
 import { memo, useEffect, useId, useState } from "react";
 
@@ -26,7 +28,7 @@ function DeleteEvidenceForm({ sourceId, onDeleted }: { sourceId: string; onDelet
     setError("");
     try {
       const result = await deleteSource(form);
-      if (result.deleted) onDeleted(sourceId, result.warning);
+      if (result.deleted) { processingMonitor("accreditation").seed([{ id: sourceId, active: false }]); onDeleted(sourceId, result.warning); }
       else setError(result.error ?? "The document could not be deleted. Please try again.");
     } catch {
       setError("The document could not be deleted. Please try again.");
@@ -74,7 +76,7 @@ const EvidenceTable = memo(function EvidenceTable({
               ? familyNames.get(source.template_family_id) ?? "Named form"
               : source.report_key ? source.report_key.replaceAll("_", " ") : "All forms"}</td>
             <td>
-              <span className={`badge ${source.status === "ready" ? "badge-approved" : source.status === "failed" ? "badge-denied" : "badge-pending"}`}>{source.status}</span>
+              <ProcessingBadge sourceId={source.id} status={source.status} type="accreditation" />
               <IngestionProgress sourceId={source.id} type="accreditation" />
               {source.processing_total > 0 ? <p className="mt-1 text-xs text-muted">{source.processing_completed}/{source.processing_total} passages embedded</p> : null}
             </td>

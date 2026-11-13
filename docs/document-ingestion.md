@@ -27,6 +27,12 @@ extraction page by page, using Gemini only for uncertain/image-containing pages.
 Partial output is kept in private staging tables until atomic activation.
 
 Library status shows the saved stage and counts. Reprocess resumes a paused job.
+Initial status is server-loaded. Rows and the upload queue share batched status
+checks (up to 20 IDs per request), only for active jobs, at 15-second intervals.
+Waiting jobs sleep until their retry time. Idle and terminal documents have no
+recurring status requests; hidden/offline tabs pause monitoring. Use Refresh
+processing status to discover jobs started in another tab. These checks do not
+make Gemini calls.
 Processing options can cancel a job or retry a native-text page with Gemini in a
 new generation. Approved report source text and published policy are protected.
 

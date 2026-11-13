@@ -24,6 +24,7 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
     alter default privileges in schema public grant all on tables to service_role;
   `);
   for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql", "20260927000000_resumable_document_embeddings.sql", "20260928000000_ai_template_onboarding.sql", "20261113000000_document_ingestion_jobs.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
+  await db.exec(await readFile(new URL('../supabase/migrations/20261113010000_ingestion_status_summary.sql',import.meta.url),'utf8'));
   const id = randomUUID();
   await db.query("insert into policy_documents(id,content_hash,storage_path,original_name,mime_type) values($1,'hash','path','fixture.pdf','application/pdf')", [id]);
   const config = { profile: 'test', provider: 'gemini', model: 'fixture' };
@@ -63,9 +64,13 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   await claim(); await commit('activate',{});
   assert.equal((await db.query('select status from document_ingestion_jobs where id=$1',[job])).rows[0].status,'complete');
   assert.equal((await db.query('select count(*)::int as n from policy_chunks where source_id=$1',[id])).rows[0].n,90);
+  const summary=(await db.query('select ingestion_status_summary($1,true) as rows',[[id]])).rows[0].rows;
+  assert.equal(summary[0].active,false);assert.equal(summary[0].processing_completed,90);assert.equal(summary[0].ingestion_status,'complete');
+  assert.ok(!JSON.stringify(summary).includes('request_hash'));
   const id2=randomUUID();
   await db.query("insert into policy_documents(id,content_hash,storage_path,original_name,mime_type) values($1,'hash','path2','fixture.pdf','application/pdf')",[id2]);
   const second=(await db.query('select ingestion_enqueue($1,true,$2) as id',[id2,config])).rows[0].id;
+  assert.equal((await db.query('select ingestion_status_summary($1,true) as rows',[[id2]])).rows[0].rows[0].active,true);
   const tok=randomUUID();await db.query('select * from ingestion_claim($1)',[tok]);
   await db.query("update policy_documents set status='archived' where id=$1",[id2]);
   await assert.rejects(db.query("select ingestion_commit($1,$2,'validated',$3)",[second,tok,{pages:1}]),/unavailable/);

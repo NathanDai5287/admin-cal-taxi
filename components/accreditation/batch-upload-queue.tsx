@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { processingMonitor, useProcessingStatuses } from "./processing-status";
 
 import {
   MAX_PROCESSING_ATTEMPTS,
@@ -21,15 +22,6 @@ export type BatchQueueItem = {
   attempt: number;
 };
 
-type ProgressRow = {
-  ingestion_message?: string;
-  ingestion_status?: string;
-  id: string;
-  processing_completed?: number;
-  processing_total?: number;
-  processing_attempts?: number;
-};
-
 export function useBatchUploadQueue(type: "policy" | "accreditation") {
   const [items, setItems] = useState<BatchQueueItem[]>([]);
   const activeIds = useMemo(() => items
@@ -38,39 +30,21 @@ export function useBatchUploadQueue(type: "policy" | "accreditation") {
     .sort()
     .join(","), [items]);
 
+  const rows = useProcessingStatuses(type, activeIds ? activeIds.split(",") : []);
   function updateItem(localId: string, patch: Partial<BatchQueueItem>) {
-    setItems((current) => current.map((item) => item.localId === localId ? { ...item, ...patch } : item));
+    const sourceId = patch.sourceId ?? items.find(item => item.localId === localId)?.sourceId;
+    if (sourceId && patch.phase === "embedding") processingMonitor(type).refresh([sourceId]);
+    setItems(current => current.map(item => item.localId === localId ? { ...item, ...patch } : item));
   }
+  const displayItems: BatchQueueItem[] = items.map(item => {
+      const row = item.sourceId ? rows[item.sourceId] : undefined;
+      if (!row || item.phase !== "embedding") return item;
+      return { ...item, completed: row.processing_completed ?? 0, total: row.processing_total ?? 0,
+        message: row.ingestion_message ?? item.message,
+        phase: row.ingestion_status === "complete" ? "ready" : ["paused", "failed", "cancelled"].includes(row.ingestion_status ?? "") ? "failed" : item.phase };
+    });
 
-  useEffect(() => {
-    if (!activeIds) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/accreditation/processing-status?type=${type}&ids=${encodeURIComponent(activeIds)}`, { cache: "no-store" });
-        if (!response.ok || cancelled) return;
-        const body = await response.json() as { documents?: ProgressRow[] };
-        const rows = new Map((body.documents ?? []).map((row) => [row.id, row]));
-        setItems((current) => current.map((item) => {
-          if (!item.sourceId || item.phase !== "embedding") return item;
-          const row = rows.get(item.sourceId);
-          if (!row) return item;
-          const completed = Number(row.processing_completed ?? 0);
-          const total = Number(row.processing_total ?? 0);
-          return { ...item, completed, total, message: row.ingestion_message ?? item.message,
-            phase: row.ingestion_status === "complete" ? "ready" : ["failed", "paused", "cancelled"].includes(row.ingestion_status ?? "") ? "failed" : item.phase,
-            attempt: Math.max(item.attempt, Number(row.processing_attempts ?? 0)) };
-        }));
-      } catch {
-        // The processing action remains authoritative; a missed poll is harmless.
-      }
-    };
-    void poll();
-    const interval = window.setInterval(poll, 1_500);
-    return () => { cancelled = true; window.clearInterval(interval); };
-  }, [activeIds, type]);
-
-  return { items, setItems, updateItem };
+  return { items: displayItems, setItems, updateItem };
 }
 
 async function waitWithCountdown(milliseconds: number, onTick: (seconds: number) => void) {
@@ -102,7 +76,7 @@ export async function processQueuedDocument(options: {
       return;
     }
     if (result.ok) {
-      update(localId, { phase: result.queued ? "embedding" : "ready", message: result.message });
+      update(localId, { sourceId, phase: result.queued ? "embedding" : "ready", message: result.message });
       return;
     }
     if (!result.retryable || attempt === MAX_PROCESSING_ATTEMPTS - 1) {

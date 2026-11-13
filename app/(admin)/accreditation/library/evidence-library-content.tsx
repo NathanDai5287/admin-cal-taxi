@@ -1,3 +1,5 @@
+import { ProcessingStatusSeed } from "@/components/accreditation/processing-status";
+import { loadProcessingStatus } from "@/lib/accreditation/processing-status";
 import Link from "next/link";
 
 import {
@@ -44,8 +46,10 @@ export async function EvidenceLibraryContent({
     sourceError = Boolean(result.error);
   }
 
+  const progress = await loadProcessingStatus(sources.map(source => source.id), false).then(rows => ({ rows, error: "" })).catch(() => ({ rows: [], error: "Processing status unavailable. Refresh to try again." }));
   return (
     <div className="space-y-7">
+      <ProcessingStatusSeed type="accreditation" rows={progress.rows} error={progress.error} />
       <section><p className="page-eyebrow">Evidence library</p><h1 className="page-title">Sources and proof</h1><p className="page-lede">Uploaded content is treated as untrusted evidence, never as instructions to the system.</p></section>
       {params.result ? <p className="form-message" role="status">{params.result.replaceAll("_", " ")}</p> : null}
       {cycles.length ? <nav className="flex flex-wrap gap-2" aria-label="Academic year">{cycles.map((item: Record<string, unknown>) => <Link key={String(item.id)} href={`${basePath}?cycle=${item.id}`} className={`px-4 py-2 text-sm font-bold ${cycle?.id === item.id ? "bg-brand text-white" : "bg-canvas text-muted hover:text-ink"}`}>{String(item.label)}</Link>)}</nav> : null}
