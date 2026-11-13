@@ -85,8 +85,7 @@ const EvidenceTable = memo(function EvidenceTable({
                 <input type="hidden" name="sourceId" value={source.id} />
                 <input type="hidden" name="returnTo" value={basePath} />
                 <label className="block text-xs"><input name="signatureFree" type="checkbox" required /> Source and text contain no signatures</label>
-                <button type="submit" className="text-xs font-bold text-brand">Reprocess / re-embed</button>
-                <p className="mt-1 text-xs text-muted">{source.active_embedding_profile ?? "Needs embedding migration"}</p>
+                <Button type="submit" variant="secondary" compact className="rounded-full">Reprocess / re-embed</Button>
               </form> : null}
               {source.status !== "archived" ? <form action={archiveSource}>
                 <input type="hidden" name="sourceId" value={source.id} />
