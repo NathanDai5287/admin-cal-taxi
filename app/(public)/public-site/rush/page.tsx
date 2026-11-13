@@ -25,6 +25,7 @@ import optiverLogo from "@/public/site/logos/optiver.png";
 import oracleLogo from "@/public/site/logos/oracle.png";
 import robinhoodLogo from "@/public/site/logos/robinhood.png";
 import twitchLogo from "@/public/site/logos/twitch.png";
+import tiktokLogo from "@/public/site/logos/tiktok.png";
 import uberLogo from "@/public/site/logos/uber.png";
 import vanguardLogo from "@/public/site/logos/vanguard.png";
 import voleonLogo from "@/public/site/logos/voleon.png";
@@ -34,6 +35,11 @@ import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 
 const companies: LogoItem[] = [
+  {
+    name: "TikTok",
+    src: tiktokLogo,
+    href: "https://www.tiktok.com/",
+  },
   {
     name: "NASA JPL",
     src: nasaJplLogo,
