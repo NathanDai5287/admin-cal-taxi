@@ -15,18 +15,47 @@ type SearchState = {
   error: string;
 };
 
+function DeleteEvidenceForm({ sourceId, onDeleted }: { sourceId: string; onDeleted: (id: string, warning?: string) => void }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function remove(form: FormData) {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const result = await deleteSource(form);
+      if (result.deleted) onDeleted(sourceId, result.warning);
+      else setError(result.error ?? "The document could not be deleted. Please try again.");
+    } catch {
+      setError("The document could not be deleted. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return <form action={remove} className="mt-2 space-y-2 border-t border-rule pt-2">
+    <input type="hidden" name="sourceId" value={sourceId} />
+    <label className="block text-xs"><input name="confirmDelete" type="checkbox" required disabled={pending} /> Permanently delete original and embeddings</label>
+    <Button type="submit" variant="danger" compact disabled={pending}>Delete permanently</Button>
+    {error ? <p role="alert" className="text-xs text-warn">{error}</p> : null}
+  </form>;
+}
+
 const EvidenceTable = memo(function EvidenceTable({
   sources,
   families,
   emptyMessage,
   id,
   basePath,
+  onDeleted,
 }: {
   sources: EvidenceSource[];
   families: Family[];
   emptyMessage: string;
   id: string;
   basePath: "/accreditation/library" | "/ask-policy/evidence";
+  onDeleted: (id: string, warning?: string) => void;
 }) {
   const familyNames = new Map(families.map((family) => [family.id, family.label]));
   return (
@@ -59,12 +88,7 @@ const EvidenceTable = memo(function EvidenceTable({
                 <input type="hidden" name="sourceId" value={source.id} />
                 <button className="text-xs font-bold text-muted hover:text-ink" type="submit">Archive</button>
               </form> : null}
-              <form action={deleteSource} className="mt-2 space-y-2 border-t border-rule pt-2">
-                <input type="hidden" name="sourceId" value={source.id} />
-                <input type="hidden" name="returnTo" value={basePath} />
-                <label className="block text-xs"><input name="confirmDelete" type="checkbox" required /> Permanently delete original and embeddings</label>
-                <Button type="submit" variant="danger" compact>Delete permanently</Button>
-              </form>
+              <DeleteEvidenceForm sourceId={source.id} onDeleted={onDeleted} />
             </td>
           </tr>
         )) : <tr><td colSpan={5} className="text-muted">{emptyMessage}</td></tr>}
@@ -94,6 +118,8 @@ export function EvidenceDocuments({
   const tableId = useId();
   const [query, setQuery] = useState("");
   const [retry, setRetry] = useState(0);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  const [deleteMessage, setDeleteMessage] = useState("");
   const [search, setSearch] = useState<SearchState>({
     term: "",
     sources: initialSources,
@@ -129,15 +155,17 @@ export function EvidenceDocuments({
   }, [term, cycleId, initialSources, retry]);
 
   const searching = Boolean(term) && (search.term !== term || search.loading);
-  const sources = term ? search.sources : initialSources;
-  const count = term ? search.count : initialCount;
+  const currentSources = term ? search.sources : initialSources;
+  const sources = currentSources.filter((source) => !deletedIds.has(source.id));
+  const visibleInitialCount = Math.max(0, initialCount - initialSources.filter((source) => deletedIds.has(source.id)).length);
+  const count = term ? Math.max(0, search.count - currentSources.filter((source) => deletedIds.has(source.id)).length) : visibleInitialCount;
   const error = term ? searching ? "" : search.error : initialError;
   const emptyMessage = searching ? "Searching documents…" : error
     ? error
     : term ? `No documents match “${term}” in this academic year.` : "No evidence uploaded for this year.";
   const countLabel = searching ? "Searching…" : error ? "Search unavailable" : term
     ? `${count} match${count === 1 ? "" : "es"}`
-    : `${initialCount} file${initialCount === 1 ? "" : "s"}`;
+    : `${visibleInitialCount} file${visibleInitialCount === 1 ? "" : "s"}`;
 
   return (
     <section className="card">
@@ -163,15 +191,19 @@ export function EvidenceDocuments({
           <p className="text-xs text-muted" role="status" aria-live="polite">
             {searching ? "Searching…" : error ? error : term && count > EVIDENCE_SEARCH_LIMIT
               ? `Showing first ${sources.length} of ${count} matches`
-              : !term && initialCount > initialSources.length
-                ? `Showing latest ${initialSources.length} of ${initialCount} files`
+              : !term && count > sources.length
+                ? `Showing latest ${sources.length} of ${count} files`
                 : term ? countLabel : "Search by file name"}
           </p>
           {error && term ? <button type="button" onClick={() => setRetry((value) => value + 1)} className="text-xs font-bold text-brand underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Try again</button> : null}
         </div>
       </div>
+      {deleteMessage ? <p role="status" className="px-6 pb-3 text-xs text-muted">{deleteMessage}</p> : null}
       <div className="table-scroll border-t border-rule" aria-busy={searching}>
-        <EvidenceTable id={tableId} sources={sources} families={families} emptyMessage={emptyMessage} basePath={basePath} />
+        <EvidenceTable id={tableId} sources={sources} families={families} emptyMessage={emptyMessage} basePath={basePath} onDeleted={(id, warning) => {
+          setDeletedIds((current) => new Set(current).add(id));
+          setDeleteMessage(warning ?? "Document deleted.");
+        }} />
       </div>
     </section>
   );

@@ -311,20 +311,20 @@ export async function archiveSource(formData: FormData) {
 
 export async function deleteSource(formData: FormData) {
   await requireAccreditationAdmin();
-  const returnPath = evidenceReturnPath(formData);
   const sourceId = uuid.safeParse(formData.get("sourceId"));
-  if (!sourceId.success || formData.get("confirmDelete") !== "on") redirect(`${returnPath}?result=confirm_deletion`);
+  if (!sourceId.success || formData.get("confirmDelete") !== "on") return { error: "Confirm permanent deletion of this document." };
   const db = createAccreditationAdminClient();
   const source = await db.from("accreditation_sources").select("cycle_id,storage_path").eq("id", sourceId.data).maybeSingle();
-  if (!source.data) redirect(`${returnPath}?result=source_not_found`);
+  if (source.error) return { error: "The document could not be loaded. Please try again." };
+  if (!source.data) return { deleted: true };
   const removed = await db.from("accreditation_sources").delete().eq("id", sourceId.data).select("id");
   if (removed.error || !removed.data?.length) {
-    redirect(`${returnPath}?cycle=${source.data.cycle_id}&result=source_is_in_use_archive_instead`);
+    return { error: "The document could not be deleted. It may be referenced by a report; try archiving it instead." };
   }
   const storage = await db.storage.from("accreditation-sources").remove([source.data.storage_path]);
   revalidatePath("/accreditation", "layout");
   revalidatePath("/ask-policy/evidence");
-  redirect(`${returnPath}?cycle=${source.data.cycle_id}&result=${storage.error ? "document_and_embeddings_deleted_storage_cleanup_failed" : "document_and_embeddings_deleted"}`);
+  return { deleted: true, warning: storage.error ? "Document and embeddings deleted, but original file cleanup failed." : undefined };
 }
 
 export async function uploadTemplate(formData: FormData) {
