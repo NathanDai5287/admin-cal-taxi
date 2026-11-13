@@ -60,6 +60,7 @@ const EvidenceTable = memo(function EvidenceTable({
                 <button className="text-xs font-bold text-muted hover:text-ink" type="submit">Archive</button>
               </form> : null}
               <form action={deleteSource} className="mt-2 space-y-2 border-t border-rule pt-2">
+                <input type="hidden" name="sourceId" value={source.id} />
                 <input type="hidden" name="returnTo" value={basePath} />
                 <label className="block text-xs"><input name="confirmDelete" type="checkbox" required /> Permanently delete original and embeddings</label>
                 <Button type="submit" variant="danger" compact>Delete permanently</Button>
