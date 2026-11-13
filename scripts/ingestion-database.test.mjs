@@ -81,4 +81,25 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   await assert.rejects(db.query("select ingestion_commit($1,$2,'validated',$3)",[second,tok,{pages:1}]),/unavailable/);
   await db.query('delete from policy_documents where id=$1',[id2]);
   assert.equal((await db.query('select count(*)::int as n from document_ingestion_jobs where id=$1',[second])).rows[0].n,0);
+  // Regression: policy uses text statuses, evidence uses an enum that has no
+  // 'published' value. Exercise real evidence activation and its status trigger.
+  const cycle=randomUUID(), evidence=randomUUID();
+  await db.query("insert into accreditation_cycles(id,label,starts_on,ends_on) values($1,'Evidence fixture','2026-08-01','2027-06-01')",[cycle]);
+  await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1,$2,'chapter_evidence','processing','fixture.pdf','application/pdf',10,'evidencehash','evidencepath')",[evidence,cycle]);
+  const evidenceJob=(await db.query('select ingestion_enqueue($1,false,$2) as id',[evidence,config])).rows[0].id;
+  async function evidenceCommit(kind,data){
+    const token=randomUUID();await db.query('select * from ingestion_claim($1)',[token]);
+    await db.query('select ingestion_commit($1,$2,$3,$4)',[evidenceJob,token,kind,data]);
+  }
+  await evidenceCommit('chunks',Array.from({length:5},(_,ordinal)=>({ordinal,content:'Evidence '+ordinal,locator:{page:1},request_hash:'e'+ordinal,embedding})));
+  const finalToken=randomUUID();await db.query('select * from ingestion_claim($1)',[finalToken]);
+  await assert.rejects(db.query("select ingestion_commit($1,$2,'activate','{}')",[evidenceJob,finalToken]),/invalid input value for enum/);
+  assert.equal((await db.query('select count(*)::int as n from document_ingestion_chunks where job_id=$1 and embedding is not null',[evidenceJob])).rows[0].n,5);
+  assert.equal((await db.query('select count(*)::int as n from accreditation_source_chunks where source_id=$1',[evidence])).rows[0].n,0);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261113030000_fix_ingestion_evidence_status_trigger.sql',import.meta.url),'utf8'));
+  await db.query("select ingestion_commit($1,$2,'activate','{}')",[evidenceJob,finalToken]);
+  assert.equal((await db.query('select status from document_ingestion_jobs where id=$1',[evidenceJob])).rows[0].status,'complete');
+  assert.equal((await db.query('select status from accreditation_sources where id=$1',[evidence])).rows[0].status,'ready');
+  assert.equal((await db.query('select count(*)::int as n from accreditation_source_chunks where source_id=$1',[evidence])).rows[0].n,5);
+  await db.query("update accreditation_sources set status='archived' where id=$1",[evidence]);
 });
