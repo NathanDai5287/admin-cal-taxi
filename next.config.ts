@@ -28,8 +28,10 @@ const nextConfig: NextConfig = {
     staleTimes: { dynamic: 600, static: 600 },
   },
   turbopack: { root: path.resolve(__dirname) },
-  serverExternalPackages: ["@myriaddreamin/typst-ts-node-compiler"],
-  outputFileTracingIncludes: { "/*": ["./lib/host-pdf/**/*", "./lib/nu-news/**/*", "./lib/accreditation/pdf/**/*"] },
+  // PDF.js loads its worker relative to its installed module. Keep that module
+  // outside the server bundle so the sibling worker URL remains valid.
+  serverExternalPackages: ["@myriaddreamin/typst-ts-node-compiler", "pdfjs-dist"],
+  outputFileTracingIncludes: { "/*": ["./lib/host-pdf/**/*", "./lib/nu-news/**/*", "./lib/accreditation/pdf/**/*", "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"] },
   // /api/host/generate/* is proxied by app/api/host/generate/[...path]/route.ts
   // (a route handler, not a rewrite) so it can enforce the admin role first.
 };
