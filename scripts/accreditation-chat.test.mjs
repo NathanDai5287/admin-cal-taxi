@@ -7,6 +7,8 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 
 import {
+  chatAnswerSchema,
+  generatedChatAnswerSchema,
   groupCitationsByDocument,
   isImageAttachment,
   isSupportedChatAttachment,
@@ -73,6 +75,23 @@ test("chat citations are grouped once per document while preserving cited locati
   });
   assert.equal(grouped[1].key, "accreditation:two");
   assert.deepEqual(grouped[1].excerpts, [{ quote: "Evidence.", locator: { page: 4 } }]);
+});
+
+test("long generated citations are verified in full before excerpts are shortened", () => {
+  const quote = "Exact supporting sentence. ".repeat(80).trim();
+  const context = { ref: "ATT:0:0", content: quote, title: "large.txt", kind: "attachment", subtitle: "", locator: {} };
+  const generated = generatedChatAnswerSchema.parse({ answer: "A summary.", citations: [{ ref: context.ref, quote }] });
+  assert.equal(chatAnswerSchema.safeParse(generated).success, false);
+  const citations = keepSupportedCitations(generated.citations, [context]);
+  assert.equal(citations.length, 1);
+  assert.ok(citations[0].quote.length <= 1_000);
+  assert.ok(quote.startsWith(citations[0].quote));
+  assert.equal(chatAnswerSchema.safeParse({ ...generated, citations }).success, true);
+  assert.deepEqual(keepSupportedCitations([
+    { ref: context.ref, quote: quote + " Fabricated ending." },
+    { ref: "ATT:unknown:0", quote },
+  ], [context]), []);
+  assert.equal(generatedChatAnswerSchema.safeParse({ answer: "A summary.", citations: [{ ref: context.ref, quote: 123 }] }).success, false);
 });
 
 test("assistant Markdown links allow only HTTPS and same-site paths", () => {

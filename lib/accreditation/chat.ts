@@ -4,6 +4,7 @@ export const MAX_CHAT_HISTORY_MESSAGES = 16;
 export const MAX_CHAT_ATTACHMENTS = 5;
 export const MAX_CHAT_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 export const MAX_CHAT_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024;
+export const MAX_CHAT_CITATION_QUOTE_CHARACTERS = 1_000;
 
 export const chatHistorySchema = z.array(z.object({
   role: z.enum(["user", "assistant"]),
@@ -20,7 +21,16 @@ export const chatAnswerSchema = z.object({
   answer: z.string().trim().min(1).max(8_000),
   citations: z.array(z.object({
     ref: z.string().trim().min(1),
-    quote: z.string().trim().min(8).max(1_000),
+    quote: z.string().trim().min(8).max(MAX_CHAT_CITATION_QUOTE_CHARACTERS),
+  })).max(12),
+});
+
+// Models can exceed the requested excerpt length. Accept those quotes at the
+// generation boundary, then verify them in full before bounding stored excerpts.
+export const generatedChatAnswerSchema = chatAnswerSchema.extend({
+  citations: z.array(z.object({
+    ref: z.string().trim().min(1),
+    quote: z.string().trim().min(8).describe(`An exact supporting excerpt, preferably under ${MAX_CHAT_CITATION_QUOTE_CHARACTERS} characters.`),
   })).max(12),
 });
 
@@ -80,7 +90,10 @@ export function keepSupportedCitations(citations: ChatCitation[], contexts: Chat
   return citations.filter((citation) => {
     const content = byRef.get(citation.ref);
     return Boolean(content && normalize(citation.quote).length >= 8 && content.includes(normalize(citation.quote)));
-  });
+  }).map((citation) => ({
+    ...citation,
+    quote: normalize(citation.quote).slice(0, MAX_CHAT_CITATION_QUOTE_CHARACTERS).trimEnd(),
+  }));
 }
 
 export function groupCitationsByDocument(citations: ChatCitation[], contexts: ChatContext[]): DocumentCitation[] {

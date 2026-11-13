@@ -212,3 +212,47 @@ test("natural date assumptions retain the existing policy citation check", async
   assert.match(result.answer, /could not verify/);
   assert.deepEqual(result.sources, []);
 });
+
+for (const streaming of [false, true]) {
+  for (const supported of [true, false]) {
+    test(`long policy quotes ${supported ? "save verified excerpts" : "reject fabricated endings"} (${streaming ? "streaming" : "regular"})`, async () => {
+      const content = "Submit the event request before the event. ".repeat(60).trim();
+      const reply = "Submit the request before your event.";
+      const { form, saves } = setupChat({
+        reply,
+        chunksForDate: () => [{ ...sharedChunk, content }],
+        citations: [{ ref: "POL:shared-policy:0", quote: content + (supported ? "" : " All events are automatically approved.") }],
+      });
+      const streamed = [];
+      if (streaming) {
+        state.providers.language.generateStructuredStream = async (request, onDelta) => {
+          const value = await state.providers.language.generateStructured(request);
+          // Citations arrive before the answer, as in the production schema.
+          const raw = JSON.stringify({ citations: value.citations, answer: value.answer });
+          for (let offset = 0; offset < raw.length; offset += 37) onDelta(raw.slice(offset, offset + 37));
+          if (supported) assert.equal(streamed.join(""), reply, "verified answer streams before generation completes");
+          else assert.deepEqual(streamed, [], "unsupported policy must not stream");
+          return value;
+        };
+      }
+      const result = await runAccreditationChat(form, {
+        adminAuthorized: true,
+        ...(streaming ? { onTextDelta: (text) => streamed.push(text) } : {}),
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(saves.length, 1);
+      if (supported) {
+        assert.equal(result.answer, reply);
+        assert.equal(result.sources.length, 1);
+        const excerpt = result.sources[0].excerpts[0].quote;
+        assert.ok(excerpt.length <= 1_000);
+        assert.ok(content.startsWith(excerpt));
+        assert.deepEqual(saves[0].p_sources, result.sources);
+        if (streaming) assert.equal(streamed.join(""), reply);
+      } else {
+        assert.match(result.answer, /could not verify/);
+        assert.deepEqual(result.sources, []);
+      }
+    });
+  }
+}

@@ -3,7 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import {
-  chatAnswerSchema,
+  generatedChatAnswerSchema,
   chatIntentSchema,
   groupCitationsByDocument,
   isImageAttachment,
@@ -475,7 +475,7 @@ export async function runAccreditationChat(
     const contexts = [...policyContexts, ...attachmentContexts];
     const deadlineCounts = extractWeekdayDeadlineCounts([parsed.data.message, ...contexts.map((context) => context.content)].join("\n"));
     const trustedRuntime = buildPolicyToolContext(policyDate, clock, deadlineCounts);
-    const answerSchema = z.toJSONSchema(chatAnswerSchema);
+    const answerSchema = z.toJSONSchema(generatedChatAnswerSchema);
     const answerProperties = answerSchema.properties as Record<string, unknown>;
     const orderedAnswerSchema = {
       ...answerSchema,
@@ -496,7 +496,7 @@ export async function runAccreditationChat(
         intent.needs_policy
           ? "This is a policy-related question. Use the supplied published-policy and accreditation-source passages. Published policy may support policy claims; accreditation evidence, guidance, and prior submissions provide context but are not automatically authoritative policy. State material differences or conflicts, preserve source provenance, and never treat absence of a prohibition as permission. If passages are missing, incomplete, or conflicting, say so and recommend officer review. This is guidance, not legal advice or event approval."
           : "No policy lookup was needed. Do not imply that you checked or applied official policy.",
-        "For every factual claim drawn from a supplied passage, put its reference ID and an exact supporting quote in the citations field. Keep the answer prose free of reference IDs, bracket citations, citation lists, and supporting quotes because the interface renders a document-level bibliography and verified excerpts at the end. Do not cite general conversational advice.",
+        "For every factual claim drawn from a supplied passage, put its reference ID and an exact supporting quote in the citations field. Keep each quote under 1,000 characters by selecting a short, relevant excerpt rather than copying an entire passage. Keep the answer prose free of reference IDs, bracket citations, citation lists, and supporting quotes because the interface renders a document-level bibliography and verified excerpts at the end. Do not cite general conversational advice.",
       ].join(" "),
       input: JSON.stringify({
         conversation: [...recentHistory, { role: "user", content: parsed.data.message }],
@@ -515,7 +515,7 @@ export async function runAccreditationChat(
       rawStreamText += delta;
       const citationField = readTopLevelJsonField(rawStreamText, "citations");
       if (citationField?.complete) {
-        const candidate = chatAnswerSchema.shape.citations.safeParse(citationField.value);
+        const candidate = generatedChatAnswerSchema.shape.citations.safeParse(citationField.value);
         if (candidate.success) {
           const supported = keepSupportedCitations(candidate.data, contexts);
           citationsVerified = !intent.needs_policy || !policyContexts.length
@@ -535,7 +535,7 @@ export async function runAccreditationChat(
     const generatedValue = options.onTextDelta && providers.language.generateStructuredStream
       ? await providers.language.generateStructuredStream(answerRequest, consumeStructuredDelta, { signal: options.signal })
       : await providers.language.generateStructured(answerRequest);
-    const generated = chatAnswerSchema.parse(generatedValue);
+    const generated = generatedChatAnswerSchema.parse(generatedValue);
 
     const citations = keepSupportedCitations(generated.citations, contexts);
     if (intent.needs_policy && policyContexts.length && !citations.some((citation) => policyContexts.some((context) => context.ref === citation.ref))) {
