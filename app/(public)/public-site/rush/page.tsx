@@ -5,6 +5,8 @@ import cityImage from "@/public/site/chapter-city.jpg";
 import dinnerImage from "@/public/site/chapter-dinner.jpg";
 import nightFlagImage from "@/public/site/chapter-night-flag.jpg";
 import accentureLogo from "@/public/site/logos/accenture.png";
+import amazonLogo from "@/public/site/logos/amazon.png";
+import capitalOneLogo from "@/public/site/logos/capital-one.png";
 import chpLogo from "@/public/site/logos/california-highway-patrol.png";
 import eliLillyLogo from "@/public/site/logos/eli-lilly.png";
 import equinoxLogo from "@/public/site/logos/equinox.png";
@@ -17,6 +19,7 @@ import kpmgLogo from "@/public/site/logos/kpmg.png";
 import mechanizeLogo from "@/public/site/logos/mechanize.png";
 import metaLogo from "@/public/site/logos/meta.png";
 import mongodbLogo from "@/public/site/logos/mongodb.png";
+import nasaJplLogo from "@/public/site/logos/nasa-jpl.png";
 import nvidiaLogo from "@/public/site/logos/nvidia.png";
 import optiverLogo from "@/public/site/logos/optiver.png";
 import oracleLogo from "@/public/site/logos/oracle.png";
@@ -25,11 +28,36 @@ import twitchLogo from "@/public/site/logos/twitch.png";
 import uberLogo from "@/public/site/logos/uber.png";
 import vanguardLogo from "@/public/site/logos/vanguard.png";
 import voleonLogo from "@/public/site/logos/voleon.png";
+import windsurfLogo from "@/public/site/logos/windsurf.png";
 import { LightboxImage } from "@/components/public/lightbox-image";
 import { LogoGrid, type LogoItem } from "@/components/public/logo-grid";
 import { Arrow } from "@/components/public/public-shell";
 
 const companies: LogoItem[] = [
+  {
+    name: "NASA JPL",
+    src: nasaJplLogo,
+    href: "https://www.jpl.nasa.gov/",
+    wordmark: true,
+  },
+  {
+    name: "Windsurf",
+    src: windsurfLogo,
+    href: "https://windsurf.com/",
+    wordmark: true,
+  },
+  {
+    name: "Amazon",
+    src: amazonLogo,
+    href: "https://www.amazon.com/",
+    wordmark: true,
+  },
+  {
+    name: "Capital One",
+    src: capitalOneLogo,
+    href: "https://www.capitalone.com/",
+    wordmark: true,
+  },
   {
     name: "Jane Street",
     src: janeStreetLogo,
