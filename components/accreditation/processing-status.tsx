@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { EMPTY_STATUSES, ProcessingMonitor, type ProcessingStatus } from "@/lib/accreditation/processing-monitor";
+import { processingLabel } from "@/lib/accreditation/processing-presentation";
 
 const monitors = new Map<string, ProcessingMonitor>();
 export function processingMonitor(type: string) {
@@ -40,6 +41,6 @@ export function ProcessingStatusSeed({ type, rows, error }: { type: string; rows
 export function ProcessingBadge({ sourceId, status, type }: { sourceId: string; status: string; type: string }) {
   const rows = useProcessingStatuses(type, [sourceId]);
   const row = rows[sourceId];
-  const label = row?.ingestion_status ?? (["processing", "pending"].includes(status) ? "Uploaded—not queued" : status);
+  const label = processingLabel(row, status);
   return <span className={`badge ${label === "running" ? "border-brand/30 bg-brand-light text-brand" : label === "complete" || label === "ready" ? "badge-approved" : label === "failed" ? "badge-denied" : "badge-pending"}`}>{label === "running" ? "Processing" : label}</span>;
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
-import { processingAction } from "@/lib/accreditation/processing-presentation";
+import { processingAction, processingReady } from "@/lib/accreditation/processing-presentation";
 import { startDocumentProcessing } from "@/app/(admin)/accreditation/ingestion-actions";
 import { processingMonitor, useProcessingStatuses } from "./processing-status";
 
@@ -10,6 +10,7 @@ export function ProcessingAction({ sourceId, type, status }: { sourceId: string;
   const action = processingAction(row, status);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  if (processingReady(row, status)) return null;
   return <form action={async form => {
     if (pending || action.disabled) return;
     setPending(true); setError("");

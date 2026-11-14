@@ -1,7 +1,17 @@
 import type { ProcessingStatus } from "./processing-monitor";
+export function processingReady(row?: ProcessingStatus, sourceStatus?: string) {
+  return !row?.active && (row?.ingestion_status === "complete" || (!row?.ingestion_status && (row?.status ?? sourceStatus) === "ready"));
+}
+
+export function processingLabel(row?: ProcessingStatus, sourceStatus = "") {
+  if ((row?.status ?? sourceStatus) === "archived") return "archived";
+  if (processingReady(row, sourceStatus)) return "ready";
+  return row?.ingestion_status ?? (["processing", "pending"].includes(sourceStatus) ? "Uploaded—not queued" : sourceStatus);
+}
+
 export function processingAction(row?: ProcessingStatus, sourceStatus?: string) {
   if (row?.active) return { label: row.ingestion_status === "running" ? "Processing…" : row.ingestion_status === "waiting" ? "Waiting for capacity" : "Queued", disabled: true };
-  if (row?.ingestion_status === "complete" || (!row?.ingestion_job && sourceStatus === "ready")) return { label: "Processing complete", disabled: true };
+  if (processingReady(row, sourceStatus)) return { label: "Ready", disabled: true };
   return { label: ["paused", "failed"].includes(row?.ingestion_status ?? "") ? "Resume processing" : "Start processing", disabled: false };
 }
 export function processingProgress(row: ProcessingStatus) {

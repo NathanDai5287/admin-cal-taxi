@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/brand/button";
-import { processingProgress } from "@/lib/accreditation/processing-presentation";
+import { processingProgress, processingReady } from "@/lib/accreditation/processing-presentation";
 import { processingMonitor, useProcessingStatuses } from "./processing-status";
 import { manageIngestion, startDocumentProcessing } from "@/app/(admin)/accreditation/ingestion-actions";
 
@@ -14,8 +14,9 @@ export function IngestionProgress({ sourceId, type }: { sourceId: string; type: 
   const row = rows[sourceId];
   if (!message || !row) return null;
   const progress = processingProgress(row);
-  return <div className="mt-3 w-full min-w-40 max-w-xs space-y-2 text-xs text-muted"><p role="status" className="font-semibold text-ink">{job ? progress.label : message}</p>
-    {job ? <><div role="progressbar" aria-label={progress.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.value} aria-valuetext={progress.value === undefined ? progress.label : `${progress.value}% of this stage complete`} className="h-2 overflow-hidden rounded-full bg-rule"><div className={`h-full rounded-full bg-brand transition-[width] motion-reduce:transition-none ${progress.value === undefined && row.ingestion_status === "running" ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${progress.value ?? (row.ingestion_status === "running" ? 30 : 0)}%` }} /></div>
+  const ready = processingReady(row);
+  return <div className="mt-3 w-full min-w-40 max-w-xs space-y-2 text-xs text-muted">{!ready ? <p role="status" className="font-semibold text-ink">{job ? progress.label : message}</p> : null}
+    {job && !ready ? <><div role="progressbar" aria-label={progress.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.value} aria-valuetext={progress.value === undefined ? progress.label : `${progress.value}% of this stage complete`} className="h-2 overflow-hidden rounded-full bg-rule"><div className={`h-full rounded-full bg-brand transition-[width] motion-reduce:transition-none ${progress.value === undefined && row.ingestion_status === "running" ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${progress.value ?? (row.ingestion_status === "running" ? 30 : 0)}%` }} /></div>
     {progress.total > 0 && row.ingestion_status !== "complete" ? <p>{progress.completed}/{progress.total} {job.stage === "extraction" ? "pages read" : "passages embedded"}</p> : null}
     {["paused", "waiting"].includes(row.ingestion_status ?? "") ? <p>{message}</p> : null}</> : null}
     {job ? <details className="group rounded-xl border border-rule bg-canvas"><summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-3 py-2 font-semibold text-brand hover:bg-brand-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">Processing options<svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 shrink-0 fill-none stroke-current transition-transform group-open:rotate-180"><path d="m4 6 4 4 4-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></summary>
