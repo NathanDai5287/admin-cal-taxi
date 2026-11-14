@@ -26,6 +26,7 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   for (const migration of ["20260916000000_accreditation_pilot.sql", "20260917000000_gemini_policy.sql", "20260925000000_combined_policy_accreditation_search.sql", "20260926000000_document_processing_progress.sql", "20260927000000_resumable_document_embeddings.sql", "20260928000000_ai_template_onboarding.sql", "20261113000000_document_ingestion_jobs.sql"]) await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), "utf8")).catch((e) => { throw new Error(`${migration}: ${e.message}`); });
   await db.exec(await readFile(new URL('../supabase/migrations/20261113010000_ingestion_status_summary.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/migrations/20261113020000_ingestion_progress_actions.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261114000000_stop_document_ingestion.sql',import.meta.url),'utf8'));
   const id = randomUUID();
   await db.query("insert into policy_documents(id,content_hash,storage_path,original_name,mime_type) values($1,'hash','path','fixture.pdf','application/pdf')", [id]);
   const config = { profile: 'test', provider: 'gemini', model: 'fixture' };
@@ -35,6 +36,16 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   await assert.rejects(db.query('select ingestion_enqueue($1,true,$2)',[id,{...config,force_embeddings:true}]),/already active/);
   await assert.rejects(db.query('select ingestion_manage($1,1)',[job]),/Processing is active/);
   assert.equal((await db.query('select status from document_ingestion_jobs where id=$1',[job])).rows[0].status,'queued');
+  const stop = async () => (await db.query('select ingestion_stop($1,true) as status',[job])).rows[0].status;
+  assert.equal(await stop(),'paused');
+  assert.equal(await stop(),'paused');
+  assert.equal((await db.query('select * from ingestion_claim($1)',[randomUUID()])).rows.length,0);
+  assert.equal(await enqueue(),job);
+  await assert.rejects(db.query('select ingestion_stop($1,false)',[job]),/Job not found/);
+  await assert.rejects(db.query('select ingestion_stop($1,true)',[randomUUID()]),/Job not found/);
+  await db.exec('set role authenticated');
+  await assert.rejects(stop(),/permission denied/);
+  await db.exec('reset role');
   let token;
   const claim = async () => {
     token = randomUUID();
@@ -48,6 +59,16 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   assert.equal((await db.query('select count(*)::int as n from document_ingestion_pages')).rows[0].n,39);
   await claim();
   await assert.rejects(commit('chunks',[{ordinal:0,content:'premature',locator:{},request_hash:'x'}]), /Invalid chunk stage|Extraction incomplete/);
+  // Stop after 39 saved pages while page 40 is in flight; reject that
+  // worker even after resume, and retain the generation and all saved pages.
+  const stoppedToken=token;
+  assert.equal(await stop(),'paused');
+  const stoppedSummary=(await db.query('select ingestion_status_summary($1,true) as rows',[[id]])).rows[0].rows[0];
+  assert.equal(stoppedSummary.active,false);assert.equal(stoppedSummary.pages_completed,39);
+  await assert.rejects(commit('page',{page:40,text:'late',method:'ocr'}),/lease expired/);
+  assert.equal(await enqueue(),job);
+  await claim();
+  await assert.rejects(db.query("select ingestion_commit($1,$2,'page',$3)",[job,stoppedToken,{page:40,text:'late',method:'ocr'}]),/lease expired/);
   const stale = token;
   await db.query("update document_ingestion_jobs set lease_until=now()-interval '1 second' where id=$1",[job]);
   await claim();
@@ -64,10 +85,15 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   for(let ordinal=1;ordinal<60;ordinal++){await claim();await commit('embedding',{ordinal,request_hash:'request'+ordinal,embedding});}
   await claim();await commit('wait',{retry_at:new Date(0).toISOString(),error:{status:429},failures:1});
   assert.equal((await db.query('select count(*)::int as n from document_ingestion_chunks where embedding is not null')).rows[0].n,60);
+  assert.equal(await stop(),'paused');
+  assert.equal((await db.query('select count(*)::int as n from document_ingestion_chunks where embedding is not null')).rows[0].n,60);
+  assert.equal((await db.query('select count(*)::int as n from policy_chunks where source_id=$1',[id])).rows[0].n,0);
+  assert.equal(await enqueue(),job);
   for(let ordinal=60;ordinal<90;ordinal++){await claim();await commit('embedding',{ordinal,request_hash:'request'+ordinal,embedding});}
   await claim(); await commit('activate',{});
   assert.equal((await db.query('select status from document_ingestion_jobs where id=$1',[job])).rows[0].status,'complete');
   assert.equal((await db.query('select count(*)::int as n from policy_chunks where source_id=$1',[id])).rows[0].n,90);
+  assert.equal(await stop(),'complete'); // Activation won the race; do not relabel it paused.
   const summary=(await db.query('select ingestion_status_summary($1,true) as rows',[[id]])).rows[0].rows;
   assert.equal(summary[0].active,false);assert.equal(summary[0].processing_completed,90);assert.equal(summary[0].ingestion_status,'complete');
   assert.equal(summary[0].pages_completed,51);assert.equal(summary[0].pages_total,51);
@@ -79,6 +105,7 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   const tok=randomUUID();await db.query('select * from ingestion_claim($1)',[tok]);
   await db.query("update policy_documents set status='archived' where id=$1",[id2]);
   await assert.rejects(db.query("select ingestion_commit($1,$2,'validated',$3)",[second,tok,{pages:1}]),/unavailable/);
+  assert.equal((await db.query('select ingestion_stop($1,true) as status',[second])).rows[0].status,'cancelled');
   await db.query('delete from policy_documents where id=$1',[id2]);
   assert.equal((await db.query('select count(*)::int as n from document_ingestion_jobs where id=$1',[second])).rows[0].n,0);
   // Regression: policy uses text statuses, evidence uses an enum that has no
@@ -87,6 +114,8 @@ test("ingestion checkpoints survive retries, reject stale workers and activate a
   await db.query("insert into accreditation_cycles(id,label,starts_on,ends_on) values($1,'Evidence fixture','2026-08-01','2027-06-01')",[cycle]);
   await db.query("insert into accreditation_sources(id,cycle_id,kind,status,original_name,mime_type,size_bytes,sha256,storage_path) values($1,$2,'chapter_evidence','processing','fixture.pdf','application/pdf',10,'evidencehash','evidencepath')",[evidence,cycle]);
   const evidenceJob=(await db.query('select ingestion_enqueue($1,false,$2) as id',[evidence,config])).rows[0].id;
+  assert.equal((await db.query('select ingestion_stop($1,false) as status',[evidenceJob])).rows[0].status,'paused');
+  assert.equal((await db.query('select ingestion_enqueue($1,false,$2) as id',[evidence,config])).rows[0].id,evidenceJob);
   async function evidenceCommit(kind,data){
     const token=randomUUID();await db.query('select * from ingestion_claim($1)',[token]);
     await db.query('select ingestion_commit($1,$2,$3,$4)',[evidenceJob,token,kind,data]);

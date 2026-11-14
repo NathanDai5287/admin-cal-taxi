@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/brand/button";
 import { processingProgress, processingReady } from "@/lib/accreditation/processing-presentation";
 import { processingMonitor, useProcessingStatuses } from "./processing-status";
-import { manageIngestion, startDocumentProcessing } from "@/app/(admin)/accreditation/ingestion-actions";
+import { manageIngestion, startDocumentProcessing, stopDocumentProcessing } from "@/app/(admin)/accreditation/ingestion-actions";
 
 export function IngestionProgress({ sourceId, type }: { sourceId: string; type: "policy" | "accreditation" }) {
   const rows = useProcessingStatuses(type, [sourceId]);
@@ -16,6 +16,24 @@ export function IngestionProgress({ sourceId, type }: { sourceId: string; type: 
   const progress = processingProgress(row);
   const ready = processingReady(row);
   return <div className="mt-3 w-full min-w-40 max-w-xs space-y-2 text-xs text-muted">{!ready ? <p role="status" className="font-semibold text-ink">{job ? progress.label : message}</p> : null}
+    {job && row.active ? <form action={async form => {
+      if (pending) return;
+      setPending(true); setError("");
+      try {
+        const result = await stopDocumentProcessing(form);
+        if (result.error) setError(result.error);
+        else if (result.status) {
+          processingMonitor(type).seed([{ ...row, active: false, ingestion_status: result.status,
+            ingestion_message: result.status === "paused" ? "Stopped; progress saved. Resume processing to continue." : result.status }]);
+          processingMonitor(type).refresh([sourceId]);
+        }
+      } catch { setError("Could not stop processing. Refresh status and try again."); }
+      finally { setPending(false); }
+    }}><input type="hidden" name="job" value={job.id} /><input type="hidden" name="type" value={type} />
+      <Button type="submit" variant="secondary" compact disabled={pending}>{pending ? "Stopping…" : "Stop processing"}</Button>
+      <p className="mt-1">Saved progress is kept for resuming.</p>
+    </form> : null}
+    {error ? <p role="status">{error}</p> : null}
     {job && !ready ? <><div role="progressbar" aria-label={progress.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.value} aria-valuetext={progress.value === undefined ? progress.label : `${progress.value}% of this stage complete`} className="h-2 overflow-hidden rounded-full bg-rule"><div className={`h-full rounded-full bg-brand transition-[width] motion-reduce:transition-none ${progress.value === undefined && row.ingestion_status === "running" ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${progress.value ?? (row.ingestion_status === "running" ? 30 : 0)}%` }} /></div>
     {progress.total > 0 && row.ingestion_status !== "complete" ? <p>{progress.completed}/{progress.total} {job.stage === "extraction" ? "pages read" : "passages embedded"}</p> : null}
     {["paused", "waiting"].includes(row.ingestion_status ?? "") ? <p>{message}</p> : null}</> : null}
@@ -33,5 +51,5 @@ export function IngestionProgress({ sourceId, type }: { sourceId: string; type: 
     setPending(true); setError("");
     try { const result = await manageIngestion(form); setError(result.error ?? "Request saved."); if (!result.error) processingMonitor(type).refresh([sourceId]); } catch { setError("Could not update processing. Please try again."); }
     finally { setPending(false); }
-  }} className="space-y-2 border-t border-rule pt-3"><input type="hidden" name="job" value={job.id} /><input type="hidden" name="type" value={type} /><label className="block">Re-extract a native-text page with AI<input name="page" type="number" min={1} max={row.pages_total ?? 200} required className="field-input mt-1" disabled={pending} /></label><p>Use this when a page’s extracted text is incorrect. This starts a new processing pass.</p><Button type="submit" variant="secondary" compact className="rounded-full" disabled={pending}>Re-extract page</Button></form></>}{error ? <p role="status">{error}</p> : null}</div></details> : null}</div>;
+  }} className="space-y-2 border-t border-rule pt-3"><input type="hidden" name="job" value={job.id} /><input type="hidden" name="type" value={type} /><label className="block">Re-extract a native-text page with AI<input name="page" type="number" min={1} max={row.pages_total ?? 200} required className="field-input mt-1" disabled={pending} /></label><p>Use this when a page’s extracted text is incorrect. This starts a new processing pass.</p><Button type="submit" variant="secondary" compact className="rounded-full" disabled={pending}>Re-extract page</Button></form></>}</div></details> : null}</div>;
 }

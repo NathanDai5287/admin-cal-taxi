@@ -27,3 +27,13 @@ export async function manageIngestion(form: FormData) {
   const result = await db.rpc("ingestion_manage", { p_job: input.job, p_page: input.page || null });
   return result.error ? { error: result.error.message } : { ok: true };
 }
+
+export async function stopDocumentProcessing(form: FormData) {
+  const input = z.object({ job: z.string().uuid(), type: z.enum(["policy", "accreditation"]) }).safeParse(Object.fromEntries(form));
+  if (!input.success) return { error: "Invalid processing job." };
+  await requireAppAccess(input.data.type, "write");
+  const db = createAccreditationAdminClient();
+  const result = await db.rpc("ingestion_stop", { p_job: input.data.job, p_policy: input.data.type === "policy" });
+  if (result.error) return { error: result.error.message };
+  return { status: String(result.data) };
+}

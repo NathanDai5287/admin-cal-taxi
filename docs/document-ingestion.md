@@ -57,6 +57,17 @@ Do not schedule the local worker against production at the same time for testing
 
 ## Recovery and limits
 
+Stop processing pauses a queued, waiting, or running job. It retains the same
+job, extraction pages, and completed embeddings; Resume processing requeues that
+job with its saved stage and configuration. Stopped jobs are not claimed or polled.
+Stopping revokes the worker lease under the same source/job locks used by
+checkpoint commits. A late worker cannot write after stopping, even after resume.
+An AI request already in flight may still finish and be billed; its uncommitted
+step can repeat on resume. Committed steps are reused. Repeated stops are harmless,
+and completion or archive that wins the race remains terminal. Active retrieval
+data stays unchanged until a full pass activates atomically. Stopping never
+deletes the original or changes approved reports or published policies.
+
 Per-page and per-chunk commits are idempotent. A provider call whose result was
 lost before saving may repeat; already committed work is reused. Five-minute
 leases fence late workers, and foreign keys/archive cancellation prevent deleted
