@@ -79,6 +79,7 @@ It does not accept pasted API keys or long-lived personal tokens.
 4. Open `https://admin.cal.taxi/connections` to review or remove connected clients.
 
 The server provides read and write tools for finance, reimbursements, members, and Nu News.
+For one person's full payment history, installment schedule, and reimbursements, use [individual finance details](docs/member-finance-mcp.md).
 Each call verifies an active administrator and writes a secret-free audit record.
 Destructive tools require explicit confirmation, and create or payment tools accept retry-safe request IDs.
 

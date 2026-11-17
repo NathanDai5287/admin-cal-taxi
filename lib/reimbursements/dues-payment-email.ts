@@ -13,7 +13,7 @@ export type DuesReceipt = {
   payment: { amount: number; paidDate: string };
 };
 
-export function duesInstallments(receipt: DuesReceipt) {
+export function duesInstallments(receipt: Pick<DuesReceipt, "assessed" | "paid" | "dueDate" | "plan">) {
   const assessed = Math.round(receipt.assessed * 100);
   const paid = Math.round(receipt.paid * 100);
   const amount = receipt.plan ? Math.round(receipt.plan.amount * 100) : assessed;

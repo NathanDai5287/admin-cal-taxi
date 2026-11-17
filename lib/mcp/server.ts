@@ -26,6 +26,7 @@ import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
 import { listIssues, loadIssue } from "@/lib/nu-news/store";
 import { registerMailingTools } from "@/lib/mcp/mailing-list";
 import { registerHostingTools } from "@/lib/mcp/hosting";
+import { registerMemberFinanceTools } from "@/lib/mcp/member-finance";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AppKey, type RoleKey } from "@/lib/app-access";
 import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 
@@ -205,7 +206,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   );
 
   server.registerTool("list_members", {
-    description: "List active members and invited members, including stable IDs for write tools.",
+    description: "List active members and invited members, including stable IDs for write tools. Use get_member_finances for one member's complete finance history and payment schedules.",
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => read(supabase, "members"));
@@ -215,12 +216,6 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     inputSchema: z.object({}),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async () => read(supabase, "reimbursements"));
-
-  server.registerTool("list_member_charges", {
-    description: "List all open and paid member charges with stable IDs.",
-    inputSchema: z.object({}),
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  }, async () => read(supabase, "member_charges"));
 
   server.registerTool("list_finance_activity", {
     description: "List recorded income, forecasts, and manual expenses with stable IDs.",
@@ -522,6 +517,7 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
     if (audit.error) throw new Error("The mailing list call could not be recorded.");
   });
   registerHostingTools(server, supabase, caller);
+  registerMemberFinanceTools(server, supabase, caller);
   return server;
 }
 
