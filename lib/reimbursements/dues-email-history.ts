@@ -33,7 +33,7 @@ async function prepareEmail(chargeId: string, paymentId: string, body: EmailBody
   const prepared: PreparedEmail = { paymentId, body, createdAt: new Date().toISOString() };
   const path = `${chargeId}/${paymentId}.prepared.json`;
   const saved = await client.from(BUCKET).upload(path, JSON.stringify(prepared), { contentType: "application/json", upsert: false });
-  if (saved.error && saved.error.statusCode !== "409") throw saved.error;
+  if (saved.error && saved.error.statusCode !== "409" && !/already exists|duplicate/i.test(saved.error.message)) throw saved.error;
   const existing = await client.from(BUCKET).download(path);
   if (existing.error) throw existing.error;
   return JSON.parse(await existing.data.text()) as PreparedEmail;
