@@ -23,13 +23,39 @@ const result = (value: unknown) => ({ content: [{ type: "text" as const, text: J
 const total = (amounts: number[]) => amounts.reduce((sum, amount) => sum + Math.round(amount * 100), 0) / 100;
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
-async function authorize(supabase: Supabase, caller: Caller, tool: string, targetId: string) {
-  const permission = await supabase.rpc("has_mcp_app_access", { app_key: "finance", required_access: "read" });
-  if (permission.error || !permission.data) throw new Error("Finance read access is required.");
+async function authorize(supabase: Supabase, caller: Caller, tool: string, targetId: string, access: "read" | "write" = "read") {
+  const permission = await supabase.rpc("has_mcp_app_access", { app_key: "finance", required_access: access });
+  if (permission.error || !permission.data) throw new Error(`Finance ${access} access is required.`);
   const db = createAdminClient();
   const audit = await db.from("mcp_audit_log").insert({ user_id: caller.userId, client_id: caller.clientId, tool_name: tool, target_id: targetId });
   if (audit.error) throw new Error("The finance MCP call could not be recorded.");
   return db;
+}
+
+type MemberChargeUpdate = { chargeId: string; memberId: string; amountOwed: number; dueDate: string; notes: string };
+
+export async function updateMemberCharge(supabase: Supabase, caller: Caller, input: MemberChargeUpdate) {
+  const db = await authorize(supabase, caller, "update_member_charge", input.chargeId, "write");
+  const current = await db.from("chapter_receivables").select("member_id,amount_paid,amount_assessed,due_date,notes,updated_at,waived_at")
+    .eq("id", input.chargeId).maybeSingle();
+  if (current.error) throw new Error("The charge could not be loaded.");
+  if (!current.data) throw new Error("Charge not found.");
+  const row = current.data;
+  if (row.member_id !== input.memberId || row.due_date !== input.dueDate || row.notes !== input.notes) {
+    const { amountOwed, ...payload } = input;
+    const updated = await supabase.rpc("mcp_admin_write", { p_action: "update_charge", p_payload: { ...payload, amount: amountOwed } });
+    if (updated.error) throw new Error(updated.error.message);
+    return updated.data;
+  }
+  if (row.waived_at) throw new Error("A waived charge cannot change.");
+  if (Number(row.amount_paid) >= Number(row.amount_assessed)) throw new Error("A fully paid charge cannot change.");
+  const amountAssessed = total([Number(row.amount_paid), input.amountOwed]);
+  const updated = await db.from("chapter_receivables").update({ amount_assessed: amountAssessed })
+    .eq("id", input.chargeId).eq("member_id", input.memberId).eq("updated_at", row.updated_at).is("waived_at", null)
+    .select("id").maybeSingle();
+  if (updated.error) throw new Error("The charge could not be updated.");
+  if (!updated.data) throw new Error("This charge changed. Refresh and try again.");
+  return { id: updated.data.id };
 }
 
 function chargeDetails(row: Charge, payments: Payment[], notes: Note[], asOfDate: string) {

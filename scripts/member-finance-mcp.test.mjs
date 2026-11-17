@@ -20,7 +20,7 @@ const bundle = await build({
 });
 const temporary = path.join(process.cwd(), `node_modules/.member-finance-test-${randomUUID()}.mjs`);
 await writeFile(temporary, bundle.outputFiles[0].text);
-const { registerMemberFinanceTools } = await import(`file://${temporary}`);
+const { registerMemberFinanceTools, updateMemberCharge } = await import(`file://${temporary}`);
 await unlink(temporary);
 
 const memberId = "522e7fce-1801-4626-9345-6dcb7d189784";
@@ -74,7 +74,7 @@ function fixture() {
   };
 }
 
-function connect({ tables = fixture(), allowed = true, auditError = false, readError = null } = {}) {
+function connect({ tables = fixture(), allowed = true, writeAllowed = allowed, auditError = false, readError = null, beforeUpdate = () => {}, updateError = false } = {}) {
   const queries = [];
   const permissions = [];
   class Query {
@@ -84,7 +84,9 @@ function connect({ tables = fixture(), allowed = true, auditError = false, readE
     end = Infinity;
     constructor(table) { this.table = table; }
     select() { return this; }
+    update(values) { this.values = values; return this; }
     eq(column, value) { this.filters.push((row) => row[column] === value); return this; }
+    is(column, value) { return this.eq(column, value); }
     in(column, values) { this.filters.push((row) => values.includes(row[column])); return this; }
     order(column) { this.sorts.push(column); return this; }
     range(start, end) { this.start = start; this.end = end; return this; }
@@ -98,14 +100,22 @@ function connect({ tables = fixture(), allowed = true, auditError = false, readE
     run() {
       queries.push({ table: this.table, start: this.start, auditCount: tables.mcp_audit_log.length });
       if (readError === this.table) return { data: null, error: { message: "Read unavailable" } };
+      if (this.values) beforeUpdate(tables);
+      if (this.values && updateError) return { data: null, error: { message: "Update unavailable" } };
       const rows = tables[this.table].filter((row) => this.filters.every((matches) => matches(row)));
+      if (this.values) rows.forEach((row) => Object.assign(row, this.values));
       rows.sort((a, b) => this.sorts.reduce((order, column) => order || String(a[column]).localeCompare(String(b[column])), 0));
       const page = rows.slice(this.start, this.end + 1);
       return { data: structuredClone(this.single ? page[0] ?? null : page), error: null };
     }
   }
   globalThis.memberFinanceTestAdmin = { from: (table) => new Query(table) };
-  const session = { rpc: async (name, args) => { permissions.push({ name, args }); return { data: name === "mcp_admin_read" ? { charges: ["existing charge list"] } : allowed, error: null }; } };
+  const session = { rpc: async (name, args) => {
+    permissions.push({ name, args });
+    if (name === "mcp_admin_read") return { data: { charges: ["existing charge list"] }, error: null };
+    if (name === "mcp_admin_write") return { data: { id: args.p_payload.chargeId }, error: null };
+    return { data: args.required_access === "write" ? writeAllowed : allowed, error: null };
+  } };
   const caller = { userId: otherMemberId, clientId: "finance-reader" };
   const handler = createMcpHandler(() => {
     const server = new McpServer({ name: "finance-test", version: "1.0.0" });
@@ -120,7 +130,8 @@ function connect({ tables = fixture(), allowed = true, auditError = false, readE
     return JSON.parse((await response.text()).match(/^data: (.*)$/m)[1]).result;
   }
   const call = (name, args) => request("tools/call", { name, arguments: args });
-  return { request, call, tables, queries, permissions, caller };
+  const updateCharge = (input) => updateMemberCharge(session, caller, input);
+  return { request, call, tables, queries, permissions, caller, updateCharge };
 }
 
 test("detail tools advertise read-only contracts and require stable IDs", async () => {
@@ -280,5 +291,66 @@ test("failed history reads return errors instead of an incomplete financial stat
     const response = await connect({ readError }).call("get_member_finances", { memberId });
     assert.equal(response.isError, true);
     assert.match(response.content[0].text, /could not be loaded/);
+  }
+});
+
+const amountUpdate = { chargeId, memberId, amountOwed: 484, dueDate: "2026-11-15", notes: "Chapter dues" };
+
+test("amount-only updates retain removed ownership, payment history, dates, notes, and plan", async () => {
+  const { updateCharge, tables, queries, permissions, caller } = connect();
+  const before = structuredClone(tables);
+  assert.deepEqual(await updateCharge(amountUpdate), { id: chargeId });
+  const after = tables.chapter_receivables[0];
+  assert.equal(after.amount_assessed, 726);
+  assert.deepEqual(after, { ...before.chapter_receivables[0], amount_assessed: 726 });
+  assert.deepEqual(tables.chapter_dues_payment_events, before.chapter_dues_payment_events);
+  assert.deepEqual(tables.chapter_receivable_notes, before.chapter_receivable_notes);
+  assert.deepEqual(tables.profiles, before.profiles);
+  assert.deepEqual(permissions, [{ name: "has_mcp_app_access", args: { app_key: "finance", required_access: "write" } }]);
+  assert.deepEqual(tables.mcp_audit_log, [{ user_id: caller.userId, client_id: caller.clientId, tool_name: "update_member_charge", target_id: chargeId }]);
+  assert.ok(queries.every((query) => query.auditCount === 1));
+});
+
+test("amount updates require write access and a successful audit before any charge access", async () => {
+  for (const options of [{ allowed: false }, { allowed: true, writeAllowed: false }, { auditError: true }]) {
+    const { updateCharge, tables, queries } = connect(options);
+    await assert.rejects(() => updateCharge(amountUpdate), /Finance write access|could not be recorded/);
+    assert.equal(queries.length, 0);
+    assert.equal(tables.chapter_receivables[0].amount_assessed, 725);
+  }
+});
+
+test("amount updates refuse concurrent payments, ownership changes, and waivers", async () => {
+  for (const change of [
+    { amount_paid: 300, updated_at: "new-version" },
+    { member_id: otherMemberId },
+    { waived_at: "2026-11-01T00:00:00Z" },
+  ]) {
+    const { updateCharge, tables } = connect({ beforeUpdate: (tables) => Object.assign(tables.chapter_receivables[0], change) });
+    await assert.rejects(() => updateCharge(amountUpdate), /charge changed/);
+    assert.equal(tables.chapter_receivables[0].amount_assessed, 725);
+  }
+});
+
+test("amount-only updates reject waived or fully paid charges and report load/update failures", async () => {
+  for (const changes of [{ waived_at: "2026-11-01T00:00:00Z" }, { amount_paid: 725 }]) {
+    const tables = fixture();
+    Object.assign(tables.chapter_receivables[0], changes);
+    await assert.rejects(() => connect({ tables }).updateCharge(amountUpdate), /waived charge|fully paid charge/);
+    assert.equal(tables.chapter_receivables[0].amount_assessed, 725);
+  }
+  await assert.rejects(() => connect({ readError: "chapter_receivables" }).updateCharge(amountUpdate), /could not be loaded/);
+  await assert.rejects(() => connect({ updateError: true }).updateCharge(amountUpdate), /could not be updated/);
+  await assert.rejects(() => connect().updateCharge({ ...amountUpdate, chargeId: randomUUID() }), /Charge not found/);
+});
+
+test("reassignments and other field edits retain the existing SQL validation path", async () => {
+  for (const change of [{ memberId: otherMemberId }, { notes: "Changed" }, { dueDate: "2026-12-15" }]) {
+    const { updateCharge, permissions, tables } = connect();
+    const input = { ...amountUpdate, ...change };
+    assert.deepEqual(await updateCharge(input), { id: chargeId });
+    const { amountOwed, ...payload } = input;
+    assert.deepEqual(permissions.at(-1), { name: "mcp_admin_write", args: { p_action: "update_charge", p_payload: { ...payload, amount: amountOwed } } });
+    assert.equal(tables.chapter_receivables[0].amount_assessed, 725);
   }
 });
