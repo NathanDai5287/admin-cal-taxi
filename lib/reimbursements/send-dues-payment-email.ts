@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sendEmailWithRetry } from "../email-send";
+import { sendRecordedDuesEmail } from "./dues-email-history";
 import { duesPaymentEmail } from "./dues-payment-email";
 import type { PaymentPlanFrequency } from "./dues-payment-plan";
 import { loadAllPages } from "./load-all-pages";
@@ -42,7 +42,8 @@ export async function sendDuesPaymentConfirmation(chargeId: string, previousPaym
           intervalDays: row.payment_plan_interval_days, startDate: row.payment_plan_start_date!,
         } : null,
       });
-      await sendEmailWithRetry({ ...body, from: process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <reimbursements@cal.taxi>", to: member.data.email }, `dues-payment/${payment.id}`);
+      const warning = await sendRecordedDuesEmail(chargeId, payment.id, { ...body, from: process.env.RESEND_FROM_EMAIL?.trim() || "Theta Xi <reimbursements@cal.taxi>", to: member.data.email });
+      if (warning) return warning;
     }
     return "Confirmation email sent.";
   } catch {

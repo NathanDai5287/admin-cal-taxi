@@ -11,6 +11,7 @@ import {
 } from "@/app/(admin)/finance/accounts/receivable/actions";
 import { DuesPaymentForm } from "./payment-form";
 import { DuesPaymentHistory } from "./payment-history";
+import { DuesEmailHistory } from "./email-history";
 import { DuesPaymentPlanForm } from "./payment-plan-form";
 import { DuesBalanceNotes } from "./balance-notes";
 import { useDuesRows } from "@/app/(admin)/finance/accounts/receivable/dues-board";
@@ -103,7 +104,7 @@ export function DuesLedger({
   const [sort, setSort] = useState("due-date");
   const [page, setPage] = useState(1);
   const [openRowId, setOpenRowId] = useState<string | null>(null);
-  const [openDetail, setOpenDetail] = useState<"notes" | "payment" | "plan">("payment");
+  const [openDetail, setOpenDetail] = useState<"notes" | "payment" | "plan" | "emails">("payment");
   const [showChargeForm, setShowChargeForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
@@ -351,7 +352,7 @@ export function DuesLedger({
             </div>
             {openRowId === row.id && <div className="dues-charge-detail" id={`dues-detail-${row.id}`}>
               <div className="dues-detail-switch" role="tablist" aria-label={`Balance details for ${row.memberName}`} onKeyDown={(event) => {
-                const tabs = ["notes", "payment", "plan"] as const;
+                const tabs = ["notes", "payment", "plan", "emails"] as const;
                 const index = tabs.indexOf(openDetail);
                 const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
                 if (nextIndex === null) return;
@@ -359,7 +360,7 @@ export function DuesLedger({
                 setOpenDetail(tabs[nextIndex]);
                 event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
               }}>
-                {(["notes", "payment", "plan"] as const).map((tab) => <button key={tab} type="button" role="tab" id={`dues-tab-${tab}-${row.id}`} tabIndex={openDetail === tab ? 0 : -1} aria-selected={openDetail === tab} aria-controls={`dues-${tab}-${row.id}`} onClick={() => setOpenDetail(tab)}>{tab === "notes" ? `Notes (${row.balanceNotes.length})` : tab === "payment" ? "Payments" : "Plan & Scheduling"}</button>)}
+                {(["notes", "payment", "plan", "emails"] as const).map((tab) => <button key={tab} type="button" role="tab" id={`dues-tab-${tab}-${row.id}`} tabIndex={openDetail === tab ? 0 : -1} aria-selected={openDetail === tab} aria-controls={`dues-${tab}-${row.id}`} onClick={() => setOpenDetail(tab)}>{tab === "notes" ? `Notes (${row.balanceNotes.length})` : tab === "payment" ? "Payments" : tab === "plan" ? "Plan & Scheduling" : "Emails"}</button>)}
               </div>
               <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-notes-${row.id}`} id={`dues-notes-${row.id}`} hidden={openDetail !== "notes"}><DuesBalanceNotes row={row} canManage={canManage} disabled={bulkBusy} /></div>
               <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-payment-${row.id}`} id={`dues-payment-${row.id}`} hidden={openDetail !== "payment"} className="dues-payment-details">
@@ -381,6 +382,9 @@ export function DuesLedger({
               </div>
               <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-plan-${row.id}`} id={`dues-plan-${row.id}`} hidden={openDetail !== "plan"}>
                 <DuesPaymentPlanForm key={`${row.paymentPlan?.frequency ?? "none"}|${row.paymentPlan?.amount ?? ""}|${row.paymentPlan?.intervalDays ?? ""}|${row.paymentPlanStartDate ?? ""}`} row={row} disabled={bulkBusy || !canManage} onSaved={setPaymentMessage} />
+              </div>
+              <div role="tabpanel" tabIndex={0} aria-labelledby={`dues-tab-emails-${row.id}`} id={`dues-emails-${row.id}`} hidden={openDetail !== "emails"}>
+                {openDetail === "emails" && <DuesEmailHistory chargeId={row.id} />}
               </div>
             </div>}
             </article>

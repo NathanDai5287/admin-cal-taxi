@@ -1,5 +1,10 @@
 # Dues payment confirmations
 
+Each charge has an **Emails** tab with recorded confirmations, their recipient, subject, sent time, and saved message text.
+Confirmation records use a private Storage bucket and require Finance read access.
+New confirmations save their exact message before sending, then save the email service result separately.
+Earlier unrecorded emails do not appear in this list.
+
 Recording a dues payment sends the linked member an HTML email and a plain text version.
 Marking one or more charges fully paid sends the same confirmation for each new payment.
 These rules apply to the finance screen and connected assistant tools.
