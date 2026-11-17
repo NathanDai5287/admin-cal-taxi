@@ -26,7 +26,7 @@ import { PHOTO_LONG_EDGE_PX, issueSchema } from "@/lib/nu-news/issue";
 import { listIssues, loadIssue } from "@/lib/nu-news/store";
 import { registerMailingTools } from "@/lib/mcp/mailing-list";
 import { registerHostingTools } from "@/lib/mcp/hosting";
-import { registerMemberFinanceTools } from "@/lib/mcp/member-finance";
+import { registerMemberFinanceTools, updateMemberCharge } from "@/lib/mcp/member-finance";
 import { ACCESS_LEVELS, APP_OPTIONS, ROLE_OPTIONS, type AppKey, type RoleKey } from "@/lib/app-access";
 import { EXECUTIVE_ROLE_OPTIONS, MEMBERSHIP_OPTIONS, type ExecutiveRole, type Membership } from "@/lib/people";
 
@@ -238,13 +238,13 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   ));
 
   server.registerTool("update_member_charge", {
-    description: "Change a member charge, its member, outstanding amount, due date, or notes.",
+    description: "Change a member charge, its member, outstanding amount, due date, or notes. An amount-only change preserves the existing linked member, including removed members, and payment history.",
     inputSchema: z.object({
       chargeId: z.uuid(), memberId: z.uuid(), amountOwed: money, dueDate: date,
       notes: z.string().trim().max(500).default(""),
     }),
     annotations: writeAnnotations,
-  }, async ({ amountOwed, ...input }) => write(supabase, "update_charge", { ...input, amount: amountOwed }));
+  }, async (input) => jsonResult(await updateMemberCharge(supabase, caller, input)));
 
   server.registerTool("record_member_credit", {
     description: "Record a payment or credit against a member charge without exceeding its balance.",

@@ -8,6 +8,11 @@ Both tools require Finance read access through the connected MCP session.
 Each tool records the caller, client, tool name, and target ID before reading financial data.
 Neither tool changes balances, records payments, or sends email.
 
+`update_member_charge` requires Finance write access and a caller audit before it reads a charge.
+An amount-only edit keeps the linked member, including a removed member, and preserves dates, notes, plans, and payments.
+It rejects changed, waived, or fully paid charges.
+Member reassignments and other field edits retain their existing validation.
+
 ## Member statement
 
 `get_member_finances` returns the member's identity, removed date, all linked charges, and all linked reimbursements.
