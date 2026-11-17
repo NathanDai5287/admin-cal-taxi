@@ -10,8 +10,8 @@ type EmailBody = { from: string; to: string; subject: string; text: string; html
 type PreparedEmail = { paymentId: string; body: EmailBody; createdAt: string };
 type Delivery = { paymentId: string; sentAt: string; providerId: string } | { paymentId: string; failedAt: string; error: string };
 export type DuesEmailHistory = {
-  id: string; recipient: string; subject: string; text: string; createdAt: string;
-  sentAt: string | null; error: string | null;
+  id: string; recipient: string; subject: string; text: string; html: string; createdAt: string;
+  sentAt: string | null; providerId: string | null; error: string | null;
 };
 
 function storage() {
@@ -84,6 +84,6 @@ export async function loadDuesEmailHistory(chargeId: string): Promise<DuesEmailH
   return prepared.map((record) => {
     const accepted = records.find((delivery): delivery is Extract<Delivery, { sentAt: string }> => delivery.paymentId === record.paymentId && "sentAt" in delivery);
     const failed = records.find((delivery): delivery is Extract<Delivery, { failedAt: string }> => delivery.paymentId === record.paymentId && "failedAt" in delivery);
-    return { id: record.paymentId, recipient: record.body.to, subject: record.body.subject, text: record.body.text, createdAt: record.createdAt, sentAt: accepted?.sentAt ?? null, error: accepted ? null : failed?.error ?? null };
+    return { id: record.paymentId, recipient: record.body.to, subject: record.body.subject, text: record.body.text, html: record.body.html, createdAt: record.createdAt, sentAt: accepted?.sentAt ?? null, providerId: accepted?.providerId ?? null, error: accepted ? null : failed?.error ?? null };
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
 }

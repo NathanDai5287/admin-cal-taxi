@@ -17,7 +17,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:mcp": "node --test scripts/mcp.test.mjs scripts/nu-news-mcp.test.mjs scripts/member-finance-mcp.test.mjs",
+    "test:mcp": "node --test scripts/mcp.test.mjs scripts/nu-news-mcp.test.mjs scripts/member-finance-mcp.test.mjs scripts/email-activity-mcp.test.mjs",
     "test:policy": "node --test scripts/gemini-policy.test.mjs scripts/policy-database.test.mjs",
     "test:public-site": "node --test scripts/public-site-routing.test.mjs scripts/public-site-images.test.mjs",
     "test:venue": "node --test scripts/venue-inquiries.test.mjs",

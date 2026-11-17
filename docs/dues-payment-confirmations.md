@@ -4,6 +4,8 @@ Each charge has an **Emails** tab with recorded confirmations, their recipient, 
 Confirmation records use a private Storage bucket and require Finance read access.
 New confirmations save their exact message before sending, then save the email service result separately.
 Earlier unrecorded emails do not appear in this list.
+Connected administrators can pass a dues charge ID to `list_email_activity` to read its saved confirmations.
+The result includes the exact HTML, recipient, sent time, and provider ID, after Finance permission and audit checks.
 
 Recording a dues payment sends the linked member an HTML email and a plain text version.
 Marking one or more charges fully paid sends the same confirmation for each new payment.

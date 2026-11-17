@@ -8,7 +8,8 @@ import { incomeSources } from "@/lib/reimbursements/financial-report";
 import { categoryValues, formatCategory } from "@/lib/reimbursements/format";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
 import { resendTrackedEmail } from "@/lib/email-send";
-import { loadEmailActivity, loadUnsentEmail } from "@/lib/email-tracking";
+import { loadUnsentEmail } from "@/lib/email-tracking";
+import { loadMcpEmailActivity } from "@/lib/mcp/email-activity";
 import { duesPaymentIds, sendDuesPaymentConfirmation } from "@/lib/reimbursements/send-dues-payment-email";
 import { sendDecisionEmail, sendPaidEmail } from "@/lib/reimbursements/send-reimbursement-email";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
@@ -341,14 +342,10 @@ export function createFinanceServer(supabase: Supabase, caller: McpCaller) {
   });
 
   server.registerTool("list_email_activity", {
-    description: "List sent and failed emails with their opens and link visits. Pass a reimbursement ID to see only its emails.",
+    description: "List sent and failed emails with their opens and link visits. Pass a reimbursement or hosting ID for its emails. Pass a dues charge ID for its saved confirmations, including exact HTML, recipient, provider ID and sent time. Dues confirmations require Finance read access.",
     inputSchema: z.object({ relatedId: z.string().max(200).optional() }),
     annotations: readAnnotations,
-  }, async ({ relatedId }) => {
-    const permission = await supabase.rpc("is_mcp_admin");
-    if (permission.error || !permission.data) throw new Error("Administrator access is required.");
-    return jsonResult(await loadEmailActivity(relatedId));
-  });
+  }, async ({ relatedId }) => jsonResult(await loadMcpEmailActivity(supabase, caller, relatedId)));
 
   server.registerTool("resend_email", {
     description: "Send a failed invite or reimbursement email again. Hosting emails are sent again from the order.",

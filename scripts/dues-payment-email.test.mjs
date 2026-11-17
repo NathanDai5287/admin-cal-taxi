@@ -99,6 +99,8 @@ test("a new positive payment sends only to the linked member using its event key
   const [message] = await loadDuesEmailHistory("charge-1");
   assert.equal(message.subject, state.sends[0].body.subject);
   assert.equal(message.recipient, "alex@example.test");
+  assert.equal(message.html, state.sends[0].body.html);
+  assert.equal(message.providerId, "provider-dues-payment/payment-1");
   assert.ok(message.sentAt);
 });
 
