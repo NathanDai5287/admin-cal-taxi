@@ -24,7 +24,7 @@ export function DuesPaymentForm({ row, today, onRecorded }: { row: DuesRow; toda
   const [state, action, pending] = useActionState(async (previous: Parameters<typeof addDuesPayment>[0], data: FormData) => {
     const result = await addDuesPayment(previous, data);
     if (result.status === "success") {
-      onRecorded(`Payment of ${formatMoney(Number(data.get("paymentAmount")))} recorded for ${row.memberName}.`);
+      onRecorded(`Payment of ${formatMoney(Number(data.get("paymentAmount")))} recorded for ${row.memberName}. ${result.message.replace(/^Payment recorded\.\s*/, "")}`);
       setAmount(null);
       setRequestId(crypto.randomUUID());
     }
