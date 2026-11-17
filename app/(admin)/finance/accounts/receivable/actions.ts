@@ -8,7 +8,7 @@ import {
   reportDuesInsertFailure,
   reportDuesProfilePreflightFailure,
 } from "@/lib/reimbursements/dues-charge-errors";
-import { latestDuesPaymentId, sendDuesPaymentConfirmation } from "@/lib/reimbursements/send-dues-payment-email";
+import { duesPaymentIds, sendDuesPaymentConfirmation } from "@/lib/reimbursements/send-dues-payment-email";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
 import { createClient } from "@/lib/reimbursements/supabase/server";
@@ -217,7 +217,7 @@ export async function setDuesPaid(
   if (!parsed.success) return actionError("The payment state could not be changed.");
 
   const paid = parsed.data.paid === "true";
-  const previousPaymentId = paid ? await latestDuesPaymentId(parsed.data.id) : null;
+  const previousPaymentIds = paid ? await duesPaymentIds(parsed.data.id) : [];
   const supabase = await createClient();
   const { data: updated, error } = await supabase.rpc("bulk_change_receivable_state", {
     p_rows: [{ id: parsed.data.id, updated_at: parsed.data.updatedAt }],
@@ -227,7 +227,7 @@ export async function setDuesPaid(
 
   if (error || !updated) return actionError("The payment state could not be changed. Refresh and try again.");
   revalidateDues();
-  const confirmation = paid ? await sendDuesPaymentConfirmation(parsed.data.id, previousPaymentId) : "";
+  const confirmation = paid ? await sendDuesPaymentConfirmation(parsed.data.id, previousPaymentIds) : "";
   return actionSuccess([paid ? "Charge marked fully paid." : "Charge reopened.", confirmation].filter(Boolean).join(" "));
 }
 
@@ -357,7 +357,7 @@ export async function addDuesPayment(
 
   if (!parsed.success) return actionError("Check the payment amount and date.");
 
-  const previousPaymentId = await latestDuesPaymentId(parsed.data.id);
+  const previousPaymentIds = await duesPaymentIds(parsed.data.id);
   const supabase = await createClient();
   const { data: recorded, error } = await supabase.rpc("record_dues_payment", {
     p_receivable_id: parsed.data.id,
@@ -369,7 +369,7 @@ export async function addDuesPayment(
   if (error) return actionError("The payment could not be recorded.");
   if (!recorded) return actionError("This balance changed. Refresh and try again.");
   revalidateDues();
-  const confirmation = await sendDuesPaymentConfirmation(parsed.data.id, previousPaymentId);
+  const confirmation = await sendDuesPaymentConfirmation(parsed.data.id, previousPaymentIds);
   return actionSuccess(["Payment recorded.", confirmation].filter(Boolean).join(" "));
 }
 
@@ -417,7 +417,7 @@ export async function bulkSetDuesPaid(
   if (!parsed.success) return actionError("Select at least one charge.");
 
   const previousPayments = await Promise.all(parsed.data.map(async (row) => ({
-    id: row.id, paymentId: await latestDuesPaymentId(row.id),
+    id: row.id, paymentIds: await duesPaymentIds(row.id),
   })));
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("bulk_change_receivable_state", {
@@ -428,7 +428,7 @@ export async function bulkSetDuesPaid(
   if (error || !data) return actionError("Some charges changed. Refresh and check the selected charges.");
 
   revalidateDues();
-  const confirmations = await Promise.all(previousPayments.map((row) => sendDuesPaymentConfirmation(row.id, row.paymentId)));
+  const confirmations = await Promise.all(previousPayments.map((row) => sendDuesPaymentConfirmation(row.id, row.paymentIds)));
   const warnings = confirmations.filter((message) => message && message !== "Confirmation email sent.");
   return actionSuccess(`Selected charges marked fully paid. ${warnings.length ? `${warnings.length} confirmation emails could not be sent.` : "Confirmation emails sent for new payments."}`);
 }

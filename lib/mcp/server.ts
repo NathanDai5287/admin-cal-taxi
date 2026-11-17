@@ -9,7 +9,7 @@ import { categoryValues, formatCategory } from "@/lib/reimbursements/format";
 import { sendDiscordDuesAnnouncement } from "@/lib/reimbursements/discord";
 import { resendTrackedEmail } from "@/lib/email-send";
 import { loadEmailActivity, loadUnsentEmail } from "@/lib/email-tracking";
-import { latestDuesPaymentId, sendDuesPaymentConfirmation } from "@/lib/reimbursements/send-dues-payment-email";
+import { duesPaymentIds, sendDuesPaymentConfirmation } from "@/lib/reimbursements/send-dues-payment-email";
 import { sendDecisionEmail, sendPaidEmail } from "@/lib/reimbursements/send-reimbursement-email";
 import { sendInviteEmails } from "@/lib/reimbursements/send-invite-email";
 import { createAdminClient } from "@/lib/reimbursements/supabase/admin";
@@ -98,11 +98,11 @@ async function write(
   const chargeIds = recordsPayment
     ? (Array.isArray(payload.chargeIds) ? payload.chargeIds as string[] : [payload.chargeId as string])
     : [];
-  const previousPayments = await Promise.all(chargeIds.map(async (id) => ({ id, paymentId: await latestDuesPaymentId(id) })));
+  const previousPayments = await Promise.all(chargeIds.map(async (id) => ({ id, paymentIds: await duesPaymentIds(id) })));
   const result = await mutate(supabase, action, payload, options);
   if (!recordsPayment) return jsonResult(result);
-  const emailConfirmations = await Promise.all(previousPayments.map(async ({ id, paymentId }) => ({
-    chargeId: id, message: await sendDuesPaymentConfirmation(id, paymentId),
+  const emailConfirmations = await Promise.all(previousPayments.map(async ({ id, paymentIds }) => ({
+    chargeId: id, message: await sendDuesPaymentConfirmation(id, paymentIds),
   })));
   return jsonResult({ result, emailConfirmations });
 }

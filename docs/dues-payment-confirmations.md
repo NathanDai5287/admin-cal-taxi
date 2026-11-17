@@ -14,6 +14,8 @@ Internal charge notes and balance notes are never included.
 The payment is saved before the email is sent.
 A missing member, missing address, or delivery failure leaves the payment saved and shows a confirmation warning.
 Repeated requests without a new payment event do not send another email.
+Each receipt includes the payment history and total through that payment event.
+Concurrent saves confirm every newly observed payment with the same event delivery key.
 Resend also receives the payment event ID as its delivery key.
 Email delivery uses the existing Resend configuration and temporary failure retries.
 No background delivery queue or automatic later retry is included.
