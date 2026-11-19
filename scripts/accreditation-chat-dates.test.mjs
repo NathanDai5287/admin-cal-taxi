@@ -110,7 +110,7 @@ const sharedChunk = {
   title: "Event requests", subtitle: "Published fixture", locator: { page: 1 },
 };
 
-function setupChat({ resolution = twoEvents, priorTurns = [], question = originalQuestion, reply, citations, chunksForDate = () => [sharedChunk] } = {}) {
+function setupChat({ resolution = twoEvents, priorTurns = [], question = originalQuestion, reply, citations, intent, chunksForDate = () => [sharedChunk] } = {}) {
   const searches = [], saves = [], requests = [];
   state.db = {
     from: () => ({
@@ -131,7 +131,7 @@ function setupChat({ resolution = twoEvents, priorTurns = [], question = origina
   state.providers = {
     language: { generateStructured: async (request) => {
       requests.push(request);
-      if (request.name === "accreditation_chat_intent") return { needs_policy: true, needs_source_catalog: false, search_query: "fire permit timing requirements" };
+      if (request.name === "accreditation_chat_intent") return intent ?? { needs_policy: true, needs_source_catalog: false, search_query: "fire permit timing requirements" };
       if (request.name === "accreditation_chat_dates") return resolution;
       assert.equal(request.name, "accreditation_chat_answer");
       return { answer: reply ?? "Assuming October 2026, submit the request before both events.", citations: citations ?? [{ ref: "POL:shared-policy:0", quote: sharedChunk.content }] };
@@ -211,6 +211,69 @@ test("natural date assumptions retain the existing policy citation check", async
   assert.equal(result.error, undefined);
   assert.match(result.answer, /could not verify/);
   assert.deepEqual(result.sources, []);
+});
+
+const rushQuestion = "what should include in a rush workshop";
+const genericIntent = { needs_policy: false, needs_source_catalog: false, search_query: "" };
+const noEventDate = { event_dates: [], assumptions: [], clarification: null };
+
+test("a rush workshop question searches and cites accreditation evidence even when classified as generic", async () => {
+  const chunk = {
+    ...sharedChunk,
+    source_type: "accreditation",
+    source_id: "recruitment-guide",
+    title: "Recruitment guide",
+    content: "The recruitment chair should review member responsibilities at the workshop.",
+  };
+  const { form, searches, saves, requests } = setupChat({
+    question: rushQuestion,
+    intent: genericIntent,
+    resolution: noEventDate,
+    chunksForDate: () => [chunk],
+    reply: "Review member responsibilities with the chapter.",
+    citations: [{ ref: "ACC:recruitment-guide:0", quote: chunk.content }],
+  });
+  const result = await runAccreditationChat(form, { adminAuthorized: true });
+  assert.equal(result.error, undefined);
+  assert.equal(searches.length, 1);
+  assert.match(searches[0].p_query, /Recruitment workshop/i);
+  assert.equal(searches[0].p_date, clock.local_date);
+  assert.equal(JSON.parse(requests.at(-1).input).sources[0].kind, "accreditation");
+  assert.equal(saves[0].p_policy_used, true);
+  assert.equal(result.sources[0].sourceId, chunk.source_id);
+  assert.equal(result.sources[0].excerpts[0].quote, chunk.content);
+});
+
+test("an empty library search reports the lack of passages without generating a generic answer", async () => {
+  const { form, searches, requests, saves } = setupChat({
+    question: rushQuestion,
+    intent: genericIntent,
+    resolution: noEventDate,
+    chunksForDate: () => [],
+  });
+  const streamed = [];
+  const result = await runAccreditationChat(form, { adminAuthorized: true, onTextDelta: (text) => streamed.push(text) });
+  assert.equal(result.error, undefined);
+  assert.equal(searches.length, 1);
+  assert.ok(requests.every((request) => request.name !== "accreditation_chat_answer"));
+  assert.match(result.answer, /no source passages/);
+  assert.equal(streamed.join(""), result.answer);
+  assert.equal(saves[0].p_policy_used, true);
+  assert.deepEqual(result.sources, []);
+});
+
+test("general writing help can still skip the knowledge library", async () => {
+  const { form, searches, requests } = setupChat({
+    question: "Can you make this sentence shorter?",
+    intent: genericIntent,
+    reply: "Sure, paste the sentence here.",
+    citations: [],
+  });
+  const result = await runAccreditationChat(form, { adminAuthorized: true });
+  assert.equal(result.error, undefined);
+  assert.equal(searches.length, 0);
+  assert.deepEqual(requests.map((request) => request.name), ["accreditation_chat_intent", "accreditation_chat_answer"]);
+  assert.equal(result.policyUsed, false);
 });
 
 for (const streaming of [false, true]) {
