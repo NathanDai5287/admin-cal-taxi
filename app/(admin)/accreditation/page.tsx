@@ -3,9 +3,11 @@ import { DeleteSavedForm } from "./delete-saved-form";
 import Link from "next/link";
 
 import { Button } from "@/components/brand/button";
+import { SUBMISSION_CHECKLIST_YEAR } from "@/lib/accreditation/submission-checklist";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import type { TemplateFamily } from "@/lib/accreditation/types";
 import { createCycle, startTemplateSubmission } from "./actions";
+import { SubmissionChecklist } from "./submission-checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +26,15 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
   const session = await requireAppAccess("accreditation");
   const params = await searchParams;
   const supabase = createAccreditationAdminClient();
-  const [cyclesResult, familiesResult, templatesResult, sourcesResult, runsResult] = await Promise.all([
+  const [cyclesResult, familiesResult, templatesResult, sourcesResult, runsResult, checklistResult] = await Promise.all([
     supabase.from("academic_years").select("*, academic_terms(*)").order("starts_on", { ascending: false }),
     supabase.from("accreditation_template_families").select("*").is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("accreditation_templates").select("template_family_id, format, is_active, analysis_status"),
     supabase.from("accreditation_sources").select("cycle_id, status"),
     supabase.from("accreditation_runs").select("id, template_family_id, cycle_id, term_id, title, status, created_at").order("created_at", { ascending: false }),
+    supabase.from("accreditation_submission_checkmarks").select("report_key").eq("academic_year", SUBMISSION_CHECKLIST_YEAR).eq("submitted", true),
   ]);
+  const submittedKeys = (checklistResult.data ?? []).map((row: { report_key: string }) => row.report_key);
   const cycles = cyclesResult.data ?? [];
   const families = (familiesResult.data ?? []) as TemplateFamily[];
   const selectedCycle = cycles.find((cycle: Record<string, unknown>) => cycle.id === params.cycle) ?? cycles[0] ?? null;
@@ -46,6 +50,11 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
     <div className="space-y-8">
       <section><p className="page-eyebrow">Accreditation</p><h1 className="page-title">Submission workspace</h1><p className="page-lede">Upload previous examples, ask for a new version, and archive the reviewed PDF.</p><Link href="/ask-policy" className="mt-3 inline-block text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">Open Ask Policy →</Link></section>
       {params.result && RESULT_MESSAGES[params.result] ? <p className="form-message" role="status">{RESULT_MESSAGES[params.result]}</p> : null}
+      <SubmissionChecklist
+        submittedKeys={submittedKeys}
+        editable={hasAppAccess(session, "accreditation", "write")}
+        unavailable={Boolean(checklistResult.error)}
+      />
       <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="card"><div className="card-header"><span className="card-title">Academic year</span></div><div className="card-body border-t border-rule">
           {cycles.length ? <div className="flex flex-wrap gap-2">{cycles.map((cycle: Record<string, unknown>) => <Link key={String(cycle.id)} href={`/accreditation?cycle=${cycle.id}`} className={`px-4 py-2 text-sm font-bold ${selectedCycle?.id === cycle.id ? "bg-brand text-white" : "bg-canvas text-muted hover:text-ink"}`}>{String(cycle.label)}</Link>)}</div> : <p className="text-sm text-muted">Create the first academic year to begin.</p>}
