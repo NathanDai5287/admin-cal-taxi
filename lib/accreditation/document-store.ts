@@ -147,7 +147,7 @@ export async function loadDocumentWorkspace(runIdValue: string) {
   const runId = uuid.parse(runIdValue);
   const run = checked(await db.from("accreditation_runs").select("*").eq("id", runId).eq("workflow_mode", "example_document").single()) as { id: string; title: string; status: string; template_family_id: string; cycle_id: string; term_id: string | null };
   const results = await Promise.all([
-    db.from("accreditation_template_families").select("id,name,guidance").eq("id", run.template_family_id).single(),
+    db.from("accreditation_template_families").select("id,name,guidance,checklist_report_key").eq("id", run.template_family_id).single(),
     db.from("accreditation_run_working_state").select("document,document_version,example_ids,readiness").eq("run_id", runId).single(),
     db.from("accreditation_run_messages").select("id,role,content,created_at").eq("run_id", runId).order("created_at", { ascending: true }),
     db.from("accreditation_examples").select("id,original_name").eq("family_id", run.template_family_id).eq("status", "ready"),

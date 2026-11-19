@@ -8,17 +8,17 @@ import { DeleteSavedForm } from "../delete-saved-form";
 import type { DocumentLibraryData, DocumentExample, DocumentFamily } from "@/lib/accreditation/document-ui-types";
 import { beginExampleDocument, completeDocumentUpload, createDocumentFromExisting, processDocumentExample, refreshDocumentLibrary, reserveDocumentBatch, updateDocumentFamily } from "../document-actions";
 
-export function DocumentLibrary({ initial, canWrite }: { initial: DocumentLibraryData; canWrite: boolean }) {
+export function DocumentLibrary({ initial, initialFamilyId, initialYearId, canWrite }: { initial: DocumentLibraryData; initialFamilyId?: string; initialYearId?: string; canWrite: boolean }) {
   const router = useRouter();
   const [data, setData] = useState(initial);
-  const [selected, setSelected] = useState(initial.families[0]?.id ?? "");
+  const [selected, setSelected] = useState(initialFamilyId ?? initial.families[0]?.id ?? "");
   const [busy, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const [progress, setProgress] = useState("");
   const [activeBatch, setActiveBatch] = useState(initial.examples.at(-1)?.batch_id ?? "");
   const paused = useRef(false);
   const today = new Date().toISOString().slice(0, 10);
-  const [yearId, setYearId] = useState(initial.years.find(year => year.starts_on <= today && year.ends_on >= today)?.id ?? initial.years[0]?.id ?? "");
+  const [yearId, setYearId] = useState(initialYearId ?? initial.years.find(year => year.starts_on <= today && year.ends_on >= today)?.id ?? initial.years[0]?.id ?? "");
   const [termId, setTermId] = useState("");
   const [chosen, setChosen] = useState<string[] | null>(null);
   const family = data.families.find(item => item.id === selected);

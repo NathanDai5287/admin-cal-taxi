@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import Link from "next/link";
+import { checklistReportPath, getChecklistReport } from "@/lib/accreditation/submission-checklist";
 import { Button } from "@/components/brand/button";
 import { accreditationDocumentSchema } from "@/lib/accreditation/document";
 import type { DocumentRequestInput, DocumentWorkspaceData } from "@/lib/accreditation/document-ui-types";
@@ -10,6 +11,7 @@ import { approveReport } from "../actions";
 import { DocumentEditor } from "./document-editor";
 
 export function DocumentWorkspace({ initial, canWrite }: { initial: DocumentWorkspaceData; canWrite: boolean }) {
+  const checklistReport = getChecklistReport(initial.family.checklist_report_key);
   const [data, setData] = useState(initial);
   const [document, setDocument] = useState(initial.state.document);
   const [exampleIds, setExampleIds] = useState(initial.state.example_ids);
@@ -58,7 +60,7 @@ export function DocumentWorkspace({ initial, canWrite }: { initial: DocumentWork
     return () => clearTimeout(timer);
   }, [dirty, busy, editable, document, exampleIds, error]);
   return <div className="space-y-5">
-    <header><Link href="/accreditation/documents" className="text-sm text-brand underline">Document types</Link><h1 className="page-title mt-3">{data.family.name}</h1><p className="page-lede">{data.period} · {approved ? "Approved and archived" : "Describe the changes, review the draft, and generate a PDF."}</p></header>
+    <header><Link href={checklistReport ? checklistReportPath(checklistReport.key) : "/accreditation/documents"} className="text-sm text-brand underline">{checklistReport ? "Back to report" : "Document types"}</Link><h1 className="page-title mt-3">{data.family.name}</h1><p className="page-lede">{data.period} · {approved ? "Approved and archived" : "Describe the changes, review the draft, and generate a PDF."}</p></header>
     {error && <p className="form-message" role="alert">{error}</p>}
     {notice && <p className="form-message success" role="status">{notice}</p>}
     <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">

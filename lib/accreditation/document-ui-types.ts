@@ -19,7 +19,7 @@ export type DocumentRequestInput = {
 };
 export type DocumentWorkspaceData = {
   run: { id: string; title: string; status: string; template_family_id: string; cycle_id: string; term_id: string | null };
-  family: DocumentFamily;
+  family: DocumentFamily & { checklist_report_key?: string | null };
   state: { document: AccreditationDocument | null; document_version: number; example_ids: string[]; readiness: { questions?: string[]; reviewNotes?: string[] } };
   messages: Array<{ id: string; role: string; content: string }>;
   examples: Array<{ id: string; original_name: string }>;

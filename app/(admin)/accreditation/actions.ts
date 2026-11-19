@@ -13,6 +13,7 @@ import { validateSourceFile } from "@/lib/accreditation/extract";
 import { isRetryableAiError } from "@/lib/accreditation/gemini";
 import { processDocument } from "@/lib/accreditation/processing";
 import { accreditationEnabled } from "@/lib/accreditation/feature";
+import { checklistReportPath, findChecklistAcademicYear, getChecklistReport } from "@/lib/accreditation/submission-checklist";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import { findVisibleTemplateTags, inspectTemplate, renderTemplate, validateTemplateFile } from "@/lib/accreditation/templates";
 import { analyzeTemplateWithAi, mappingFromAnalysis } from "@/lib/accreditation/template-ai";
@@ -330,29 +331,34 @@ export async function deleteSource(formData: FormData) {
 
 export async function uploadTemplate(formData: FormData) {
   const { userId } = await requireAccreditationAdmin();
-  const templateName = z.string().trim().min(1).max(160).safeParse(formData.get("templateName"));
+  const checklistKey = formData.get("checklistReportKey");
+  const report = getChecklistReport(checklistKey);
+  if (checklistKey !== null && !report) redirect("/accreditation");
+  const returnPath = report ? checklistReportPath(report.key) : "/accreditation/templates";
+  const fail = (result: string): never => redirect(`${returnPath}?result=${result}`);
+  const templateName = z.string().trim().min(1).max(160).safeParse(report?.title ?? formData.get("templateName"));
   const guidance = z.string().trim().max(5_000).catch("").parse(formData.get("guidance"));
   const file = formData.get("file");
   const example = formData.get("example");
   const exampleFile = example instanceof File && example.size > 0 ? example : null;
-  if (!templateName.success || !(file instanceof File)) redirect("/accreditation/templates?result=invalid");
+  if (!templateName.success || !(file instanceof File)) return fail("invalid");
   let format;
   try {
     format = validateTemplateFile(file);
   } catch {
-    redirect("/accreditation/templates?result=invalid_file");
+    return fail("invalid_file");
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (exampleFile) {
     let exampleFormat;
-    try { exampleFormat = validateTemplateFile(exampleFile); } catch { redirect("/accreditation/templates?result=invalid_example"); }
-    if (exampleFormat !== format) redirect("/accreditation/templates?result=example_format_mismatch");
+    try { exampleFormat = validateTemplateFile(exampleFile); } catch { return fail("invalid_example"); }
+    if (exampleFormat !== format) return fail("example_format_mismatch");
   }
   let inspection;
   try {
     inspection = await inspectTemplate(bytes, format);
   } catch {
-    redirect("/accreditation/templates?result=invalid_file");
+    return fail("invalid_file");
   }
   const providers = getAccreditationProviders();
   if (format === "pdf" && providers.ocr?.extractLayout) {
@@ -390,23 +396,32 @@ export async function uploadTemplate(formData: FormData) {
     });
   } catch (error) {
     console.error("Accreditation template analysis failed", error);
-    redirect(`/accreditation/templates?result=${templateAnalysisResult(error)}`);
+    return fail(templateAnalysisResult(error));
   }
   const supabase = createAccreditationAdminClient();
-  let family = await supabase.from("accreditation_template_families").select("id").ilike("name", templateName.data).is("archived_at", null).maybeSingle();
+  const families = supabase.from("accreditation_template_families").select("id,workflow_mode").is("archived_at", null);
+  let family = await (report ? families.eq("checklist_report_key", report.key) : families.ilike("name", templateName.data)).maybeSingle();
+  if (report && family.data && family.data.workflow_mode !== "legacy") return fail("example_document_linked");
   if (!family.data && !family.error) {
-    family = await supabase.from("accreditation_template_families").insert({ name: templateName.data, description: analysis.description, guidance, created_by: userId }).select("id").single();
+    family = await supabase.from("accreditation_template_families").insert({
+      name: templateName.data,
+      description: analysis.description,
+      guidance,
+      created_by: userId,
+      ...(report && { checklist_report_key: report.key }),
+    }).select("id").single();
+    if (report && family.error?.code === "23505") return fail("saved_form_conflict");
   }
   if (family.error || !family.data) {
     console.error("Accreditation template family insert failed", family.error);
-    redirect(`/accreditation/templates?result=${templateRecordResult(family.error)}`);
+    return fail(templateRecordResult(family.error));
   }
   const familyId = String(family.data.id);
   if (guidance) await supabase.from("accreditation_template_families").update({ guidance }).eq("id", familyId);
   const versions = await supabase.from("accreditation_templates").select("version").eq("template_family_id", familyId).order("version", { ascending: false }).limit(1);
   if (versions.error) {
     console.error("Accreditation template version lookup failed", versions.error);
-    redirect(`/accreditation/templates?result=${templateRecordResult(versions.error)}`);
+    return fail(templateRecordResult(versions.error));
   }
   const version = Number(versions.data?.[0]?.version ?? 0) + 1;
   const templateId = crypto.randomUUID();
@@ -415,7 +430,7 @@ export async function uploadTemplate(formData: FormData) {
   const uploaded = await supabase.storage.from("accreditation-templates").upload(path, bytes, { contentType: mimeType });
   if (uploaded.error) {
     console.error("Accreditation template original upload failed", uploaded.error);
-    redirect(`/accreditation/templates?result=${templateStorageResult(uploaded.error)}`);
+    return fail(templateStorageResult(uploaded.error));
   }
   const mapping = mappingFromAnalysis(analysis);
   let examplePath: string | null = null;
@@ -425,7 +440,7 @@ export async function uploadTemplate(formData: FormData) {
     if (exampleUpload.error) {
       await supabase.storage.from("accreditation-templates").remove([path]);
       console.error("Accreditation template example upload failed", exampleUpload.error);
-      redirect(`/accreditation/templates?result=${templateStorageResult(exampleUpload.error, "template_example_storage_failed")}`);
+      return fail(templateStorageResult(exampleUpload.error, "template_example_storage_failed"));
     }
   }
   const sampleDraft: ReportDraft = { fields: Object.fromEntries(analysis.fields.map((field) => [field.key, {
@@ -443,7 +458,7 @@ export async function uploadTemplate(formData: FormData) {
     if (examplePath) await supabase.storage.from("accreditation-templates").remove([examplePath]);
     await supabase.storage.from("accreditation-templates").remove([path]);
     console.error("Accreditation template preview failed", error);
-    redirect(`/accreditation/templates?result=template_analysis_failed`);
+    return fail("template_analysis_failed");
   }
   const inserted = await supabase.from("accreditation_templates").insert({
     id: templateId,
@@ -467,13 +482,16 @@ export async function uploadTemplate(formData: FormData) {
   if (inserted.error) {
     await supabase.storage.from("accreditation-templates").remove([path, ...(examplePath ? [examplePath] : []), ...(previewPath ? [previewPath] : [])]);
     console.error("Accreditation template record insert failed", inserted.error);
-    redirect(`/accreditation/templates?result=${templateRecordResult(inserted.error)}`);
+    return fail(templateRecordResult(inserted.error));
   }
-  await supabase.from("accreditation_templates").update({ is_active: false }).eq("template_family_id", familyId).neq("id", templateId);
-  await supabase.from("accreditation_templates").update({ is_active: true, analysis_status: "active" }).eq("id", templateId);
+  const activated = await supabase.rpc("activate_accreditation_uploaded_template", { p_family_id: familyId, p_template_id: templateId });
+  if (activated.error || !activated.data) {
+    console.error("Accreditation template activation failed", activated.error);
+    return fail("template_activation_failed");
+  }
   revalidatePath("/accreditation/templates");
   revalidatePath("/accreditation", "layout");
-  redirect(`/accreditation/templates?template=${templateId}&result=template_ready`);
+  redirect(report ? `${returnPath}?result=template_ready` : `${returnPath}?template=${templateId}&result=template_ready`);
 }
 
 export async function confirmTemplate(formData: FormData) {
@@ -511,20 +529,30 @@ export async function confirmTemplate(formData: FormData) {
 
 export async function startTemplateSubmission(formData: FormData) {
   const { userId } = await requireAccreditationAdmin();
+  const checklistKey = formData.get("checklistReportKey");
+  const report = getChecklistReport(checklistKey);
+  if (checklistKey !== null && !report) redirect("/accreditation");
+  const fail = (): never => redirect(`${report ? checklistReportPath(report.key) : "/accreditation/templates"}?result=start_error`);
   const familyId = uuid.safeParse(formData.get("templateFamilyId"));
   const requestedTerm = String(formData.get("termId") ?? "");
-  if (!familyId.success) redirect("/accreditation/templates?result=start_error");
+  if (!familyId.success) return fail();
   const supabase = createAccreditationAdminClient();
   const [family, cycles, activeTemplate] = await Promise.all([
-    supabase.from("accreditation_template_families").select("id, name").eq("id", familyId.data).is("archived_at", null).single(),
+    supabase.from("accreditation_template_families").select(report ? "id,name,checklist_report_key,workflow_mode" : "id,name").eq("id", familyId.data).is("archived_at", null).single(),
     supabase.from("academic_years").select("id,label,starts_on,ends_on,academic_terms(id,label,starts_on,ends_on)").order("starts_on", { ascending: false }),
-    supabase.from("accreditation_templates").select("id").eq("template_family_id", familyId.data).eq("is_active", true).single(),
+    supabase.from("accreditation_templates").select(report ? "id,analysis" : "id").eq("template_family_id", familyId.data).eq("is_active", true).single(),
   ]);
-  if (family.error || !family.data || cycles.error || !cycles.data?.length || activeTemplate.error || !activeTemplate.data) redirect("/accreditation/templates?result=start_error");
+  if (family.error || !family.data || cycles.error || !cycles.data?.length || activeTemplate.error || !activeTemplate.data) return fail();
+  if (report && (family.data.checklist_report_key !== report.key || family.data.workflow_mode !== "legacy" || !Array.isArray(activeTemplate.data.analysis?.fields))) return fail();
   const today = new Date().toISOString().slice(0, 10);
-  const cycle = ((cycles.data as Array<Record<string, unknown>>).find((item) => String(item.starts_on) <= today && String(item.ends_on) >= today) ?? cycles.data[0]) as Record<string, unknown>;
-  const terms = (Array.isArray((cycle as Record<string, unknown>).academic_terms) ? (cycle as Record<string, unknown>).academic_terms : []) as Array<Record<string, unknown>>;
-  const term = (requestedTerm ? terms.find((item) => String(item.id) === requestedTerm) ?? null : terms.find((item) => String(item.starts_on) <= today && String(item.ends_on) >= today) ?? null);
+  type Period = { id: string; label: string; starts_on: string; ends_on: string };
+  const years = cycles.data as (Period & { academic_terms: Period[] })[];
+  const current = (period: Period) => period.starts_on <= today && period.ends_on >= today;
+  const cycle = report ? findChecklistAcademicYear(years) : years.find(current) ?? years[0];
+  if (!cycle) return fail();
+  const terms = cycle.academic_terms ?? [];
+  const term = requestedTerm ? terms.find((item) => item.id === requestedTerm) : report ? undefined : terms.find(current);
+  if (report && requestedTerm && !term) return fail();
   let existingQuery = supabase.from("accreditation_runs").select("id").eq("template_family_id", familyId.data).eq("cycle_id", cycle.id).neq("status", "approved");
   existingQuery = term ? existingQuery.eq("term_id", term.id) : existingQuery.is("term_id", null);
   const existing = await existingQuery.maybeSingle();
@@ -535,10 +563,16 @@ export async function startTemplateSubmission(formData: FormData) {
     report_key: null,
     cycle_id: cycle.id,
     term_id: term?.id ?? null,
-    title: `${cycle.label} ${family.data.name}`.slice(0, 160),
+    title: (report ? report.title : `${cycle.label} ${family.data.name}`).slice(0, 160),
     created_by: userId,
   }).select("id").single();
-  if (inserted.error) redirect("/accreditation/templates?result=start_error");
+  if (inserted.error) {
+    if (inserted.error.code === "23505") {
+      const raced = await existingQuery.maybeSingle();
+      if (raced.data) redirect(reportPath(raced.data.id));
+    }
+    return fail();
+  }
   await supabase.from("accreditation_run_working_state").insert({ run_id: inserted.data.id, draft: { fields: {} }, readiness: { ready: false, missing: [] }, updated_by: userId });
   revalidatePath("/accreditation", "layout");
   redirect(reportPath(inserted.data.id));

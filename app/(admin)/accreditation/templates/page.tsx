@@ -2,23 +2,15 @@ import { requireAppAccess, hasAppAccess } from "@/lib/reimbursements/auth";
 import { DeleteSavedForm } from "../delete-saved-form";
 import { Button } from "@/components/brand/button";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
+import { TEMPLATE_RESULT_MESSAGES } from "@/lib/accreditation/template-results";
 import { startTemplateSubmission, uploadTemplate } from "../actions";
 import { PdfTemplateViewer } from "./pdf-template-viewer";
+import { TemplateUploadFields } from "./template-upload-fields";
 
 export const dynamic = "force-dynamic";
 
 const RESULT_MESSAGES: Record<string, string> = {
-  invalid: "Give the form a name and choose a supported template file.",
-  invalid_file: "The template could not be opened. Use a valid, unencrypted PDF, DOCX, or XLSX file up to 25 MB.",
-  invalid_example: "The example could not be opened. Use a valid PDF, DOCX, or XLSX file up to 25 MB.",
-  example_format_mismatch: "The blank template and example must use the same file format.",
-  template_ai_not_configured: "Template analysis is not configured. Add the accreditation AI credentials before retrying.",
-  template_ai_temporarily_unavailable: "The AI provider is temporarily busy. Wait a moment and retry.",
-  template_analysis_failed: "The form was not ready for use. Upload a fresh export or retry the analysis.",
-  template_storage_failed: "The original form could not be saved. Retry the upload.",
-  template_ready: "Template ready. Start a submission whenever you are ready.",
-  template_uploaded: "Template ready. Start a submission whenever you are ready.",
-  template_confirmed: "Template ready. Start a submission whenever you are ready.",
+  ...TEMPLATE_RESULT_MESSAGES,
   start_error: "A submission could not be started. Create an academic year first, then retry.",
 };
 
@@ -58,22 +50,13 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
         <p className="page-lede">Save each official form once. Generate a fresh draft using chapter guidance and prior submissions, adjust the details, and download the completed file.</p>
       </section>
 
-      {params.result && RESULT_MESSAGES[params.result] ? <p className={`form-message ${["template_ready", "template_uploaded", "template_confirmed"].includes(params.result) ? "success" : ""}`} role="status">{RESULT_MESSAGES[params.result]}</p> : null}
+      {typeof params.result === "string" && Object.hasOwn(RESULT_MESSAGES, params.result) ? <p className={`form-message ${["template_ready", "template_uploaded", "template_confirmed"].includes(params.result) ? "success" : ""}`} role="status">{RESULT_MESSAGES[params.result]}</p> : null}
 
       <section className="grid gap-5 lg:grid-cols-[330px_1fr]">
         <div className="card">
           <div className="card-header"><span className="card-title">Add a form</span></div>
           <form action={uploadTemplate} className="card-body border-t border-rule form-stack">
-            <label className="field-label">Template name<input className="field-input" name="templateName" placeholder="Big Brother Contract" required /></label>
-            <label className="field-label">Blank PDF, DOCX, or XLSX<input className="file-input mt-1" type="file" name="file" accept=".pdf,.docx,.xlsx" required /></label>
-            <details className="border-t border-rule pt-3">
-              <summary className="cursor-pointer text-sm font-bold text-brand">Optional guidance</summary>
-              <div className="mt-3 form-stack">
-                <label className="field-label">What should the assistant know?<textarea className="field-textarea min-h-24" name="guidance" placeholder="Terminology, ordinary defaults, or how this form is used." /></label>
-                <label className="field-label">Completed example<input className="file-input mt-1" type="file" name="example" accept=".pdf,.docx,.xlsx" /><span className="field-hint">Used for structure, tone, and comparison when creating a different version for this year.</span></label>
-              </div>
-            </details>
-            <Button type="submit">Save template</Button>
+            <TemplateUploadFields />
           </form>
           <div className="border-t border-rule p-4 space-y-2">
             {families.length ? families.map((family: Record<string, unknown>) => {

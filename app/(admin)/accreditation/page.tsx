@@ -55,7 +55,7 @@ export default async function AccreditationDashboard({ searchParams }: { searchP
         editable={hasAppAccess(session, "accreditation", "write")}
         unavailable={Boolean(checklistResult.error)}
       />
-      <section className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <section id="academic-year" className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="card"><div className="card-header"><span className="card-title">Academic year</span></div><div className="card-body border-t border-rule">
           {cycles.length ? <div className="flex flex-wrap gap-2">{cycles.map((cycle: Record<string, unknown>) => <Link key={String(cycle.id)} href={`/accreditation?cycle=${cycle.id}`} className={`px-4 py-2 text-sm font-bold ${selectedCycle?.id === cycle.id ? "bg-brand text-white" : "bg-canvas text-muted hover:text-ink"}`}>{String(cycle.label)}</Link>)}</div> : <p className="text-sm text-muted">Create the first academic year to begin.</p>}
           {selectedCycle ? <div className="mt-5 grid gap-3 sm:grid-cols-3"><div className="border border-rule p-4"><p className="text-xs font-bold uppercase tracking-wide text-muted">Evidence ready</p><p className="mt-1 text-2xl font-bold">{readySources}</p></div><div className="border border-rule p-4"><p className="text-xs font-bold uppercase tracking-wide text-muted">Document types</p><p className="mt-1 text-2xl font-bold">{families.length}</p></div><div className="border border-rule p-4"><p className="text-xs font-bold uppercase tracking-wide text-muted">Approved</p><p className="mt-1 text-2xl font-bold">{cycleRuns.filter((run: Record<string, unknown>) => run.status === "approved").length}</p></div></div> : null}

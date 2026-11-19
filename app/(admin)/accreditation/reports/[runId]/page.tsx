@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/brand/button";
 import { getReportDefinition } from "@/lib/accreditation/definitions";
+import { checklistReportPath, getChecklistReport } from "@/lib/accreditation/submission-checklist";
 import { createAccreditationAdminClient } from "@/lib/accreditation/supabase";
 import type { ReportDraft, TemplateAnalysis } from "@/lib/accreditation/types";
 import type { TemplateChatResult } from "@/lib/accreditation/template-drafting";
@@ -61,7 +62,7 @@ export default async function ReportWorkspace({
       ? templateQuery.eq("id", run.template_id)
       : templateQuery.eq("template_family_id", run.template_family_id).eq("is_active", true);
     const [familyResult, templateResult, messagesResult, stateResult, revisionsResult] = await Promise.all([
-      supabase.from("accreditation_template_families").select("id,name,description").eq("id", run.template_family_id).maybeSingle(),
+      supabase.from("accreditation_template_families").select("id,name,description,checklist_report_key").eq("id", run.template_family_id).maybeSingle(),
       templateQuery.maybeSingle(),
       supabase.from("accreditation_run_messages").select("role,content").eq("run_id", runId).in("role", ["user", "assistant"]).order("created_at", { ascending: true }),
       supabase.from("accreditation_run_working_state").select("draft,readiness,updated_at").eq("run_id", runId).maybeSingle(),
@@ -75,14 +76,17 @@ export default async function ReportWorkspace({
     const family = familyResult.data;
     const template = templateResult.data;
     if (!family || !template) notFound();
+    const checklistReport = getChecklistReport(family.checklist_report_key);
     const analysis = template.analysis as TemplateAnalysis;
     const state = stateResult.data;
     const review = state?.readiness as Partial<TemplateChatResult> | null;
     const draft = (state?.draft as ReportDraft | null) ?? { fields: {} };
     const missing = Array.isArray((state?.readiness as Record<string, unknown> | null)?.missing) ? (state?.readiness as { missing: string[] }).missing : analysis.fields.filter((field) => field.required && field.target && !draft.fields[field.key]?.value).map((field) => field.label);
     const revisionIds = (revisionsResult.data ?? []).map((item: Record<string, unknown>) => String(item.id));
-    const artifactsResult = revisionIds.length ? await supabase.from("accreditation_artifacts").select("id,filename,kind").in("revision_id", revisionIds).order("created_at", { ascending: false }) : { data: [] };
+    if (run.approved_revision_id && !revisionIds.includes(run.approved_revision_id)) revisionIds.push(run.approved_revision_id);
+    const artifactsResult = revisionIds.length ? await supabase.from("accreditation_artifacts").select("id,filename,kind,revision_id").in("revision_id", revisionIds).order("created_at", { ascending: false }) : { data: [] };
     const artifact = artifactsResult.data?.find((item: Record<string, unknown>) => item.kind === "draft") ?? null;
+    const approvedArtifact = artifactsResult.data?.find((item: Record<string, unknown>) => item.kind === "approved" && item.revision_id === run.approved_revision_id) ?? null;
     const messages = (messagesResult.data ?? []).map((item: Record<string, unknown>) => ({ role: item.role as "user" | "assistant", content: String(item.content) }));
     const cycleRelation = Array.isArray(run.academic_years) ? run.academic_years[0] : run.academic_years;
     const termRelation = Array.isArray(run.academic_terms) ? run.academic_terms[0] : run.academic_terms;
@@ -90,7 +94,7 @@ export default async function ReportWorkspace({
       <div className="space-y-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <section>
-            <Link href="/accreditation/templates" className="text-sm font-bold text-brand hover:underline">← Template library</Link>
+            <Link href={checklistReport ? checklistReportPath(checklistReport.key) : "/accreditation/templates"} className="text-sm font-bold text-brand hover:underline">{checklistReport ? "Back to report" : "← Template library"}</Link>
             <p className="page-eyebrow mt-5">{String(cycleRelation?.label ?? "Current academic year")}{termRelation?.label ? ` · ${termRelation.label}` : ""}</p>
             <h1 className="page-title">{String(family.name)}</h1>
             <p className="page-lede">{String(family.description || "Complete this official form through a short conversation.")}</p>
@@ -98,7 +102,7 @@ export default async function ReportWorkspace({
           <span className={`badge mt-8 ${run.status === "ready_for_review" || run.status === "approved" ? "badge-approved" : "badge-pending"}`}>{label(String(run.status))}</span>
         </div>
         {query.result && RESULT_MESSAGES[query.result] ? <p className={`form-message ${query.result === "draft_ready" ? "success" : ""}`} role="status">{RESULT_MESSAGES[query.result]}</p> : null}
-        <TemplateSubmissionChat key={`${runId}:${state?.updated_at ?? "new"}`} runId={runId} initialMessages={messages} initialDraft={draft} initialMissing={missing} initialReady={Boolean(review?.ready) && !missing.length} initialReview={{ warnings: review?.warnings ?? [], sources: review?.sources ?? [], ruleChecks: review?.ruleChecks ?? [] }} fieldLabels={Object.fromEntries(analysis.fields.map((field) => [field.key, field.label]))} status={String(run.status)} draftArtifact={artifact ? { id: String(artifact.id), filename: String(artifact.filename) } : null} />
+        <TemplateSubmissionChat key={`${runId}:${state?.updated_at ?? "new"}`} runId={runId} initialMessages={messages} initialDraft={draft} initialMissing={missing} initialReady={Boolean(review?.ready) && !missing.length} initialReview={{ warnings: review?.warnings ?? [], sources: review?.sources ?? [], ruleChecks: review?.ruleChecks ?? [] }} fieldLabels={Object.fromEntries(analysis.fields.map((field) => [field.key, field.label]))} status={String(run.status)} canWrite={hasAppAccess(session, "accreditation", "write")} draftArtifact={artifact} approvedArtifact={approvedArtifact} reviewRevisionId={checklistReport && artifact?.revision_id === revisionIds[0] ? artifact?.revision_id : undefined} />
       </div>
     );
   }

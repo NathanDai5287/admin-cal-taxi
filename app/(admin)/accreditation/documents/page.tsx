@@ -6,8 +6,10 @@ import { DocumentLibrary } from "./document-library";
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
-export default async function DocumentTypesPage() {
+export default async function DocumentTypesPage({ searchParams }: { searchParams: Promise<{ family?: string; cycle?: string }> }) {
   const session = await requireAppAccess("accreditation");
-  const data = await loadDocumentLibrary() as DocumentLibraryData;
-  return <DocumentLibrary initial={data} canWrite={hasAppAccess(session, "accreditation", "write")} />;
+  const [data, { family, cycle }] = await Promise.all([loadDocumentLibrary() as Promise<DocumentLibraryData>, searchParams]);
+  const selectedFamily = data.families.find((item) => item.id === family)?.id;
+  const selectedYear = data.years.find((item) => item.id === cycle)?.id;
+  return <DocumentLibrary key={`${selectedFamily ?? ""}:${selectedYear ?? ""}`} initial={data} initialFamilyId={selectedFamily} initialYearId={selectedYear} canWrite={hasAppAccess(session, "accreditation", "write")} />;
 }

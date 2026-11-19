@@ -27,3 +27,16 @@ export const SUBMISSION_CHECKLIST_REPORTS = [
   { key: "risk-management-review", title: "Theta Xi Risk Managment Review" },
   { key: "member-initiation-reporting", title: "Member Initiation Reporting" },
 ] as const;
+
+export function getChecklistReport(key: unknown) {
+  return SUBMISSION_CHECKLIST_REPORTS.find((report) => report.key === key);
+}
+
+export function checklistReportPath(key: string) {
+  return `/accreditation/checklist/${key}`;
+}
+
+export function findChecklistAcademicYear<T extends { starts_on: string; ends_on: string }>(years: T[]) {
+  const [start, end] = SUBMISSION_CHECKLIST_YEAR.split("-");
+  return years.find((year) => year.starts_on.startsWith(`${start}-`) && year.ends_on.startsWith(`${end}-`));
+}

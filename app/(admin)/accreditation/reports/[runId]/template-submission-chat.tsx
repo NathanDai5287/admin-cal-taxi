@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/brand/button";
-import { clearTemplateConversation, generateTemplateSubmission, sendTemplateMessage } from "../../actions";
+import { approveReport, clearTemplateConversation, generateTemplateSubmission, sendTemplateMessage } from "../../actions";
 import type { DraftField } from "@/lib/accreditation/types";
 import type { TemplateChatResult, TemplateSourceSummary } from "@/lib/accreditation/template-drafting";
 
@@ -18,7 +18,10 @@ export function TemplateSubmissionChat({
   initialReview,
   fieldLabels,
   status,
+  canWrite,
   draftArtifact,
+  approvedArtifact,
+  reviewRevisionId,
 }: {
   runId: string;
   initialMessages: ChatItem[];
@@ -28,7 +31,10 @@ export function TemplateSubmissionChat({
   initialReview: Pick<TemplateChatResult, "warnings" | "sources" | "ruleChecks">;
   fieldLabels: Record<string, string>;
   status: string;
+  canWrite: boolean;
   draftArtifact: { id: string; filename: string } | null;
+  approvedArtifact: { id: string; filename: string } | null;
+  reviewRevisionId?: string;
 }) {
   const [messages, setMessages] = useState<ChatItem[]>(initialMessages);
   const [draft, setDraft] = useState(initialDraft);
@@ -39,7 +45,7 @@ export function TemplateSubmissionChat({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const end = useRef<HTMLDivElement>(null);
-  const busy = pending || status === "drafting" || status === "approved";
+  const busy = pending || !canWrite || status === "drafting" || status === "approved";
   const resolvedCount = useMemo(() => Object.values(draft.fields).filter((field) => field.value).length, [draft]);
   const generatedCount = useMemo(() => Object.values(draft.fields).filter((field) => field.value && field.provenance === "generated").length, [draft]);
   const sourceDocuments = useMemo(() => [...new Map(review.sources.map((source) => [`${source.kind}:${source.sourceId ?? source.title}`, source])).values()], [review.sources]);
@@ -113,7 +119,28 @@ export function TemplateSubmissionChat({
           {sourceDocuments.length ? <details><summary className="cursor-pointer text-sm font-bold text-brand">Sources consulted ({sourceDocuments.length})</summary><ul className="mt-3 space-y-3 text-sm">{sourceDocuments.map((source) => <li key={source.ref}>{sourceHref(source) ? <a className="font-bold text-brand underline" href={sourceHref(source)}>{source.title}</a> : <span className="font-bold">{source.title}</span>}<span className="mt-1 block text-xs text-muted">{source.kind.replaceAll("_", " ")}</span></li>)}</ul></details> : null}
           {review.ruleChecks.length ? <details><summary className="cursor-pointer text-sm font-bold text-brand">Rules applied ({review.ruleChecks.length})</summary><ul className="mt-3 space-y-3 text-sm leading-relaxed">{review.ruleChecks.map((check, index) => <li key={`${check.ref}-${index}`}><p>{check.application}</p><blockquote className="mt-1 text-xs text-muted">“{check.quote}”</blockquote><p className="mt-1 text-xs text-muted">{review.sources.find((source) => source.ref === check.ref)?.title}</p></li>)}</ul></details> : null}
         </div></section> : null}
-        <section className="card"><div className="card-header"><span className="card-title">Completed file</span></div><div className="card-body border-t border-rule space-y-3"><form action={generateTemplateSubmission}><input type="hidden" name="runId" value={runId} /><Button type="submit" className="w-full" disabled={!ready || busy}>{draftArtifact ? "Generate updated form" : "Generate completed form"}</Button></form>{draftArtifact ? <a className="block text-center text-sm font-bold text-brand underline" href={`/api/accreditation/artifacts/${draftArtifact.id}`}>Download last generated {draftArtifact.filename.split(".").pop()?.toUpperCase()}</a> : null}<p className="text-xs leading-relaxed text-muted">Generation creates a downloadable draft. Review and archive it separately when it is ready.</p></div></section>
+        <section className="card">
+          <div className="card-header"><span className="card-title">Completed file</span></div>
+          <div className="card-body space-y-3 border-t border-rule pt-3">
+            {approvedArtifact ? (
+              <a className="text-sm font-bold text-brand underline" href={`/api/accreditation/artifacts/${approvedArtifact.id}`}>Download approved form</a>
+            ) : (
+              <>
+                {canWrite && status !== "approved" && <form action={generateTemplateSubmission}><input type="hidden" name="runId" value={runId} /><Button type="submit" className="w-full" disabled={!ready || busy}>{draftArtifact ? "Generate updated form" : "Generate completed form"}</Button></form>}
+                {draftArtifact && <a className="block text-center text-sm font-bold text-brand underline" href={`/api/accreditation/artifacts/${draftArtifact.id}`}>Download last generated {draftArtifact.filename.split(".").pop()?.toUpperCase()}</a>}
+                {canWrite && status === "ready_for_review" && reviewRevisionId && (
+                  <form action={approveReport} className="space-y-3 border-t border-rule pt-3">
+                    <input type="hidden" name="runId" value={runId} />
+                    <input type="hidden" name="revisionId" value={reviewRevisionId} />
+                    <label className="check-row"><input type="checkbox" name="reviewed" required disabled={busy} /><span>I’ve reviewed the generated form.</span></label>
+                    <Button type="submit" variant="secondary" className="w-full" disabled={busy}>Approve and archive</Button>
+                  </form>
+                )}
+                {!draftArtifact && <p className="text-xs leading-relaxed text-muted">The generated form will appear here for review.</p>}
+              </>
+            )}
+          </div>
+        </section>
         <form action={clearTemplateConversation}><input type="hidden" name="runId" value={runId} /><button className="text-xs font-bold text-muted hover:text-warn" type="submit" disabled={busy}>Clear conversation</button></form>
       </aside>
     </div>
