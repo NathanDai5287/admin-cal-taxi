@@ -12,8 +12,7 @@ export const chatHistorySchema = z.array(z.object({
 })).max(MAX_CHAT_HISTORY_MESSAGES);
 
 export const chatIntentSchema = z.object({
-  needs_policy: z.boolean(),
-  needs_source_catalog: z.boolean(),
+  route: z.enum(["library", "inventory", "attachment_only", "text_edit"]),
   search_query: z.string().trim().max(1_000),
 });
 
