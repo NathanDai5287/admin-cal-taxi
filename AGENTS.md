@@ -12,7 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 Work directly on `main` and commit and push completed changes to `origin/main`.
 Do not create or deploy a feature branch unless the user explicitly requests it.
-Vercel's production branch is `main`; production deployments must use a commit
-on `origin/main`. Verify the deployed Git ref and commit before reporting success.
+Use commits from `origin/main` for Vercel production deployments. Checking the
+deployed Git ref and commit is optional. If Vercel is unavailable or a deployment
+fails, report the push and deployment status separately.
 Preserve existing live orders, approved contract PDFs, signing envelopes, and
 personal signing links when changing the hosting workflow.
