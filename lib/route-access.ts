@@ -11,7 +11,6 @@ const ROUTE_ACCESS: Record<string, RouteAccess> = {
   "/taxi-icon.png": "public",
   "/fonts": "public",
   "/site": "public",
-  "/demo": "public",
   "/public-site": "public",
   "/connect": "public",
   "/auth": "public",

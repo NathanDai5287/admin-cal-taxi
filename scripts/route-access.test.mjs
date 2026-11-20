@@ -29,7 +29,8 @@ test("unknown and private paths are not public", () => {
   assert.deepEqual(routeAccess("/finance/planning"), ["finance"]);
   assert.deepEqual(routeAccess("/api/accreditation/ask/stream"), ["ask-policy"]);
   assert.equal(routeAccess("/"), "signed-in");
-  assert.equal(routeAccess("/demo"), "public");
+  assert.equal(routeAccess("/demo"), undefined);
+  assert.equal(routeAccess("/demo/sample"), undefined);
 });
 
 const MASTER_KEY_FILES = new Set(["lib/reimbursements/supabase/admin.ts", "lib/mcp/server.ts", "lib/venue-inquiries.ts"]);

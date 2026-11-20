@@ -32,8 +32,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `ProtectedShell`, and nested feature layouts supply navigation and access
   checks where needed.
 - `reimbursements.cal.taxi` serves the member submission workflow from
-  `app/submit/`. The `/demo` route lives in `app/demo/` and uses fictional,
-  browser-local data. See [docs/demo.md](docs/demo.md) for its isolation rules.
+  `app/submit/`.
 - [app/layout.tsx](app/layout.tsx) defines the shared document shell, loads
   global styles, and initializes the theme. Start with the nearest nested
   layout when changing navigation or page framing for one surface.
