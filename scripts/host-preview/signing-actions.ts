@@ -1,12 +1,13 @@
 import { read, write } from "./data";
 import type { SigningActivation, SigningRevision } from "../../lib/host-signing";
+import type { ContractSigner } from "../../lib/host-state-model";
 
 export async function listSigningAction(id: string) { return read().revisions[id] ?? []; }
-export async function prepareSigningAction(orderId: string, payload: any, _key: string, expectedLatest: string) {
+export async function prepareSigningAction(orderId: string, payload: { signers?: Pick<ContractSigner, "fullName" | "email">[] }, _key: string, expectedLatest: string) {
   const data = read(); const rows = data.revisions[orderId] ?? [];
   if ((rows[0]?.id ?? "") !== expectedLatest) throw new Error("Signing history changed. Reload the sample order.");
   const revision: SigningRevision = { id: `sig_local_${crypto.randomUUID().slice(0, 8)}`, order_id: orderId, revision: (rows[0]?.revision ?? 0) + 1, state: "preview", original_sha256: "local-preview", envelope_id: null, signedCount: 0, totalCount: payload.signers?.length ?? 0, files: { original: true, completed: false, audit: false }, error: null, created_at: new Date().toISOString(),
-    recipients: (payload.signers ?? []).map((person: any, index: number) => ({ id: index + 1, name: person.fullName, email: person.email, status: "NOT_SIGNED", link: "" })) };
+    recipients: (payload.signers ?? []).map((person, index) => ({ id: index + 1, name: person.fullName, email: person.email, status: "NOT_SIGNED", link: "" })) };
   data.revisions[orderId] = [revision, ...rows]; write(data); return revision;
 }
 export async function createSigningLinksAction(orderId: string, id: string, _hash: string, activation: SigningActivation) {

@@ -11,10 +11,10 @@ const modules = new Map();
 function load(name) {
   const filename = path.resolve(root, name.endsWith(".ts") ? name : name + ".ts");
   if (modules.has(filename)) return modules.get(filename).exports;
-  const module = { exports: {} }; modules.set(filename, module);
+  const loaded = { exports: {} }; modules.set(filename, loaded);
   const code = ts.transpileModule(fs.readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename })(specifier => load(path.relative(root, path.resolve(path.dirname(filename), specifier))), module, module.exports);
-  return module.exports;
+  vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename })(specifier => load(path.relative(root, path.resolve(path.dirname(filename), specifier))), loaded, loaded.exports);
+  return loaded.exports;
 }
 function storage() {
   const values = new Map();
