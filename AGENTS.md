@@ -53,6 +53,34 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   In the handoff, name the reference screen and report any checks you could
   not run.
 
+## Local verification
+
+- Start the app with `npm run dev`. Use `localhost:3000` for admin tools,
+  `cal.localhost:3000` for the public site, and `reimbursements.localhost:3000`
+  for member reimbursement submission.
+- Use `npm run preview:host` to exercise the Host components with sample
+  orders and simulated signing. See [the Host preview guide](docs/host-local-preview.md).
+- Run the affected `test:*` scripts from [package.json](package.json) and
+  `npm run lint` for code changes. Run `npm run build` for changes to routing,
+  shared layouts, dependencies, or build configuration.
+
+## Permissions
+
+- When adding or moving a page or endpoint, check the matching prefix in
+  [lib/route-access.ts](lib/route-access.ts) and the app's `none`, `read`, and
+  `write` levels in [lib/app-access.ts](lib/app-access.ts).
+- Enforce write access in server actions and route handlers. Reuse the access
+  helpers in [lib/reimbursements/auth.ts](lib/reimbursements/auth.ts) for
+  session-based access checks. Verify the changed workflow with read and write
+  access, and check that View As blocks writes where applicable.
+
+## Database changes
+
+- Add schema changes in a new Supabase migration. Test against representative
+  existing records and check affected access policies when permissions change.
+- If app code depends on a migration, record the rollout order before pushing
+  to `main`. Account for Vercel deploying while the migration is still pending.
+
 ## Git and production deployments
 
 Work directly on `main` and commit and push completed changes to `origin/main`.
