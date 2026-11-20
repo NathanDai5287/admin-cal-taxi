@@ -8,6 +8,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## UI consistency
+
+- Before editing UI, identify the closest existing screen for the same workflow
+  on the same surface. For the public site, follow [DESIGN.md](DESIGN.md). For
+  signed-in tools, use the reference screen and its shared components and
+  styles. Shared theme tokens live in [app/brand.css](app/brand.css).
+- Reuse the reference screen's page layout, spacing, typography, and patterns
+  for actions, forms, tables, and status feedback. Search `components/` and the
+  relevant route group before introducing a new component or style.
+- Before wrapping up, compare the changed screen with the reference in a browser
+  at desktop and narrow widths and in light and dark themes where supported.
+  Exercise the changed workflow and relevant loading, empty, and error states.
+  In the handoff, name the reference screen and report any checks you could
+  not run.
+
 ## Git and production deployments
 
 Work directly on `main` and commit and push completed changes to `origin/main`.
